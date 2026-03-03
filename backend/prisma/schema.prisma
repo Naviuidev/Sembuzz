@@ -1,0 +1,809 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// SUPER ADMIN MODULE
+// ============================================
+
+model SuperAdmin {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String // hashed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  queries SuperAdminQuery[]
+
+  @@map("super_admins")
+}
+
+// ============================================
+// SCHOOL MANAGEMENT
+// ============================================
+
+model School {
+  id        String   @id @default(uuid())
+  refNum    String   @unique // unique, immutable reference number
+  name      String
+  country   String?
+  state     String?
+  city      String
+  domain    String? // Domain name of the school (e.g., school.edu)
+  image     String? // URL or path to school image
+  tenure    Int? // Tenure in months
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  admins                SchoolAdmin[]
+  adsAdmins             AdsAdmin[]
+  features              SchoolFeature[]
+  categories            Category[]
+  categoryAdmins        CategoryAdmin[]
+  subCategoryAdmins     SubCategoryAdmin[]
+  users                 User[]
+  categoryAdminQueries  CategoryAdminQuery[]
+  events                Event[]
+  schoolAdminToCategoryAdminQueries SchoolAdminToCategoryAdminQuery[]
+  schoolAdminToSubCategoryAdminQueries SchoolAdminToSubCategoryAdminQuery[]
+  subCategoryAdminToSchoolAdminQueries SubCategoryAdminToSchoolAdminQuery[]
+  userHelpQueries                    UserHelpQuery[]
+  schoolSocialAccounts               SchoolSocialAccount[]
+  upcomingPosts                      UpcomingPost[]
+  bannerAds                          BannerAd[]
+  sponsoredAds                       SponsoredAd[]
+
+  @@map("schools")
+}
+
+model SchoolAdmin {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  password     String // hashed (temporary initially)
+  schoolId     String
+  isActive     Boolean  @default(true)
+  isFirstLogin Boolean  @default(true) // Track if password has been changed
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  school            School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  queries           Query[]
+  queriesToCategoryAdmins    SchoolAdminToCategoryAdminQuery[]
+  queriesToSubCategoryAdmins SchoolAdminToSubCategoryAdminQuery[]
+  passwordResetOtps PasswordResetOtp[]
+
+  @@map("school_admins")
+}
+
+// Ads Admin: manages banner and sponsored ads for a school (when school has Ads feature)
+model AdsAdmin {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  password     String // hashed (temporary initially)
+  schoolId     String
+  isActive     Boolean  @default(true)
+  isFirstLogin Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  school             School                    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  passwordResetOtps  AdsAdminPasswordResetOtp[]
+  bannerAds          BannerAd[]
+  sponsoredAds       SponsoredAd[]
+
+  @@map("ads_admins")
+}
+
+model AdsAdminPasswordResetOtp {
+  id           String   @id @default(uuid())
+  adsAdminId   String
+  otp          String   @db.VarChar(6)
+  expiresAt    DateTime @db.DateTime(3)
+  isUsed       Boolean  @default(false)
+  createdAt    DateTime @default(now()) @db.DateTime(3)
+
+  adsAdmin AdsAdmin @relation(fields: [adsAdminId], references: [id], onDelete: Cascade)
+
+  @@index([adsAdminId])
+  @@index([otp, isUsed])
+  @@map("ads_admin_password_reset_otps")
+}
+
+// ============================================
+// FEATURE MANAGEMENT
+// ============================================
+
+model Feature {
+  id        String   @id @default(uuid())
+  code      String   @unique // NEWS, EVENTS, ADS, INSTAGRAM, ANALYTICS, EMERGENCY
+  name      String
+  createdAt DateTime @default(now())
+
+  // Relations
+  schoolFeatures SchoolFeature[]
+
+  @@map("features")
+}
+
+model SchoolFeature {
+  id        String   @id @default(uuid())
+  schoolId  String
+  featureId String
+  isEnabled Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  feature Feature @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, featureId])
+  @@map("school_features")
+}
+
+// ============================================
+// QUERIES/HELP SYSTEM
+// ============================================
+
+model Query {
+  id             String    @id @default(uuid())
+  schoolAdminId  String
+  type           String // 'dev_support', 'features_not_working', 'schedule_meeting', 'custom_message'
+  meetingType    String? // 'google_meet', 'zoom' (only for schedule_meeting)
+  date           DateTime? // Meeting date (only for schedule_meeting)
+  timeSlot       String? // Meeting time slot (only for schedule_meeting)
+  timeZone       String? // Time zone (only for schedule_meeting)
+  meetingLink    String? // Google Meet or Zoom link (only for schedule_meeting)
+  status         String    @default("pending") // 'pending', 'resolved', 'in_progress', 'responded'
+  description    String? // Message / additional details
+  attachmentUrl  String? // Optional document attachment URL
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  schoolAdmin SchoolAdmin @relation(fields: [schoolAdminId], references: [id], onDelete: Cascade)
+
+  @@map("queries")
+}
+
+model PasswordResetOtp {
+  id            String   @id @default(uuid())
+  schoolAdminId String
+  otp           String   @db.VarChar(6)
+  expiresAt     DateTime @db.DateTime(3)
+  isUsed        Boolean  @default(false)
+  createdAt     DateTime @default(now()) @db.DateTime(3)
+
+  schoolAdmin SchoolAdmin @relation(fields: [schoolAdminId], references: [id], onDelete: Cascade)
+
+  @@index([schoolAdminId])
+  @@index([otp, isUsed])
+  @@map("password_reset_otps")
+}
+
+model SuperAdminQuery {
+  id            String    @id @default(uuid())
+  superAdminId  String
+  type          String // 'raise_issue', 'integrate_feature', 'ui_change', 'upscale_platform', 'custom_message', 'schedule_meeting'
+  meetingType   String? // 'google_meet', 'zoom' (only for schedule_meeting)
+  meetingDate   DateTime? // Meeting date (only for schedule_meeting)
+  timeZone      String? // Time zone (only for schedule_meeting)
+  timeSlot      String? // Meeting time slot (only for schedule_meeting)
+  meetingLink   String? // Google Meet or Zoom link (only for schedule_meeting)
+  description   String? // Additional details
+  customMessage String? // Custom message content
+  status        String   @default("pending") // 'pending', 'resolved', 'in_progress', 'responded'
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  superAdmin SuperAdmin @relation(fields: [superAdminId], references: [id], onDelete: Cascade)
+
+  @@index([superAdminId])
+  @@index([status])
+  @@map("super_admin_queries")
+}
+
+// School admin → Category admins (of same school)
+model SchoolAdminToCategoryAdminQuery {
+  id             String    @id @default(uuid())
+  schoolAdminId  String
+  schoolId       String
+  type           String
+  meetingType    String?
+  date           DateTime?
+  timeSlot       String?
+  timeZone       String?
+  meetingLink    String?
+  description    String?
+  attachmentUrl  String?
+  status         String    @default("pending")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  schoolAdmin    SchoolAdmin @relation(fields: [schoolAdminId], references: [id], onDelete: Cascade)
+  school         School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  @@index([schoolId])
+  @@index([schoolAdminId])
+  @@map("school_admin_to_category_admin_queries")
+}
+
+// School admin → Subcategory admins (of same school)
+model SchoolAdminToSubCategoryAdminQuery {
+  id             String    @id @default(uuid())
+  schoolAdminId  String
+  schoolId       String
+  type           String
+  meetingType    String?
+  date           DateTime?
+  timeSlot       String?
+  timeZone       String?
+  meetingLink    String?
+  description    String?
+  attachmentUrl  String?
+  status         String    @default("pending")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  schoolAdmin    SchoolAdmin @relation(fields: [schoolAdminId], references: [id], onDelete: Cascade)
+  school         School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  @@index([schoolId])
+  @@index([schoolAdminId])
+  @@map("school_admin_to_sub_category_admin_queries")
+}
+
+// Category admin → Subcategory admins (of same category)
+model CategoryAdminToSubCategoryAdminQuery {
+  id              String    @id @default(uuid())
+  categoryAdminId String
+  categoryId      String
+  type            String
+  meetingType     String?
+  meetingDate     DateTime?
+  timeSlot        String?
+  timeZone        String?
+  meetingLink     String?
+  description     String?
+  attachmentUrl   String?
+  status          String    @default("pending")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  categoryAdmin   CategoryAdmin @relation(fields: [categoryAdminId], references: [id], onDelete: Cascade)
+  category        Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  @@index([categoryId])
+  @@index([categoryAdminId])
+  @@map("category_admin_to_sub_category_admin_queries")
+}
+
+// Subcategory admin → School admin
+model SubCategoryAdminToSchoolAdminQuery {
+  id                 String    @id @default(uuid())
+  subCategoryAdminId String
+  schoolId           String
+  type               String
+  meetingType        String?
+  meetingDate        DateTime?
+  timeSlot           String?
+  timeZone           String?
+  meetingLink        String?
+  description        String?
+  attachmentUrl      String?
+  status             String    @default("pending")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  subCategoryAdmin   SubCategoryAdmin @relation(fields: [subCategoryAdminId], references: [id], onDelete: Cascade)
+  school             School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  @@index([schoolId])
+  @@index([subCategoryAdminId])
+  @@map("sub_category_admin_to_school_admin_queries")
+}
+
+// Category admin → Super admin
+model CategoryAdminToSuperAdminQuery {
+  id              String    @id @default(uuid())
+  categoryAdminId String
+  type            String
+  meetingType     String?
+  meetingDate     DateTime?
+  timeSlot        String?
+  timeZone        String?
+  meetingLink     String?
+  description     String?
+  customMessage   String?
+  attachmentUrl   String?
+  status          String    @default("pending")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  categoryAdmin   CategoryAdmin @relation(fields: [categoryAdminId], references: [id], onDelete: Cascade)
+  @@index([categoryAdminId])
+  @@map("category_admin_to_super_admin_queries")
+}
+
+// Subcategory admin → Super admin
+model SubCategoryAdminToSuperAdminQuery {
+  id                 String    @id @default(uuid())
+  subCategoryAdminId String
+  type               String
+  meetingType        String?
+  meetingDate        DateTime?
+  timeSlot           String?
+  timeZone           String?
+  meetingLink        String?
+  description        String?
+  customMessage      String?
+  attachmentUrl      String?
+  status             String    @default("pending")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  subCategoryAdmin   SubCategoryAdmin @relation(fields: [subCategoryAdminId], references: [id], onDelete: Cascade)
+  @@index([subCategoryAdminId])
+  @@map("sub_category_admin_to_super_admin_queries")
+}
+
+// ============================================
+// CATEGORIES MANAGEMENT
+// ============================================
+
+model Category {
+  id        String   @id @default(uuid())
+  schoolId  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  school                  School                  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subcategories           SubCategory[]
+  categoryAdmins          CategoryAdmin[]         @relation("CategoryAdminPrimaryCategory")
+  categoryAdminCategories CategoryAdminCategory[] @relation("CategoryAdminCategories")
+  subCategoryAdmins       SubCategoryAdmin[]
+  categoryAdminToSubCategoryAdminQueries CategoryAdminToSubCategoryAdminQuery[]
+  upcomingPosts                          UpcomingPost[]
+
+  @@map("categories")
+}
+
+model SubCategory {
+  id         String   @id @default(uuid())
+  categoryId String
+  name       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  category                      Category                      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  subCategoryAdmins             SubCategoryAdmin[]            @relation("SubCategoryAdminPrimarySubCategory")
+  subCategoryAdminSubCategories SubCategoryAdminSubCategory[] @relation("SubCategoryAdminSubCategories")
+  events                        Event[]
+  upcomingPosts                 UpcomingPost[]
+
+  @@map("sub_categories")
+}
+
+// ============================================
+// CATEGORY ADMIN MANAGEMENT
+// ============================================
+
+model CategoryAdmin {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  password     String // hashed (temporary initially)
+  categoryId   String // Keep for backward compatibility
+  schoolId     String
+  isActive     Boolean  @default(true)
+  isFirstLogin Boolean  @default(true) // Track if password has been changed
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  category          Category                        @relation("CategoryAdminPrimaryCategory", fields: [categoryId], references: [id], onDelete: Cascade)
+  school            School                          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  passwordResetOtps   CategoryAdminPasswordResetOtp[]
+  categories          CategoryAdminCategory[] // Many-to-many relationship
+  categoryAdminQueries CategoryAdminQuery[] // Queries raised by this admin to school admin
+  queriesToSubCategoryAdmins CategoryAdminToSubCategoryAdminQuery[]
+  queriesToSuperAdmins CategoryAdminToSuperAdminQuery[]
+  bannerAds                BannerAd[]
+  sponsoredAds             SponsoredAd[]
+
+  @@map("category_admins")
+}
+
+model CategoryAdminCategory {
+  id              String   @id @default(uuid())
+  categoryAdminId String
+  categoryId      String
+  createdAt       DateTime @default(now())
+
+  // Relations
+  categoryAdmin CategoryAdmin @relation(fields: [categoryAdminId], references: [id], onDelete: Cascade)
+  category      Category      @relation("CategoryAdminCategories", fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryAdminId, categoryId])
+  @@map("category_admin_categories")
+}
+
+model CategoryAdminPasswordResetOtp {
+  id              String   @id @default(uuid())
+  categoryAdminId String
+  otp             String   @db.VarChar(6)
+  expiresAt       DateTime @db.DateTime(3)
+  isUsed          Boolean  @default(false)
+  createdAt       DateTime @default(now()) @db.DateTime(3)
+
+  categoryAdmin CategoryAdmin @relation(fields: [categoryAdminId], references: [id], onDelete: Cascade)
+
+  @@index([categoryAdminId])
+  @@index([otp, isUsed])
+  @@map("category_admin_password_reset_otps")
+}
+
+// ============================================
+// SUBCATEGORY ADMIN MANAGEMENT
+// ============================================
+
+model SubCategoryAdmin {
+  id            String   @id @default(uuid())
+  name          String
+  email         String   @unique
+  password      String // hashed (temporary initially)
+  subCategoryId String // Keep for backward compatibility
+  categoryId    String
+  schoolId      String
+  isActive      Boolean  @default(true)
+  isFirstLogin  Boolean  @default(true) // Track if password has been changed
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  subCategory       SubCategory                        @relation("SubCategoryAdminPrimarySubCategory", fields: [subCategoryId], references: [id], onDelete: Cascade)
+  category          Category                           @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  school            School                             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  passwordResetOtps SubCategoryAdminPasswordResetOtp[]
+  subCategories     SubCategoryAdminSubCategory[] // Many-to-many relationship
+  events            Event[]
+  queries           SubCategoryAdminQuery[]
+  queriesToSchoolAdmins SubCategoryAdminToSchoolAdminQuery[]
+  queriesToSuperAdmins SubCategoryAdminToSuperAdminQuery[]
+
+  @@map("sub_category_admins")
+}
+
+model SubCategoryAdminSubCategory {
+  id                 String   @id @default(uuid())
+  subCategoryAdminId String
+  subCategoryId      String
+  createdAt          DateTime @default(now())
+
+  // Relations
+  subCategoryAdmin SubCategoryAdmin @relation(fields: [subCategoryAdminId], references: [id], onDelete: Cascade)
+  subCategory      SubCategory      @relation("SubCategoryAdminSubCategories", fields: [subCategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([subCategoryAdminId, subCategoryId])
+  @@map("sub_category_admin_sub_categories")
+}
+
+model SubCategoryAdminPasswordResetOtp {
+  id                 String   @id @default(uuid())
+  subCategoryAdminId String
+  otp                String   @db.VarChar(6)
+  expiresAt          DateTime @db.DateTime(3)
+  isUsed             Boolean  @default(false)
+  createdAt          DateTime @default(now()) @db.DateTime(3)
+
+  subCategoryAdmin SubCategoryAdmin @relation(fields: [subCategoryAdminId], references: [id], onDelete: Cascade)
+
+  @@index([subCategoryAdminId])
+  @@index([otp, isUsed])
+  @@map("sub_category_admin_password_reset_otps")
+}
+
+// Queries raised by subcategory admin → visible to category admin (POC)
+model SubCategoryAdminQuery {
+  id                 String    @id @default(uuid())
+  subCategoryAdminId  String
+  type                String   // 'custom_message', 'schedule_meeting'
+  description         String?
+  attachmentUrl       String?
+  meetingType         String?
+  meetingDate         DateTime? // Meeting date (only for schedule_meeting)
+  timeZone            String?
+  timeSlot            String?
+  meetingLink         String? // Google Meet or Zoom link (only for schedule_meeting)
+  status              String   @default("pending") // 'pending', 'responded'
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  subCategoryAdmin SubCategoryAdmin @relation(fields: [subCategoryAdminId], references: [id], onDelete: Cascade)
+
+  @@index([subCategoryAdminId])
+  @@index([status])
+  @@map("sub_category_admin_queries")
+}
+
+// Queries raised by category admin → visible to school admin (POC)
+model CategoryAdminQuery {
+  id              String    @id @default(uuid())
+  categoryAdminId String
+  schoolId        String
+  type            String   // 'custom_message', 'schedule_meeting'
+  description     String?
+  attachmentUrl   String?
+  meetingType     String?
+  meetingDate     DateTime? // Meeting date (only for schedule_meeting)
+  timeZone        String?
+  timeSlot        String?
+  meetingLink     String? // Google Meet or Zoom link (only for schedule_meeting)
+  status          String   @default("pending") // 'pending', 'responded'
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  categoryAdmin CategoryAdmin @relation(fields: [categoryAdminId], references: [id], onDelete: Cascade)
+  school        School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([categoryAdminId])
+  @@index([schoolId])
+  @@index([status])
+  @@map("category_admin_queries")
+}
+
+// ============================================
+// EVENTS (subcategory admin posts for approval)
+// ============================================
+
+model Event {
+  id                 String   @id @default(uuid())
+  subCategoryAdminId String
+  subCategoryId      String
+  categoryId         String
+  schoolId           String
+  title              String
+  description        String?  @db.Text
+  externalLink       String?  @db.VarChar(500)
+  commentsEnabled    Boolean  @default(true)
+  imageUrls          String?  @db.Text // JSON array of image URLs
+  status             String   @default("pending") // pending | approved | reverted
+  revertNotes        String?  @db.Text // Category admin feedback when reverted
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  school             School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subCategoryAdmin   SubCategoryAdmin   @relation(fields: [subCategoryAdminId], references: [id], onDelete: Cascade)
+  subCategory        SubCategory        @relation(fields: [subCategoryId], references: [id], onDelete: Cascade)
+  likes              EventLike[]
+  comments           EventComment[]
+  savedBy            UserSavedEvent[]
+
+  @@index([subCategoryAdminId])
+  @@index([subCategoryId])
+  @@index([status])
+  @@index([schoolId])
+  @@map("events")
+}
+
+model EventLike {
+  id        String   @id @default(uuid())
+  eventId   String
+  userId    String
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+  @@index([userId])
+  @@map("event_likes")
+}
+
+model EventComment {
+  id        String   @id @default(uuid())
+  eventId   String
+  userId    String
+  text      String   @db.Text
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([userId])
+  @@map("event_comments")
+}
+
+model UserSavedEvent {
+  id        String   @id @default(uuid())
+  userId    String
+  eventId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@index([userId])
+  @@index([eventId])
+  @@map("user_saved_events")
+}
+
+// Upcoming / scheduled news by school admin (no approval; visible on scheduledTo date)
+model UpcomingPost {
+  id             String   @id @default(uuid())
+  schoolId       String
+  categoryId     String
+  subCategoryId  String
+  title          String   @db.VarChar(500)
+  description    String?  @db.Text
+  imageUrls      String?  @db.Text // JSON array of URLs
+  scheduledTo    DateTime @db.Date // mandatory: date when post is visible
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  school      School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  category    Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  subCategory SubCategory @relation(fields: [subCategoryId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([scheduledTo])
+  @@map("upcoming_posts")
+}
+
+// Banner ads: created by Category Admin or Ads Admin. Shown at bottom of news feed between startAt and endAt.
+model BannerAd {
+  id              String   @id @default(uuid())
+  categoryAdminId String?  // set when created by category admin
+  adsAdminId      String?  // set when created by ads admin (school has Ads feature)
+  categoryId      String?  // optional when created by ads admin
+  schoolId        String
+  imageUrl        String   @db.VarChar(1000)
+  externalLink    String?  @db.VarChar(1000)
+  startAt         DateTime @db.DateTime(3)
+  endAt           DateTime @db.DateTime(3)
+  createdAt       DateTime @default(now())
+
+  categoryAdmin CategoryAdmin?  @relation(fields: [categoryAdminId], references: [id], onDelete: Cascade)
+  adsAdmin      AdsAdmin?       @relation(fields: [adsAdminId], references: [id], onDelete: Cascade)
+  school        School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  events        BannerAdEvent[]
+
+  @@index([schoolId])
+  @@index([startAt])
+  @@index([endAt])
+  @@map("banner_ads")
+}
+
+model BannerAdEvent {
+  id         String   @id @default(uuid())
+  bannerAdId String
+  eventType  String   @db.VarChar(20) // 'view' | 'click'
+  createdAt  DateTime @default(now())
+
+  bannerAd BannerAd @relation(fields: [bannerAdId], references: [id], onDelete: Cascade)
+
+  @@index([bannerAdId])
+  @@index([createdAt])
+  @@map("banner_ad_events")
+}
+
+// Sponsored ads: created by Category Admin or Ads Admin. Same UI as news, light blue bg, "Ad" badge.
+model SponsoredAd {
+  id              String   @id @default(uuid())
+  categoryAdminId String?  // set when created by category admin
+  adsAdminId      String?  // set when created by ads admin
+  categoryId      String?  // optional when created by ads admin
+  schoolId        String
+  title           String?  @db.VarChar(500)
+  description     String?  @db.Text
+  imageUrls       String?  @db.Text // JSON array of URLs (max 4)
+  externalLink    String?  @db.VarChar(1000)
+  startAt         DateTime @db.DateTime(3)
+  endAt           DateTime @db.DateTime(3)
+  createdAt       DateTime @default(now())
+
+  categoryAdmin CategoryAdmin?  @relation(fields: [categoryAdminId], references: [id], onDelete: Cascade)
+  adsAdmin      AdsAdmin?       @relation(fields: [adsAdminId], references: [id], onDelete: Cascade)
+  school        School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  events        SponsoredAdEvent[]
+
+  @@index([schoolId])
+  @@index([startAt])
+  @@index([endAt])
+  @@map("sponsored_ads")
+}
+
+model SponsoredAdEvent {
+  id           String   @id @default(uuid())
+  sponsoredAdId String
+  eventType   String   @db.VarChar(20) // 'view' | 'click'
+  createdAt   DateTime @default(now())
+
+  sponsoredAd SponsoredAd @relation(fields: [sponsoredAdId], references: [id], onDelete: Cascade)
+
+  @@index([sponsoredAdId])
+  @@index([createdAt])
+  @@map("sponsored_ad_events")
+}
+
+// ============================================
+// PUBLIC USER (Student / Parent - website login)
+// ============================================
+
+model User {
+  id                  String    @id @default(uuid())
+  name                String    // full name (firstName + lastName) for display
+  firstName           String?
+  lastName            String?
+  profilePicUrl       String?   // optional profile picture URL
+  email               String    @unique
+  password            String    // hashed
+  schoolId            String
+  registrationMethod  String?   // 'school_domain' | 'gmail'
+  status              String    @default("active") // 'pending_otp' | 'pending_approval' | 'active' | 'rejected'
+  verificationDocUrl       String?   // for gmail: uploaded school doc (ID card, fee receipt, etc.)
+  additionalVerificationDocUrl String?   // optional second doc when admin asks for "one more"
+  otp                 String?   // one-time password for school domain verification
+  otpExpiresAt        DateTime? @db.DateTime(3)
+  approvalEmailVerifiedAt DateTime? @db.DateTime(3) // set when user clicks verify link after admin approval (gmail flow)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  school         School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  eventLikes     EventLike[]
+  eventComments  EventComment[]
+  savedEvents    UserSavedEvent[]
+  helpQueries    UserHelpQuery[]
+
+  @@index([schoolId])
+  @@index([email])
+  @@index([status])
+  @@map("users")
+}
+
+model UserHelpQuery {
+  id        String   @id @default(uuid())
+  userId    String
+  schoolId  String
+  message   String   @db.Text
+  status    String   @default("open") // open | replied | closed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([userId])
+  @@map("user_help_queries")
+}
+
+model SchoolSocialAccount {
+  id            String   @id @default(uuid())
+  schoolId      String
+  platformId    String   // e.g. instagram, facebook
+  platformName  String   // e.g. Instagram, Facebook
+  pageName      String   // e.g. Sports Club, Academics Club
+  icon          String   // e.g. bi-instagram
+  link          String   @db.VarChar(1000)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@map("school_social_accounts")
+}
