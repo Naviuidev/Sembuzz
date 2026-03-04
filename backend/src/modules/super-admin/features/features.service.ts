@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateFeatureDto } from '../dto/create-feature.dto';
 import { UpdateFeatureDto } from '../dto/update-feature.dto';
@@ -8,9 +8,18 @@ export class FeaturesService {
   constructor(private prisma: PrismaService) {}
 
   async findAll() {
-    return this.prisma.feature.findMany({
-      orderBy: { createdAt: 'asc' },
-    });
+    try {
+      return await this.prisma.feature.findMany({
+        orderBy: { createdAt: 'asc' },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[SuperAdmin Features] findAll error:', message, err);
+      throw new HttpException(
+        { statusCode: 500, message: 'Failed to load features' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   async findByCode(code: string) {
