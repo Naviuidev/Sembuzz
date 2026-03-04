@@ -29,7 +29,7 @@ export interface SchoolAdminUser {
   refNum: string;
   isFirstLogin: boolean;
   features: Array<{ code: string; name: string }>;
-  schoolDomain?: string; // School domain for email validation
+  schoolDomain?: string | null; // School domain for email validation (API may return null)
 }
 
 export interface ChangePasswordDto {

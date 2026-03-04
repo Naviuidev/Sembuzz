@@ -7,7 +7,7 @@ export const SchoolAdminForgotPassword = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
-  const [emailMask, setEmailMask] = useState('');
+  const [, setEmailMask] = useState('');
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {

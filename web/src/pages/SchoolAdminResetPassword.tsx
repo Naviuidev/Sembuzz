@@ -5,8 +5,8 @@ import { api } from '../config/api';
 export const SchoolAdminResetPassword = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [refNum, setRefNum] = useState(location.state?.refNum || '');
-  const [otp, setOtp] = useState(location.state?.otp || '');
+  const [refNum] = useState(location.state?.refNum || '');
+  const [otp] = useState(location.state?.otp || '');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);

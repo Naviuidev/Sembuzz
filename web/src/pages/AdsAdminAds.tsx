@@ -5,8 +5,6 @@ import { adsAdminBannerAdsService } from '../services/ads-admin-banner-ads.servi
 import { adsAdminSponsoredAdsService } from '../services/ads-admin-sponsored-ads.service';
 import { cstDatetimeLocalStringToUTC } from '../utils/cst-date';
 
-const MAX_SPONSORED_IMAGES = 4;
-
 export const AdsAdminAds = () => {
   const [showBannerForm, setShowBannerForm] = useState(false);
   const [showSponsoredForm, setShowSponsoredForm] = useState(false);

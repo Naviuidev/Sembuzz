@@ -3084,24 +3084,7 @@ export const PublicEvents = () => {
                       All
                     </button>
                   )}
-                  {homeContentCategories.map((cat: CategoryPublic, idx: number) => {
-                    // Different light bg colors per category: light blue, light green, light red, light yellow, light purple, etc.
-                    const lightBgColors = [
-                      'rgba(13, 202, 240, 0.2)',   // light blue (info)
-                      'rgba(25, 135, 84, 0.2)',   // light green (success)
-                      'rgba(220, 53, 69, 0.18)',  // light red (danger)
-                      'rgba(255, 193, 7, 0.25)',  // light yellow (warning)
-                      'rgba(111, 66, 193, 0.18)', // light purple (secondary)
-                      'rgba(253, 126, 20, 0.2)',  // light orange
-                      'rgba(32, 201, 151, 0.2)',  // light teal
-                      'rgba(214, 51, 132, 0.18)', // light pink
-                      'rgba(13, 110, 253, 0.18)', // light primary blue
-                      'rgba(108, 117, 125, 0.18)', // light gray
-                    ];
-                    const textColors = ['#087990', '#198754', '#dc3545', '#997404', '#6f42c1', '#fd7e14', '#20c997', '#d63384', '#0d6efd', '#6c757d'];
-                    const colorIndex = idx % lightBgColors.length;
-                    const bgColor = lightBgColors[colorIndex];
-                    const textColor = textColors[colorIndex];
+                  {homeContentCategories.map((cat: CategoryPublic) => {
                     const hasSelection = selectedSubCategoryIds.some((id: string) =>
                       cat.subcategories.some((s: { id: string }) => s.id === id),
                     );

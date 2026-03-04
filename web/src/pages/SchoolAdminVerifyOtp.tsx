@@ -5,7 +5,7 @@ import { api } from '../config/api';
 export const SchoolAdminVerifyOtp = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [refNum, setRefNum] = useState(location.state?.refNum || '');
+  const [refNum] = useState(location.state?.refNum || '');
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
