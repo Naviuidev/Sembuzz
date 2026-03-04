@@ -7,8 +7,13 @@ import { UpdateBannerAdDto } from './dto/update-banner-ad.dto';
 export class AdsAdminBannerAdsService {
   constructor(private prisma: PrismaService) {}
 
+  /** Cast so generated delegates (adsAdmin, bannerAd.adsAdminId) are accepted; run `npx prisma generate` so runtime client matches. */
+  private get client() {
+    return this.prisma as any;
+  }
+
   private async getSchoolId(adsAdminId: string): Promise<string | null> {
-    const admin = await this.prisma.adsAdmin.findUnique({
+    const admin = await this.client.adsAdmin.findUnique({
       where: { id: adsAdminId },
       select: { schoolId: true },
     });
@@ -25,7 +30,7 @@ export class AdsAdminBannerAdsService {
       throw new ForbiddenException('End date/time must be after start date/time');
     }
 
-    return this.prisma.bannerAd.create({
+    return this.client.bannerAd.create({
       data: {
         adsAdminId,
         schoolId,
@@ -39,7 +44,7 @@ export class AdsAdminBannerAdsService {
   }
 
   async listByAdsAdmin(adsAdminId: string) {
-    return this.prisma.bannerAd.findMany({
+    return this.client.bannerAd.findMany({
       where: { adsAdminId },
       orderBy: { createdAt: 'desc' },
       select: { id: true, imageUrl: true, externalLink: true, startAt: true, endAt: true, createdAt: true },
@@ -49,7 +54,7 @@ export class AdsAdminBannerAdsService {
   async getAnalytics(adsAdminId: string, dateFrom?: string, dateTo?: string, bannerAdId?: string) {
     const whereAd: { adsAdminId: string; id?: string } = { adsAdminId };
     if (bannerAdId) whereAd.id = bannerAdId;
-    const ads = await this.prisma.bannerAd.findMany({
+    const ads = await this.client.bannerAd.findMany({
       where: whereAd,
       select: { id: true, imageUrl: true, externalLink: true, startAt: true, endAt: true },
       orderBy: { createdAt: 'desc' },
@@ -65,7 +70,7 @@ export class AdsAdminBannerAdsService {
         lte: new Date(dateTo + 'T23:59:59.999Z'),
       };
     }
-    const events = await this.prisma.bannerAdEvent.findMany({
+    const events = await this.client.bannerAdEvent.findMany({
       where: eventWhere,
       select: { bannerAdId: true, eventType: true, createdAt: true },
     });
@@ -96,7 +101,7 @@ export class AdsAdminBannerAdsService {
   }
 
   async updateSchedule(adsAdminId: string, bannerAdId: string, dto: UpdateBannerAdDto) {
-    const ad = await this.prisma.bannerAd.findFirst({
+    const ad = await this.client.bannerAd.findFirst({
       where: { id: bannerAdId, adsAdminId },
     });
     if (!ad) throw new ForbiddenException('Banner ad not found');
@@ -105,7 +110,7 @@ export class AdsAdminBannerAdsService {
     if (endAt <= startAt) {
       throw new ForbiddenException('End date/time must be after start date/time');
     }
-    return this.prisma.bannerAd.update({
+    return this.client.bannerAd.update({
       where: { id: bannerAdId },
       data: {
         startAt,
@@ -116,19 +121,19 @@ export class AdsAdminBannerAdsService {
   }
 
   async endNow(adsAdminId: string, bannerAdId: string) {
-    const ad = await this.prisma.bannerAd.findFirst({
+    const ad = await this.client.bannerAd.findFirst({
       where: { id: bannerAdId, adsAdminId },
     });
     if (!ad) throw new ForbiddenException('Banner ad not found');
     const now = new Date();
-    return this.prisma.bannerAd.update({
+    return this.client.bannerAd.update({
       where: { id: bannerAdId },
       data: { endAt: now },
     });
   }
 
   async remove(adsAdminId: string, bannerAdId: string) {
-    const ad = await this.prisma.bannerAd.findFirst({
+    const ad = await this.client.bannerAd.findFirst({
       where: { id: bannerAdId, adsAdminId },
     });
     if (!ad) throw new ForbiddenException('Banner ad not found');
@@ -136,7 +141,7 @@ export class AdsAdminBannerAdsService {
     if (now >= ad.startAt && now <= ad.endAt) {
       throw new ForbiddenException('Cannot delete an active ad. Set the ad to inactive first, then you can delete it.');
     }
-    await this.prisma.bannerAd.delete({ where: { id: bannerAdId } });
+    await this.client.bannerAd.delete({ where: { id: bannerAdId } });
     return { deleted: true };
   }
 }

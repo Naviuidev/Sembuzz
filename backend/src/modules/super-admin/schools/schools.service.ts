@@ -15,6 +15,11 @@ export class SchoolsService {
     private emailService: EmailService,
   ) {}
 
+  /** Cast so generated delegate (adsAdmin) is accepted; run `npx prisma generate` so runtime client matches. */
+  private get client() {
+    return this.prisma as any;
+  }
+
   async generateRefNum(): Promise<string> {
     // Generate unique reference number: SB-YYYYMMDD-XXXXXX
     const prefix = 'SB';
@@ -75,7 +80,7 @@ export class SchoolsService {
 
     // If Ads feature: check Ads Admin email is not already used
     if (hasAdsFeature && adsAdminEmail) {
-      const existingAdsAdmin = await this.prisma.adsAdmin.findUnique({
+      const existingAdsAdmin = await this.client.adsAdmin.findUnique({
         where: { email: adsAdminEmail.trim() },
       });
       if (existingAdsAdmin) {
@@ -180,7 +185,7 @@ export class SchoolsService {
         // If Ads feature: create Ads Admin for this school
         let adsAdmin: any = undefined;
         if (hasAdsFeature && adsAdminEmail && hashedAdsPassword) {
-          adsAdmin = await tx.adsAdmin.create({
+          adsAdmin = await (tx as any).adsAdmin.create({
             data: {
               name: adsAdminName!,
               email: adsAdminEmail.trim(),

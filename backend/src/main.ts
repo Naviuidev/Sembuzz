@@ -10,9 +10,13 @@ async function bootstrap() {
   // Serve uploaded files (e.g. query attachments)
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads/' });
 
-  // Enable CORS with proper configuration
+  // CORS: use env in production (e.g. CORS_ORIGIN=https://sembuzz.com,https://www.sembuzz.com)
+  const corsOrigin = process.env.CORS_ORIGIN;
+  const origins = corsOrigin
+    ? corsOrigin.split(',').map((o) => o.trim()).filter(Boolean)
+    : ['http://localhost:5173', 'http://localhost:3000'];
   app.enableCors({
-    origin: ['http://localhost:5173', 'http://localhost:3000'],
+    origin: origins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

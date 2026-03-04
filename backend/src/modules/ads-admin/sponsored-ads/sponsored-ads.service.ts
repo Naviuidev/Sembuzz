@@ -7,8 +7,13 @@ import { UpdateSponsoredAdDto } from './dto/update-sponsored-ad.dto';
 export class AdsAdminSponsoredAdsService {
   constructor(private prisma: PrismaService) {}
 
+  /** Cast so generated delegates (adsAdmin, sponsoredAd.adsAdminId) are accepted; run `npx prisma generate` so runtime client matches. */
+  private get client() {
+    return this.prisma as any;
+  }
+
   private async getSchoolId(adsAdminId: string): Promise<string | null> {
-    const admin = await this.prisma.adsAdmin.findUnique({
+    const admin = await this.client.adsAdmin.findUnique({
       where: { id: adsAdminId },
       select: { schoolId: true },
     });
@@ -22,7 +27,7 @@ export class AdsAdminSponsoredAdsService {
     const endAt = new Date(dto.endAt);
     if (endAt <= startAt) throw new ForbiddenException('End date/time must be after start date/time');
     const imageUrls = dto.imageUrls?.trim() || null;
-    return this.prisma.sponsoredAd.create({
+    return this.client.sponsoredAd.create({
       data: {
         adsAdminId,
         schoolId,
@@ -38,7 +43,7 @@ export class AdsAdminSponsoredAdsService {
   }
 
   async listByAdsAdmin(adsAdminId: string) {
-    return this.prisma.sponsoredAd.findMany({
+    return this.client.sponsoredAd.findMany({
       where: { adsAdminId },
       orderBy: { createdAt: 'desc' },
       select: { id: true, title: true, description: true, imageUrls: true, externalLink: true, startAt: true, endAt: true, createdAt: true },
@@ -48,7 +53,7 @@ export class AdsAdminSponsoredAdsService {
   async getAnalytics(adsAdminId: string, dateFrom?: string, dateTo?: string, sponsoredAdId?: string) {
     const whereAd: { adsAdminId: string; id?: string } = { adsAdminId };
     if (sponsoredAdId) whereAd.id = sponsoredAdId;
-    const ads = await this.prisma.sponsoredAd.findMany({
+    const ads = await this.client.sponsoredAd.findMany({
       where: whereAd,
       select: { id: true, title: true, imageUrls: true, externalLink: true, startAt: true, endAt: true },
       orderBy: { createdAt: 'desc' },
@@ -62,7 +67,7 @@ export class AdsAdminSponsoredAdsService {
         lte: new Date(dateTo + 'T23:59:59.999Z'),
       };
     }
-    const events = await this.prisma.sponsoredAdEvent.findMany({
+    const events = await this.client.sponsoredAdEvent.findMany({
       where: eventWhere,
       select: { sponsoredAdId: true, eventType: true, createdAt: true },
     });
@@ -93,12 +98,12 @@ export class AdsAdminSponsoredAdsService {
   }
 
   async updateSchedule(adsAdminId: string, id: string, dto: UpdateSponsoredAdDto) {
-    const ad = await this.prisma.sponsoredAd.findFirst({ where: { id, adsAdminId } });
+    const ad = await this.client.sponsoredAd.findFirst({ where: { id, adsAdminId } });
     if (!ad) throw new ForbiddenException('Sponsored ad not found');
     const startAt = new Date(dto.startAt);
     const endAt = new Date(dto.endAt);
     if (endAt <= startAt) throw new ForbiddenException('End date/time must be after start date/time');
-    return this.prisma.sponsoredAd.update({
+    return this.client.sponsoredAd.update({
       where: { id },
       data: {
         startAt,
@@ -112,19 +117,19 @@ export class AdsAdminSponsoredAdsService {
   }
 
   async endNow(adsAdminId: string, id: string) {
-    const ad = await this.prisma.sponsoredAd.findFirst({ where: { id, adsAdminId } });
+    const ad = await this.client.sponsoredAd.findFirst({ where: { id, adsAdminId } });
     if (!ad) throw new ForbiddenException('Sponsored ad not found');
-    return this.prisma.sponsoredAd.update({ where: { id }, data: { endAt: new Date() } });
+    return this.client.sponsoredAd.update({ where: { id }, data: { endAt: new Date() } });
   }
 
   async remove(adsAdminId: string, id: string) {
-    const ad = await this.prisma.sponsoredAd.findFirst({ where: { id, adsAdminId } });
+    const ad = await this.client.sponsoredAd.findFirst({ where: { id, adsAdminId } });
     if (!ad) throw new ForbiddenException('Sponsored ad not found');
     const now = new Date();
     if (now >= ad.startAt && now <= ad.endAt) {
       throw new ForbiddenException('Cannot delete an active ad. Set the ad to inactive first, then you can delete it.');
     }
-    await this.prisma.sponsoredAd.delete({ where: { id } });
+    await this.client.sponsoredAd.delete({ where: { id } });
     return { deleted: true };
   }
 }
