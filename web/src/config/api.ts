@@ -1,7 +1,17 @@
 import axios from 'axios';
 
-// Always use backend URL so API requests go to the backend; avoids proxy conflicting with SPA routes (e.g. /super-admin/schools/new)
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// Backend API URL: from build-time env, or runtime fallback when served from production domain
+function getApiBaseUrl(): string {
+  const fromEnv = import.meta.env.VITE_API_URL;
+  if (fromEnv && fromEnv.trim()) return fromEnv.trim().replace(/\/$/, '');
+  if (typeof window !== 'undefined') {
+    const origin = window.location.origin;
+    if (origin === 'https://sembuzz.com' || origin === 'https://www.sembuzz.com') return 'https://api.sembuzz.com';
+  }
+  return 'http://localhost:3000';
+}
+
+const API_BASE_URL = getApiBaseUrl();
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

@@ -3571,7 +3571,16 @@ export const PublicEvents = () => {
             <p className="mt-2 mb-0" style={{ color: '#6c757d' }}>Loading…</p>
           </div>
         ) : error ? (
-          <div className="alert alert-danger" style={{ borderRadius: '8px' }}>Failed to load events.</div>
+          <div className="alert alert-danger d-flex align-items-center justify-content-between flex-wrap gap-2" style={{ borderRadius: '8px' }}>
+            <span>Failed to load events. Check that the API is reachable and CORS allows this site.</span>
+            <button
+              type="button"
+              className="btn btn-outline-danger btn-sm"
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['public', 'events', 'approved'] })}
+            >
+              Retry
+            </button>
+          </div>
         ) : feedItems.length === 0 ? (
           <div className="card border-0 shadow-sm" style={{ borderRadius: '12px' }}>
             <div className="card-body text-center py-5 px-4">

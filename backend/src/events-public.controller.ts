@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Query, Param } from '@nestjs/common';
+import { Controller, Get, Post, Query, Param, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
 
 @Controller('events')
@@ -37,26 +37,34 @@ export class EventsPublicController {
         : {}),
     };
 
-    // Debug: log counts so we can see if approved events exist in DB
-    const [totalEvents, approvedCount, list] = await Promise.all([
-      this.prisma.event.count(),
-      this.prisma.event.count({ where: { status: 'approved' } }),
-      this.prisma.event.findMany({
-        where,
-        include: {
-          school: { select: { name: true, image: true } },
-          subCategory: { select: { id: true, name: true } },
-        },
-        orderBy: { updatedAt: 'desc' },
-        take: 500,
-      }),
-    ]);
-    console.log(
-      `[Events] GET /events/approved${sid ? ` schoolId=${sid}` : ' (all schools)'}: ` +
-        `returning ${list.length}, DB has ${approvedCount} approved / ${totalEvents} total events`,
-    );
-
-    return list;
+    try {
+      // Debug: log counts so we can see if approved events exist in DB
+      const [totalEvents, approvedCount, list] = await Promise.all([
+        this.prisma.event.count(),
+        this.prisma.event.count({ where: { status: 'approved' } }),
+        this.prisma.event.findMany({
+          where,
+          include: {
+            school: { select: { name: true, image: true } },
+            subCategory: { select: { id: true, name: true } },
+          },
+          orderBy: { updatedAt: 'desc' },
+          take: 500,
+        }),
+      ]);
+      console.log(
+        `[Events] GET /events/approved${sid ? ` schoolId=${sid}` : ' (all schools)'}: ` +
+          `returning ${list.length}, DB has ${approvedCount} approved / ${totalEvents} total events`,
+      );
+      return list;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[Events] GET /events/approved error:', message, err);
+      throw new HttpException(
+        { statusCode: 500, message: 'Failed to load approved events' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   /** Upcoming/scheduled posts by date (school admin created). Public, no auth. date=YYYY-MM-DD. Visible when date equals scheduledTo. */
