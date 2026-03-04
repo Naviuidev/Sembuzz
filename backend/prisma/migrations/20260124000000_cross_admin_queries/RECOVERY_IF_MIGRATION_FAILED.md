@@ -20,6 +20,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS `school_admin_to_category_admin_queries`;
 DROP TABLE IF EXISTS `school_admin_to_sub_category_admin_queries`;
 DROP TABLE IF EXISTS `category_admin_to_sub_category_admin_queries`;
+DROP TABLE IF EXISTS `sub_category_admin_to_school_admin_queries`;
 SET FOREIGN_KEY_CHECKS = 1;
 ```
 

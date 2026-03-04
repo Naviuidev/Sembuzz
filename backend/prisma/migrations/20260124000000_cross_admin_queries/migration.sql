@@ -61,7 +61,7 @@ CREATE TABLE `category_admin_to_sub_category_admin_queries` (
     INDEX `category_admin_to_sub_category_admin_queries_categoryAdminId_idx`(`categoryAdminId`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- CreateTable
+-- CreateTable (indexes added separately for MariaDB compatibility)
 CREATE TABLE `sub_category_admin_to_school_admin_queries` (
     `id` VARCHAR(191) NOT NULL,
     `subCategoryAdminId` VARCHAR(191) NOT NULL,
@@ -77,10 +77,10 @@ CREATE TABLE `sub_category_admin_to_school_admin_queries` (
     `status` VARCHAR(191) NOT NULL DEFAULT 'pending',
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
-    PRIMARY KEY (`id`),
-    INDEX `sca2sa_queries_schoolId_idx`(`schoolId`),
-    INDEX `sca2sa_queries_subCatAdminId_idx`(`subCategoryAdminId`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    PRIMARY KEY (`id`)
+) DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE INDEX `sca2sa_queries_schoolId_idx` ON `sub_category_admin_to_school_admin_queries`(`schoolId`);
+CREATE INDEX `sca2sa_queries_subCatAdminId_idx` ON `sub_category_admin_to_school_admin_queries`(`subCategoryAdminId`);
 
 -- CreateTable
 CREATE TABLE `category_admin_to_super_admin_queries` (
