@@ -1,6 +1,22 @@
-# Recovery: migration failed (identifier too long)
+# Recovery: migration failed (identifier too long / syntax near PRIMARY KEY)
 
-If this migration failed on MySQL with "Identifier name ... is too long", do the following **on the VPS** (after pulling the fixed migration).
+If this migration failed with "Identifier name ... is too long" or "syntax ... near 'PRIMARY KEY'", do the following **on the VPS**.
+
+## 0. Pull latest code and verify (required)
+
+```bash
+cd /var/www/Sembuzz
+git pull origin main
+```
+
+Confirm the migration file is updated: the first line should mention MariaDB, and there must be no `DEFAULT CHARACTER SET` (use `DEFAULT CHARSET`):
+
+```bash
+head -1 backend/prisma/migrations/20260124000000_cross_admin_queries/migration.sql
+grep -c "DEFAULT CHARSET" backend/prisma/migrations/20260124000000_cross_admin_queries/migration.sql
+```
+
+You should see "MariaDB-compatible" and the grep count should be **5** or more. If you see `DEFAULT CHARACTER SET` in the file, the pull did not update the file; fix that before continuing.
 
 ## 1. Mark the migration as rolled back
 

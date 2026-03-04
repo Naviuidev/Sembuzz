@@ -1,3 +1,4 @@
+-- MariaDB-compatible (DEFAULT CHARSET, short index names)
 -- CreateTable
 CREATE TABLE `school_admin_to_category_admin_queries` (
     `id` VARCHAR(191) NOT NULL,
@@ -17,7 +18,7 @@ CREATE TABLE `school_admin_to_category_admin_queries` (
     PRIMARY KEY (`id`),
     INDEX `school_admin_to_category_admin_queries_schoolId_idx`(`schoolId`),
     INDEX `school_admin_to_category_admin_queries_schoolAdminId_idx`(`schoolAdminId`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+) DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
 CREATE TABLE `school_admin_to_sub_category_admin_queries` (
@@ -38,7 +39,7 @@ CREATE TABLE `school_admin_to_sub_category_admin_queries` (
     PRIMARY KEY (`id`),
     INDEX `school_admin_to_sub_category_admin_queries_schoolId_idx`(`schoolId`),
     INDEX `school_admin_to_sub_category_admin_queries_schoolAdminId_idx`(`schoolAdminId`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+) DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
 CREATE TABLE `category_admin_to_sub_category_admin_queries` (
@@ -59,7 +60,7 @@ CREATE TABLE `category_admin_to_sub_category_admin_queries` (
     PRIMARY KEY (`id`),
     INDEX `category_admin_to_sub_category_admin_queries_categoryId_idx`(`categoryId`),
     INDEX `category_admin_to_sub_category_admin_queries_categoryAdminId_idx`(`categoryAdminId`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+) DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable (indexes added separately for MariaDB compatibility)
 CREATE TABLE `sub_category_admin_to_school_admin_queries` (
@@ -100,7 +101,7 @@ CREATE TABLE `category_admin_to_super_admin_queries` (
     `updatedAt` DATETIME(3) NOT NULL,
     PRIMARY KEY (`id`),
     INDEX `category_admin_to_super_admin_queries_categoryAdminId_idx`(`categoryAdminId`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+) DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
 CREATE TABLE `sub_category_admin_to_super_admin_queries` (
@@ -120,7 +121,7 @@ CREATE TABLE `sub_category_admin_to_super_admin_queries` (
     `updatedAt` DATETIME(3) NOT NULL,
     PRIMARY KEY (`id`),
     INDEX `sca2super_queries_subCatAdminId_idx`(`subCategoryAdminId`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+) DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- AddForeignKey
 ALTER TABLE `school_admin_to_category_admin_queries` ADD CONSTRAINT `school_admin_to_category_admin_queries_schoolAdminId_fkey` FOREIGN KEY (`schoolAdminId`) REFERENCES `school_admins`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
