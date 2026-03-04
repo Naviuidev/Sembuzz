@@ -22,6 +22,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx src/scripts/seed-features.ts",
     "seed:super-admin": "tsx src/scripts/seed-super-admin.ts",
+    "seed:all": "tsx src/scripts/seed-all.ts",
     "list:super-admins": "tsx src/scripts/list-super-admins.ts",
     "db:create": "ts-node src/scripts/create-database.ts",
     "db:event-tables": "ts-node src/scripts/run-event-engagement-tables.ts",
