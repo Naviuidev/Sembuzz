@@ -8,7 +8,7 @@ CREATE TABLE `ads_admins` (
     `name` VARCHAR(255) NOT NULL,
     `email` VARCHAR(255) NOT NULL,
     `password` VARCHAR(255) NOT NULL,
-    `schoolId` VARCHAR(36) NOT NULL,
+    `schoolId` VARCHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
     `isActive` BOOLEAN NOT NULL DEFAULT true,
     `isFirstLogin` BOOLEAN NOT NULL DEFAULT true,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -16,7 +16,7 @@ CREATE TABLE `ads_admins` (
     PRIMARY KEY (`id`),
     UNIQUE INDEX `ads_admins_email_key`(`email`),
     INDEX `ads_admins_schoolId_idx`(`schoolId`)
-) DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 ALTER TABLE `ads_admins` ADD CONSTRAINT `ads_admins_schoolId_fkey` FOREIGN KEY (`schoolId`) REFERENCES `schools`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -30,6 +30,6 @@ CREATE TABLE `ads_admin_password_reset_otps` (
     PRIMARY KEY (`id`),
     INDEX `ads_admin_password_reset_otps_adsAdminId_idx`(`adsAdminId`),
     INDEX `ads_admin_password_reset_otps_otp_isUsed_idx`(`otp`, `isUsed`)
-) DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 ALTER TABLE `ads_admin_password_reset_otps` ADD CONSTRAINT `ads_admin_password_reset_otps_adsAdminId_fkey` FOREIGN KEY (`adsAdminId`) REFERENCES `ads_admins`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
