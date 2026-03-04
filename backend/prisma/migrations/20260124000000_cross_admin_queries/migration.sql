@@ -2,8 +2,8 @@
 -- CreateTable
 CREATE TABLE `school_admin_to_category_admin_queries` (
     `id` VARCHAR(191) NOT NULL,
-    `schoolAdminId` VARCHAR(191) NOT NULL,
-    `schoolId` VARCHAR(191) NOT NULL,
+    `schoolAdminId` VARCHAR(36) NOT NULL,
+    `schoolId` VARCHAR(36) NOT NULL,
     `type` VARCHAR(191) NOT NULL,
     `meetingType` VARCHAR(191) NULL,
     `date` DATETIME(3) NULL,
@@ -23,8 +23,8 @@ CREATE TABLE `school_admin_to_category_admin_queries` (
 -- CreateTable
 CREATE TABLE `school_admin_to_sub_category_admin_queries` (
     `id` VARCHAR(191) NOT NULL,
-    `schoolAdminId` VARCHAR(191) NOT NULL,
-    `schoolId` VARCHAR(191) NOT NULL,
+    `schoolAdminId` VARCHAR(36) NOT NULL,
+    `schoolId` VARCHAR(36) NOT NULL,
     `type` VARCHAR(191) NOT NULL,
     `meetingType` VARCHAR(191) NULL,
     `date` DATETIME(3) NULL,
@@ -44,8 +44,8 @@ CREATE TABLE `school_admin_to_sub_category_admin_queries` (
 -- CreateTable
 CREATE TABLE `category_admin_to_sub_category_admin_queries` (
     `id` VARCHAR(191) NOT NULL,
-    `categoryAdminId` VARCHAR(191) NOT NULL,
-    `categoryId` VARCHAR(191) NOT NULL,
+    `categoryAdminId` VARCHAR(36) NOT NULL,
+    `categoryId` VARCHAR(36) NOT NULL,
     `type` VARCHAR(191) NOT NULL,
     `meetingType` VARCHAR(191) NULL,
     `meetingDate` DATETIME(3) NULL,
@@ -65,8 +65,8 @@ CREATE TABLE `category_admin_to_sub_category_admin_queries` (
 -- CreateTable (indexes added separately for MariaDB compatibility)
 CREATE TABLE `sub_category_admin_to_school_admin_queries` (
     `id` VARCHAR(191) NOT NULL,
-    `subCategoryAdminId` VARCHAR(191) NOT NULL,
-    `schoolId` VARCHAR(191) NOT NULL,
+    `subCategoryAdminId` VARCHAR(36) NOT NULL,
+    `schoolId` VARCHAR(36) NOT NULL,
     `type` VARCHAR(191) NOT NULL,
     `meetingType` VARCHAR(191) NULL,
     `meetingDate` DATETIME(3) NULL,
@@ -86,7 +86,7 @@ CREATE INDEX `sca2sa_queries_subCatAdminId_idx` ON `sub_category_admin_to_school
 -- CreateTable
 CREATE TABLE `category_admin_to_super_admin_queries` (
     `id` VARCHAR(191) NOT NULL,
-    `categoryAdminId` VARCHAR(191) NOT NULL,
+    `categoryAdminId` VARCHAR(36) NOT NULL,
     `type` VARCHAR(191) NOT NULL,
     `meetingType` VARCHAR(191) NULL,
     `meetingDate` DATETIME(3) NULL,
@@ -106,7 +106,7 @@ CREATE TABLE `category_admin_to_super_admin_queries` (
 -- CreateTable
 CREATE TABLE `sub_category_admin_to_super_admin_queries` (
     `id` VARCHAR(191) NOT NULL,
-    `subCategoryAdminId` VARCHAR(191) NOT NULL,
+    `subCategoryAdminId` VARCHAR(36) NOT NULL,
     `type` VARCHAR(191) NOT NULL,
     `meetingType` VARCHAR(191) NULL,
     `meetingDate` DATETIME(3) NULL,
