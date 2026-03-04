@@ -14,10 +14,9 @@ CREATE TABLE `school_admin_to_category_admin_queries` (
     `status` VARCHAR(191) NOT NULL DEFAULT 'pending',
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
-
+    PRIMARY KEY (`id`),
     INDEX `school_admin_to_category_admin_queries_schoolId_idx`(`schoolId`),
-    INDEX `school_admin_to_category_admin_queries_schoolAdminId_idx`(`schoolAdminId`),
-    PRIMARY KEY (`id`)
+    INDEX `school_admin_to_category_admin_queries_schoolAdminId_idx`(`schoolAdminId`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
@@ -36,10 +35,9 @@ CREATE TABLE `school_admin_to_sub_category_admin_queries` (
     `status` VARCHAR(191) NOT NULL DEFAULT 'pending',
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
-
+    PRIMARY KEY (`id`),
     INDEX `school_admin_to_sub_category_admin_queries_schoolId_idx`(`schoolId`),
-    INDEX `school_admin_to_sub_category_admin_queries_schoolAdminId_idx`(`schoolAdminId`),
-    PRIMARY KEY (`id`)
+    INDEX `school_admin_to_sub_category_admin_queries_schoolAdminId_idx`(`schoolAdminId`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
@@ -58,10 +56,9 @@ CREATE TABLE `category_admin_to_sub_category_admin_queries` (
     `status` VARCHAR(191) NOT NULL DEFAULT 'pending',
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
-
+    PRIMARY KEY (`id`),
     INDEX `category_admin_to_sub_category_admin_queries_categoryId_idx`(`categoryId`),
-    INDEX `category_admin_to_sub_category_admin_queries_categoryAdminId_idx`(`categoryAdminId`),
-    PRIMARY KEY (`id`)
+    INDEX `category_admin_to_sub_category_admin_queries_categoryAdminId_idx`(`categoryAdminId`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
@@ -80,10 +77,9 @@ CREATE TABLE `sub_category_admin_to_school_admin_queries` (
     `status` VARCHAR(191) NOT NULL DEFAULT 'pending',
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
-
-    INDEX `sub_category_admin_to_school_admin_queries_schoolId_idx`(`schoolId`),
-    INDEX `sub_category_admin_to_school_admin_queries_subCategoryAdminId_idx`(`subCategoryAdminId`),
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`id`),
+    INDEX `sca2sa_queries_schoolId_idx`(`schoolId`),
+    INDEX `sca2sa_queries_subCatAdminId_idx`(`subCategoryAdminId`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
@@ -102,9 +98,8 @@ CREATE TABLE `category_admin_to_super_admin_queries` (
     `status` VARCHAR(191) NOT NULL DEFAULT 'pending',
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
-
-    INDEX `category_admin_to_super_admin_queries_categoryAdminId_idx`(`categoryAdminId`),
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`id`),
+    INDEX `category_admin_to_super_admin_queries_categoryAdminId_idx`(`categoryAdminId`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
@@ -123,9 +118,8 @@ CREATE TABLE `sub_category_admin_to_super_admin_queries` (
     `status` VARCHAR(191) NOT NULL DEFAULT 'pending',
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
-
-    INDEX `sub_category_admin_to_super_admin_queries_subCategoryAdminId_idx`(`subCategoryAdminId`),
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`id`),
+    INDEX `sca2super_queries_subCatAdminId_idx`(`subCategoryAdminId`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- AddForeignKey
