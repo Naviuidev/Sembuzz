@@ -1,6 +1,6 @@
-# Recovery: migration failed (identifier too long / syntax near PRIMARY KEY)
+# Recovery: migration failed (identifier too long / syntax / foreign key errno 150)
 
-If this migration failed with "Identifier name ... is too long" or "syntax ... near 'PRIMARY KEY'", do the following **on the VPS**.
+If this migration failed with "Identifier name ... is too long", "syntax ... near 'PRIMARY KEY'", or "Foreign key constraint is incorrectly formed" (errno 150), do the following **on the VPS**.
 
 ## 0. Pull latest code and verify (required)
 
