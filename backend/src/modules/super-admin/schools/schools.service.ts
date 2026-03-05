@@ -46,6 +46,22 @@ export class SchoolsService {
   }
 
   async create(createSchoolDto: CreateSchoolDto) {
+    try {
+      return await this.createInternal(createSchoolDto);
+    } catch (err) {
+      if (err instanceof BadRequestException || err instanceof NotFoundException) {
+        throw err;
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[SchoolsService] create error:', message, err);
+      throw new HttpException(
+        { statusCode: 500, message: 'Failed to create school. Check server logs for details.' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  private async createInternal(createSchoolDto: CreateSchoolDto) {
     const { schoolName, country, state, city, domain, image, selectedFeatures, adminEmail, adsAdminEmail, tenure } = createSchoolDto;
 
     const hasAdsFeature = selectedFeatures.includes('ADS');
@@ -205,34 +221,34 @@ export class SchoolsService {
         };
       });
     } catch (error: any) {
-      // Check if error is due to missing database columns
       const errorMessage = error?.message || '';
       const errorCode = error?.code || '';
-      
+
+      // Missing columns on schools table (run add_school_domain_and_image.sql and add-school-fields.sql)
       if (
-        errorMessage.includes("Unknown column 'domain'") ||
-        errorMessage.includes("Unknown column 'image'") ||
+        errorMessage.includes("Unknown column") ||
         errorMessage.includes('column "domain"') ||
         errorMessage.includes('column "image"') ||
-        errorCode === '42703' // PostgreSQL unknown column
+        errorCode === '42703'
       ) {
-        console.error('[SchoolsService] Database migration required!');
-        console.error('[SchoolsService] Error:', errorMessage);
+        console.error('[SchoolsService] Database schema mismatch:', errorMessage);
         throw new BadRequestException(
-          'Database migration required. The domain and image columns are missing. ' +
-          'Please run: mysql -u your_username -p sembuzz < prisma/migrations/add_school_domain_and_image.sql ' +
-          'Or see RUN_MIGRATION.md for instructions.',
+          'Database schema is missing columns. On the server run: ' +
+          'ALTER TABLE schools ADD COLUMN country VARCHAR(255) NULL, ADD COLUMN state VARCHAR(50) NULL, ADD COLUMN tenure INT NULL; ' +
+          'ALTER TABLE schools ADD COLUMN domain VARCHAR(255) NULL, ADD COLUMN image TEXT NULL; ' +
+          'Or run prisma/migrations/add_school_domain_and_image.sql and add-school-fields.sql in phpMyAdmin.',
         );
       }
-      
-      // Log the full error for debugging
-      console.error('[SchoolsService] Error creating school:', {
-        message: errorMessage,
-        code: errorCode,
-        stack: error?.stack,
-      });
-      
-      // Re-throw other errors
+
+      // Table ads_admins missing (run migrations)
+      if (errorMessage.includes('ads_admins') || errorMessage.includes('adsAdmin')) {
+        console.error('[SchoolsService] ads_admins table missing or error:', errorMessage);
+        throw new BadRequestException(
+          'Ads admin table is missing. Run: npx prisma migrate deploy',
+        );
+      }
+
+      console.error('[SchoolsService] Transaction error:', errorMessage, error?.stack);
       throw error;
     }
 
