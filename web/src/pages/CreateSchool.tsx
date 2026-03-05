@@ -173,7 +173,12 @@ export const CreateSchool = () => {
       });
       return;
     }
-    createMutation.mutate(formData);
+    // Send adsAdminEmail only when ADS is selected (backend requires it only in that case)
+    const payload: CreateSchoolDto = {
+      ...formData,
+      adsAdminEmail: formData.selectedFeatures.includes('ADS') ? (formData.adsAdminEmail?.trim() || undefined) : undefined,
+    };
+    createMutation.mutate(payload);
   };
 
   return (

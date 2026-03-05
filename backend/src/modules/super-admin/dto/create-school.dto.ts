@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsArray, IsNotEmpty, ArrayMinSize, IsOptional, IsInt, Min, Matches } from 'class-validator';
+import { IsString, IsEmail, IsArray, IsNotEmpty, ArrayMinSize, IsOptional, IsInt, Min, Matches, ValidateIf } from 'class-validator';
 
 export class CreateSchoolDto {
   @IsString()
@@ -37,8 +37,9 @@ export class CreateSchoolDto {
   @IsNotEmpty()
   adminEmail: string;
 
-  /** Required when "ADS" is in selectedFeatures. Email for the Ads Admin (manages banner/sponsored ads). */
-  @IsEmail()
+  /** Required only when "ADS" is in selectedFeatures. Email for the Ads Admin (manages banner/sponsored ads). */
+  @ValidateIf((o) => (o.adsAdminEmail ?? '') !== '')
+  @IsEmail({}, { message: 'Ads Admin email must be a valid email when provided.' })
   @IsOptional()
   adsAdminEmail?: string;
 

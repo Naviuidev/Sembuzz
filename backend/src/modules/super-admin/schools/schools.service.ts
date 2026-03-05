@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { FeaturesService } from '../features/features.service';
 import { CreateSchoolDto } from '../dto/create-school.dto';
@@ -323,101 +323,120 @@ export class SchoolsService {
   }
 
   async findAll() {
-    const schools = await this.prisma.school.findMany({
-      include: {
-        admins: {
-          where: { isActive: true },
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            isActive: true,
-            createdAt: true,
+    try {
+      const schools = await this.prisma.school.findMany({
+        include: {
+          admins: {
+            where: { isActive: true },
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              isActive: true,
+              createdAt: true,
+            },
           },
-        },
-        features: {
-          where: { isEnabled: true },
-          include: {
-            feature: {
-              select: {
-                id: true,
-                code: true,
-                name: true,
+          features: {
+            where: { isEnabled: true },
+            include: {
+              feature: {
+                select: {
+                  id: true,
+                  code: true,
+                  name: true,
+                },
               },
             },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+      });
 
-    return schools.map((school) => ({
-      id: school.id,
-      refNum: school.refNum,
-      name: school.name,
-      country: school.country,
-      state: school.state,
-      city: school.city,
-      tenure: school.tenure,
-      isActive: school.isActive,
-      enabledFeatures: school.features.map((sf) => ({
-        code: sf.feature.code,
-        name: sf.feature.name,
-      })),
-      admin: school.admins[0] || null,
-      createdAt: school.createdAt,
-    }));
+      return schools.map((school) => ({
+        id: school.id,
+        refNum: school.refNum,
+        name: school.name,
+        country: school.country,
+        state: school.state,
+        city: school.city,
+        tenure: school.tenure,
+        isActive: school.isActive,
+        enabledFeatures: school.features.map((sf) => ({
+          code: sf.feature.code,
+          name: sf.feature.name,
+        })),
+        admin: school.admins[0] || null,
+        createdAt: school.createdAt,
+      }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[SuperAdmin Schools] findAll error:', message, err);
+      throw new HttpException(
+        { statusCode: 500, message: 'Failed to load schools list' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   async findOne(id: string) {
-    const school = await this.prisma.school.findUnique({
-      where: { id },
-      include: {
-        admins: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            isActive: true,
-            createdAt: true,
+    try {
+      const school = await this.prisma.school.findUnique({
+        where: { id },
+        include: {
+          admins: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              isActive: true,
+              createdAt: true,
+            },
           },
-        },
-        features: {
-          where: { isEnabled: true },
-          include: {
-            feature: {
-              select: {
-                id: true,
-                code: true,
-                name: true,
+          features: {
+            where: { isEnabled: true },
+            include: {
+              feature: {
+                select: {
+                  id: true,
+                  code: true,
+                  name: true,
+                },
               },
             },
           },
         },
-      },
-    });
+      });
 
-    if (!school) {
-      throw new NotFoundException(`School with ID ${id} not found`);
+      if (!school) {
+        throw new NotFoundException(`School with ID ${id} not found`);
+      }
+
+      return {
+        id: school.id,
+        refNum: school.refNum,
+        name: school.name,
+        country: school.country,
+        state: school.state,
+        city: school.city,
+        tenure: school.tenure,
+        isActive: school.isActive,
+        enabledFeatures: school.features.map((sf) => ({
+          code: sf.feature.code,
+          name: sf.feature.name,
+        })),
+        admin: school.admins[0] || null,
+        createdAt: school.createdAt,
+        updatedAt: school.updatedAt,
+      };
+    } catch (err) {
+      if (err instanceof NotFoundException) throw err;
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[SuperAdmin Schools] findOne error:', message, err);
+      throw new HttpException(
+        { statusCode: 500, message: 'Failed to load school' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
-
-    return {
-      id: school.id,
-      refNum: school.refNum,
-      name: school.name,
-      country: school.country,
-      state: school.state,
-      city: school.city,
-      tenure: school.tenure,
-      isActive: school.isActive,
-      enabledFeatures: school.features.map((sf) => ({
-        code: sf.feature.code,
-        name: sf.feature.name,
-      })),
-      admin: school.admins[0] || null,
-      createdAt: school.createdAt,
-      updatedAt: school.updatedAt,
-    };
   }
 
   async update(id: string, updateSchoolDto: UpdateSchoolDto) {
