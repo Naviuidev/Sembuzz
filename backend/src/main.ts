@@ -10,11 +10,12 @@ async function bootstrap() {
   // Serve uploaded files (e.g. query attachments)
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads/' });
 
-  // CORS: use env in production (e.g. CORS_ORIGIN=https://sembuzz.com,https://www.sembuzz.com)
+  // CORS: use CORS_ORIGIN from env; always add localhost so local dev (frontend :5173 → API :3000) works
   const corsOrigin = process.env.CORS_ORIGIN;
-  const origins = corsOrigin
+  const fromEnv = corsOrigin
     ? corsOrigin.split(',').map((o) => o.trim()).filter(Boolean)
-    : ['http://localhost:5173', 'http://localhost:3000'];
+    : [];
+  const origins = [...new Set([...fromEnv, 'http://localhost:5173', 'http://localhost:3000'])];
   app.enableCors({
     origin: origins,
     credentials: true,

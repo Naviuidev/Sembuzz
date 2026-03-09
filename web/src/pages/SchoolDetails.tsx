@@ -395,7 +395,7 @@ export const SchoolDetails = () => {
           </div>
 
           {school.admin && (
-            <div className="card border-0 shadow-sm" style={{ borderRadius: '0px' }}>
+            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '0px' }}>
               <div className="card-body p-4">
                 <h2 style={{
                   fontSize: '1.25rem',
@@ -420,16 +420,63 @@ export const SchoolDetails = () => {
                   </div>
                   <div className="col-md-12">
                     <label style={{ fontSize: '0.875rem', color: '#6c757d', fontWeight: '500' }}>
-                      Password
+                      Temporary password
                     </label>
                     <p style={{ color: '#1a1f2e', margin: 0, fontFamily: 'monospace', fontSize: '0.875rem' }}>
-                      {school.admin.password || 'Password was set during school creation. Check creation email for temporary password.'}
+                      {school.admin.password || 'Shared at school creation. Check the creation success message or the email sent to the School Admin.'}
                     </p>
                     <small className="text-muted" style={{ fontSize: '0.75rem' }}>
                       Note: Password is hashed for security. The temporary password was sent via email during school creation.
                     </small>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Ads Admin section – when school has ADS feature */}
+          {school.enabledFeatures.some((f) => f.code === 'ADS') && (
+            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '0px' }}>
+              <div className="card-body p-4">
+                <h2 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: 'normal',
+                  color: '#1a1f2e',
+                  marginBottom: '1.5rem'
+                }}>
+                  Ads Admin
+                </h2>
+                {school.adsAdmin ? (
+                  <div className="row g-3">
+                    <div className="col-md-6">
+                      <label style={{ fontSize: '0.875rem', color: '#6c757d', fontWeight: '500' }}>
+                        Name
+                      </label>
+                      <p style={{ color: '#1a1f2e', margin: 0 }}>{school.adsAdmin.name}</p>
+                    </div>
+                    <div className="col-md-6">
+                      <label style={{ fontSize: '0.875rem', color: '#6c757d', fontWeight: '500' }}>
+                        Email
+                      </label>
+                      <p style={{ color: '#1a1f2e', margin: 0 }}>{school.adsAdmin.email}</p>
+                    </div>
+                    <div className="col-md-12">
+                      <label style={{ fontSize: '0.875rem', color: '#6c757d', fontWeight: '500' }}>
+                        Temporary password
+                      </label>
+                      <p style={{ color: '#1a1f2e', margin: 0, fontFamily: 'monospace', fontSize: '0.875rem' }}>
+                        Shared at school creation. Check the creation success message or the email sent to the Ads Admin.
+                      </p>
+                      <small className="text-muted" style={{ fontSize: '0.75rem' }}>
+                        The temporary password was sent via email during school creation. Ads Admin can log in at /ads-admin/login.
+                      </small>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-muted mb-0" style={{ fontSize: '0.875rem' }}>
+                    No Ads Admin assigned yet for this school.
+                  </p>
+                )}
               </div>
             </div>
           )}

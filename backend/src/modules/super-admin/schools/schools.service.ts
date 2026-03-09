@@ -408,6 +408,15 @@ export class SchoolsService {
               createdAt: true,
             },
           },
+          adsAdmins: {
+            take: 1,
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              isActive: true,
+            },
+          },
           features: {
             where: { isEnabled: true },
             include: {
@@ -427,6 +436,19 @@ export class SchoolsService {
         throw new NotFoundException(`School with ID ${id} not found`);
       }
 
+      type SchoolWithIncludes = typeof school & {
+        features: Array<{ feature: { code: string; name: string } }>;
+        admins: Array<{ id: string; name: string; email: string; isActive: boolean; createdAt: Date }>;
+        adsAdmins?: Array<{ id: string; name: string; email: string; isActive: boolean }>;
+      };
+      const s = school as SchoolWithIncludes;
+
+      const enabledFeatures = s.features.map((sf) => ({
+        code: sf.feature.code,
+        name: sf.feature.name,
+      }));
+      const hasAds = enabledFeatures.some((f) => f.code === 'ADS');
+
       return {
         id: school.id,
         refNum: school.refNum,
@@ -436,11 +458,9 @@ export class SchoolsService {
         city: school.city,
         tenure: school.tenure,
         isActive: school.isActive,
-        enabledFeatures: school.features.map((sf) => ({
-          code: sf.feature.code,
-          name: sf.feature.name,
-        })),
-        admin: school.admins[0] || null,
+        enabledFeatures,
+        admin: s.admins[0] || null,
+        adsAdmin: hasAds ? (s.adsAdmins?.[0] || null) : null,
         createdAt: school.createdAt,
         updatedAt: school.updatedAt,
       };
@@ -647,9 +667,64 @@ export class SchoolsService {
       throw new NotFoundException(`School with ID ${id} not found`);
     }
 
-    // Delete school (cascade will delete related records)
-    await this.prisma.school.delete({
-      where: { id },
+    // Delete school and all related data in dependency order (works even if DB FKs lack CASCADE)
+    await this.prisma.$transaction(async (tx) => {
+      const db = tx as any; // transactional client with full delegate access
+      // 1) Direct school-scoped data
+      await db.userHelpQuery.deleteMany({ where: { schoolId: id } });
+      await db.schoolSocialAccount.deleteMany({ where: { schoolId: id } });
+      await db.upcomingPost.deleteMany({ where: { schoolId: id } });
+      await db.bannerAd.deleteMany({ where: { schoolId: id } });
+      await db.sponsoredAd.deleteMany({ where: { schoolId: id } });
+      await db.user.deleteMany({ where: { schoolId: id } });
+      await db.schoolFeature.deleteMany({ where: { schoolId: id } });
+      await db.categoryAdminQuery.deleteMany({ where: { schoolId: id } });
+      await db.schoolAdminToCategoryAdminQuery.deleteMany({ where: { schoolId: id } });
+      await db.schoolAdminToSubCategoryAdminQuery.deleteMany({ where: { schoolId: id } });
+      await db.subCategoryAdminToSchoolAdminQuery.deleteMany({ where: { schoolId: id } });
+      await db.event.deleteMany({ where: { schoolId: id } });
+
+      // 2) SubCategoryAdmins and their dependent rows (then CategoryAdmins)
+      const subCatAdminIds = (await db.subCategoryAdmin.findMany({ where: { schoolId: id }, select: { id: true } })).map((a) => a.id);
+      if (subCatAdminIds.length > 0) {
+        await db.subCategoryAdminSubCategory.deleteMany({ where: { subCategoryAdminId: { in: subCatAdminIds } } });
+        await db.subCategoryAdminPasswordResetOtp.deleteMany({ where: { subCategoryAdminId: { in: subCatAdminIds } } });
+        await db.subCategoryAdminToSuperAdminQuery.deleteMany({ where: { subCategoryAdminId: { in: subCatAdminIds } } });
+      }
+      await db.subCategoryAdmin.deleteMany({ where: { schoolId: id } });
+
+      const categoryAdminIds = (await db.categoryAdmin.findMany({ where: { schoolId: id }, select: { id: true } })).map((a) => a.id);
+      if (categoryAdminIds.length > 0) {
+        await db.categoryAdminCategory.deleteMany({ where: { categoryAdminId: { in: categoryAdminIds } } });
+        await db.categoryAdminPasswordResetOtp.deleteMany({ where: { categoryAdminId: { in: categoryAdminIds } } });
+        await db.categoryAdminToSubCategoryAdminQuery.deleteMany({ where: { categoryAdminId: { in: categoryAdminIds } } });
+        await db.categoryAdminToSuperAdminQuery.deleteMany({ where: { categoryAdminId: { in: categoryAdminIds } } });
+      }
+      await db.categoryAdmin.deleteMany({ where: { schoolId: id } });
+
+      // 3) Categories and subcategories (posts/news)
+      const categoryIds = (await db.category.findMany({ where: { schoolId: id }, select: { id: true } })).map((c) => c.id);
+      if (categoryIds.length > 0) {
+        await db.subCategory.deleteMany({ where: { categoryId: { in: categoryIds } } });
+      }
+      await db.category.deleteMany({ where: { schoolId: id } });
+
+      // 4) School admins and their dependent rows, then Ads admins
+      const schoolAdminIds = (await db.schoolAdmin.findMany({ where: { schoolId: id }, select: { id: true } })).map((a) => a.id);
+      if (schoolAdminIds.length > 0) {
+        await db.query.deleteMany({ where: { schoolAdminId: { in: schoolAdminIds } } });
+        await db.passwordResetOtp.deleteMany({ where: { schoolAdminId: { in: schoolAdminIds } } });
+      }
+      await db.schoolAdmin.deleteMany({ where: { schoolId: id } });
+
+      const adsAdminIds = (await db.adsAdmin.findMany({ where: { schoolId: id }, select: { id: true } })).map((a) => a.id);
+      if (adsAdminIds.length > 0) {
+        await db.adsAdminPasswordResetOtp.deleteMany({ where: { adsAdminId: { in: adsAdminIds } } });
+      }
+      await db.adsAdmin.deleteMany({ where: { schoolId: id } });
+
+      // 5) School
+      await db.school.delete({ where: { id } });
     });
 
     return { message: 'School deleted successfully' };

@@ -54,9 +54,9 @@ export class AdsAdminBannerAdsController {
     if (!ALLOWED_MIMES.includes(file.mimetype)) {
       throw new BadRequestException('Allowed types: JPEG, PNG, GIF, WebP');
     }
-    const baseUrl = process.env.API_URL || 'http://localhost:3000';
+    // Return relative path so frontend can resolve against its current API base (works for both local and production)
     return {
-      url: `${baseUrl}/uploads/ads-admin-banner-ads/${file.filename}`,
+      url: `/uploads/ads-admin-banner-ads/${file.filename}`,
     };
   }
 

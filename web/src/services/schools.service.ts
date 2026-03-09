@@ -24,6 +24,13 @@ export interface School {
     isActive: boolean;
     password?: string; // Temporary password (only available immediately after creation)
   } | null;
+  /** Present when school has ADS feature enabled. */
+  adsAdmin?: {
+    id: string;
+    name: string;
+    email: string;
+    isActive: boolean;
+  } | null;
   createdAt: string;
   updatedAt?: string;
 }

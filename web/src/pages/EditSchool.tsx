@@ -591,7 +591,7 @@ export const EditSchool = () => {
         <div 
           className="modal show d-block" 
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={() => setShowDeleteConfirm(false)}
+          onClick={() => !deleteMutation.isPending && setShowDeleteConfirm(false)}
         >
           <div 
             className="modal-dialog modal-dialog-centered"
@@ -600,54 +600,83 @@ export const EditSchool = () => {
             <div className="modal-content" style={{ borderRadius: '0px' }}>
               <div className="modal-header border-0">
                 <h5 className="modal-title" style={{ color: '#1a1f2e' }}>
-                  Confirm Delete
+                  Confirm Delete School
                 </h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setShowDeleteConfirm(false)}
-                ></button>
+                {!deleteMutation.isPending && (
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => setShowDeleteConfirm(false)}
+                  />
+                )}
               </div>
               <div className="modal-body">
-                <p style={{ color: '#6c757d' }}>
-                  Are you sure you want to delete <strong>{school?.name}</strong>? 
-                  This action cannot be undone and will delete all associated data.
-                </p>
+                {deleteMutation.isPending ? (
+                  <div className="text-center py-4">
+                    <div className="spinner-border text-danger" role="status" style={{ width: '3rem', height: '3rem' }}>
+                      <span className="visually-hidden">Deleting...</span>
+                    </div>
+                    <p className="mt-3 mb-0" style={{ color: '#1a1f2e', fontWeight: '500' }}>
+                      Deleting school and all related data...
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <p style={{ color: '#1a1f2e', fontWeight: '500' }}>
+                      Are you sure you want to delete <strong>{school?.name}</strong>?
+                    </p>
+                    <p style={{ color: '#6c757d', fontSize: '0.95rem', marginBottom: 0 }}>
+                      This action cannot be undone. The following data will be <strong>permanently deleted</strong>:
+                    </p>
+                    <ul style={{ color: '#6c757d', fontSize: '0.9rem', marginTop: '0.5rem', paddingLeft: '1.25rem' }}>
+                      <li>School Admin account(s)</li>
+                      <li>Ads Admin account(s) (if any)</li>
+                      <li>Posts / News</li>
+                      <li>Banner ads and Sponsored ads</li>
+                      <li>Categories and Subcategories</li>
+                      <li>Category Admins and Subcategory Admins</li>
+                      <li>All other data linked to this school</li>
+                    </ul>
+                    <p style={{ color: '#dc3545', fontSize: '0.9rem', fontWeight: '500', marginTop: '0.75rem', marginBottom: 0 }}>
+                      Click &quot;Delete&quot; to confirm.
+                    </p>
+                  </>
+                )}
               </div>
-              <div className="modal-footer border-0">
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  style={{
-                    backgroundColor: 'transparent',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '50px',
-                    padding: '0.5rem 1.5rem',
-                    color: '#1a1f2e',
-                    fontWeight: '500'
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={confirmDelete}
-                  disabled={deleteMutation.isPending}
-                  style={{
-                    backgroundColor: '#dc3545',
-                    border: 'none',
-                    borderRadius: '50px',
-                    padding: '0.5rem 1.5rem',
-                    color: '#fff',
-                    fontWeight: '500',
-                    opacity: deleteMutation.isPending ? 0.7 : 1
-                  }}
-                >
-                  {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
-                </button>
-              </div>
+              {!deleteMutation.isPending && (
+                <div className="modal-footer border-0">
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => setShowDeleteConfirm(false)}
+                    style={{
+                      backgroundColor: 'transparent',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '50px',
+                      padding: '0.5rem 1.5rem',
+                      color: '#1a1f2e',
+                      fontWeight: '500'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={confirmDelete}
+                    style={{
+                      backgroundColor: '#dc3545',
+                      border: 'none',
+                      borderRadius: '50px',
+                      padding: '0.5rem 1.5rem',
+                      color: '#fff',
+                      fontWeight: '500'
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

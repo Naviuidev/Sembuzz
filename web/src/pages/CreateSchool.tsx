@@ -244,79 +244,36 @@ export const CreateSchool = () => {
                     </div>
                   )}
 
-                  <div
-                    style={{
-                      backgroundColor: '#f8f9fa',
-                      padding: '1.5rem',
-                      borderRadius: '0px',
-                      border: '1px solid #dee2e6',
-                      marginBottom: '1.5rem',
-                    }}
-                  >
-                    <h4 style={{ fontSize: '1rem', fontWeight: '500', color: '#1a1f2e', marginBottom: '1rem' }}>
-                      Admin Credentials
-                    </h4>
-                    <div className="mb-2">
-                      <strong>Reference Number:</strong>
-                      <div
-                        style={{
-                          fontFamily: 'monospace',
-                          backgroundColor: 'white',
-                          padding: '0.5rem',
-                          borderRadius: '0px',
-                          marginTop: '0.25rem',
-                          border: '1px solid #dee2e6',
-                        }}
-                      >
-                        {successModal.data.refNum}
-                      </div>
-                    </div>
-                    <div className="mb-2">
-                      <strong>Email:</strong>
-                      <div
-                        style={{
-                          fontFamily: 'monospace',
-                          backgroundColor: 'white',
-                          padding: '0.5rem',
-                          borderRadius: '0px',
-                          marginTop: '0.25rem',
-                          border: '1px solid #dee2e6',
-                        }}
-                      >
-                        {successModal.data.adminEmail}
-                      </div>
-                    </div>
-                    <div>
-                      <strong>Temporary Password:</strong>
-                      <div
-                        style={{
-                          fontFamily: 'monospace',
-                          backgroundColor: 'white',
-                          padding: '0.5rem',
-                          borderRadius: '0px',
-                          marginTop: '0.25rem',
-                          border: '1px solid #dee2e6',
-                          color: '#dc3545',
-                          fontWeight: 'bold',
-                        }}
-                      >
-                        {successModal.data.tempPassword}
-                      </div>
+                  <div className="mb-2">
+                    <strong>Reference Number:</strong>
+                    <div
+                      style={{
+                        fontFamily: 'monospace',
+                        backgroundColor: '#f8f9fa',
+                        padding: '0.5rem',
+                        borderRadius: '0px',
+                        marginTop: '0.25rem',
+                        border: '1px solid #dee2e6',
+                      }}
+                    >
+                      {successModal.data.refNum}
                     </div>
                   </div>
 
-                  {successModal.data.adsAdminEmail && (
-                    <>
-                      {!successModal.data.adsEmailSent && successModal.data.adsEmailError && (
-                        <div className="alert alert-warning mb-3" style={{ borderRadius: '0px' }}>
-                          <i className="bi bi-exclamation-triangle me-2"></i>
-                          <strong>Ads Admin email not sent:</strong> {successModal.data.adsEmailError}
-                          <br />
-                          <small>Please save the Ads Admin credentials below and send them manually.</small>
-                        </div>
-                      )}
-                      <h4 style={{ fontSize: '1rem', fontWeight: '500', color: '#1a1f2e', marginBottom: '1rem', marginTop: '1rem' }}>
-                        Ads Admin Credentials
+                  {/* Credentials: School Admin (email then temp password); if ADS enabled, Ads Admin (email then temp password) */}
+                  {!successModal.data.adsEmailSent && successModal.data.adsEmailError && successModal.data.adsAdminEmail && (
+                    <div className="alert alert-warning mb-3" style={{ borderRadius: '0px' }}>
+                      <i className="bi bi-exclamation-triangle me-2"></i>
+                      <strong>Ads Admin email not sent:</strong> {successModal.data.adsEmailError}
+                      <br />
+                      <small>Please save the Ads Admin credentials below and send them manually.</small>
+                    </div>
+                  )}
+                  <div className={successModal.data.adsAdminEmail ? 'row g-3' : ''}>
+                    {/* School Admin: email, then temporary password shared to School Admin */}
+                    <div className={successModal.data.adsAdminEmail ? 'col-md-6' : 'col-12'}>
+                      <h4 style={{ fontSize: '1rem', fontWeight: '500', color: '#1a1f2e', marginBottom: '0.75rem', marginTop: '1rem' }}>
+                        School Admin
                       </h4>
                       <div
                         style={{
@@ -328,21 +285,72 @@ export const CreateSchool = () => {
                         }}
                       >
                         <div className="mb-2">
-                          <strong>Ads Admin Email:</strong>
-                          <div style={{ fontFamily: 'monospace', backgroundColor: 'white', padding: '0.5rem', marginTop: '0.25rem', border: '1px solid #dee2e6' }}>
-                            {successModal.data.adsAdminEmail}
+                          <strong>School Admin Email:</strong>
+                          <div
+                            style={{
+                              fontFamily: 'monospace',
+                              backgroundColor: 'white',
+                              padding: '0.5rem',
+                              borderRadius: '0px',
+                              marginTop: '0.25rem',
+                              border: '1px solid #dee2e6',
+                            }}
+                          >
+                            {successModal.data.adminEmail}
                           </div>
                         </div>
                         <div>
-                          <strong>Temporary Password:</strong>
-                          <div style={{ fontFamily: 'monospace', backgroundColor: 'white', padding: '0.5rem', marginTop: '0.25rem', border: '1px solid #dee2e6', color: '#dc3545', fontWeight: 'bold' }}>
-                            {successModal.data.adsTempPassword}
+                          <strong>Temporary password (shared to School Admin):</strong>
+                          <div
+                            style={{
+                              fontFamily: 'monospace',
+                              backgroundColor: 'white',
+                              padding: '0.5rem',
+                              borderRadius: '0px',
+                              marginTop: '0.25rem',
+                              border: '1px solid #dee2e6',
+                              color: '#dc3545',
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            {successModal.data.tempPassword}
                           </div>
                         </div>
-                        <small className="text-muted d-block mt-2">Ads Admin can log in at /ads-admin/login to manage banner and sponsored ads.</small>
                       </div>
-                    </>
-                  )}
+                    </div>
+
+                    {/* Ads Admin (when ADS enabled): email, then temporary password shared to Ads Admin */}
+                    {successModal.data.adsAdminEmail && (
+                      <div className="col-md-6">
+                        <h4 style={{ fontSize: '1rem', fontWeight: '500', color: '#1a1f2e', marginBottom: '0.75rem', marginTop: successModal.data.adsAdminEmail ? '1rem' : '0rem' }}>
+                          Ads Admin
+                        </h4>
+                        <div
+                          style={{
+                            backgroundColor: '#f8f9fa',
+                            padding: '1rem',
+                            borderRadius: '0px',
+                            border: '1px solid #dee2e6',
+                            marginBottom: '1rem',
+                          }}
+                        >
+                          <div className="mb-2">
+                            <strong>Ads Admin Email:</strong>
+                            <div style={{ fontFamily: 'monospace', backgroundColor: 'white', padding: '0.5rem', marginTop: '0.25rem', border: '1px solid #dee2e6' }}>
+                              {successModal.data.adsAdminEmail}
+                            </div>
+                          </div>
+                          <div>
+                            <strong>Temporary password (shared to Ads Admin):</strong>
+                            <div style={{ fontFamily: 'monospace', backgroundColor: 'white', padding: '0.5rem', marginTop: '0.25rem', border: '1px solid #dee2e6', color: '#dc3545', fontWeight: 'bold' }}>
+                              {successModal.data.adsTempPassword ?? '—'}
+                            </div>
+                          </div>
+                          <small className="text-muted d-block mt-2">Ads Admin can log in at /ads-admin/login to manage banner and sponsored ads.</small>
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   <div className="d-flex justify-content-end">
                     <button
@@ -702,26 +710,26 @@ export const CreateSchool = () => {
                   }}>
                     School Admin Information
                   </h2>
-                  <div className="row g-3">
-                    <div className="col-md-6">
-                      <label className="form-label" style={{ fontWeight: '500', color: '#1a1f2e' }}>
-                        Admin Email *
-                      </label>
-                      <input
-                        type="email"
-                        className="form-control"
-                        required
-                        value={formData.adminEmail}
-                        onChange={(e) => setFormData({ ...formData, adminEmail: e.target.value })}
-                        placeholder="admin@school.edu"
-                        style={{
-                          borderRadius: '0px',
-                          padding: '0.75rem 1rem',
-                          borderColor: formData.domain && formData.adminEmail && !validateDomainMatch() ? '#dc3545' : undefined,
-                        }}
-                      />
-                      <small className="text-muted" style={{ fontSize: '0.75rem' }}>
-                        Reference Number will be auto-generated. Temporary password will be sent via email.
+                    <div className="row g-3">
+                      <div className="col-md-6">
+                        <label className="form-label" style={{ fontWeight: '500', color: '#1a1f2e' }}>
+                          School Admin Email *
+                        </label>
+                        <input
+                          type="email"
+                          className="form-control"
+                          required
+                          value={formData.adminEmail}
+                          onChange={(e) => setFormData({ ...formData, adminEmail: e.target.value })}
+                          placeholder="admin@school.edu"
+                          style={{
+                            borderRadius: '0px',
+                            padding: '0.75rem 1rem',
+                            borderColor: formData.domain && formData.adminEmail && !validateDomainMatch() ? '#dc3545' : undefined,
+                          }}
+                        />
+                      <small className="text-muted d-block mt-1" style={{ fontSize: '0.75rem' }}>
+                        Reference Number will be auto-generated. <strong>Temporary password</strong> will be shared to this email and shown after creation (under School Admin in the success message).
                       </small>
                       {formData.domain && formData.adminEmail && !validateDomainMatch() && (
                         <small className="text-danger" style={{ fontSize: '0.75rem', display: 'block', marginTop: '0.25rem' }}>
@@ -756,8 +764,8 @@ export const CreateSchool = () => {
                           placeholder="ads@school.edu"
                           style={{ borderRadius: '0px', padding: '0.75rem 1rem' }}
                         />
-                        <small className="text-muted" style={{ fontSize: '0.75rem' }}>
-                          This user will manage banner and sponsored ads for the school. Temporary password will be sent via email.
+                        <small className="text-muted d-block mt-1" style={{ fontSize: '0.75rem' }}>
+                          This user will manage banner and sponsored ads. <strong>Temporary password</strong> will be shared to this email and shown after creation (under Ads Admin in the success message).
                         </small>
                       </div>
                     </div>
