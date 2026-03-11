@@ -670,8 +670,9 @@ export class SchoolsService {
 
     // Delete school and all related data in dependency order (works even if DB FKs lack CASCADE)
     try {
-      await this.prisma.$transaction(async (tx) => {
-        const db = tx as any; // transactional client with full delegate access
+      await this.prisma.$transaction(
+        async (tx) => {
+          const db = tx as any; // transactional client with full delegate access
         // 1) Event-related child tables (must delete before events)
         const eventIds = (await db.event.findMany({ where: { schoolId: id }, select: { id: true } })).map((e) => e.id);
         if (eventIds.length > 0) {
@@ -743,10 +744,13 @@ export class SchoolsService {
 
       // 5) School
       await db.school.delete({ where: { id } });
-    });
+        },
+        { timeout: 60000, maxWait: 10000 },
+      );
     } catch (err: any) {
       const message = err?.message || String(err);
-      console.error('[SchoolsService] remove error:', message);
+      const cause = err?.cause?.message ?? err?.meta?.cause ?? '';
+      console.error('[SchoolsService] remove error:', message, cause || err);
       throw new HttpException(
         message.includes('Foreign key') || message.includes('foreign key') || message.includes('a foreign key')
           ? 'Cannot delete school: related data could not be removed. You may need to remove linked records first.'
