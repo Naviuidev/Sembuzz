@@ -669,21 +669,38 @@ export class SchoolsService {
     }
 
     // Delete school and all related data in dependency order (works even if DB FKs lack CASCADE)
-    await this.prisma.$transaction(async (tx) => {
-      const db = tx as any; // transactional client with full delegate access
-      // 1) Direct school-scoped data
-      await db.userHelpQuery.deleteMany({ where: { schoolId: id } });
-      await db.schoolSocialAccount.deleteMany({ where: { schoolId: id } });
-      await db.upcomingPost.deleteMany({ where: { schoolId: id } });
-      await db.bannerAd.deleteMany({ where: { schoolId: id } });
-      await db.sponsoredAd.deleteMany({ where: { schoolId: id } });
-      await db.user.deleteMany({ where: { schoolId: id } });
-      await db.schoolFeature.deleteMany({ where: { schoolId: id } });
-      await db.categoryAdminQuery.deleteMany({ where: { schoolId: id } });
-      await db.schoolAdminToCategoryAdminQuery.deleteMany({ where: { schoolId: id } });
-      await db.schoolAdminToSubCategoryAdminQuery.deleteMany({ where: { schoolId: id } });
-      await db.subCategoryAdminToSchoolAdminQuery.deleteMany({ where: { schoolId: id } });
-      await db.event.deleteMany({ where: { schoolId: id } });
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const db = tx as any; // transactional client with full delegate access
+        // 1) Event-related child tables (must delete before events)
+        const eventIds = (await db.event.findMany({ where: { schoolId: id }, select: { id: true } })).map((e) => e.id);
+        if (eventIds.length > 0) {
+          await db.eventLike.deleteMany({ where: { eventId: { in: eventIds } } });
+          await db.eventComment.deleteMany({ where: { eventId: { in: eventIds } } });
+          await db.userSavedEvent.deleteMany({ where: { eventId: { in: eventIds } } });
+        }
+        // 2) BannerAd and SponsoredAd child tables (must delete before parent)
+        const bannerAdIds = (await db.bannerAd.findMany({ where: { schoolId: id }, select: { id: true } })).map((b) => b.id);
+        if (bannerAdIds.length > 0) {
+          await db.bannerAdEvent.deleteMany({ where: { bannerAdId: { in: bannerAdIds } } });
+        }
+        const sponsoredAdIds = (await db.sponsoredAd.findMany({ where: { schoolId: id }, select: { id: true } })).map((s) => s.id);
+        if (sponsoredAdIds.length > 0) {
+          await db.sponsoredAdEvent.deleteMany({ where: { sponsoredAdId: { in: sponsoredAdIds } } });
+        }
+        // 3) Direct school-scoped data
+        await db.userHelpQuery.deleteMany({ where: { schoolId: id } });
+        await db.schoolSocialAccount.deleteMany({ where: { schoolId: id } });
+        await db.upcomingPost.deleteMany({ where: { schoolId: id } });
+        await db.bannerAd.deleteMany({ where: { schoolId: id } });
+        await db.sponsoredAd.deleteMany({ where: { schoolId: id } });
+        await db.user.deleteMany({ where: { schoolId: id } });
+        await db.schoolFeature.deleteMany({ where: { schoolId: id } });
+        await db.categoryAdminQuery.deleteMany({ where: { schoolId: id } });
+        await db.schoolAdminToCategoryAdminQuery.deleteMany({ where: { schoolId: id } });
+        await db.schoolAdminToSubCategoryAdminQuery.deleteMany({ where: { schoolId: id } });
+        await db.subCategoryAdminToSchoolAdminQuery.deleteMany({ where: { schoolId: id } });
+        await db.event.deleteMany({ where: { schoolId: id } });
 
       // 2) SubCategoryAdmins and their dependent rows (then CategoryAdmins)
       const subCatAdminIds = (await db.subCategoryAdmin.findMany({ where: { schoolId: id }, select: { id: true } })).map((a) => a.id);
@@ -727,6 +744,16 @@ export class SchoolsService {
       // 5) School
       await db.school.delete({ where: { id } });
     });
+    } catch (err: any) {
+      const message = err?.message || String(err);
+      console.error('[SchoolsService] remove error:', message);
+      throw new HttpException(
+        message.includes('Foreign key') || message.includes('foreign key') || message.includes('a foreign key')
+          ? 'Cannot delete school: related data could not be removed. You may need to remove linked records first.'
+          : `Failed to delete school: ${message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
 
     return { message: 'School deleted successfully' };
   }
