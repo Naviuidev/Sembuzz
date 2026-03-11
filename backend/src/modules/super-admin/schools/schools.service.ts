@@ -417,18 +417,6 @@ export class SchoolsService {
               isActive: true,
             },
           },
-          features: {
-            where: { isEnabled: true },
-            include: {
-              feature: {
-                select: {
-                  id: true,
-                  code: true,
-                  name: true,
-                },
-              },
-            },
-          },
         },
       });
 
@@ -437,16 +425,28 @@ export class SchoolsService {
       }
 
       type SchoolWithIncludes = typeof school & {
-        features: Array<{ feature: { code: string; name: string } }>;
         admins: Array<{ id: string; name: string; email: string; isActive: boolean; createdAt: Date }>;
         adsAdmins?: Array<{ id: string; name: string; email: string; isActive: boolean }>;
       };
       const s = school as SchoolWithIncludes;
 
-      const enabledFeatures = s.features.map((sf) => ({
-        code: sf.feature.code,
-        name: sf.feature.name,
-      }));
+      let enabledFeatures: Array<{ code: string; name: string }> = [];
+      try {
+        const schoolFeatures = await this.prisma.schoolFeature.findMany({
+          where: { schoolId: id, isEnabled: true },
+          select: { featureId: true },
+        });
+        for (const sf of schoolFeatures) {
+          const feature = await this.prisma.feature.findUnique({
+            where: { id: sf.featureId },
+            select: { code: true, name: true },
+          });
+          if (feature) enabledFeatures.push({ code: feature.code, name: feature.name });
+        }
+      } catch (featErr) {
+        console.warn('[SuperAdmin Schools] findOne: could not load features for school', id, featErr);
+      }
+
       const hasAds = enabledFeatures.some((f) => f.code === 'ADS');
 
       return {
