@@ -396,27 +396,19 @@ export class SchoolsService {
 
   async findOne(id: string) {
     try {
-      const school = await this.client.school.findUnique({
+      const school = await this.prisma.school.findUnique({
         where: { id },
-        include: {
-          admins: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              isActive: true,
-              createdAt: true,
-            },
-          },
-          adsAdmins: {
-            take: 1,
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              isActive: true,
-            },
-          },
+        select: {
+          id: true,
+          refNum: true,
+          name: true,
+          country: true,
+          state: true,
+          city: true,
+          tenure: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
         },
       });
 
@@ -424,11 +416,18 @@ export class SchoolsService {
         throw new NotFoundException(`School with ID ${id} not found`);
       }
 
-      type SchoolWithIncludes = typeof school & {
-        admins: Array<{ id: string; name: string; email: string; isActive: boolean; createdAt: Date }>;
-        adsAdmins?: Array<{ id: string; name: string; email: string; isActive: boolean }>;
-      };
-      const s = school as SchoolWithIncludes;
+      let admin: { id: string; name: string; email: string; isActive: boolean; createdAt: Date } | null = null;
+      try {
+        const admins = await this.prisma.schoolAdmin.findMany({
+          where: { schoolId: id },
+          take: 1,
+          select: { id: true, name: true, email: true, isActive: true, createdAt: true },
+          orderBy: { createdAt: 'asc' },
+        });
+        admin = admins[0] || null;
+      } catch (e) {
+        console.warn('[SuperAdmin Schools] findOne: could not load admins for school', id, e);
+      }
 
       let enabledFeatures: Array<{ code: string; name: string }> = [];
       try {
@@ -448,6 +447,20 @@ export class SchoolsService {
       }
 
       const hasAds = enabledFeatures.some((f) => f.code === 'ADS');
+      let adsAdmin: { id: string; name: string; email: string; isActive: boolean } | null = null;
+      if (hasAds) {
+        try {
+          const ads = await this.prisma.adsAdmin.findMany({
+            where: { schoolId: id },
+            take: 1,
+            select: { id: true, name: true, email: true, isActive: true },
+            orderBy: { createdAt: 'asc' },
+          });
+          adsAdmin = ads[0] || null;
+        } catch (e) {
+          console.warn('[SuperAdmin Schools] findOne: could not load adsAdmin for school', id, e);
+        }
+      }
 
       return {
         id: school.id,
@@ -459,8 +472,8 @@ export class SchoolsService {
         tenure: school.tenure,
         isActive: school.isActive,
         enabledFeatures,
-        admin: s.admins[0] || null,
-        adsAdmin: hasAds ? (s.adsAdmins?.[0] || null) : null,
+        admin,
+        adsAdmin,
         createdAt: school.createdAt,
         updatedAt: school.updatedAt,
       };
@@ -469,7 +482,7 @@ export class SchoolsService {
       const message = err instanceof Error ? err.message : String(err);
       console.error('[SuperAdmin Schools] findOne error:', message, err);
       throw new HttpException(
-        { statusCode: 500, message: 'Failed to load school' },
+        { statusCode: 500, message: 'Failed to load school', error: message },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
