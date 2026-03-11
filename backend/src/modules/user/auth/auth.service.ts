@@ -236,7 +236,7 @@ export class UserAuthService {
       },
     });
     if (!user) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('Email not registered');
     }
     if (user.status !== 'active') {
       if (user.status === 'banned') {
@@ -262,7 +262,7 @@ export class UserAuthService {
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.password);
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('Incorrect password');
     }
 
     const payload = { sub: user.id, email: user.email, role: 'user' };

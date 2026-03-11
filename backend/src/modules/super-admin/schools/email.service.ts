@@ -681,6 +681,61 @@ export class EmailService {
     }
   }
 
+  /** Send "registration rejected" email to user when school admin rejects their pending signup. */
+  async sendRejectionEmailToUser(toEmail: string, userName: string, schoolName: string) {
+    const textBody = `Hello ${userName || 'there'},\n\nYour school administrator for ${schoolName} has not approved your SemBuzz account registration.\n\nYour registration has been declined. If you believe this was a mistake, please contact your school administration or try registering again with the correct documents.\n\n— SemBuzz`;
+
+    const mailOptions = {
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: toEmail,
+      subject: `SemBuzz - Registration not approved (${schoolName})`,
+      text: textBody,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: 'Poppins', Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #1a1f2e; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .content { background-color: #f8f9fa; padding: 30px; border-radius: 0 0 8px 8px; }
+            .footer { text-align: center; margin-top: 30px; color: #6c757d; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Registration not approved</h1>
+            </div>
+            <div class="content">
+              <p>Hello ${userName || 'there'},</p>
+              <p>Your school administrator for <strong>${schoolName}</strong> has not approved your SemBuzz account registration.</p>
+              <p>Your registration has been declined. If you believe this was a mistake, please contact your school administration or try registering again with the correct documents.</p>
+            </div>
+            <div class="footer">
+              <p>This is an automated email from SemBuzz. Please do not reply.</p>
+              <p>&copy; ${new Date().getFullYear()} SemBuzz. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.error('[EmailService] SMTP not configured. Cannot send rejection email.');
+      throw new Error('SMTP is not configured. Set SMTP_USER and SMTP_PASS in .env to send rejection emails.');
+    }
+    try {
+      console.log('[EmailService] 📧 Sending rejection email to', toEmail);
+      await this.transporter.sendMail(mailOptions);
+      console.log('[EmailService] ✅ Rejection email sent to', toEmail);
+    } catch (error: any) {
+      console.error('[EmailService] ❌ Failed to send rejection email:', error?.message || error);
+      throw error;
+    }
+  }
+
   async sendPendingUserToSchoolAdmin(
     adminEmail: string,
     userDetails: { firstName: string; lastName: string; email: string },
@@ -1489,7 +1544,8 @@ export class EmailService {
       if (requestData.meetingLink) {
         emailContent += `<p><strong style="color: #1a1f2e;">Join meeting:</strong> <a href="${requestData.meetingLink}" target="_blank">${requestData.meetingLink}</a></p><p style="color: #6c757d; font-size: 0.9em;">Google Calendar invites include a 5-minute reminder. Zoom sends its own reminder to participants.</p>`;
       } else if (requestData.meetingError) {
-        emailContent += `<p style="color: #856404; background-color: #fff3cd; padding: 12px; border-radius: 4px; font-size: 0.95em;"><strong>Meeting could not be created:</strong> ${requestData.meetingError}</p><p style="color: #6c757d; font-size: 0.9em;">To get a Meet link and calendar invite, open <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}">the app</a>, then visit <strong>http://localhost:3000/google/auth</strong> and sign in with the <strong>same Google account</strong> that owns the calendar where you want the event (e.g. naveen reddy). After authorizing, try scheduling again.</p>`;
+        const apiBase = process.env.API_URL || 'http://localhost:3000';
+        emailContent += `<p style="color: #856404; background-color: #fff3cd; padding: 12px; border-radius: 4px; font-size: 0.95em;"><strong>Meeting could not be created:</strong> ${requestData.meetingError}</p><p style="color: #6c757d; font-size: 0.9em;">To get a Meet link and calendar invite, open <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}">the app</a>, then visit <strong>${apiBase}/google/auth</strong> and sign in with the <strong>same Google account</strong> that owns the calendar where you want the event (e.g. naveen reddy). After authorizing, try scheduling again.</p>`;
       }
     }
 
@@ -2057,6 +2113,132 @@ export class EmailService {
       console.error('[EmailService] ❌ Failed to send category admin categories updated email:', error);
       throw error;
     }
+  }
+
+  /**
+   * Send contact form submission to support (and optional auto-reply to user).
+   * Uses same Hostinger SMTP as other emails.
+   */
+  async sendContactFormSubmission(data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    intent: string;
+    message: string;
+    query?: string;
+  }) {
+    const intentLabels: Record<string, string> = {
+      '': 'Choose...',
+      book_slot: 'Book slot',
+      raise_query: 'Raise query',
+      need_support: 'Need support',
+    };
+    const intentLabel = intentLabels[data.intent as keyof typeof intentLabels] || data.intent;
+
+    const supportEmail = process.env.CONTACT_EMAIL || process.env.SUPPORT_EMAIL || 'contact@sdmlllc.com';
+    const queryBlock =
+      data.query && data.query.trim()
+        ? `<div class="field"><span class="label">Query</span><div class="value message-box">${this.escapeHtml(data.query.trim())}</div></div>`
+        : '';
+    const mailOptions = {
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: supportEmail,
+      subject: `SemBuzz Contact: ${intentLabel} - from ${data.firstName} ${data.lastName}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: 'Poppins', Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #1a1f2e; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .content { background-color: #f8f9fa; padding: 30px; border-radius: 0 0 8px 8px; }
+            .field { margin: 12px 0; }
+            .label { font-weight: 600; color: #1a1f2e; }
+            .value { color: #495057; background: white; padding: 10px 14px; border-radius: 6px; margin-top: 4px; }
+            .message-box { white-space: pre-wrap; }
+            .footer { text-align: center; margin-top: 24px; color: #6c757d; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header"><h1>Contact form submission</h1></div>
+            <div class="content">
+              <div class="field"><span class="label">First name</span><div class="value">${this.escapeHtml(data.firstName)}</div></div>
+              <div class="field"><span class="label">Last name</span><div class="value">${this.escapeHtml(data.lastName)}</div></div>
+              <div class="field"><span class="label">Email</span><div class="value">${this.escapeHtml(data.email)}</div></div>
+              <div class="field"><span class="label">I want to</span><div class="value">${this.escapeHtml(intentLabel)}</div></div>
+              ${queryBlock}
+              <div class="field"><span class="label">Message</span><div class="value message-box">${this.escapeHtml(data.message)}</div></div>
+            </div>
+            <div class="footer"><p>&copy; ${new Date().getFullYear()} SemBuzz. Sent via contact form.</p></div>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.warn('[EmailService] SMTP not configured. Contact form submission not sent. Data:', data);
+      return;
+    }
+    try {
+      await this.transporter.sendMail(mailOptions);
+      console.log('[EmailService] Contact form email sent to', supportEmail);
+    } catch (error: any) {
+      console.error('[EmailService] Failed to send contact form email:', error?.message || error);
+      throw error;
+    }
+
+    // Auto-reply to user
+    try {
+      await this.sendContactFormAutoReply(data.email, data.firstName);
+    } catch (e: any) {
+      console.warn('[EmailService] Contact auto-reply failed (non-fatal):', e?.message);
+    }
+  }
+
+  private escapeHtml(text: string): string {
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  async sendContactFormAutoReply(toEmail: string, firstName: string) {
+    const mailOptions = {
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: toEmail,
+      subject: "We've received your message - SemBuzz",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: 'Poppins', Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #1a1f2e; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .content { background-color: #f8f9fa; padding: 30px; border-radius: 0 0 8px 8px; }
+            .footer { text-align: center; margin-top: 24px; color: #6c757d; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header"><h1>Thank you for reaching out</h1></div>
+            <div class="content">
+              <p>Hi ${this.escapeHtml(firstName)},</p>
+              <p>We've received your message and will get back to you as soon as possible.</p>
+              <p>Best regards,<br>The SemBuzz Team</p>
+            </div>
+            <div class="footer"><p>&copy; ${new Date().getFullYear()} SemBuzz.</p></div>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
+    await this.transporter.sendMail(mailOptions);
   }
 
   async sendSubCategoryAdminSubCategoriesUpdatedEmail(

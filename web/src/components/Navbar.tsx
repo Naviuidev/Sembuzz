@@ -10,9 +10,31 @@ export const Navbar = () => {
   const eventsFilter = useEventsFilter();
   const isActive = (path: string) => location.pathname === path;
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [sembuzzForDropdownOpen, setSembuzzForDropdownOpen] = useState(false);
+  const [sembuzzPolicyDropdownOpen, setSembuzzPolicyDropdownOpen] = useState(false);
   const isEventsPage = location.pathname === '/events';
   const showEventsNav =
     isAuthenticated && isEventsPage && eventsFilter;
+
+  const navLinkStyle = {
+    color: '#fff',
+    fontWeight: '400' as const,
+    padding: '0.5rem 1rem',
+    transition: 'color 0.3s',
+  };
+
+  const dropdownMenuStyle = {
+    position: 'absolute' as const,
+    top: '100%',
+    left: 0,
+    zIndex: 1050,
+    backgroundColor: '#fff',
+    border: '1px solid #dee2e6',
+    borderRadius: '8px',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    padding: '0.25rem 0',
+    minWidth: '200px',
+  };
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -28,7 +50,7 @@ export const Navbar = () => {
         backgroundColor: 'transparent',
         padding: '1rem 0'
       }}>
-        <div className="container " style={{
+        <div className="container-fluid " style={{
           border: '1px solid rgba(255, 255, 255, 0.15)',
           borderRadius: '50px',
           padding: '0.35rem 2rem',
@@ -36,8 +58,18 @@ export const Navbar = () => {
           boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
           backdropFilter: 'blur(10px)'
         }}>
-          {/* Brand/Logo - Left */}
-          <Link className="navbar-brand d-flex align-items-center" to="/" style={{ fontSize: '1.5rem', fontWeight: '600' }}>
+          {/* Brand/Logo - Left: scroll to top on home, else go to home */}
+          <Link
+            className="navbar-brand d-flex align-items-center"
+            to="/"
+            style={{ fontSize: '1.5rem', fontWeight: '600' }}
+            onClick={(e) => {
+              if (location.pathname === '/') {
+                e.preventDefault();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }
+            }}
+          >
             <span style={{ 
               display: 'inline-block',
               width: '30px',
@@ -82,69 +114,154 @@ export const Navbar = () => {
             <span style={{ color: '#4dabf7' }}>Buzz</span>
           </Link>
 
-          {/* Desktop Navigation Links - Center, Login - Right */}
-          <div className="d-none d-lg-flex w-100">
-            <ul className="navbar-nav mx-auto">
+          {/* Desktop Navigation Links - Center */}
+          <div className="d-none d-lg-flex w-100 align-items-center">
+            <ul className="navbar-nav ms-auto mb-0 align-items-center">
               <li className="nav-item">
                 <Link
-                  className={`nav-link ${isActive('/') ? 'active' : ''}`}
-                  to="/"
-                  style={{
-                    color: '#fff',
-                    fontWeight: '400',
-                    padding: '0.5rem 1rem',
-                    transition: 'color 0.3s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = '#4dabf7'}
-                  onMouseLeave={(e) => e.currentTarget.style.color = '#fff'}
-                >
-                  Home
-                </Link>
-              </li>
-              <li className="nav-item">
-                <Link
-                  className={`nav-link ${isActive('/about') ? 'active' : ''}`}
-                  to="/about"
-                  style={{
-                    color: '#fff',
-                    fontWeight: '400',
-                    padding: '0.5rem 1rem',
-                    transition: 'color 0.3s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = '#4dabf7'}
-                  onMouseLeave={(e) => e.currentTarget.style.color = '#fff'}
+                  className="nav-link"
+                  to="/#about"
+                  style={navLinkStyle}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#4dabf7'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#fff'; }}
                 >
                   About
                 </Link>
               </li>
+              <li
+                className="nav-item dropdown"
+                style={{ position: 'relative' }}
+                onMouseEnter={() => setSembuzzForDropdownOpen(true)}
+                onMouseLeave={() => setSembuzzForDropdownOpen(false)}
+              >
+                <button
+                  type="button"
+                  className="nav-link dropdown-toggle border-0 bg-transparent d-flex align-items-center gap-1"
+                  style={{ ...navLinkStyle, cursor: 'pointer' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#4dabf7'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#fff'; }}
+                  aria-expanded={sembuzzForDropdownOpen}
+                  aria-haspopup="true"
+                >
+                  Sembuzz is for
+                  <i
+                    className="bi bi-chevron-down"
+                    style={{ fontSize: '0.75rem', transition: 'transform 0.2s ease', transform: sembuzzForDropdownOpen ? 'rotate(180deg)' : 'none' }}
+                    aria-hidden
+                  />
+                </button>
+                <ul
+                  className="dropdown-menu list-unstyled mb-0"
+                  style={{
+                    ...dropdownMenuStyle,
+                    display: sembuzzForDropdownOpen ? 'block' : 'none',
+                  }}
+                >
+                  <li>
+                    <Link
+                      className="dropdown-item"
+                      to="/#for-students"
+                      style={{ color: '#1a1f2e', padding: '0.5rem 1rem', textDecoration: 'none', display: 'block' }}
+                    >
+                      For Students
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      className="dropdown-item"
+                      to="/#for-universities"
+                      style={{ color: '#1a1f2e', padding: '0.5rem 1rem', textDecoration: 'none', display: 'block' }}
+                    >
+                      For Universities
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      className="dropdown-item"
+                      to="/#for-employers"
+                      style={{ color: '#1a1f2e', padding: '0.5rem 1rem', textDecoration: 'none', display: 'block' }}
+                    >
+                      For Employers
+                    </Link>
+                  </li>
+                </ul>
+              </li>
+              <li
+                className="nav-item dropdown"
+                style={{ position: 'relative' }}
+                onMouseEnter={() => setSembuzzPolicyDropdownOpen(true)}
+                onMouseLeave={() => setSembuzzPolicyDropdownOpen(false)}
+              >
+                <button
+                  type="button"
+                  className="nav-link dropdown-toggle border-0 bg-transparent d-flex align-items-center gap-1"
+                  style={{ ...navLinkStyle, cursor: 'pointer' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#4dabf7'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#fff'; }}
+                  aria-expanded={sembuzzPolicyDropdownOpen}
+                  aria-haspopup="true"
+                >
+                  Sembuzz Policy
+                  <i
+                    className="bi bi-chevron-down"
+                    style={{ fontSize: '0.75rem', transition: 'transform 0.2s ease', transform: sembuzzPolicyDropdownOpen ? 'rotate(180deg)' : 'none' }}
+                    aria-hidden
+                  />
+                </button>
+                <ul
+                  className="dropdown-menu list-unstyled mb-0"
+                  style={{
+                    ...dropdownMenuStyle,
+                    display: sembuzzPolicyDropdownOpen ? 'block' : 'none',
+                  }}
+                >
+                  <li>
+                    <Link
+                      className="dropdown-item"
+                      to="/#privacy"
+                      style={{ color: '#1a1f2e', padding: '0.5rem 1rem', textDecoration: 'none', display: 'block' }}
+                    >
+                      Privacy Policy
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      className="dropdown-item"
+                      to="/#community-guidelines"
+                      style={{ color: '#1a1f2e', padding: '0.5rem 1rem', textDecoration: 'none', display: 'block' }}
+                    >
+                      Community Guidelines
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      className="dropdown-item"
+                      to="/#terms-of-service"
+                      style={{ color: '#1a1f2e', padding: '0.5rem 1rem', textDecoration: 'none', display: 'block' }}
+                    >
+                      Terms and Conditions
+                    </Link>
+                  </li>
+                </ul>
+              </li>
               <li className="nav-item">
                 <Link
-                  className={`nav-link ${isActive('/contact') ? 'active' : ''}`}
-                  to="/contact"
-                  style={{
-                    color: '#fff',
-                    fontWeight: '400',
-                    padding: '0.5rem 1rem',
-                    transition: 'color 0.3s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = '#4dabf7'}
-                  onMouseLeave={(e) => e.currentTarget.style.color = '#fff'}
+                  className={`nav-link ${isActive('/events') ? 'active' : ''}`}
+                  to="/events"
+                  style={navLinkStyle}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#4dabf7'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#fff'; }}
                 >
-                  Contact
+                  Events
                 </Link>
               </li>
               <li className="nav-item">
                 <Link
-                  className={`nav-link ${isActive('/faqs') ? 'active' : ''}`}
-                  to="/faqs"
-                  style={{
-                    color: '#fff',
-                    fontWeight: '400',
-                    padding: '0.5rem 1rem',
-                    transition: 'color 0.3s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = '#4dabf7'}
-                  onMouseLeave={(e) => e.currentTarget.style.color = '#fff'}
+                  className="nav-link"
+                  to="/#faqs"
+                  style={navLinkStyle}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#4dabf7'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#fff'; }}
                 >
                   FAQs
                 </Link>
@@ -154,13 +271,7 @@ export const Navbar = () => {
                   <button
                     type="button"
                     className="nav-link border-0 bg-transparent"
-                    style={{
-                      color: '#fff',
-                      fontWeight: '400',
-                      padding: '0.5rem 1rem',
-                      transition: 'color 0.3s',
-                      cursor: 'pointer',
-                    }}
+                    style={{ ...navLinkStyle, cursor: 'pointer' }}
                     onMouseEnter={(e) => { e.currentTarget.style.color = '#4dabf7'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.color = '#fff'; }}
                     onClick={() => navigate('/events', { state: { openAuth: 'signup', bottomNav: 'settings' } })}
@@ -171,24 +282,55 @@ export const Navbar = () => {
               )}
               <li className="nav-item">
                 <Link
-                  className={`nav-link ${isActive('/events') ? 'active' : ''}`}
-                  to="/events"
-                  style={{
-                    color: '#fff',
-                    fontWeight: '400',
-                    padding: '0.5rem 1rem',
-                    transition: 'color 0.3s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = '#4dabf7'}
-                  onMouseLeave={(e) => e.currentTarget.style.color = '#fff'}
+                  className="nav-link"
+                  to="/#contact-us"
+                  style={navLinkStyle}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#4dabf7'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#fff'; }}
                 >
-                  Events
+                  Contact
                 </Link>
               </li>
             </ul>
 
-            {/* Right: Events page – selected category, search, settings, more; then User / Login */}
-            <div className="d-flex align-items-center gap-2">
+            {/* Right: Social icons, Register, Login (or Events page tools + User) */}
+            <div className="d-flex align-items-center gap-2 ms-auto">
+              <a
+                href="https://www.instagram.com/sembuzzofficial/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="d-flex align-items-center justify-content-center"
+                style={{ color: 'rgba(255,255,255,0.9)', width: 32, height: 32, borderRadius: '50%', transition: 'color 0.2s' }}
+                aria-label="Instagram"
+                onMouseEnter={(e) => { e.currentTarget.style.color = '#4dabf7'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.9)'; }}
+              >
+                <i className="bi bi-instagram" style={{ fontSize: '1.2rem' }} />
+              </a>
+              <a
+                href="https://www.facebook.com/people/Sembuzzofficial/61555782134710/?ref=1"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="d-flex align-items-center justify-content-center"
+                style={{ color: 'rgba(255,255,255,0.9)', width: 32, height: 32, borderRadius: '50%', transition: 'color 0.2s' }}
+                aria-label="Facebook"
+                onMouseEnter={(e) => { e.currentTarget.style.color = '#4dabf7'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.9)'; }}
+              >
+                <i className="bi bi-facebook" style={{ fontSize: '1.2rem' }} />
+              </a>
+              <a
+                href="https://www.linkedin.com/company/sembuzzsdmlhq/posts/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="d-flex align-items-center justify-content-center"
+                style={{ color: 'rgba(255,255,255,0.9)', width: 32, height: 32, borderRadius: '50%', transition: 'color 0.2s' }}
+                aria-label="LinkedIn"
+                onMouseEnter={(e) => { e.currentTarget.style.color = '#4dabf7'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.9)'; }}
+              >
+                <i className="bi bi-linkedin" style={{ fontSize: '1.2rem' }} />
+              </a>
               {showEventsNav && (
                 <>
                   <span
@@ -395,7 +537,12 @@ export const Navbar = () => {
             <Link
               to="/"
               className="d-flex align-items-center"
-              onClick={closeMobileMenu}
+              onClick={() => {
+                closeMobileMenu();
+                if (location.pathname === '/') {
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              }}
               style={{ fontSize: '1.25rem', fontWeight: '600', textDecoration: 'none' }}
             >
               <span style={{ 
@@ -464,171 +611,67 @@ export const Navbar = () => {
           {/* Mobile Navigation Links */}
           <ul className="list-unstyled">
             <li className="mb-3">
-              <Link
-                to="/"
-                onClick={closeMobileMenu}
-                className={`d-block py-2 px-3 ${isActive('/') ? 'active' : ''}`}
-                style={{
-                  color: isActive('/') ? '#4dabf7' : '#fff',
-                  textDecoration: 'none',
-                  borderRadius: '8px',
-                  transition: 'all 0.3s',
-                  backgroundColor: isActive('/') ? 'rgba(77, 171, 247, 0.1)' : 'transparent'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive('/')) {
-                    e.currentTarget.style.color = '#4dabf7';
-                    e.currentTarget.style.backgroundColor = 'rgba(77, 171, 247, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive('/')) {
-                    e.currentTarget.style.color = '#fff';
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                Home
-              </Link>
-            </li>
-            <li className="mb-3">
-              <Link
-                to="/about"
-                onClick={closeMobileMenu}
-                className={`d-block py-2 px-3 ${isActive('/about') ? 'active' : ''}`}
-                style={{
-                  color: isActive('/about') ? '#4dabf7' : '#fff',
-                  textDecoration: 'none',
-                  borderRadius: '8px',
-                  transition: 'all 0.3s',
-                  backgroundColor: isActive('/about') ? 'rgba(77, 171, 247, 0.1)' : 'transparent'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive('/about')) {
-                    e.currentTarget.style.color = '#4dabf7';
-                    e.currentTarget.style.backgroundColor = 'rgba(77, 171, 247, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive('/about')) {
-                    e.currentTarget.style.color = '#fff';
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
+              <Link to="/#about" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
                 About
               </Link>
             </li>
+            <li className="mb-2 ms-3 small text-white-50">Sembuzz is for</li>
             <li className="mb-3">
-              <Link
-                to="/contact"
-                onClick={closeMobileMenu}
-                className={`d-block py-2 px-3 ${isActive('/contact') ? 'active' : ''}`}
-                style={{
-                  color: isActive('/contact') ? '#4dabf7' : '#fff',
-                  textDecoration: 'none',
-                  borderRadius: '8px',
-                  transition: 'all 0.3s',
-                  backgroundColor: isActive('/contact') ? 'rgba(77, 171, 247, 0.1)' : 'transparent'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive('/contact')) {
-                    e.currentTarget.style.color = '#4dabf7';
-                    e.currentTarget.style.backgroundColor = 'rgba(77, 171, 247, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive('/contact')) {
-                    e.currentTarget.style.color = '#fff';
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                Contact
+              <Link to="/#for-students" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
+                For Students
               </Link>
             </li>
             <li className="mb-3">
-              <Link
-                to="/faqs"
-                onClick={closeMobileMenu}
-                className={`d-block py-2 px-3 ${isActive('/faqs') ? 'active' : ''}`}
-                style={{
-                  color: isActive('/faqs') ? '#4dabf7' : '#fff',
-                  textDecoration: 'none',
-                  borderRadius: '8px',
-                  transition: 'all 0.3s',
-                  backgroundColor: isActive('/faqs') ? 'rgba(77, 171, 247, 0.1)' : 'transparent'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive('/faqs')) {
-                    e.currentTarget.style.color = '#4dabf7';
-                    e.currentTarget.style.backgroundColor = 'rgba(77, 171, 247, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive('/faqs')) {
-                    e.currentTarget.style.color = '#fff';
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
+              <Link to="/#for-universities" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
+                For Universities
+              </Link>
+            </li>
+            <li className="mb-3">
+              <Link to="/#for-employers" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
+                For Employers
+              </Link>
+            </li>
+            <li className="mb-2 ms-3 small text-white-50">Sembuzz Policy</li>
+            <li className="mb-3">
+              <Link to="/#privacy" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
+                Privacy Policy
+              </Link>
+            </li>
+            <li className="mb-3">
+              <Link to="/#community-guidelines" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
+                Community Guidelines
+              </Link>
+            </li>
+            <li className="mb-3">
+              <Link to="/#terms-of-service" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
+                Terms and Conditions
+              </Link>
+            </li>
+            <li className="mb-3">
+              <Link to="/events" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
+                Events
+              </Link>
+            </li>
+            <li className="mb-3">
+              <Link to="/#faqs" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
                 FAQs
               </Link>
             </li>
-            {!isAuthenticated && (
-              <li className="mb-3">
-                <button
-                  type="button"
-                  onClick={() => { closeMobileMenu(); navigate('/events', { state: { openAuth: 'signup', bottomNav: 'settings' } }); }}
-                  className="d-block py-2 px-3 w-100 text-start border-0 bg-transparent"
-                  style={{
-                    color: '#fff',
-                    textDecoration: 'none',
-                    borderRadius: '8px',
-                    transition: 'all 0.3s',
-                    backgroundColor: 'transparent',
-                    cursor: 'pointer',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = '#4dabf7';
-                    e.currentTarget.style.backgroundColor = 'rgba(77, 171, 247, 0.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = '#fff';
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  Register
-                </button>
-              </li>
-            )}
             <li className="mb-3">
-              <Link
-                to="/events"
-                onClick={closeMobileMenu}
-                className={`d-block py-2 px-3 ${isActive('/events') ? 'active' : ''}`}
-                style={{
-                  color: isActive('/events') ? '#4dabf7' : '#fff',
-                  textDecoration: 'none',
-                  borderRadius: '8px',
-                  transition: 'all 0.3s',
-                  backgroundColor: isActive('/events') ? 'rgba(77, 171, 247, 0.1)' : 'transparent'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive('/events')) {
-                    e.currentTarget.style.color = '#4dabf7';
-                    e.currentTarget.style.backgroundColor = 'rgba(77, 171, 247, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive('/events')) {
-                    e.currentTarget.style.color = '#fff';
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                Events
+              <Link to="/#contact-us" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
+                Contact us
               </Link>
+            </li>
+            <li className="mb-3 d-flex gap-2">
+              <a href="https://www.instagram.com/sembuzzofficial/" target="_blank" rel="noopener noreferrer" style={{ color: '#fff', padding: '0.5rem' }} aria-label="Instagram">
+                <i className="bi bi-instagram" style={{ fontSize: '1.25rem' }} />
+              </a>
+              <a href="https://www.facebook.com/people/Sembuzzofficial/61555782134710/?ref=1" target="_blank" rel="noopener noreferrer" style={{ color: '#fff', padding: '0.5rem' }} aria-label="Facebook">
+                <i className="bi bi-facebook" style={{ fontSize: '1.25rem' }} />
+              </a>
+              <a href="https://www.linkedin.com/company/sembuzzsdmlhq/posts/" target="_blank" rel="noopener noreferrer" style={{ color: '#fff', padding: '0.5rem' }} aria-label="LinkedIn">
+                <i className="bi bi-linkedin" style={{ fontSize: '1.25rem' }} />
+              </a>
             </li>
             {showEventsNav && (
               <li className="mb-3">
@@ -678,10 +721,27 @@ export const Navbar = () => {
                   Log out ({user.name})
                 </button>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => { closeMobileMenu(); navigate('/events', { state: { openAuth: 'login', bottomNav: 'settings' } }); }}
-                  className="btn btn-primary w-100 text-center d-block"
+                <>
+                  <button
+                    type="button"
+                    onClick={() => { closeMobileMenu(); navigate('/events', { state: { openAuth: 'signup', bottomNav: 'settings' } }); }}
+                    className="btn btn-outline-light w-100 text-center d-block mb-2"
+                    style={{
+                      borderRadius: '8px',
+                      padding: '0.75rem 1.5rem',
+                      fontWeight: '500',
+                      border: '1px solid rgba(255,255,255,0.5)',
+                      color: '#fff',
+                      backgroundColor: 'transparent',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Register
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { closeMobileMenu(); navigate('/events', { state: { openAuth: 'login', bottomNav: 'settings' } }); }}
+                    className="btn btn-primary w-100 text-center d-block"
                   style={{
                     backgroundColor: '#4dabf7',
                     border: 'none',
@@ -705,6 +765,7 @@ export const Navbar = () => {
               >
                 Log In
               </button>
+              </>
               )}
             </li>
           </ul>

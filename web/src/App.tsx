@@ -72,12 +72,14 @@ import { AdsAdminLogin } from './pages/AdsAdminLogin';
 import { AdsAdminSetPassword } from './pages/AdsAdminSetPassword';
 import { AdsAdminDashboard } from './pages/AdsAdminDashboard';
 import { AdsAdminAds } from './pages/AdsAdminAds';
+import { AdsAdminAdsAnalytics } from './pages/AdsAdminAdsAnalytics';
 import { About } from './pages/About';
 import { Contact } from './pages/Contact';
 import { FAQs } from './pages/FAQs';
 import { Register } from './pages/Register';
 import { UpdateVerificationDoc } from './pages/UpdateVerificationDoc';
 import { VerifyApproval } from './pages/VerifyApproval';
+import { Home } from './pages/Home';
 import { PublicEvents } from './pages/PublicEvents';
 import { SavedItems } from './pages/SavedItems';
 
@@ -552,6 +554,7 @@ const AdsAdminRoutes = () => {
       />
       <Route path="dashboard" element={<AdsAdminProtectedRoute><AdsAdminDashboard /></AdsAdminProtectedRoute>} />
       <Route path="ads" element={<AdsAdminProtectedRoute><AdsAdminAds /></AdsAdminProtectedRoute>} />
+      <Route path="ads-analytics" element={<AdsAdminProtectedRoute><AdsAdminAdsAnalytics /></AdsAdminProtectedRoute>} />
     </Routes>
   );
 };
@@ -559,8 +562,8 @@ const AdsAdminRoutes = () => {
 const AppRoutes = () => {
   return (
     <Routes>
-      {/* Public Routes — Events is the default (home) page */}
-      <Route path="/" element={<PublicEvents />} />
+      {/* Public Routes — Home is placeholder; Events at /events */}
+      <Route path="/" element={<Home />} />
       <Route path="/events" element={<PublicEvents />} />
       <Route path="/about" element={<About />} />
       <Route path="/contact" element={<Contact />} />
@@ -569,7 +572,6 @@ const AppRoutes = () => {
       <Route path="/update-verification-doc" element={<UpdateVerificationDoc />} />
       <Route path="/verify-approval" element={<VerifyApproval />} />
       <Route path="/login" element={<Navigate to="/events" state={{ openAuth: 'login' }} replace />} />
-      <Route path="/events" element={<PublicEvents />} />
       <Route path="/saved" element={<SavedItems />} />
       
       {/* Super Admin Routes */}

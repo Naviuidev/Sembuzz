@@ -18,6 +18,7 @@ import {
   type EventCommentResponse,
 } from '../services/user-events.service';
 import { userAuthService } from '../services/user-auth.service';
+import { api } from '../config/api';
 import { imageSrc } from '../utils/image';
 import { userHelpService } from '../services/user-help.service';
 import { userSchoolSocialService, type SchoolSocialAccountPublic } from '../services/user-school-social.service';
@@ -79,6 +80,25 @@ function parseImageUrls(imageUrls: string | null): string[] {
   } catch {
     return [];
   }
+}
+
+/** Build backend URL for "Login with Google" to add event to user's calendar (OAuth flow). */
+function buildGoogleCalendarAddAuthUrl(
+  post: { title: string; description?: string | null; scheduledTo: string },
+  returnUrl: string,
+): string {
+  const dateStr = post.scheduledTo.trim().slice(0, 10);
+  const startISO = `${dateStr}T09:00:00.000Z`;
+  const endISO = `${dateStr}T10:00:00.000Z`;
+  const base = (api.defaults.baseURL || '').replace(/\/$/, '');
+  const params = new URLSearchParams({
+    returnUrl,
+    title: post.title,
+    start: startISO,
+    end: endISO,
+    ...(post.description ? { description: post.description } : {}),
+  });
+  return `${base}/google/calendar/add-auth?${params.toString()}`;
 }
 
 type LikedEventItem = import('../services/user-events.service').LikedEventItem;
@@ -1105,6 +1125,11 @@ export const PublicEvents = () => {
   const [calendarPendingDate, setCalendarPendingDate] = useState<string | null>(null);
   const [calendarLoginTooltipVisible, setCalendarLoginTooltipVisible] = useState(false);
   const [selectedUpcomingPost, setSelectedUpcomingPost] = useState<UpcomingPostPublic | null>(null);
+  const [googleCalDropdownPostId, setGoogleCalDropdownPostId] = useState<string | null>(null);
+  const [googleCalReturnSuccess, setGoogleCalReturnSuccess] = useState(false);
+  const [googleCalReturnError, setGoogleCalReturnError] = useState<string | null>(null);
+  const [googleCalDropdownPosition, setGoogleCalDropdownPosition] = useState<{ top: number; left: number } | null>(null);
+  const googleCalAnchorRef = useRef<HTMLButtonElement | null>(null);
   const calendarButtonRef = useRef<HTMLButtonElement>(null);
   const calendarDropdownRef = useRef<HTMLDivElement>(null);
   const [selectedSettingsEvent, setSelectedSettingsEvent] = useState<ApprovedEventPublic | null>(null);
@@ -1117,6 +1142,53 @@ export const PublicEvents = () => {
   const contentCategoriesRef = useRef<HTMLDivElement | null>(null);
   const selectedSubCategoryIds = eventsFilter?.selectedSubCategoryIds ?? [];
   const queryClient = useQueryClient();
+
+  // When user returns from Google OAuth: read success/error from URL and show result
+  useEffect(() => {
+    const success = searchParams.get('googleCalSuccess');
+    const error = searchParams.get('googleCalError');
+    if (success === '1') {
+      setGoogleCalReturnSuccess(true);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('googleCalSuccess');
+        return next;
+      }, { replace: true });
+    }
+    if (error) {
+      setGoogleCalReturnError(decodeURIComponent(error));
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('googleCalError');
+        return next;
+      }, { replace: true });
+    }
+  }, [searchParams]);
+
+  // Position and close Google Calendar dropdown: set position after ref is attached, close on outside click
+  useEffect(() => {
+    if (!googleCalDropdownPostId) {
+      setGoogleCalDropdownPosition(null);
+      return;
+    }
+    const raf = requestAnimationFrame(() => {
+      const rect = googleCalAnchorRef.current?.getBoundingClientRect();
+      if (rect) {
+        const left = Math.max(8, Math.min(rect.right - 200, window.innerWidth - 208));
+        setGoogleCalDropdownPosition({ top: rect.bottom + 4, left });
+      }
+    });
+    const onDocClick = () => {
+      setGoogleCalDropdownPostId(null);
+      setGoogleCalDropdownPosition(null);
+    };
+    const t = setTimeout(() => document.addEventListener('click', onDocClick), 0);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(t);
+      document.removeEventListener('click', onDocClick);
+    };
+  }, [googleCalDropdownPostId]);
 
   // For logged-in user on home: use their school and saved subcategory preferences for the feed
   const isLoggedInHome = !!user && bottomNavActive === 'home';
@@ -1545,14 +1617,10 @@ export const PublicEvents = () => {
   type FeedItem = { type: 'event'; event: ApprovedEventPublic } | { type: 'sponsored'; ad: SponsoredAdPublic };
   const feedItems = useMemo((): FeedItem[] => {
     const events: FeedItem[] = sortedEvents.map((event) => ({ type: 'event', event }));
-    const sponsored: FeedItem[] = activeSponsoredAds.map((ad) => ({ type: 'sponsored', ad }));
-    const combined = [...events, ...sponsored];
-    combined.sort((a, b) => {
-      const dateA = a.type === 'event' ? new Date(a.event.updatedAt).getTime() : new Date(a.ad.startAt).getTime();
-      const dateB = b.type === 'event' ? new Date(b.event.updatedAt).getTime() : new Date(b.ad.startAt).getTime();
-      return dateB - dateA;
-    });
-    return combined;
+    const sponsored: FeedItem[] = [...activeSponsoredAds]
+      .sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime())
+      .map((ad) => ({ type: 'sponsored' as const, ad }));
+    return [...events, ...sponsored];
   }, [sortedEvents, activeSponsoredAds]);
 
   const { data: allSchools = [], isLoading: schoolsLoading } = useQuery({
@@ -1617,7 +1685,16 @@ export const PublicEvents = () => {
       setBottomNavActive('home');
       navigate('/events', { replace: true });
     } catch (err: unknown) {
-      setSettingsLoginError(err instanceof Error ? err.message : 'Login failed. Please try again.');
+      const ax = err as { response?: { status?: number; data?: { message?: string | string[] } } };
+      const msg = ax.response?.data?.message;
+      const text = Array.isArray(msg) ? msg[0] : typeof msg === 'string' ? msg : null;
+      if (text) {
+        setSettingsLoginError(text);
+      } else if (ax.response?.status === 401) {
+        setSettingsLoginError('Incorrect email or password. Please check your details or sign up if you don\'t have an account.');
+      } else {
+        setSettingsLoginError('Login failed. Please try again.');
+      }
     } finally {
       setSettingsLoginLoading(false);
     }
@@ -2435,8 +2512,8 @@ export const PublicEvents = () => {
                 <div className="d-flex flex-wrap gap-2 mb-4" style={{ gap: '0.5rem' }}>
                   <button
                     type="button"
-                    className="btn text-start border-0 d-flex align-items-center gap-2 py-2 px-3"
-                    style={{ borderRadius: '10px', backgroundColor: 'rgba(25, 135, 84, 0.15)', color: '#198754', flex: '0 0 auto', whiteSpace: 'nowrap' }}
+                    className="btn text-start btn-outline-dark rounded-pill d-flex align-items-center gap-2 py-2 px-3"
+                    style={{ borderRadius: '10px', flex: '0 0 auto', whiteSpace: 'nowrap' }}
                     onClick={openChangeCategoryModal}
                   >
                     <i className="bi bi-folder" />
@@ -2444,8 +2521,8 @@ export const PublicEvents = () => {
                   </button>
                   <button
                     type="button"
-                    className="btn text-start border-0 d-flex align-items-center gap-2 py-2 px-3"
-                    style={{ borderRadius: '10px', backgroundColor: 'rgba(13, 202, 240, 0.2)', color: '#087990', flex: '0 0 auto', whiteSpace: 'nowrap' }}
+                    className="btn text-start btn-outline-dark  rounded-pill d-flex align-items-center gap-2 py-2 px-3"
+                    style={{ borderRadius: '10px', flex: '0 0 auto', whiteSpace: 'nowrap' }}
                     onClick={() => setBottomNavActive('liked')}
                   >
                     <i className="bi bi-heart" />
@@ -2453,8 +2530,8 @@ export const PublicEvents = () => {
                   </button>
                   <button
                     type="button"
-                    className="btn text-start border-0 d-flex align-items-center gap-2 py-2 px-3"
-                    style={{ borderRadius: '10px', backgroundColor: 'rgba(13, 202, 240, 0.2)', color: '#087990', flex: '0 0 auto', whiteSpace: 'nowrap' }}
+                    className="btn text-start  btn-outline-dark rounded-pill d-flex align-items-center gap-2 py-2 px-3"
+                    style={{ borderRadius: '10px',  flex: '0 0 auto', whiteSpace: 'nowrap' }}
                     onClick={() => navigate('/saved')}
                   >
                     <i className="bi bi-bookmark" />
@@ -2462,8 +2539,8 @@ export const PublicEvents = () => {
                   </button>
                   <button
                     type="button"
-                    className="btn text-start border-0 d-flex align-items-center gap-2 py-2 px-3"
-                    style={{ borderRadius: '10px', backgroundColor: 'rgba(253, 126, 20, 0.2)', color: '#fd7e14', flex: '0 0 auto', whiteSpace: 'nowrap' }}
+                    className="btn text-start  btn-outline-dark rounded-pill d-flex align-items-center gap-2 py-2 px-3"
+                    style={{ borderRadius: '10px', flex: '0 0 auto', whiteSpace: 'nowrap' }}
                     onClick={() => setShowHelpModal(true)}
                   >
                     <i className="bi bi-question-circle" />
@@ -2471,8 +2548,8 @@ export const PublicEvents = () => {
                   </button>
                   <button
                     type="button"
-                    className="btn text-start border-0 d-flex align-items-center gap-2 py-2 px-3"
-                    style={{ borderRadius: '10px', backgroundColor: 'rgba(220, 53, 69, 0.15)', color: '#dc3545', flex: '0 0 auto', whiteSpace: 'nowrap' }}
+                    className="btn text-start btn-dark rounded-pill border d-flex align-items-center gap-2 py-2 px-3"
+                    style={{ borderRadius: '10px',  flex: '0 0 auto', whiteSpace: 'nowrap' }}
                     onClick={() => { logout(); navigate('/events'); }}
                   >
                     <i className="bi bi-box-arrow-right" />
@@ -2480,8 +2557,8 @@ export const PublicEvents = () => {
                   </button>
                   <button
                     type="button"
-                    className="btn text-start border-0 d-flex align-items-center gap-2 py-2 px-3"
-                    style={{ borderRadius: '10px', backgroundColor: 'rgba(108, 117, 125, 0.2)', color: '#6c757d', flex: '0 0 auto', whiteSpace: 'nowrap' }}
+                    className="btn text-start  btn-outline-danger rounded-pill d-flex align-items-center gap-2 py-2 px-3"
+                    style={{ borderRadius: '10px',  flex: '0 0 auto', whiteSpace: 'nowrap' }}
                     onClick={() => setShowDeleteAccountModal(true)}
                   >
                     <i className="bi bi-trash" />
@@ -3153,7 +3230,7 @@ export const PublicEvents = () => {
                         <div className="px-3 py-1 small text-muted">What&apos;s happening</div>
                         <button
                           type="button"
-                          className="btn btn-link btn-sm text-start w-100 d-block text-decoration-none"
+                          className="btn btn-link text-dark btn-sm text-start w-100 d-block text-decoration-none"
                           onClick={() => {
                             const d = new Date();
                             d.setDate(d.getDate() + 1);
@@ -3164,7 +3241,7 @@ export const PublicEvents = () => {
                         </button>
                         <button
                           type="button"
-                          className="btn btn-link btn-sm text-start w-100 d-block text-decoration-none"
+                          className="btn btn-link text-dark btn-sm text-start w-100 d-block text-decoration-none"
                           onClick={() => {
                             const d = new Date();
                             d.setDate(d.getDate() + 2);
@@ -3186,8 +3263,8 @@ export const PublicEvents = () => {
                           />
                           <button
                             type="button"
-                            className="btn btn-sm rounded-pill w-100"
-                            style={{ backgroundColor: 'rgba(13, 202, 240, 0.2)', color: '#087990' }}
+                            className="btn btn-outline-dark btn-sm rounded-pill w-100"
+                            
                             disabled={!calendarPendingDate}
                             onClick={() => {
                               if (calendarPendingDate) {
@@ -3393,6 +3470,97 @@ export const PublicEvents = () => {
                   className="btn btn-primary"
                   style={{ borderRadius: '8px' }}
                   onClick={() => setShowNoNewsPopup(false)}
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Success modal when user returns from Google OAuth after adding event */}
+        {googleCalReturnSuccess && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Event added"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 1070,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(0,0,0,0.4)',
+            }}
+            onClick={() => setGoogleCalReturnSuccess(false)}
+          >
+            <div
+              style={{
+                backgroundColor: '#fff',
+                borderRadius: '16px',
+                padding: '1.5rem',
+                maxWidth: '380px',
+                width: '90%',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="mb-0 fw-medium" style={{ color: '#1a1f2e', fontSize: '1rem' }}>
+                The event has been added to your Google Calendar successfully.
+              </p>
+              <div className="d-flex justify-content-end mt-3">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ borderRadius: '8px' }}
+                  onClick={() => setGoogleCalReturnSuccess(false)}
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Error modal when Google OAuth or add-event fails */}
+        {googleCalReturnError && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Error"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 1070,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(0,0,0,0.4)',
+            }}
+            onClick={() => setGoogleCalReturnError(null)}
+          >
+            <div
+              style={{
+                backgroundColor: '#fff',
+                borderRadius: '16px',
+                padding: '1.5rem',
+                maxWidth: '380px',
+                width: '90%',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="mb-0 fw-medium text-danger" style={{ fontSize: '1rem' }}>
+                Could not add event to Google Calendar
+              </p>
+              <p className="small text-muted mt-2 mb-3">{googleCalReturnError}</p>
+              <div className="d-flex justify-content-end">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ borderRadius: '8px' }}
+                  onClick={() => setGoogleCalReturnError(null)}
                 >
                   OK
                 </button>
@@ -3629,38 +3797,86 @@ export const PublicEvents = () => {
             ) : (
               <div className="d-flex flex-column gap-2">
                 {upcomingPostsByDate.map((post: UpcomingPostPublic) => (
-                  <div key={post.id} className="shadow-sm rounded-3 p-0 overflow-hidden" style={{ backgroundColor: '#fff' }}>
+                  <div key={post.id} className="shadow-sm rounded-3 p-0 d-flex align-items-stretch" style={{ backgroundColor: '#fff', overflow: 'visible' }}>
                     <button
                       type="button"
-                      className="border-0 w-100 text-start p-3 bg-transparent"
+                      className="border-0 text-start p-3 bg-transparent flex-grow-1"
                       style={{
                         display: 'flex',
                         flexDirection: 'row',
                         alignItems: 'center',
                         gap: '0.75rem',
                         cursor: 'pointer',
+                        minWidth: 0,
                       }}
                       onClick={() => setSelectedUpcomingPost(post)}
                     >
-                    {/* 1. Logo */}
-                    {post.school?.image ? (
-                      <img src={imageSrc(post.school.image)} alt="" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-                    ) : (
-                      <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(63deg, rgb(39 158 247 / 35%), rgb(87 177 245 / 36%))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#1a1f2e', fontSize: '1rem', flexShrink: 0 }}>
-                        {post.school?.name?.charAt(0)?.toUpperCase() ?? '?'}
-                      </div>
-                    )}
-                    {/* 2. Title (beside logo) */}
-                    <span style={{ flex: '1 1 0', minWidth: 0, fontWeight: 600, color: '#1a1f2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }} title={post.title}>{post.title}</span>
-                    {/* 3. School name (after title) */}
-                    <span className="small text-muted" style={{ flexShrink: 0, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={post.school?.name ?? 'School'}>{post.school?.name ?? 'School'}</span>
-                    {/* 4. Arrow */}
-                    <i className="bi bi-chevron-right text-muted" style={{ flexShrink: 0 }} />
+                      {post.school?.image ? (
+                        <img src={imageSrc(post.school.image)} alt="" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                      ) : (
+                        <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(63deg, rgb(39 158 247 / 35%), rgb(87 177 245 / 36%))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#1a1f2e', fontSize: '1rem', flexShrink: 0 }}>
+                          {post.school?.name?.charAt(0)?.toUpperCase() ?? '?'}
+                        </div>
+                      )}
+                      <span style={{ flex: '1 1 0', minWidth: 0, fontWeight: 600, color: '#1a1f2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }} title={post.title}>{post.title}</span>
+                      <span className="small text-muted" style={{ flexShrink: 0, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={post.school?.name ?? 'School'}>{post.school?.name ?? 'School'}</span>
+                      <i className="bi bi-chevron-right text-muted" style={{ flexShrink: 0 }} />
                     </button>
+                    <div className="d-flex align-items-center pe-2" style={{ position: 'relative' }}>
+                      <button
+                        ref={googleCalDropdownPostId === post.id ? googleCalAnchorRef : undefined}
+                        type="button"
+                        className="btn btn-link p-1 text-secondary border-0"
+                        style={{ minWidth: 36, minHeight: 36 }}
+                        aria-label="Add to Google Calendar"
+                        aria-expanded={googleCalDropdownPostId === post.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setGoogleCalDropdownPostId(googleCalDropdownPostId === post.id ? null : post.id);
+                        }}
+                      >
+                        <i className="bi bi-calendar-plus" style={{ fontSize: '1.25rem' }} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
+            {googleCalDropdownPostId && googleCalDropdownPosition && (() => {
+              const post = upcomingPostsByDate.find((p: UpcomingPostPublic) => p.id === googleCalDropdownPostId);
+              if (!post) return null;
+              const { top, left } = googleCalDropdownPosition;
+              return createPortal(
+                <div
+                  className="dropdown-menu show shadow-sm border py-1 bg-white"
+                  style={{
+                    position: 'fixed',
+                    left,
+                    top,
+                    minWidth: '200px',
+                    borderRadius: '8px',
+                    zIndex: 1060,
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    className="dropdown-item small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const returnUrl = `${window.location.origin}/events`;
+                      const url = buildGoogleCalendarAddAuthUrl(post, returnUrl);
+                      window.open(url, '_blank', 'noopener,noreferrer');
+                      setGoogleCalDropdownPostId(null);
+                      setGoogleCalDropdownPosition(null);
+                    }}
+                  >
+                    Add to Google Calendar
+                  </button>
+                </div>,
+                document.body,
+              );
+            })()}
           </div>
         ) : (
           <div style={{ maxWidth: '600px', margin: '0 auto' }}>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdsAdminAuth } from '../contexts/AdsAdminAuthContext';
 
@@ -7,8 +7,15 @@ export const AdsAdminLogin = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAdsAdminAuth();
+  const [showPassword, setShowPassword] = useState(false);
+  const { login, isAuthenticated } = useAdsAdminAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/ads-admin/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,66 +35,212 @@ export const AdsAdminLogin = () => {
   };
 
   return (
-    <div className="min-h-screen d-flex" style={{ backgroundColor: '#fafafa' }}>
-      <div className="d-flex align-items-center justify-content-center" style={{ flex: 1, padding: '2rem' }}>
-        <div style={{ width: '100%', maxWidth: '400px' }}>
-          <h1 style={{ fontSize: '1rem', fontWeight: 'normal', color: '#1a1f2e', marginBottom: '0.5rem' }}>SemBuzz</h1>
-          <h2 style={{ fontSize: '2rem', fontWeight: 'normal', color: '#1a1f2e', marginBottom: '0.5rem' }}>Ads Admin Portal</h2>
-          <p style={{ color: '#6c757d', fontSize: '1rem', marginBottom: '2rem' }}>
+    <div className="min-h-screen d-flex" style={{ backgroundColor: 'white' }}>
+      {/* Left Side - Image */}
+      <div
+        className="d-none d-md-flex align-items-center justify-content-center position-relative"
+        style={{
+          width: '50%',
+          minHeight: '100vh',
+          backgroundColor: '#f8f9fa',
+        }}
+      >
+        <img
+          src="https://www.shutterstock.com/image-illustration/content-creating-concept-creator-making-600nw-2262002449.jpg"
+          alt="Login Visual"
+          className="img-fluid h-100 w-100"
+          style={{ objectFit: 'cover' }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(255, 255, 255, 0)',
+          }}
+        />
+      </div>
+
+      {/* Right Side - Login Form */}
+      <div
+        className="d-flex align-items-center justify-content-start"
+        style={{
+          width: '50%',
+          minHeight: '100vh',
+          backgroundColor: '#fafafa',
+          padding: '2rem',
+        }}
+      >
+        <div style={{ width: '100%', maxWidth: '90%' }}>
+          {/* Brand Name */}
+          <div className="text-start mb-4">
+            <h1
+              style={{
+                fontSize: '1rem',
+                fontWeight: 'normal',
+                color: '#1a1f2e',
+                marginBottom: '0.5rem',
+              }}
+            >
+              SemBuzz
+            </h1>
+          </div>
+
+          {/* Main Heading */}
+          <h2
+            className="mb-3"
+            style={{
+              fontSize: '3rem',
+              fontWeight: 'normal',
+              color: '#1a1f2e',
+              marginBottom: '0.5rem',
+            }}
+          >
+            Ads Admin Portal
+          </h2>
+
+          <p
+            style={{
+              color: '#6c757d',
+              fontSize: '1rem',
+              marginBottom: '2rem',
+            }}
+          >
             Sign in to manage banner and sponsored ads for your school.
           </p>
+
           <form onSubmit={handleSubmit}>
             {error && (
-              <div className="alert alert-danger" style={{ borderRadius: '0px' }}>
+              <div className="alert alert-danger" role="alert">
                 {error}
               </div>
             )}
+
             <div className="mb-3">
-              <label className="form-label" style={{ fontWeight: '500', color: '#1a1f2e' }}>Email</label>
+              <label
+                htmlFor="email"
+                className="form-label"
+                style={{
+                  fontWeight: '500',
+                  color: '#1a1f2e',
+                  marginBottom: '0.5rem',
+                }}
+              >
+                Email
+              </label>
               <input
+                id="email"
                 type="email"
-                className="form-control"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                required
                 placeholder="ads@school.edu"
-                required
-                style={{ borderRadius: '0px', padding: '0.75rem' }}
+                style={{
+                  borderRadius: '0px',
+                  padding: '0.75rem 1rem',
+                  border: '1px solid #dee2e6',
+                  width: '100%',
+                }}
               />
             </div>
-            <div className="mb-4">
-              <label className="form-label" style={{ fontWeight: '500', color: '#1a1f2e' }}>Password</label>
-              <p className="text-muted small mb-1">Use your temporary password for first-time login; you will be asked to set a new password.</p>
-              <input
-                type="password"
-                className="form-control"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                style={{ borderRadius: '0px', padding: '0.75rem' }}
-              />
+
+            <div className="mb-3">
+              <label
+                htmlFor="password"
+                className="form-label"
+                style={{
+                  fontWeight: '500',
+                  color: '#1a1f2e',
+                  marginBottom: '0.5rem',
+                }}
+              >
+                Password
+              </label>
+              <p className="text-muted small mb-1">
+                Use your temporary password for first-time login; you will be asked to set a new password.
+              </p>
+              <div className="input-group">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  placeholder="Enter your password"
+                  style={{
+                    borderRadius: '0px',
+                    padding: '0.75rem 1rem',
+                    paddingRight: '3rem',
+                    border: '1px solid #dee2e6',
+                    width: '100%',
+                  }}
+                />
+                <button
+                  className="btn btn-outline-secondary"
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    borderLeft: 'none',
+                    borderRadius: '0px',
+                    backgroundColor: 'white',
+                    borderColor: '#dee2e6',
+                  }}
+                >
+                  <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`} style={{ fontSize: '1rem' }} />
+                </button>
+              </div>
             </div>
+
+            <div className="mb-4 text-end">
+              <a
+                href="/ads-admin/forgot-password"
+                style={{
+                  color: '#1a1f2e',
+                  textDecoration: 'none',
+                  fontSize: '0.9rem',
+                }}
+              >
+                Forgot Password?
+              </a>
+            </div>
+
             <button
               type="submit"
               disabled={loading}
-              className="btn w-100"
               style={{
-                backgroundColor: '#1a1f2e',
+                background: 'rgb(26, 31, 46)',
                 border: 'none',
                 borderRadius: '50px',
-                padding: '0.75rem',
+                padding: '0.75rem 1.5rem',
+                fontWeight: '600',
                 color: '#fff',
-                fontWeight: '500',
+                width: '100%',
+                transition: 'all 0.3s',
+              }}
+              onMouseEnter={(e) => {
+                if (!loading) {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.backgroundColor = 'white';
+                  e.currentTarget.style.color = 'black';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgb(26, 31, 46, 0.32)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!loading) {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.backgroundColor = 'rgb(26, 31, 46)';
+                  e.currentTarget.style.color = 'white';
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(26, 31, 46, 0.32)';
+                }
               }}
             >
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
-          <p className="mt-3 mb-0" style={{ fontSize: '0.875rem', color: '#6c757d' }}>
-            <a href="/ads-admin/forgot-password" style={{ color: '#1a1f2e' }}>Forgot password?</a>
-          </p>
         </div>
       </div>
     </div>
   );
-}
+};

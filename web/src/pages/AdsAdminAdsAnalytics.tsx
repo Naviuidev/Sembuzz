@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CategoryAdminNavbar } from '../components/CategoryAdminNavbar';
-import { CategoryAdminSidebar } from '../components/CategoryAdminSidebar';
-import { categoryAdminBannerAdsService } from '../services/category-admin-banner-ads.service';
-import { categoryAdminSponsoredAdsService } from '../services/category-admin-sponsored-ads.service';
+import { AdsAdminNavbar } from '../components/AdsAdminNavbar';
+import { AdsAdminSidebar } from '../components/AdsAdminSidebar';
+import { adsAdminBannerAdsService } from '../services/ads-admin-banner-ads.service';
+import { adsAdminSponsoredAdsService } from '../services/ads-admin-sponsored-ads.service';
 import { imageSrc } from '../utils/image';
 import { formatInCST, utcToCSTDatetimeLocalString, cstDatetimeLocalStringToUTC } from '../utils/cst-date';
 
@@ -20,7 +20,7 @@ function formatScheduleDate(d: Date): string {
 
 type AdAnalyticsTab = 'banner' | 'sponsored';
 
-export const CategoryAdminAdsAnalytics = () => {
+export const AdsAdminAdsAnalytics = () => {
   const [tab, setTab] = useState<AdAnalyticsTab>('banner');
   const [dateRangePreset, setDateRangePreset] = useState('7');
   const [filterDateFrom, setFilterDateFrom] = useState('');
@@ -41,10 +41,13 @@ export const CategoryAdminAdsAnalytics = () => {
   const [deleteConfirmAdId, setDeleteConfirmAdId] = useState<string | null>(null);
   const [deleteDeleting, setDeleteDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [toggleOffConfirm, setToggleOffConfirm] = useState<{ ad: AdRow; type: 'banner' | 'sponsored' } | null>(null);
+  const [toggleOffSubmitting, setToggleOffSubmitting] = useState(false);
 
   const queryClient = useQueryClient();
 
-  // Update current time periodically so the active/inactive toggle matches the system clock (same as banner ads)
+  type AdRow = { id: string; startAt: string; endAt: string; externalLink?: string | null };
+
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 10 * 1000);
@@ -52,14 +55,14 @@ export const CategoryAdminAdsAnalytics = () => {
   }, []);
 
   const { data: bannerList = [] } = useQuery({
-    queryKey: ['category-admin', 'banner-ads', 'list'],
-    queryFn: () => categoryAdminBannerAdsService.list(),
+    queryKey: ['ads-admin', 'banner-ads', 'list'],
+    queryFn: () => adsAdminBannerAdsService.list(),
     enabled: tab === 'banner',
   });
 
   const { data: sponsoredList = [] } = useQuery({
-    queryKey: ['category-admin', 'sponsored-ads', 'list'],
-    queryFn: () => categoryAdminSponsoredAdsService.list(),
+    queryKey: ['ads-admin', 'sponsored-ads', 'list'],
+    queryFn: () => adsAdminSponsoredAdsService.list(),
     enabled: tab === 'sponsored',
   });
 
@@ -81,9 +84,9 @@ export const CategoryAdminAdsAnalytics = () => {
   }, [dateRangePreset, filterDateFrom, filterDateTo]);
 
   const { data: analytics, isLoading: analyticsLoading } = useQuery({
-    queryKey: ['category-admin', 'banner-ads', 'analytics', queryDateFrom ?? '', queryDateTo ?? '', filterBannerAdId],
+    queryKey: ['ads-admin', 'banner-ads', 'analytics', queryDateFrom ?? '', queryDateTo ?? '', filterBannerAdId],
     queryFn: () =>
-      categoryAdminBannerAdsService.getAnalytics({
+      adsAdminBannerAdsService.getAnalytics({
         dateFrom: queryDateFrom,
         dateTo: queryDateTo,
         bannerAdId: filterBannerAdId || undefined,
@@ -92,9 +95,9 @@ export const CategoryAdminAdsAnalytics = () => {
   });
 
   const { data: sponsoredAnalytics, isLoading: sponsoredAnalyticsLoading } = useQuery({
-    queryKey: ['category-admin', 'sponsored-ads', 'analytics', queryDateFrom ?? '', queryDateTo ?? '', filterSponsoredAdId],
+    queryKey: ['ads-admin', 'sponsored-ads', 'analytics', queryDateFrom ?? '', queryDateTo ?? '', filterSponsoredAdId],
     queryFn: () =>
-      categoryAdminSponsoredAdsService.getAnalytics({
+      adsAdminSponsoredAdsService.getAnalytics({
         dateFrom: queryDateFrom,
         dateTo: queryDateTo,
         sponsoredAdId: filterSponsoredAdId || undefined,
@@ -104,13 +107,38 @@ export const CategoryAdminAdsAnalytics = () => {
 
   const totals = analytics?.totals ?? { views: 0, clicks: 0 };
   const adsWithCounts = analytics?.ads ?? [];
-  const byDay = analytics?.byDay ?? [];
+  const byDayRaw = analytics?.byDay ?? [];
   const totalViews = totals.views;
   const totalClicks = totals.clicks;
 
   const sponsoredTotals = sponsoredAnalytics?.totals ?? { views: 0, clicks: 0 };
   const sponsoredAdsWithCounts = sponsoredAnalytics?.ads ?? [];
-  const sponsoredByDay = sponsoredAnalytics?.byDay ?? [];
+  const sponsoredByDayRaw = sponsoredAnalytics?.byDay ?? [];
+
+  // Fill byDay with date range when empty so line chart always has a timeline
+  const byDay = useMemo(() => {
+    if (byDayRaw.length > 0) return byDayRaw;
+    if (!queryDateFrom || !queryDateTo) return [];
+    const days: Array<{ date: string; views: number; clicks: number }> = [];
+    const from = new Date(queryDateFrom + 'T00:00:00');
+    const to = new Date(queryDateTo + 'T00:00:00');
+    for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+      days.push({ date: d.toISOString().slice(0, 10), views: 0, clicks: 0 });
+    }
+    return days;
+  }, [byDayRaw, queryDateFrom, queryDateTo]);
+
+  const sponsoredByDay = useMemo(() => {
+    if (sponsoredByDayRaw.length > 0) return sponsoredByDayRaw;
+    if (!queryDateFrom || !queryDateTo) return [];
+    const days: Array<{ date: string; views: number; clicks: number }> = [];
+    const from = new Date(queryDateFrom + 'T00:00:00');
+    const to = new Date(queryDateTo + 'T00:00:00');
+    for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+      days.push({ date: d.toISOString().slice(0, 10), views: 0, clicks: 0 });
+    }
+    return days;
+  }, [sponsoredByDayRaw, queryDateFrom, queryDateTo]);
 
   const openReactivateModal = (ad: { id: string; startAt: string; endAt: string; externalLink?: string | null }, type: 'banner' | 'sponsored') => {
     const start = new Date(ad.startAt);
@@ -145,29 +173,29 @@ export const CategoryAdminAdsAnalytics = () => {
       setReactivateError('End date/time must be after start date/time.');
       return;
     }
-    const now = new Date();
-    if (end <= now) {
+    const nowDate = new Date();
+    if (end <= nowDate) {
       setReactivateError('End date/time must be in the future so the ad can show in the feed.');
       return;
     }
     setReactivateSubmitting(true);
     try {
       if (reactivateType === 'banner') {
-        await categoryAdminBannerAdsService.updateBannerAd(reactivateAdId, {
+        await adsAdminBannerAdsService.update(reactivateAdId, {
           startAt: start.toISOString(),
           endAt: end.toISOString(),
           externalLink: reactivateUrl.trim() || undefined,
         });
-        await queryClient.invalidateQueries({ queryKey: ['category-admin', 'banner-ads'] });
-        await queryClient.invalidateQueries({ queryKey: ['public', 'banner-ads'] });
+        await queryClient.invalidateQueries({ queryKey: ['ads-admin', 'banner-ads'] });
+        await queryClient.refetchQueries({ queryKey: ['ads-admin', 'banner-ads'] });
       } else {
-        await categoryAdminSponsoredAdsService.updateSponsoredAd(reactivateAdId, {
+        await adsAdminSponsoredAdsService.update(reactivateAdId, {
           startAt: start.toISOString(),
           endAt: end.toISOString(),
           externalLink: reactivateUrl.trim() || undefined,
         });
-        await queryClient.invalidateQueries({ queryKey: ['category-admin', 'sponsored-ads'] });
-        await queryClient.invalidateQueries({ queryKey: ['public', 'sponsored-ads'] });
+        await queryClient.invalidateQueries({ queryKey: ['ads-admin', 'sponsored-ads'] });
+        await queryClient.refetchQueries({ queryKey: ['ads-admin', 'sponsored-ads'] });
       }
       closeReactivateModal();
     } catch (err: unknown) {
@@ -180,25 +208,36 @@ export const CategoryAdminAdsAnalytics = () => {
     }
   };
 
-  type AdRow = { id: string; startAt: string; endAt: string; externalLink?: string | null };
-  const handleStatusToggle = async (ad: AdRow, type: 'banner' | 'sponsored') => {
+  const handleStatusToggle = (ad: AdRow, type: 'banner' | 'sponsored') => {
     const start = new Date(ad.startAt);
     const end = new Date(ad.endAt);
     const isActive = now >= start && now <= end;
     if (isActive) {
-      try {
-        if (type === 'banner') {
-          await categoryAdminBannerAdsService.endBannerAdNow(ad.id);
-          await queryClient.invalidateQueries({ queryKey: ['category-admin', 'banner-ads'] });
-        } else {
-          await categoryAdminSponsoredAdsService.endSponsoredAdNow(ad.id);
-          await queryClient.invalidateQueries({ queryKey: ['category-admin', 'sponsored-ads'] });
-        }
-      } catch {
-        // ignore
-      }
+      setToggleOffConfirm({ ad, type });
     } else {
       openReactivateModal(ad, type);
+    }
+  };
+
+  const confirmToggleOff = async () => {
+    if (!toggleOffConfirm) return;
+    const { ad, type } = toggleOffConfirm;
+    setToggleOffSubmitting(true);
+    try {
+      if (type === 'banner') {
+        await adsAdminBannerAdsService.endNow(ad.id);
+        await queryClient.invalidateQueries({ queryKey: ['ads-admin', 'banner-ads'] });
+        await queryClient.refetchQueries({ queryKey: ['ads-admin', 'banner-ads'] });
+      } else {
+        await adsAdminSponsoredAdsService.endNow(ad.id);
+        await queryClient.invalidateQueries({ queryKey: ['ads-admin', 'sponsored-ads'] });
+        await queryClient.refetchQueries({ queryKey: ['ads-admin', 'sponsored-ads'] });
+      }
+      setToggleOffConfirm(null);
+    } catch {
+      // keep modal open on error
+    } finally {
+      setToggleOffSubmitting(false);
     }
   };
 
@@ -221,11 +260,11 @@ export const CategoryAdminAdsAnalytics = () => {
     setDeleteDeleting(true);
     try {
       if (deleteConfirmType === 'banner') {
-        await categoryAdminBannerAdsService.deleteBannerAd(deleteConfirmAdId);
-        queryClient.invalidateQueries({ queryKey: ['category-admin', 'banner-ads'] });
+        await adsAdminBannerAdsService.delete(deleteConfirmAdId);
+        queryClient.invalidateQueries({ queryKey: ['ads-admin', 'banner-ads'] });
       } else {
-        await categoryAdminSponsoredAdsService.deleteSponsoredAd(deleteConfirmAdId);
-        queryClient.invalidateQueries({ queryKey: ['category-admin', 'sponsored-ads'] });
+        await adsAdminSponsoredAdsService.delete(deleteConfirmAdId);
+        queryClient.invalidateQueries({ queryKey: ['ads-admin', 'sponsored-ads'] });
       }
       setDeleteConfirmAdId(null);
     } catch (err: unknown) {
@@ -240,9 +279,9 @@ export const CategoryAdminAdsAnalytics = () => {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#eef1f5' }}>
-      <CategoryAdminNavbar />
+      <AdsAdminNavbar />
       <div className="d-flex">
-        <CategoryAdminSidebar />
+        <AdsAdminSidebar />
         <div style={{ flex: 1, padding: '1.5rem 2rem', minWidth: 0 }}>
           <div className="mb-4">
             <h1 className="h4 mb-1" style={{ color: '#1a1f2e', fontWeight: 600 }}>
@@ -290,7 +329,7 @@ export const CategoryAdminAdsAnalytics = () => {
                 <div className="d-flex align-items-center gap-2 flex-wrap">
                   <select className="form-select form-select-sm" style={{ width: 'auto', minWidth: 180 }} value={filterSponsoredAdId} onChange={(e) => setFilterSponsoredAdId(e.target.value)}>
                     <option value="">All sponsored ads</option>
-                    {sponsoredList.map((ad) => (
+                    {sponsoredList.map((ad: { id: string; title?: string | null; startAt: string }) => (
                       <option key={ad.id} value={ad.id}>{ad.title || `Ad ${new Date(ad.startAt).toLocaleDateString()}`}</option>
                     ))}
                   </select>
@@ -372,7 +411,7 @@ export const CategoryAdminAdsAnalytics = () => {
                           </div>
                         );
                       })()}
-                      {graphView === 'line' && sponsoredByDay.length === 0 && <p className="text-muted text-center py-4 mb-0 small">No data in this date range.</p>}
+                      {graphView === 'line' && sponsoredByDay.length === 0 && <p className="text-muted text-center py-4 mb-0 small">Select a date range to see the line chart.</p>}
                       {graphView === 'bar' && (
                         <div className="mb-4">
                           <div className="small text-muted mb-2 fw-medium">Totals</div>
@@ -475,7 +514,7 @@ export const CategoryAdminAdsAnalytics = () => {
                                   <div className="rounded-2 overflow-hidden flex-shrink-0" style={{ width: 80, height: 44, backgroundColor: '#e9ecef' }}>
                                     {firstImg ? <img src={imageSrc(firstImg)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div className="w-100 h-100 d-flex align-items-center justify-content-center"><i className="bi bi-badge-ad text-muted" /></div>}
                                   </div>
-                                  <span className="small text-muted">{(ad as { title?: string | null }).title ?? 'Sponsored ad'}</span>
+                                  <span className="small text-muted">{ad.title ?? 'Sponsored ad'}</span>
                                 </div>
                               </td>
                               <td>
@@ -536,7 +575,7 @@ export const CategoryAdminAdsAnalytics = () => {
                     onChange={(e) => setFilterBannerAdId(e.target.value)}
                   >
                     <option value="">All banner ads</option>
-                    {bannerList.map((ad) => (
+                    {bannerList.map((ad: { id: string; startAt: string; endAt: string }) => (
                       <option key={ad.id} value={ad.id}>
                         Banner {new Date(ad.startAt).toLocaleDateString()} – {new Date(ad.endAt).toLocaleDateString()}
                       </option>
@@ -648,7 +687,7 @@ export const CategoryAdminAdsAnalytics = () => {
                           </div>
                         );
                       })}
-                      {graphView === 'line' && byDay.length === 0 && <p className="text-muted text-center py-4 mb-0 small">No data in this date range.</p>}
+                      {graphView === 'line' && byDay.length === 0 && <p className="text-muted text-center py-4 mb-0 small">Select a date range to see the line chart.</p>}
 
                       {graphView === 'bar' && (
                         <div className="mb-4">
@@ -839,7 +878,28 @@ export const CategoryAdminAdsAnalytics = () => {
             </>
           )}
 
-          {/* Modals: outside tab content so they work for both Banner and Sponsored */}
+          {toggleOffConfirm && (
+            <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} tabIndex={-1}>
+              <div className="modal-dialog modal-dialog-centered">
+                <div className="modal-content rounded-3">
+                  <div className="modal-header border-0 pb-0">
+                    <h5 className="modal-title" style={{ fontWeight: 600, color: '#1a1f2e' }}>Turn off {toggleOffConfirm.type === 'sponsored' ? 'sponsored' : 'banner'} ad?</h5>
+                    <button type="button" className="btn-close" aria-label="Close" onClick={() => !toggleOffSubmitting && setToggleOffConfirm(null)} disabled={toggleOffSubmitting} />
+                  </div>
+                  <div className="modal-body pt-2">
+                    <p className="mb-0">By turning off this ad, it will <strong>no longer be displayed</strong> to users. You can turn it back on later with a new schedule from this page.</p>
+                  </div>
+                  <div className="modal-footer border-0 pt-0">
+                    <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setToggleOffConfirm(null)} disabled={toggleOffSubmitting}>Cancel</button>
+                    <button type="button" className="btn btn-warning btn-sm" onClick={confirmToggleOff} disabled={toggleOffSubmitting}>
+                      {toggleOffSubmitting ? 'Turning off…' : 'Turn off ad'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {reactivateAdId && (
             <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} tabIndex={-1}>
               <div className="modal-dialog modal-dialog-centered">
@@ -854,33 +914,15 @@ export const CategoryAdminAdsAnalytics = () => {
                       {reactivateError && <div className="alert alert-danger py-2 small mb-3">{reactivateError}</div>}
                       <div className="mb-3">
                         <label className="form-label small fw-semibold">Start date & time <span className="text-muted fw-normal">(CST)</span></label>
-                        <input
-                          type="datetime-local"
-                          className="form-control form-control-sm"
-                          value={reactivateStartAt}
-                          onChange={(e) => setReactivateStartAt(e.target.value)}
-                          required
-                        />
+                        <input type="datetime-local" className="form-control form-control-sm" value={reactivateStartAt} onChange={(e) => setReactivateStartAt(e.target.value)} required />
                       </div>
                       <div className="mb-3">
                         <label className="form-label small fw-semibold">End date & time <span className="text-muted fw-normal">(CST)</span></label>
-                        <input
-                          type="datetime-local"
-                          className="form-control form-control-sm"
-                          value={reactivateEndAt}
-                          onChange={(e) => setReactivateEndAt(e.target.value)}
-                          required
-                        />
+                        <input type="datetime-local" className="form-control form-control-sm" value={reactivateEndAt} onChange={(e) => setReactivateEndAt(e.target.value)} required />
                       </div>
                       <div className="mb-3">
                         <label className="form-label small fw-semibold">Attached URL (optional)</label>
-                        <input
-                          type="url"
-                          className="form-control form-control-sm"
-                          placeholder="https://..."
-                          value={reactivateUrl}
-                          onChange={(e) => setReactivateUrl(e.target.value)}
-                        />
+                        <input type="url" className="form-control form-control-sm" placeholder="https://..." value={reactivateUrl} onChange={(e) => setReactivateUrl(e.target.value)} />
                       </div>
                     </div>
                     <div className="modal-footer border-0 pt-0">

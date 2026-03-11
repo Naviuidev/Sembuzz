@@ -12,6 +12,7 @@ import { CategoryAdminModule } from './modules/category-admin/category-admin.mod
 import { SubCategoryAdminModule } from './modules/subcategory-admin/subcategory-admin.module';
 import { AdsAdminModule } from './modules/ads-admin/ads-admin.module';
 import { UserModule } from './modules/user/user.module';
+import { ContactModule } from './modules/contact/contact.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { UserModule } from './modules/user/user.module';
     SubCategoryAdminModule,
     AdsAdminModule,
     UserModule,
+    ContactModule,
   ],
   controllers: [AppController, GoogleAuthController, EventsPublicController],
   providers: [AppService],

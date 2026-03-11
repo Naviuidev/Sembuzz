@@ -225,13 +225,13 @@ export const Register = () => {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#f8f9fa' }}>
+    <div className="min-h-screen contact-page-bg">
       <Navbar />
 
       <div className="container py-5" style={{ paddingBottom: '5rem' }}>
         <div className="row justify-content-center">
           <div className="col-md-8 col-lg-6">
-            <div className="card border-0 shadow-sm" style={{ borderRadius: '12px' }}>
+            <div className="card border-0" style={{ borderRadius: '12px', backgroundColor: 'transparent', boxShadow: 'none' }}>
               <div className="card-body p-5">
                 {step === 'method' && (
                   <>
@@ -570,7 +570,7 @@ export const Register = () => {
                       </p>
                       <button
                         type="button"
-                        className="btn btn-outline-primary"
+                        className="btn btn-outline-dark rounded-pill"
                         style={{ borderRadius: '8px' }}
                         onClick={() => navigate('/events', { state: { openAuth: 'login', bottomNav: 'settings' } })}
                       >

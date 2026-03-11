@@ -86,7 +86,7 @@ export class SchoolsService {
     }
 
     // Check if admin email already exists
-    const existingAdmin = await this.prisma.schoolAdmin.findUnique({
+    const existingAdmin = await this.client.schoolAdmin.findUnique({
       where: { email: adminEmail },
     });
 
@@ -102,7 +102,7 @@ export class SchoolsService {
       if (existingAdsAdmin) {
         throw new BadRequestException('Ads Admin email is already in use.');
       }
-      const existingSchoolAdminWithAdsEmail = await this.prisma.schoolAdmin.findUnique({
+      const existingSchoolAdminWithAdsEmail = await this.client.schoolAdmin.findUnique({
         where: { email: adsAdminEmail.trim() },
       });
       if (existingSchoolAdminWithAdsEmail) {
@@ -175,7 +175,7 @@ export class SchoolsService {
         });
 
         // Create school admin
-        const admin = await tx.schoolAdmin.create({
+        const admin = await (tx as any).schoolAdmin.create({
           data: {
             name: adminName,
             email: adminEmail,
@@ -340,7 +340,7 @@ export class SchoolsService {
 
   async findAll() {
     try {
-      const schools = await this.prisma.school.findMany({
+      const schools = await this.client.school.findMany({
         include: {
           admins: {
             where: { isActive: true },
@@ -396,7 +396,7 @@ export class SchoolsService {
 
   async findOne(id: string) {
     try {
-      const school = await this.prisma.school.findUnique({
+      const school = await this.client.school.findUnique({
         where: { id },
         include: {
           admins: {
@@ -521,11 +521,12 @@ export class SchoolsService {
           allFeatures.map((f) => [f.code, f])
         );
 
-        // Get current school features to track changes
-        const currentSchoolFeatures = await tx.schoolFeature.findMany({
+        // Get current school features to track changes (tx client types may not infer include; assert result shape)
+        type SchoolFeatureWithFeature = { featureId: string; isEnabled: boolean; feature: { code: string; name: string } };
+        const currentSchoolFeatures = (await (tx as any).schoolFeature.findMany({
           where: { schoolId: id },
           include: { feature: true },
-        });
+        })) as SchoolFeatureWithFeature[];
 
         // Get currently enabled feature codes for comparison
         const currentEnabledCodes = currentSchoolFeatures
@@ -586,7 +587,7 @@ export class SchoolsService {
 
         // Send email notification if features were changed
         if (addedFeatureNames.length > 0 || removedFeatureNames.length > 0) {
-          const admin = await tx.schoolAdmin.findFirst({
+          const admin = await (tx as any).schoolAdmin.findFirst({
             where: { schoolId: id },
           });
 
@@ -609,13 +610,13 @@ export class SchoolsService {
 
       // Update admin email if provided
       if (adminEmail) {
-        const admin = await tx.schoolAdmin.findFirst({
+        const admin = await (tx as any).schoolAdmin.findFirst({
           where: { schoolId: id },
         });
 
         if (admin) {
           // Check if email is already taken by another admin
-          const emailExists = await tx.schoolAdmin.findFirst({
+          const emailExists = await (tx as any).schoolAdmin.findFirst({
             where: {
               email: adminEmail,
               id: { not: admin.id },
@@ -626,7 +627,7 @@ export class SchoolsService {
             throw new BadRequestException('Admin email already exists');
           }
 
-          await tx.schoolAdmin.update({
+          await (tx as any).schoolAdmin.update({
             where: { id: admin.id },
             data: { email: adminEmail },
           });
@@ -635,7 +636,7 @@ export class SchoolsService {
 
       // Reset admin password if requested
       if (resetAdminPassword) {
-        const admin = await tx.schoolAdmin.findFirst({
+        const admin = await (tx as any).schoolAdmin.findFirst({
           where: { schoolId: id },
         });
 
@@ -643,7 +644,7 @@ export class SchoolsService {
           const tempPassword = await this.generateTemporaryPassword();
           const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
-          await tx.schoolAdmin.update({
+          await (tx as any).schoolAdmin.update({
             where: { id: admin.id },
             data: { password: hashedPassword },
           });
@@ -731,7 +732,7 @@ export class SchoolsService {
   }
 
   async sendEmailToSchool(schoolId: string, emailType: string) {
-    const school = await this.prisma.school.findUnique({
+    const school = await this.client.school.findUnique({
       where: { id: schoolId },
       include: {
         admins: {

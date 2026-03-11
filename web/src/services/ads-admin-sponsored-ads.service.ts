@@ -1,5 +1,22 @@
 import { api } from '../config/api';
 
+export interface SponsoredAdWithMetrics {
+  id: string;
+  title: string | null;
+  imageUrls: string | null;
+  externalLink: string | null;
+  startAt: string;
+  endAt: string;
+  views: number;
+  clicks: number;
+}
+
+export interface SponsoredAdsAnalyticsResponse {
+  ads: SponsoredAdWithMetrics[];
+  totals: { views: number; clicks: number };
+  byDay: Array<{ date: string; views: number; clicks: number }>;
+}
+
 export const adsAdminSponsoredAdsService = {
   uploadImage: async (file: File): Promise<{ url: string }> => {
     const formData = new FormData();
@@ -10,6 +27,11 @@ export const adsAdminSponsoredAdsService = {
 
   list: async () => {
     const response = await api.get('/ads-admin/sponsored-ads');
+    return response.data;
+  },
+
+  getAnalytics: async (params: { dateFrom?: string; dateTo?: string; sponsoredAdId?: string }) => {
+    const response = await api.get<SponsoredAdsAnalyticsResponse>('/ads-admin/sponsored-ads/analytics', { params });
     return response.data;
   },
 

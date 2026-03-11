@@ -71,6 +71,7 @@ export class PendingUsersService {
   async reject(userId: string, schoolId: string) {
     const user = await this.prisma.user.findFirst({
       where: { id: userId, schoolId },
+      include: { school: { select: { name: true } } },
     });
     if (!user) {
       throw new NotFoundException('Pending user not found');
@@ -78,9 +79,21 @@ export class PendingUsersService {
     if (user.status !== 'pending_approval') {
       throw new BadRequestException('User is not pending approval');
     }
-    await this.prisma.user.update({
+    const userName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.name;
+    try {
+      await this.emailService.sendRejectionEmailToUser(
+        user.email,
+        userName,
+        user.school.name,
+      );
+    } catch (err) {
+      console.error('[PendingUsersService] Rejection email failed:', err);
+      throw new BadRequestException(
+        'We couldn\'t send the rejection email. Please try again.',
+      );
+    }
+    await this.prisma.user.delete({
       where: { id: userId },
-      data: { status: 'rejected' },
     });
     return { success: true };
   }

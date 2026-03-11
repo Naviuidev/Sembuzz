@@ -25,6 +25,11 @@ body {
   animation: fadeIn 0.3s ease-in-out;
 }
 
+/* Remove Bootstrap's default dropdown caret; we use custom chevron icon */
+.dropdown-toggle::after {
+  display: none !important;
+}
+
 /* Chatbot Slide Animation */
 @keyframes slideInFromRight {
   from {
@@ -79,4 +84,1035 @@ body {
   position: static;
   left: auto;
   top: auto;
+}
+
+/* Home hero CTA buttons — dark bg, white text; hover: white bg, dark text */
+.hero-btn {
+  border: 2px solid #212529;
+  background-color: #212529;
+  color: #fff !important;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+.hero-btn span {
+  color: #fff !important;
+}
+.hero-btn:hover {
+  background-color: #fff !important;
+  border-color: #212529 !important;
+  color: #212529 !important;
+}
+.hero-btn:hover span {
+  color: #212529 !important;
+}
+.hero-btn-fill {
+  background-color: #212529;
+  border-color: #212529;
+}
+.hero-btn-fill:hover {
+  background-color: #fff !important;
+  border-color: #212529 !important;
+  color: #212529 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+.hero-btn-fill:hover span {
+  color: #212529 !important;
+}
+
+/* Home page: full-page bg — radial gradients + phenom SVG (reference) */
+.home-page-bg {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: #f8fafc;
+  background-image:
+    radial-gradient(900px 500px at 10% 0%, #2563eb2e, #2563eb00 60%),
+    radial-gradient(900px 500px at 90% 10%, #14b8a629, #14b8a600 55%),
+    radial-gradient(700px 400px at 30% 95%, #f59e0b24, #f59e0b00 60%),
+    linear-gradient(180deg, #f8fafcb3, #f1f5f999),
+    url(https://login.phenom.com/img/phenombackground.svg);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+.home-fragmented-heading {
+  font-weight: normal;
+}
+
+/* Campus communication is fragmented — contact-form-style bg */
+.fragmented-section {
+  background-image:
+    radial-gradient(ellipse 100% 60% at 0% 20%, rgba(220, 210, 240, 0.5), transparent 50%),
+    radial-gradient(ellipse 80% 50% at 100% 80%, rgba(255, 228, 215, 0.45), transparent 45%),
+    radial-gradient(ellipse 70% 40% at 50% 50%, rgba(235, 225, 250, 0.35), transparent 40%);
+  color: #1a1f2e;
+}
+.fragmented-content {
+  max-width: 720px;
+  margin: 0 auto;
+  text-align: left;
+}
+.fragmented-title {
+  /* font-size: clamp(2rem, 4.5vw, 3rem); */
+  font-weight: 700;
+  line-height: 1.25;
+  color: #1a1f2e;
+  margin-bottom: 1rem;
+}
+.fragmented-intro {
+  font-size: 1.125rem;
+  line-height: 1.6;
+  color: #1a1f2e;
+  margin-bottom: 1.25rem;
+}
+.fragmented-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0 0 1.25rem 0;
+}
+.fragmented-list-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  font-size: 1.0625rem;
+  line-height: 1.5;
+  color: #1a1f2e;
+}
+.fragmented-icon {
+  font-size: 1.25rem;
+  color: #374151;
+  flex-shrink: 0;
+}
+.fragmented-para {
+  font-weight: bold;
+}
+.fragmented-para-last {
+  margin-bottom: 0;
+}
+
+/* Unified platform section: contact-form-style bg, two-column layout */
+.unified-section {
+  background-image:
+    radial-gradient(ellipse 100% 60% at 0% 20%, rgba(220, 210, 240, 0.5), transparent 50%),
+    radial-gradient(ellipse 80% 50% at 100% 80%, rgba(255, 228, 215, 0.45), transparent 45%),
+    radial-gradient(ellipse 70% 40% at 50% 50%, rgba(235, 225, 250, 0.35), transparent 40%);
+}
+.unified-heading {
+  font-weight: 600;
+}
+.unified-app-store-img {
+  max-width: 100%;
+  /* width: 380px; */
+  /* height: auto; */
+  /* display: block; */
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+}
+
+/* What Students Can Do — contact-form-style bg, soft lavender shapes, text left + illustration right */
+.students-can-do-section {
+  background-image:
+    radial-gradient(ellipse 100% 60% at 0% 20%, rgba(220, 210, 240, 0.5), transparent 50%),
+    radial-gradient(ellipse 80% 50% at 100% 80%, rgba(255, 228, 215, 0.45), transparent 45%),
+    radial-gradient(ellipse 70% 40% at 50% 50%, rgba(235, 225, 250, 0.35), transparent 40%),
+    radial-gradient(ellipse 80% 50% at 0% 0%, rgba(220, 210, 240, 0.4), transparent 45%),
+    radial-gradient(ellipse 60% 40% at 0% 100%, rgba(220, 210, 240, 0.25), transparent 40%);
+  background-repeat: no-repeat;
+}
+.students-can-do-title {
+  font-size: clamp(1.75rem, 4vw, 2.25rem);
+  font-weight: 700;
+  color: #1a1f2e;
+  margin-bottom: 1.25rem;
+  text-align: left;
+}
+.students-can-do-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0 0 1.25rem 0;
+}
+.students-can-do-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  color: #1a1f2e;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.students-can-do-icon {
+  flex-shrink: 0;
+  font-size: 1.25rem;
+  color: #0d6efd;
+  margin-top: 0.15rem;
+}
+.students-can-do-callout {
+  border-left: 4px solid #0d6efd;
+  padding: 0.75rem 1rem;
+  border-radius: 0 6px 6px 0;
+  background: rgba(13, 110, 253, 0.06);
+}
+.students-can-do-callout p {
+  font-size: 1rem;
+  color: #1a1f2e;
+  margin: 0;
+}
+.students-can-do-illustration {
+  position: relative;
+  max-width: 100%;
+}
+.students-can-do-img {
+  max-width: 320px;
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+}
+
+
+/* App Store–style card (dark grey, rounded) */
+.app-store-card {
+  background-color: #2d2d2d;
+  max-width: 380px;
+}
+.app-store-card-header {
+  background-color: #2d2d2d;
+}
+.app-store-meta {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.app-store-icon {
+  flex-shrink: 0;
+}
+
+/* Home page section CTAs: dark bg, white text; hover: white bg, dark text */
+.home-section-btn {
+  background-color: #212529 !important;
+  border: 2px solid #212529 !important;
+  color: #fff !important;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.home-section-btn:hover {
+  background-color: #fff !important;
+  border-color: #212529 !important;
+  color: #212529 !important;
+}
+
+/* Contact section — reference: soft translucent pastel purple & orange, no card */
+.contact-section-ref {
+  background-image:
+    radial-gradient(ellipse 100% 60% at 0% 20%, rgba(220, 210, 240, 0.5), transparent 50%),
+    radial-gradient(ellipse 80% 50% at 100% 80%, rgba(255, 228, 215, 0.45), transparent 45%),
+    radial-gradient(ellipse 70% 40% at 50% 50%, rgba(235, 225, 250, 0.35), transparent 40%);
+}
+.contact-form-ref .form-control,
+.contact-form-ref .form-select {
+  background-color: #fff;
+}
+/* Standalone Contact page */
+.contact-page-bg {
+  background-color: #fafafa;
+  background-image:
+    radial-gradient(ellipse 100% 60% at 0% 20%, rgba(220, 210, 240, 0.5), transparent 50%),
+    radial-gradient(ellipse 80% 50% at 100% 80%, rgba(255, 228, 215, 0.45), transparent 45%);
+  min-height: 100vh;
+}
+.contact-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1a1f2e;
+  margin-bottom: 0.25rem;
+}
+.contact-subtitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #4dabf7;
+  margin-bottom: 0.5rem;
+}
+.contact-description {
+  font-size: 0.95rem;
+  color: #495057;
+  margin-bottom: 1.5rem;
+}
+.contact-label {
+  font-weight: 500;
+  color: #495057;
+  font-size: 0.9rem;
+}
+.contact-input,
+.contact-select {
+  border-radius: 50rem;
+  border: 1px solid #dee2e6;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.95rem;
+}
+.contact-input:focus,
+.contact-select:focus {
+  border-color: #4dabf7;
+  box-shadow: 0 0 0 0.2rem rgba(77, 171, 247, 0.2);
+}
+.contact-textarea {
+  min-height: 120px;
+  resize: vertical;
+  border-radius: 0.5rem;
+}
+/* Submit: dark bg, white text; hover: white bg, dark text */
+.contact-submit-btn {
+  background-color: #212529;
+  border: 2px solid #212529;
+  color: #fff;
+  font-weight: 600;
+  padding: 0.6rem 1.5rem;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.contact-submit-btn:hover:not(:disabled) {
+  background-color: #fff;
+  border-color: #212529;
+  color: #212529;
+}
+.contact-submit-btn:disabled {
+  opacity: 0.8;
+  cursor: not-allowed;
+}
+
+/* Terms of Service — same bg as contact form (soft pastel purple & orange) */
+.terms-section {
+  background-image:
+    radial-gradient(ellipse 100% 60% at 0% 20%, rgba(220, 210, 240, 0.5), transparent 50%),
+    radial-gradient(ellipse 80% 50% at 100% 80%, rgba(255, 228, 215, 0.45), transparent 45%),
+    radial-gradient(ellipse 70% 40% at 50% 50%, rgba(235, 225, 250, 0.35), transparent 40%);
+  color: #1a1f2e;
+}
+.terms-title {
+  font-size: clamp(1.5rem, 4vw, 2.25rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #1a1f2e;
+}
+.terms-effective {
+  font-size: 0.95rem;
+}
+.terms-intro {
+  font-size: 1rem;
+  color: #333;
+}
+
+/* FAQ — same bg as contact form (soft pastel purple & orange) */
+.faq-section {
+  background-image:
+    radial-gradient(ellipse 100% 60% at 0% 20%, rgba(220, 210, 240, 0.5), transparent 50%),
+    radial-gradient(ellipse 80% 50% at 100% 80%, rgba(255, 228, 215, 0.45), transparent 45%),
+    radial-gradient(ellipse 70% 40% at 50% 50%, rgba(235, 225, 250, 0.35), transparent 40%);
+}
+
+/* For Universities — contact-form-style bg, above For Employers */
+.universities-section {
+  background-image:
+    radial-gradient(ellipse 100% 60% at 0% 20%, rgba(220, 210, 240, 0.5), transparent 50%),
+    radial-gradient(ellipse 80% 50% at 100% 80%, rgba(255, 228, 215, 0.45), transparent 45%),
+    radial-gradient(ellipse 70% 40% at 50% 50%, rgba(235, 225, 250, 0.35), transparent 40%);
+  border-radius: 0 0 1rem 1rem;
+}
+.universities-inner {
+  max-width: 640px;
+  margin: 0 auto;
+  text-align: center;
+}
+.universities-title {
+  font-size: clamp(1.5rem, 3.5vw, 2rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #1a1f2e;
+  margin-bottom: 0.5rem;
+}
+.universities-subtitle {
+  font-size: clamp(1.1rem, 2.5vw, 1.35rem);
+  font-weight: 700;
+  color: #1a1f2e;
+  margin-bottom: 1.25rem;
+}
+.universities-para {
+  font-size: 1rem;
+  color: #1a1f2e;
+  margin-bottom: 0.75rem;
+  line-height: 1.6;
+}
+.universities-features-heading {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1a1f2e;
+  margin-bottom: 0.75rem;
+}
+.universities-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0 0 1.5rem 0;
+  text-align: left;
+  display: inline-block;
+}
+.universities-list li {
+  margin-bottom: 0.4rem;
+  padding-left: 1.25rem;
+  position: relative;
+}
+.universities-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.5em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #0d9488;
+}
+.universities-highlight {
+  background: #ccfbf1;
+  border-left: 4px solid #0d9488;
+  padding: 0.75rem 1rem;
+  border-radius: 0 6px 6px 0;
+  text-align: left;
+  max-width: 520px;
+  margin: 0 auto;
+}
+.universities-highlight p {
+  font-size: 1rem;
+  color: #1a1f2e;
+  margin: 0;
+}
+
+/* For Employers — contact form bg (soft purple/orange gradient), above For Businesses & Advertisers */
+.employers-section {
+  background-image:
+    radial-gradient(ellipse 100% 60% at 0% 20%, rgba(220, 210, 240, 0.5), transparent 50%),
+    radial-gradient(ellipse 80% 50% at 100% 80%, rgba(255, 228, 215, 0.45), transparent 45%),
+    radial-gradient(ellipse 70% 40% at 50% 50%, rgba(235, 225, 250, 0.35), transparent 40%);
+}
+.employers-inner {
+  max-width: 640px;
+  margin: 0 auto;
+}
+.employers-title {
+  font-size: clamp(1.5rem, 3.5vw, 2rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #1a1f2e;
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+.employers-tagline {
+  font-size: clamp(1.1rem, 2.5vw, 1.35rem);
+  font-weight: 700;
+  color: #1a1f2e;
+  text-align: center;
+  margin-bottom: 1.25rem;
+}
+.employers-text-block {
+  text-align: left;
+  margin-bottom: 1.25rem;
+}
+.employers-para {
+  font-size: 1rem;
+  color: #1a1f2e;
+  margin-bottom: 0.75rem;
+  line-height: 1.6;
+}
+.employers-capabilities-heading {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1a1f2e;
+  text-align: center;
+  margin-bottom: 0.75rem;
+}
+.employers-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0 0 1.5rem 0;
+  text-align: left;
+}
+.employers-list li {
+  margin-bottom: 0.4rem;
+  padding-left: 1.25rem;
+  position: relative;
+}
+.employers-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.5em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #dc6b4a;
+}
+.employers-highlight {
+  background: rgba(255, 228, 215, 0.6);
+  border-left: 4px solid #c9956e;
+  padding: 0.75rem 1rem;
+  border-radius: 0 6px 6px 0;
+  text-align: left;
+  max-width: 520px;
+}
+.employers-highlight p {
+  font-size: 1rem;
+  color: #1a1f2e;
+  margin: 0;
+}
+
+/* For Businesses & Advertisers — contact-form-style bg, above Pilot Schools */
+.businesses-advertisers-section {
+  background-image:
+    radial-gradient(ellipse 100% 60% at 0% 20%, rgba(220, 210, 240, 0.5), transparent 50%),
+    radial-gradient(ellipse 80% 50% at 100% 80%, rgba(255, 228, 215, 0.45), transparent 45%),
+    radial-gradient(ellipse 70% 40% at 50% 50%, rgba(235, 225, 250, 0.35), transparent 40%);
+}
+.businesses-advertisers-inner {
+  max-width: 640px;
+  margin: 0 auto;
+  text-align: center;
+}
+.businesses-advertisers-title {
+  font-size: clamp(1.5rem, 3.5vw, 2rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #1a1f2e;
+  margin-bottom: 0.5rem;
+}
+.businesses-advertisers-subtitle {
+  font-size: clamp(1.1rem, 2.5vw, 1.35rem);
+  font-weight: 700;
+  color: #1a1f2e;
+  margin-bottom: 1rem;
+}
+.businesses-advertisers-para {
+  font-size: 1rem;
+  color: #1a1f2e;
+  margin-bottom: 1rem;
+  line-height: 1.6;
+}
+.businesses-advertisers-options-heading {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1a1f2e;
+  margin-bottom: 0.75rem;
+}
+.businesses-advertisers-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0 0 1.5rem 0;
+  text-align: left;
+  display: inline-block;
+}
+.businesses-advertisers-list li {
+  margin-bottom: 0.4rem;
+  padding-left: 1.25rem;
+  position: relative;
+}
+.businesses-advertisers-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.5em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #a855f7;
+}
+.businesses-advertisers-disclaimer {
+  background: #f2f4f6;
+  border-left: 3px solid #c4c8cc;
+  padding: 0.75rem 1rem;
+  border-radius: 0 6px 6px 0;
+  text-align: left;
+  max-width: 520px;
+  margin: 0 auto;
+}
+.businesses-advertisers-disclaimer p {
+  font-size: 0.9rem;
+  color: #1a1f2e;
+}
+
+/* Pilot Schools — above Privacy Policy; soft purple/orange gradient, blue bullets, callout */
+.pilot-schools-section {
+  background-image:
+    radial-gradient(ellipse 100% 60% at 0% 20%, rgba(220, 210, 240, 0.5), transparent 50%),
+    radial-gradient(ellipse 80% 50% at 100% 80%, rgba(255, 228, 215, 0.45), transparent 45%),
+    radial-gradient(ellipse 70% 40% at 50% 50%, rgba(235, 225, 250, 0.35), transparent 40%);
+}
+.pilot-schools-inner {
+  max-width: 640px;
+  margin: 0 auto;
+  text-align: center;
+}
+.pilot-schools-title {
+  font-size: clamp(1.75rem, 4vw, 2.25rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #1a1f2e;
+  margin-bottom: 0.75rem;
+}
+.pilot-schools-intro {
+  font-size: 1rem;
+  color: #333;
+  margin-bottom: 1.25rem;
+  line-height: 1.5;
+}
+.pilot-schools-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0 0 1.5rem 0;
+  text-align: left;
+  display: inline-block;
+}
+.pilot-schools-list li {
+  margin-bottom: 0.4rem;
+  padding-left: 1.25rem;
+  position: relative;
+}
+.pilot-schools-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.5em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #2563eb;
+}
+.pilot-schools-callout {
+  background: rgba(255, 255, 255, 0.6);
+  border-left: 4px solid #2563eb;
+  padding: 0.75rem 1rem;
+  border-radius: 0 6px 6px 0;
+  text-align: left;
+  max-width: 480px;
+  margin: 0 auto;
+}
+.pilot-schools-callout p {
+  font-size: 1rem;
+  color: #1a1f2e;
+}
+
+/* Privacy Policy — body bg image shows through (same as contact form); soft overlay only */
+.privacy-section {
+  background-image:
+    radial-gradient(ellipse 100% 60% at 0% 20%, rgba(220, 210, 240, 0.5), transparent 50%),
+    radial-gradient(ellipse 80% 50% at 100% 80%, rgba(255, 228, 215, 0.45), transparent 45%),
+    radial-gradient(ellipse 70% 40% at 50% 50%, rgba(235, 225, 250, 0.35), transparent 40%);
+  border-radius: 0 0 1.25rem 1.25rem;
+}
+.privacy-section-inner {
+  max-width: 720px;
+  margin: 0 auto;
+  text-align: left;
+}
+.privacy-title {
+  font-size: clamp(2rem, 4vw, 2.5rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #1a1f2e;
+  text-align: center;
+}
+.privacy-effective {
+  font-size: 0.9rem;
+  color: #5a5a6e;
+  text-align: center;
+}
+.privacy-intro {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #333;
+  text-align: center;
+}
+.privacy-heading {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #000;
+}
+/* Pills: white bg, dark text, very thin/subtle border, extreme pill shape (reference ss1/ss2) */
+.privacy-pills-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+}
+.privacy-pill {
+  background-color: #fff;
+  color: #1a1f2e;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 9999px;
+  padding: 0.5rem 1.25rem;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+.privacy-pill:hover {
+  background-color: #f8f9fa;
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #1a1f2e;
+}
+/* Section 2: centered title, blue bullet circles, composite graphic with animation */
+.privacy-how-wrap {
+  margin-bottom: 0.5rem;
+}
+.privacy-how-title {
+  text-align: center;
+}
+.privacy-how-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+  color: #1a1f2e;
+  font-size: 0.95rem;
+  line-height: 1.9;
+}
+.privacy-how-list li {
+  margin-bottom: 0.4rem;
+  padding-left: 1.25rem;
+  position: relative;
+}
+.privacy-how-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.5em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #2563eb;
+}
+/* Section 2: composite graphic — padlock, document, line graph + bars, clock (light blue outline) */
+.privacy-how-graphic {
+  color: #6b9bd1;
+  max-width: 220px;
+}
+.privacy-how-svg {
+  width: 100%;
+  height: auto;
+  max-height: 100px;
+}
+.privacy-how-graphic-padlock,
+.privacy-how-graphic-doc,
+.privacy-how-graphic-chart,
+.privacy-how-graphic-clock {
+  opacity: 0;
+  animation: privacy-how-fade-in 0.5s ease-out forwards;
+}
+.privacy-how-graphic-padlock { animation-delay: 0.2s; }
+.privacy-how-graphic-doc { animation-delay: 0.35s; }
+.privacy-how-graphic-chart { animation-delay: 0.5s; }
+.privacy-how-graphic-clock { animation-delay: 0.65s; }
+@keyframes privacy-how-fade-in {
+  to { opacity: 1; }
+}
+.privacy-how-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: privacy-how-line-draw 0.8s ease-out 0.4s forwards;
+}
+@keyframes privacy-how-line-draw {
+  to { stroke-dashoffset: 0; }
+}
+.privacy-how-dot {
+  opacity: 0;
+  animation: privacy-how-fade-in 0.4s ease-out 0.9s forwards;
+}
+/* Sections 3, 4, 5: reference — icon placement, vibrant blue icons, bold black headings */
+.privacy-block {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+.privacy-block-icon-wrap {
+  flex-shrink: 0;
+}
+.privacy-block-icon {
+  font-size: 2.25rem;
+  color: #2563eb;
+}
+.privacy-block-icon-lg {
+  font-size: 3.5rem;
+}
+.privacy-block-text {
+  flex: 1;
+  min-width: 0;
+}
+.privacy-block-body {
+  font-weight: 400;
+  color: #1a1f2e;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+/* Privacy popups — overlay + modal fade-up + inner elements fade-up */
+.privacy-popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+  padding: 1rem;
+  animation: privacy-overlay-in 0.2s ease-out forwards;
+}
+@keyframes privacy-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.privacy-popup-modal {
+  background: #fff;
+  border-radius: 16px;
+  max-width: 440px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 1.5rem 1.5rem 1.75rem;
+  position: relative;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+  animation: privacy-modal-fade-up 0.35s ease-out forwards;
+}
+@keyframes privacy-modal-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.privacy-popup-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #b0b0b0;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 10;
+  padding: 0;
+}
+.privacy-popup-close:hover {
+  color: #333;
+  background: #f0f0f0;
+}
+.privacy-popup-close-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+  pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.privacy-popup-body .privacy-popup-item {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: privacy-item-fade-up 0.4s ease-out forwards;
+}
+.privacy-popup-body .privacy-popup-item:nth-child(1) { animation-delay: 0.06s; }
+.privacy-popup-body .privacy-popup-item:nth-child(2) { animation-delay: 0.12s; }
+.privacy-popup-body .privacy-popup-item:nth-child(3) { animation-delay: 0.18s; }
+.privacy-popup-body .privacy-popup-item:nth-child(4) { animation-delay: 0.24s; }
+.privacy-popup-body .privacy-popup-item:nth-child(5) { animation-delay: 0.3s; }
+.privacy-popup-body .privacy-popup-item:nth-child(6) { animation-delay: 0.36s; }
+.privacy-popup-body .privacy-popup-item:nth-child(7) { animation-delay: 0.42s; }
+.privacy-popup-body .privacy-popup-item:nth-child(8) { animation-delay: 0.48s; }
+.privacy-popup-body .privacy-popup-item:nth-child(9) { animation-delay: 0.54s; }
+.privacy-popup-body .privacy-popup-item:nth-child(10) { animation-delay: 0.6s; }
+@keyframes privacy-item-fade-up {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.privacy-popup-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #333;
+  padding-right: 2.5rem;
+  margin-bottom: 0;
+}
+/* Account popup — avatar: solid light blue circle (head) + inner circle + U-shape body */
+.privacy-avatar-icon {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+.privacy-avatar-head {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #b8d4f1;
+  border: 2px solid #5d8bf4;
+  position: relative;
+  display: block;
+}
+.privacy-avatar-head::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #d4e6f7;
+}
+.privacy-avatar-body {
+  display: block;
+  width: 36px;
+  height: 18px;
+  margin-top: -2px;
+  border: 2px solid #5d8bf4;
+  border-top: none;
+  border-radius: 0 0 18px 18px;
+  background: transparent;
+}
+/* Account popup — fields: label left, masked value right in light gray box */
+.privacy-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+.privacy-field-label {
+  font-size: 0.9rem;
+  color: #666;
+  margin: 0;
+  flex-shrink: 0;
+}
+.privacy-field-value {
+  flex: 1;
+  max-width: 220px;
+  background: #e9ecef;
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.95rem;
+  color: #333;
+}
+/* Account disclaimer: very light gray, thin dark blue/gray left border */
+.privacy-info-box-account {
+  background: #f0f2f5;
+  border-left: 3px solid #495057;
+  padding: 0.75rem 1rem;
+  border-radius: 0 8px 8px 0;
+  font-size: 0.9rem;
+  color: #333;
+}
+/* Student popup — document+check SVG + body text + callout */
+.privacy-doc-check-icon {
+  width: 48px;
+  height: 56px;
+}
+.privacy-body-text {
+  font-size: 1rem;
+  color: #333;
+  line-height: 1.6;
+}
+.privacy-body-list {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin: 0;
+  color: #333;
+  font-size: 1rem;
+  line-height: 1.7;
+}
+.privacy-body-list li {
+  margin-bottom: 0.25rem;
+}
+.privacy-info-box-student {
+  background: #e6f7ff;
+  border-left: 4px solid #add8e6;
+  padding: 0.75rem 1rem;
+  border-radius: 0 8px 8px 0;
+  font-size: 0.9rem;
+  color: #666;
+}
+/* Engagement popup — teal line chart SVG + headings + lists */
+.privacy-line-chart-icon {
+  width: 120px;
+  height: 50px;
+}
+.privacy-engagement-heading {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #212529;
+}
+.privacy-info-box {
+  background: #f0f4f8;
+  border-left: 4px solid #0d6efd;
+  padding: 0.75rem 1rem;
+  border-radius: 0 6px 6px 0;
+}
+.guidelines-section {
+  background-image:
+    radial-gradient(ellipse 100% 60% at 0% 20%, rgba(220, 210, 240, 0.5), transparent 50%),
+    radial-gradient(ellipse 80% 50% at 100% 80%, rgba(255, 228, 215, 0.45), transparent 45%),
+    radial-gradient(ellipse 70% 40% at 50% 50%, rgba(235, 225, 250, 0.35), transparent 40%);
+  color: #1a1f2e;
+}
+.guidelines-title {
+  font-size: clamp(1.25rem, 3vw, 1.5rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #1a1f2e;
+}
+.guidelines-intro {
+  font-size: 1rem;
+  color: #333;
+}
+.guidelines-card {
+  padding: 0.75rem 0;
+  align-items: flex-start;
+}
+.guidelines-icon {
+  font-size: 1.5rem;
+  color: #0d6efd;
+}
+.guidelines-heading {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1a1f2e;
+}
+.guidelines-desc {
+  color: #333;
+  line-height: 1.5;
+}
+
+/* Sembuzz letter animation — inside contact success popup only, faster */
+.sembuzz-loader-word {
+  display: inline-flex;
+  font-weight: 700;
+  font-size: 2rem;
+  letter-spacing: 0.08em;
+  color: #1a1f2e;
+}
+.sembuzz-loader-in-popup {
+  justify-content: center;
+  min-height: 2.5rem;
+}
+.sembuzz-loader-letter {
+  display: inline-block;
+  animation: sembuzz-letter 0.35s ease-out forwards;
+  opacity: 0;
+  transform: translateY(10px);
+}
+@keyframes sembuzz-letter {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

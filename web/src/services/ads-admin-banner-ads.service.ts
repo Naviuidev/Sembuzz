@@ -1,5 +1,21 @@
 import { api } from '../config/api';
 
+export interface BannerAdWithMetrics {
+  id: string;
+  imageUrl: string;
+  externalLink: string | null;
+  startAt: string;
+  endAt: string;
+  views: number;
+  clicks: number;
+}
+
+export interface BannerAdsAnalyticsResponse {
+  ads: BannerAdWithMetrics[];
+  totals: { views: number; clicks: number };
+  byDay: Array<{ date: string; views: number; clicks: number }>;
+}
+
 export const adsAdminBannerAdsService = {
   uploadImage: async (file: File): Promise<{ url: string }> => {
     const formData = new FormData();
@@ -10,6 +26,11 @@ export const adsAdminBannerAdsService = {
 
   list: async () => {
     const response = await api.get('/ads-admin/banner-ads');
+    return response.data;
+  },
+
+  getAnalytics: async (params: { dateFrom?: string; dateTo?: string; bannerAdId?: string }) => {
+    const response = await api.get<BannerAdsAnalyticsResponse>('/ads-admin/banner-ads/analytics', { params });
     return response.data;
   },
 

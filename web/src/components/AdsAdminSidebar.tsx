@@ -9,6 +9,7 @@ export const AdsAdminSidebar = () => {
   const menuItems = [
     { path: '/ads-admin/dashboard', label: 'Dashboard', icon: 'bi-speedometer2' },
     { path: '/ads-admin/ads', label: 'Ads', icon: 'bi-megaphone' },
+    { path: '/ads-admin/ads-analytics', label: 'Ads Analytics', icon: 'bi-bar-chart-line' },
   ];
 
   return (
