@@ -48,14 +48,14 @@ export class SchoolsService {
   async create(createSchoolDto: CreateSchoolDto) {
     try {
       return await this.createInternal(createSchoolDto);
-    } catch (err) {
-      if (err instanceof BadRequestException || err instanceof NotFoundException) {
+    } catch (err: any) {
+      if (err instanceof BadRequestException || err instanceof NotFoundException || err instanceof HttpException) {
         throw err;
       }
       const message = err instanceof Error ? err.message : String(err);
       console.error('[SchoolsService] create error:', message, err);
       throw new HttpException(
-        { statusCode: 500, message: 'Failed to create school. Check server logs for details.' },
+        { statusCode: 500, message: 'Failed to create school. Check server logs for details.', error: message },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -150,9 +150,10 @@ export class SchoolsService {
       adsTempPassword?: string;
     };
     try {
-      result = await this.prisma.$transaction(async (tx) => {
-        // Build school data object - conditionally include domain/image
-        const schoolData: any = {
+      result = await this.prisma.$transaction(
+        async (tx) => {
+          // Build school data object - conditionally include domain/image
+          const schoolData: any = {
           refNum,
           name: schoolName,
           country,
@@ -219,7 +220,9 @@ export class SchoolsService {
           features,
           ...(adsAdmin ? { adsAdmin, adsTempPassword: adsTempPassword! } : {}),
         };
-      });
+        },
+        { timeout: 60000, maxWait: 10000 },
+      );
     } catch (error: any) {
       const errorMessage = error?.message || '';
       const errorCode = error?.code || '';
@@ -245,6 +248,20 @@ export class SchoolsService {
         console.error('[SchoolsService] ads_admins table missing or error:', errorMessage);
         throw new BadRequestException(
           'Ads admin table is missing. Run: npx prisma migrate deploy',
+        );
+      }
+
+      // Unique constraint on ads admin email (e.g. same email in ads_admins)
+      if (errorCode === 'P2002' && (errorMessage.includes('ads_admins') || errorMessage.includes('adsAdmin') || errorMessage.includes('email'))) {
+        throw new BadRequestException('Ads Admin email is already in use by another Ads Admin.');
+      }
+
+      // Transaction timeout
+      if (errorMessage.includes('Transaction') && errorMessage.includes('closed')) {
+        console.error('[SchoolsService] Transaction timeout or closed:', errorMessage);
+        throw new HttpException(
+          { statusCode: 500, message: 'Create took too long. Please try again.', error: errorMessage },
+          HttpStatus.INTERNAL_SERVER_ERROR,
         );
       }
 
