@@ -11,17 +11,26 @@ import {
   Linking,
   useWindowDimensions,
   ScrollView,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import CalendarEventIcon from 'react-native-bootstrap-icons/icons/calendar-event';
+import CalendarPlusIcon from 'react-native-bootstrap-icons/icons/calendar-plus';
 import {
   getApprovedEvents,
   getCategoriesBySchool,
   getEngagementCounts,
+  getUpcomingByDate,
+  buildGoogleCalendarAddAuthUrl,
   imageSrc,
   ApprovedEventPublic,
   CategoryPublic,
+  UpcomingPostPublic,
 } from '../services/events';
 import { useAuth } from '../contexts/AuthContext';
+
+const RETURN_URL = process.env.EXPO_PUBLIC_FRONTEND_URL || 'https://sembuzz.com';
 
 export default function EventsScreen() {
   const { user } = useAuth();
@@ -32,6 +41,11 @@ export default function EventsScreen() {
   const [feedSort, setFeedSort] = useState<'latest' | 'popular'>('latest');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [calendarModalOpen, setCalendarModalOpen] = useState(false);
+  const [calendarPendingDate, setCalendarPendingDate] = useState<string | null>(null);
+  const [upcomingByDate, setUpcomingByDate] = useState<UpcomingPostPublic[]>([]);
+  const [upcomingLoading, setUpcomingLoading] = useState(false);
+  const [calendarHasFetched, setCalendarHasFetched] = useState(false);
   const { width } = useWindowDimensions();
 
   const schoolId = user?.schoolId ?? null;
@@ -93,6 +107,37 @@ export default function EventsScreen() {
     setSelectedSubCategoryIds((prev) =>
       prev.includes(subId) ? prev.filter((id) => id !== subId) : [...prev, subId],
     );
+  };
+
+  useEffect(() => {
+    if (calendarModalOpen && user && !calendarPendingDate) {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      setCalendarPendingDate(
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+      );
+    }
+    if (!calendarModalOpen) setCalendarHasFetched(false);
+  }, [calendarModalOpen, user, calendarPendingDate]);
+
+  const fetchUpcomingForDate = useCallback(async () => {
+    if (!calendarPendingDate) return;
+    setCalendarHasFetched(true);
+    setUpcomingLoading(true);
+    try {
+      const list = await getUpcomingByDate(calendarPendingDate);
+      setUpcomingByDate(list);
+    } catch {
+      setUpcomingByDate([]);
+    } finally {
+      setUpcomingLoading(false);
+    }
+  }, [calendarPendingDate]);
+
+  const openAddToCalendar = (post: UpcomingPostPublic) => {
+    const returnUrl = `${RETURN_URL.replace(/\/$/, '')}/events`;
+    const url = buildGoogleCalendarAddAuthUrl(post, returnUrl);
+    Linking.openURL(url);
   };
 
   const formatDate = (dateStr: string) => {
@@ -212,9 +257,18 @@ export default function EventsScreen() {
         </ScrollView>
       ) : null}
 
-      {/* Latest / Popular */}
+      {/* Calendar icon + Latest / Popular */}
       {(user || events.length > 0) && (
         <View style={styles.sortRow}>
+          {user && (
+            <TouchableOpacity
+              style={[styles.calendarIconBtn, calendarModalOpen && styles.calendarIconBtnActive]}
+              onPress={() => setCalendarModalOpen(true)}
+              accessibilityLabel="Calendar"
+            >
+              <CalendarEventIcon width={22} height={22} fill={calendarModalOpen ? '#087990' : '#6c757d'} />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={[styles.sortPill, feedSort === 'latest' && styles.sortPillActive]}
             onPress={() => setFeedSort('latest')}
@@ -251,6 +305,81 @@ export default function EventsScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         />
       )}
+
+      {/* Calendar / Upcoming by date modal */}
+      <Modal
+        visible={calendarModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCalendarModalOpen(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setCalendarModalOpen(false)}>
+          <Pressable style={styles.calendarModalBox} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.calendarModalHeader}>
+              <Text style={styles.calendarModalTitle}>What&apos;s happening</Text>
+              <TouchableOpacity onPress={() => setCalendarModalOpen(false)} hitSlop={12}>
+                <Text style={styles.calendarModalClose}>×</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={styles.calendarQuickBtn}
+              onPress={() => {
+                const d = new Date();
+                d.setDate(d.getDate() + 1);
+                setCalendarPendingDate(
+                  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+                );
+              }}
+            >
+              <Text style={styles.calendarQuickBtnText}>Tomorrow</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.calendarQuickBtn}
+              onPress={() => {
+                const d = new Date();
+                d.setDate(d.getDate() + 2);
+                setCalendarPendingDate(
+                  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+                );
+              }}
+            >
+              <Text style={styles.calendarQuickBtnText}>Day after tomorrow</Text>
+            </TouchableOpacity>
+            <View style={styles.calendarOkRow}>
+              <TouchableOpacity
+                style={[styles.calendarOkBtn, !calendarPendingDate && styles.calendarOkBtnDisabled]}
+                disabled={!calendarPendingDate}
+                onPress={fetchUpcomingForDate}
+              >
+                <Text style={styles.calendarOkBtnText}>OK — View filtered news</Text>
+              </TouchableOpacity>
+            </View>
+            {upcomingLoading ? (
+              <ActivityIndicator size="small" color="#1a1f2e" style={{ marginVertical: 16 }} />
+            ) : upcomingByDate.length > 0 ? (
+              <ScrollView style={styles.upcomingList} nestedScrollEnabled>
+                {upcomingByDate.map((post) => (
+                  <View key={post.id} style={styles.upcomingItem}>
+                    <View style={styles.upcomingItemText}>
+                      <Text style={styles.upcomingItemTitle} numberOfLines={1}>{post.title}</Text>
+                      <Text style={styles.upcomingItemSub} numberOfLines={1}>{post.school?.name ?? 'School'}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.addToCalBtn}
+                      onPress={() => openAddToCalendar(post)}
+                    >
+                      <CalendarPlusIcon width={20} height={20} fill="#fff" />
+                      <Text style={styles.addToCalBtnText}>Add to Google Calendar</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            ) : calendarHasFetched && !upcomingLoading && upcomingByDate.length === 0 ? (
+              <Text style={styles.upcomingEmpty}>No upcoming events for this date.</Text>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -330,6 +459,118 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     backgroundColor: '#fff',
     gap: 10,
+    alignItems: 'center',
+  },
+  calendarIconBtn: {
+    padding: 8,
+    marginRight: 4,
+  },
+  calendarIconBtnActive: {
+    backgroundColor: 'rgba(13, 202, 240, 0.2)',
+    borderRadius: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  calendarModalBox: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    maxWidth: 360,
+    maxHeight: '80%',
+  },
+  calendarModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  calendarModalTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1f2e',
+  },
+  calendarModalClose: {
+    fontSize: 28,
+    color: '#6c757d',
+    padding: 4,
+  },
+  calendarQuickBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+  },
+  calendarQuickBtnText: {
+    fontSize: 15,
+    color: '#1a1f2e',
+  },
+  calendarOkRow: {
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  calendarOkBtn: {
+    backgroundColor: '#212529',
+    paddingVertical: 10,
+    borderRadius: 20,
+    alignItems: 'center',
+  },
+  calendarOkBtnDisabled: {
+    opacity: 0.5,
+  },
+  calendarOkBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  upcomingList: {
+    maxHeight: 240,
+    marginTop: 8,
+  },
+  upcomingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    gap: 8,
+  },
+  upcomingItemText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  upcomingItemTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a1f2e',
+  },
+  upcomingItemSub: {
+    fontSize: 12,
+    color: '#6c757d',
+    marginTop: 2,
+  },
+  addToCalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1f2e',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    gap: 4,
+  },
+  addToCalBtnText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  upcomingEmpty: {
+    fontSize: 14,
+    color: '#6c757d',
+    marginVertical: 16,
   },
   sortPill: {
     paddingHorizontal: 14,

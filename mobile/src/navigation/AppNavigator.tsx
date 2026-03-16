@@ -1,90 +1,32 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, LayoutChangeEvent, Easing } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import SearchIcon from 'react-native-bootstrap-icons/icons/search';
 import HouseDoorIcon from 'react-native-bootstrap-icons/icons/house-door';
 import GearIcon from 'react-native-bootstrap-icons/icons/gear';
 import Grid3x3GapIcon from 'react-native-bootstrap-icons/icons/grid-3x3-gap';
 
 import GlobalNavbar from '../components/GlobalNavbar';
-import EventsScreen from '../screens/EventsScreen';
-import SearchScreen from '../screens/SearchScreen';
-import SettingsScreen from '../screens/SettingsScreen';
-import AppsScreen from '../screens/AppsScreen';
+import { EventsScreen, SearchScreen, SettingsScreen, AppsScreen, AuthScreen } from '../screens';
 
 const Tab = createBottomTabNavigator();
 
-const TAB_LABELS: Record<string, string> = {
-  Search: 'Search',
-  Home: 'Home',
-  Settings: 'Settings',
-  Apps: 'Apps',
-};
+const TAB_CONFIG = [
+  { name: 'Search', label: 'Search', Icon: SearchIcon },
+  { name: 'Events', label: 'Home', Icon: HouseDoorIcon },
+  { name: 'Settings', label: 'Settings', Icon: GearIcon },
+  { name: 'Apps', label: 'Apps', Icon: Grid3x3GapIcon },
+];
 
-const ICON_SIZE = 22;
-
-const TAB_ICONS: Record<string, React.ComponentType<{ width: number; height: number; fill: string }>> = {
-  Search: SearchIcon,
-  Home: HouseDoorIcon,
-  Settings: GearIcon,
-  Apps: Grid3x3GapIcon,
-};
-
-const TAB_COUNT = 4;
-const PILL_ANIM_DURATION = 220;
-
-/** Custom tab bar with smooth sliding pill animation when switching tabs. */
 function BottomNavBar({ state, descriptors, navigation }: any) {
-  const [layoutWidth, setLayoutWidth] = useState(0);
-  const slideAnim = useRef(new Animated.Value(state.index)).current;
-
-  useEffect(() => {
-    Animated.timing(slideAnim, {
-      toValue: state.index,
-      duration: PILL_ANIM_DURATION,
-      useNativeDriver: true,
-      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-    }).start();
-  }, [state.index, slideAnim]);
-
-  const onLayout = (e: LayoutChangeEvent) => {
-    const { width } = e.nativeEvent.layout;
-    if (width > 0) setLayoutWidth(width);
-  };
-
-  const segmentWidth = layoutWidth > 0 ? layoutWidth / TAB_COUNT : 0;
-  const pillWidth = Math.max(0, segmentWidth - 16);
-  const pillOffset = 8 + (segmentWidth - pillWidth) / 2;
-  const pillTranslateX = slideAnim.interpolate({
-    inputRange: [0, 1, 2, 3],
-    outputRange: [
-      pillOffset,
-      segmentWidth + pillOffset,
-      segmentWidth * 2 + pillOffset,
-      segmentWidth * 3 + pillOffset,
-    ],
-  });
-
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.tabBar} onLayout={onLayout}>
-      {layoutWidth > 0 && (
-        <Animated.View
-          style={[
-            styles.slidingPill,
-            {
-              width: pillWidth,
-              transform: [{ translateX: pillTranslateX }],
-            },
-          ]}
-          pointerEvents="none"
-        />
-      )}
+    <View style={[styles.tabBar, { paddingBottom: Math.max(10, insets.bottom) }]}>
       {state.routes.map((route: { key: string; name: string }, index: number) => {
         const focused = state.index === index;
-        const label = TAB_LABELS[route.name] ?? route.name;
-        const IconComponent = TAB_ICONS[route.name];
+        const config = TAB_CONFIG.find((c) => c.name === route.name) ?? { label: route.name, Icon: null };
+        const { label, Icon } = config;
 
         const onPress = () => {
           const event = navigation.emit({
@@ -101,24 +43,20 @@ function BottomNavBar({ state, descriptors, navigation }: any) {
           <TouchableOpacity
             key={route.key}
             onPress={onPress}
-            style={styles.tabButton}
+            style={[styles.tabButton, focused && styles.tabButtonActive]}
             activeOpacity={0.7}
             accessibilityRole="button"
             accessibilityState={focused ? { selected: true } : {}}
             accessibilityLabel={label}
           >
-            {IconComponent ? (
-              <View style={!focused ? { opacity: 0.7 } : undefined}>
-                <IconComponent
-                  width={ICON_SIZE}
-                  height={ICON_SIZE}
-                  fill={focused ? '#fff' : '#1a1f2e'}
-                />
-              </View>
+            {Icon ? (
+              <Icon
+                width={22}
+                height={22}
+                fill={focused ? '#1a1f2e' : '#6c757d'}
+              />
             ) : null}
-            {focused ? (
-              <Text style={styles.tabLabelActive}>{label}</Text>
-            ) : null}
+            {focused ? <Text style={styles.tabLabelActive}>{label}</Text> : null}
           </TouchableOpacity>
         );
       })}
@@ -132,31 +70,26 @@ type AppNavigatorProps = {
 
 export default function AppNavigator({ onNavigate }: AppNavigatorProps) {
   const insets = useSafeAreaInsets();
-  const topInsetRef = useRef<number | null>(null);
-  if (topInsetRef.current === null) topInsetRef.current = insets.top;
-  const topInset = topInsetRef.current;
 
   return (
     <View style={styles.appContainer}>
-      <View style={[styles.navbarWrapper, { paddingTop: topInset }]} pointerEvents="box-none">
+      <View style={[styles.navbarWrapper, { paddingTop: insets.top }]} pointerEvents="box-none">
         <GlobalNavbar
-          onNavigateToEvents={() => onNavigate?.('Home')}
+          onNavigateToEvents={() => onNavigate?.('Events')}
           onNavigateToSettings={() => onNavigate?.('Settings')}
         />
       </View>
-      <View style={[styles.tabContent, { paddingTop: 0 }]}>
+      <View style={styles.content}>
         <Tab.Navigator
-        tabBar={(props) => <BottomNavBar {...props} />}
-        screenOptions={{
-          headerShown: false,
-          tabBarShowLabel: false,
-        }}
-      >
-        <Tab.Screen name="Search" component={SearchScreen} />
-        <Tab.Screen name="Home" component={EventsScreen} />
-        <Tab.Screen name="Settings" component={SettingsScreen} />
-        <Tab.Screen name="Apps" component={AppsScreen} />
-      </Tab.Navigator>
+          tabBar={(props) => <BottomNavBar {...props} />}
+          screenOptions={{ headerShown: false }}
+          initialRouteName="Events"
+        >
+          <Tab.Screen name="Search" component={SearchScreen} options={{ tabBarLabel: 'Search' }} />
+          <Tab.Screen name="Events" component={EventsScreen} options={{ tabBarLabel: 'Home' }} />
+          <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: 'Settings' }} />
+          <Tab.Screen name="Apps" component={AppsScreen} options={{ tabBarLabel: 'Apps' }} />
+        </Tab.Navigator>
       </View>
     </View>
   );
@@ -170,13 +103,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     zIndex: 10,
   },
-  tabContent: {
+  content: {
     flex: 1,
   },
   tabBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     backgroundColor: '#fff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -185,22 +118,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 16,
     elevation: 8,
-    paddingVertical: 8,
+    paddingVertical: 10,
     paddingHorizontal: 8,
-    height: 72,
-  },
-  slidingPill: {
-    position: 'absolute',
-    left: 0,
-    top: 8,
-    bottom: 8,
-    borderRadius: 999,
-    backgroundColor: '#212529',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
+    paddingBottom: 10,
   },
   tabButton: {
     flex: 1,
@@ -214,9 +134,17 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: 'transparent',
   },
+  tabButtonActive: {
+    backgroundColor: '#f0f0f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
   tabLabelActive: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#fff',
+    color: '#1a1f2e',
   },
 });

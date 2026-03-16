@@ -856,9 +856,38 @@ export const SchoolAdminPrivacy = () => {
                           <td style={{ border: 'none', padding: '0.75rem', color: '#1a1f2e' }}>{admin.name}</td>
                           <td style={{ border: 'none', padding: '0.75rem', color: '#6c757d' }}>{admin.email}</td>
                           <td style={{ border: 'none', padding: '0.75rem', color: '#6c757d' }}>
-                            {admin.categories && admin.categories.length > 0
-                              ? admin.categories.map((c) => c.category.name).join(', ')
-                              : admin.category.name}
+                            <div className="d-flex flex-wrap gap-1">
+                              {admin.categories && admin.categories.length > 0
+                                ? admin.categories.map((c) => (
+                                    <span
+                                      key={c.category.id}
+                                      className="badge rounded-pill"
+                                      style={{
+                                        backgroundColor: '#d1e7dd',
+                                        color: '#0f5132',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 500,
+                                        padding: '0.35rem 0.65rem',
+                                      }}
+                                    >
+                                      {c.category.name}
+                                    </span>
+                                  ))
+                                : (
+                                    <span
+                                      className="badge rounded-pill"
+                                      style={{
+                                        backgroundColor: '#d1e7dd',
+                                        color: '#0f5132',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 500,
+                                        padding: '0.35rem 0.65rem',
+                                      }}
+                                    >
+                                      {admin.category.name}
+                                    </span>
+                                  )}
+                            </div>
                           </td>
                           <td style={{ border: 'none', padding: '0.75rem' }}>
                             <span

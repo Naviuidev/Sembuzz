@@ -7,15 +7,21 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   Linking,
   Image,
+  Modal,
+  Pressable,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import PersonPlusIcon from 'react-native-bootstrap-icons/icons/person-plus';
 import { useAuth } from '../contexts/AuthContext';
 import { getApprovedEvents, imageSrc, ApprovedEventPublic } from '../services/events';
+
+const REGISTER_URL = process.env.EXPO_PUBLIC_FRONTEND_URL || 'https://sembuzz.com';
+const BASE_URL = REGISTER_URL.startsWith('http') ? REGISTER_URL.replace(/\/$/, '') : `https://${REGISTER_URL}`;
 
 export default function SettingsScreen() {
   const { user, login, logout, loading: authLoading } = useAuth();
@@ -25,6 +31,7 @@ export default function SettingsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [recentEvents, setRecentEvents] = useState<ApprovedEventPublic[]>([]);
   const [recentLoading, setRecentLoading] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const fetchRecent = useCallback(async () => {
     setRecentLoading(true);
@@ -164,108 +171,133 @@ export default function SettingsScreen() {
     );
   }
 
+  const openRegister = () => {
+    setShowLoginModal(false);
+    Linking.openURL(`${BASE_URL}/register`).catch(() => {});
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.keyboard}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          <View style={styles.card}>
-            <View style={styles.loginPromptRow}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.card}>
+          <View style={styles.loginPromptRow}>
+            <View style={styles.personIconWrap}>
               <Text style={styles.loginPromptIcon}>👤</Text>
-              <Text style={styles.loginPromptText}>
-                To get filterised categories and subcategories news, like comment and saved options
-                needs login.
-              </Text>
             </View>
-            <View style={styles.loginButtonsRow}>
+            <Text style={styles.loginPromptText}>
+              To get filterised categories and subcategories news, like comment and saved options
+              needs login.
+            </Text>
+          </View>
+          <View style={styles.loginButtonsRow}>
+            <TouchableOpacity
+              style={styles.loginButton}
+              onPress={() => setShowLoginModal(true)}
+            >
+              <Text style={styles.loginButtonText}>Login</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.signUpButton}
+              onPress={openRegister}
+            >
+              <PersonPlusIcon width={18} height={18} fill="#1a1f2e" />
+              <Text style={[styles.signUpButtonText, { marginLeft: 6 }]}>Sign up</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <Text style={styles.sectionTitle}>Recently added schools / news</Text>
+        {recentLoading ? (
+          <ActivityIndicator size="small" color="#1a1f2e" style={{ marginVertical: 16 }} />
+        ) : (
+          recentEvents.map((ev) => (
+            <View key={ev.id} style={styles.recentItem}>
+              {ev.school?.image ? (
+                <Image source={{ uri: imageSrc(ev.school.image) }} style={styles.recentLogo} />
+              ) : (
+                <View style={styles.recentLogoPlaceholder}>
+                  <Text style={styles.recentLogoLetter}>{ev.school?.name?.charAt(0) ?? '?'}</Text>
+                </View>
+              )}
+              <View style={styles.recentText}>
+                <Text style={styles.recentTitle}>{ev.title}</Text>
+                <Text style={styles.recentSub}>{ev.school?.name ?? ev.subCategory?.name ?? ''}</Text>
+              </View>
+            </View>
+          ))
+        )}
+
+        <View style={styles.footerLinks}>
+          <TouchableOpacity onPress={() => Linking.openURL(`${BASE_URL}/#privacy`).catch(() => {})}>
+            <Text style={styles.footerLink}>Privacy policy</Text>
+          </TouchableOpacity>
+          <Text style={styles.footerDot}> · </Text>
+          <TouchableOpacity onPress={() => Linking.openURL(`${BASE_URL}/#terms-of-service`).catch(() => {})}>
+            <Text style={styles.footerLink}>Terms and conditions</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      {/* Login modal — matches web: Sembuzz, Login to your Account, Email, Password, Sign in, Create new account? Sign up, Privacy, Terms, Cancel */}
+      <Modal visible={showLoginModal} transparent animationType="fade">
+        <Pressable style={styles.modalOverlay} onPress={() => setShowLoginModal(false)}>
+          <Pressable style={styles.modalBox} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1 }} />
+              <TouchableOpacity onPress={() => setShowLoginModal(false)} hitSlop={12}>
+                <Text style={styles.modalClose}>×</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalBrand}>Sembuzz</Text>
+            <Text style={styles.modalTitle}>Login to your Account</Text>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Email"
+                placeholderTextColor="#8e8e8e"
+                value={email}
+                onChangeText={(t) => { setEmail(t); setError(null); }}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoComplete="email"
+              />
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Password"
+                placeholderTextColor="#8e8e8e"
+                value={password}
+                onChangeText={(t) => { setPassword(t); setError(null); }}
+                secureTextEntry
+                autoComplete="password"
+              />
+              {error ? <Text style={styles.modalError}>{error}</Text> : null}
               <TouchableOpacity
-                style={[styles.loginButton, loading && styles.buttonDisabled]}
+                style={[styles.modalSignInBtn, loading && styles.buttonDisabled]}
                 onPress={handleLogin}
                 disabled={loading}
               >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.loginButtonText}>Login</Text>
-                )}
+                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalSignInText}>Sign in</Text>}
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.signUpButton}
-                onPress={() => Linking.openURL('/register').catch(() => {})}
-              >
-                <Text style={styles.signUpButtonText}>Sign up</Text>
+            </KeyboardAvoidingView>
+            <Text style={styles.modalSignUpPrompt}>
+              Create new account?{' '}
+              <Text style={styles.modalSignUpLink} onPress={openRegister}>Sign up</Text>
+            </Text>
+            <View style={styles.modalLegalRow}>
+              <TouchableOpacity onPress={() => Linking.openURL(`${BASE_URL}/#privacy`).catch(() => {})}>
+                <Text style={styles.modalLegalLink}>Privacy policy</Text>
+              </TouchableOpacity>
+              <Text style={styles.footerDot}> </Text>
+              <TouchableOpacity onPress={() => Linking.openURL(`${BASE_URL}/#terms-of-service`).catch(() => {})}>
+                <Text style={styles.modalLegalLink}>Terms and conditions</Text>
               </TouchableOpacity>
             </View>
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-            <TextInput
-              style={styles.input}
-              placeholder="Email address"
-              placeholderTextColor="#8e8e8e"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              autoComplete="email"
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              placeholderTextColor="#8e8e8e"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoComplete="password"
-            />
-            <TouchableOpacity
-              style={[styles.loginButtonFull, loading && styles.buttonDisabled]}
-              onPress={handleLogin}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.loginButtonText}>Log in</Text>
-              )}
+            <TouchableOpacity onPress={() => setShowLoginModal(false)} style={styles.modalCancel}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={styles.footer}>
-              Don&apos;t have an account? Register on the web at SemBuzz.
-            </Text>
-          </View>
-
-          <Text style={styles.sectionTitle}>Recently added schools / news</Text>
-          {recentLoading ? (
-            <ActivityIndicator size="small" color="#1a1f2e" style={{ marginVertical: 16 }} />
-          ) : (
-            recentEvents.map((ev) => (
-              <View key={ev.id} style={styles.recentItem}>
-                {ev.school?.image ? (
-                  <Image source={{ uri: imageSrc(ev.school.image) }} style={styles.recentLogo} />
-                ) : (
-                  <View style={styles.recentLogoPlaceholder}>
-                    <Text style={styles.recentLogoLetter}>{ev.school?.name?.charAt(0) ?? '?'}</Text>
-                  </View>
-                )}
-                <View style={styles.recentText}>
-                  <Text style={styles.recentTitle}>{ev.title}</Text>
-                  <Text style={styles.recentSub}>{ev.school?.name ?? ev.subCategory?.name ?? ''}</Text>
-                </View>
-              </View>
-            ))
-          )}
-
-          <View style={styles.footerLinks}>
-            <TouchableOpacity onPress={() => Linking.openURL('/privacy').catch(() => {})}>
-              <Text style={styles.footerLink}>Privacy policy</Text>
-            </TouchableOpacity>
-            <Text style={styles.footerDot}> · </Text>
-            <TouchableOpacity onPress={() => Linking.openURL('/terms').catch(() => {})}>
-              <Text style={styles.footerLink}>Terms and conditions</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -316,20 +348,23 @@ const styles = StyleSheet.create({
   loginButtonsRow: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 0,
   },
   loginButton: {
     backgroundColor: '#212529',
     borderRadius: 25,
     paddingVertical: 12,
     paddingHorizontal: 24,
+    flex: 1,
   },
-  loginButtonFull: {
-    backgroundColor: '#212529',
-    borderRadius: 25,
-    paddingVertical: 14,
+  personIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#e9ecef',
     alignItems: 'center',
-    marginTop: 8,
+    justifyContent: 'center',
+    marginRight: 12,
   },
   signUpButton: {
     backgroundColor: '#fff',
@@ -338,6 +373,17 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     paddingVertical: 12,
     paddingHorizontal: 24,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loginButtonFull: {
+    backgroundColor: '#212529',
+    borderRadius: 25,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 8,
   },
   signUpButtonText: {
     color: '#212529',
@@ -488,5 +534,155 @@ const styles = StyleSheet.create({
   footerDot: {
     fontSize: 14,
     color: '#6c757d',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalBox: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderRadius: 16,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 32,
+    elevation: 8,
+  },
+  signupModalBox: {
+    maxWidth: 420,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  modalClose: {
+    fontSize: 28,
+    color: '#6c757d',
+    lineHeight: 32,
+  },
+  modalBrand: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1a1f2e',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#495057',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    marginBottom: 12,
+    backgroundColor: '#fff',
+  },
+  modalError: {
+    fontSize: 14,
+    color: '#dc3545',
+    marginBottom: 8,
+  },
+  modalSignInBtn: {
+    backgroundColor: '#212529',
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  modalSignInText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  modalSignUpPrompt: {
+    fontSize: 14,
+    color: '#212529',
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  modalSignUpLink: {
+    color: '#0d6efd',
+    fontWeight: '500',
+  },
+  modalLegalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    marginTop: 16,
+  },
+  modalLegalLink: {
+    fontSize: 14,
+    color: '#6c757d',
+  },
+  modalCancel: {
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  modalCancelText: {
+    fontSize: 14,
+    color: '#6c757d',
+  },
+  signupModalHeading: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1a1f2e',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  signupModalSub: {
+    fontSize: 14,
+    color: '#6c757d',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  signupOption: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#212529',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  signupOptionOutline: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#212529',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  signupOptionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1f2e',
+    marginBottom: 4,
+  },
+  signupOptionDesc: {
+    fontSize: 13,
+    color: '#6c757d',
+    textAlign: 'center',
+  },
+  signupOptionG: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1a1f2e',
+    marginBottom: 8,
   },
 });

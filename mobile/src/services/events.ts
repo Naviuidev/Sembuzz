@@ -94,3 +94,22 @@ export function imageSrc(url: string | null | undefined): string {
   if (url.startsWith('http')) return url;
   return url.startsWith('/') ? `${base}${url}` : `${base}/${url}`;
 }
+
+/** Build backend URL for "Login with Google" to add event to user's calendar (OAuth flow). */
+export function buildGoogleCalendarAddAuthUrl(
+  post: { title: string; description?: string | null; scheduledTo: string },
+  returnUrl: string,
+): string {
+  const dateStr = post.scheduledTo.trim().slice(0, 10);
+  const startISO = `${dateStr}T09:00:00.000Z`;
+  const endISO = `${dateStr}T10:00:00.000Z`;
+  const base = getApiBaseUrl().replace(/\/$/, '');
+  const params = new URLSearchParams({
+    returnUrl,
+    title: post.title,
+    start: startISO,
+    end: endISO,
+    ...(post.description ? { description: post.description } : {}),
+  });
+  return `${base}/google/calendar/add-auth?${params.toString()}`;
+}

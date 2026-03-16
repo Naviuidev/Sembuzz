@@ -8,12 +8,20 @@ import type { SchoolOption } from '../services/user-auth.service';
 type Step = 'method' | 'form' | 'otp' | 'pending';
 type RegistrationMethod = 'school_domain' | 'gmail' | null;
 
+function getMethodFromLocation(location: { search: string; state?: unknown }): RegistrationMethod {
+  const fromState = (location.state as { registrationMethod?: 'school_domain' | 'gmail' })?.registrationMethod;
+  const fromQuery = new URLSearchParams(location.search).get('method');
+  const method = fromState ?? (fromQuery === 'school_domain' || fromQuery === 'gmail' ? fromQuery : null);
+  return method;
+}
+
 export const Register = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { register: doRegister, isAuthenticated } = useUserAuth();
-  const [step, setStep] = useState<Step>('method');
-  const [registrationMethod, setRegistrationMethod] = useState<RegistrationMethod>(null);
+  const initialMethod = getMethodFromLocation(location);
+  const [step, setStep] = useState<Step>(() => (initialMethod ? 'form' : 'method'));
+  const [registrationMethod, setRegistrationMethod] = useState<RegistrationMethod>(() => initialMethod);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -63,22 +71,22 @@ export const Register = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  // If navigated from Settings signup popup with a chosen method, skip method step
+  // When location gets method (e.g. user navigated with state or URL changed), skip method step
   useEffect(() => {
-    const method = (location.state as { registrationMethod?: 'school_domain' | 'gmail' })?.registrationMethod;
+    const method = getMethodFromLocation(location);
     if (method === 'school_domain' || method === 'gmail') {
       setRegistrationMethod(method);
       setStep('form');
     }
-  }, [location.state]);
+  }, [location.state, location.search]);
 
   // Direct visit to /register (no method chosen) → show signup popup on events page instead of full register page
   useEffect(() => {
-    const method = (location.state as { registrationMethod?: 'school_domain' | 'gmail' })?.registrationMethod;
-    if (!method && step === 'method') {
+    const hasMethod = !!getMethodFromLocation(location);
+    if (!hasMethod && step === 'method') {
       navigate('/events', { replace: true, state: { openAuth: 'signup', bottomNav: 'settings' } });
     }
-  }, [location.state, step, navigate]);
+  }, [location, step, navigate]);
 
   const handleMethodSelect = (method: 'school_domain' | 'gmail') => {
     setRegistrationMethod(method);
