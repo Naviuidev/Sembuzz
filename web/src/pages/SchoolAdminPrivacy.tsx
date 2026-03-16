@@ -477,11 +477,30 @@ export const SchoolAdminPrivacy = () => {
                   <p style={{ color: '#6c757d', marginBottom: '1rem', fontSize: '0.9rem' }}>
                     Select all categories this admin should have. You can assign as many as you need; no new email or login required.
                   </p>
-                  <p style={{ color: '#1a1f2e', marginBottom: '1.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
-                    Current: {editModal.categoryAdmin.categories?.length
-                      ? editModal.categoryAdmin.categories.map((c) => c.category.name).join(', ')
-                      : editModal.categoryAdmin.category?.name || '—'}
+                  <p style={{ color: '#1a1f2e', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
+                    Current:
                   </p>
+                  <div className="d-flex flex-wrap gap-1" style={{ marginBottom: '1.5rem' }}>
+                    {(() => {
+                      const a = editModal.categoryAdmin;
+                      const items: { id: string; name: string }[] = [];
+                      if (a.category?.id && a.category?.name) items.push({ id: a.category.id, name: a.category.name });
+                      a.categories?.forEach((c) => {
+                        if (c.category?.id && c.category?.name && !items.some((i) => i.id === c.category.id)) {
+                          items.push({ id: c.category.id, name: c.category.name });
+                        }
+                      });
+                      return items.length > 0 ? items.map((item) => (
+                        <span
+                          key={item.id}
+                          className="badge rounded-pill"
+                          style={{ backgroundColor: '#d1e7dd', color: '#0f5132', fontSize: '0.75rem', fontWeight: 500, padding: '0.35rem 0.65rem' }}
+                        >
+                          {item.name}
+                        </span>
+                      )) : '—';
+                    })()}
+                  </div>
 
                   <div style={{ maxHeight: '400px', overflowY: 'auto', marginBottom: '1.5rem' }}>
                     {categories?.map((category) => (
@@ -857,36 +876,36 @@ export const SchoolAdminPrivacy = () => {
                           <td style={{ border: 'none', padding: '0.75rem', color: '#6c757d' }}>{admin.email}</td>
                           <td style={{ border: 'none', padding: '0.75rem', color: '#6c757d' }}>
                             <div className="d-flex flex-wrap gap-1">
-                              {admin.categories && admin.categories.length > 0
-                                ? admin.categories.map((c) => (
-                                    <span
-                                      key={c.category.id}
-                                      className="badge rounded-pill"
-                                      style={{
-                                        backgroundColor: '#d1e7dd',
-                                        color: '#0f5132',
-                                        fontSize: '0.75rem',
-                                        fontWeight: 500,
-                                        padding: '0.35rem 0.65rem',
-                                      }}
-                                    >
-                                      {c.category.name}
-                                    </span>
-                                  ))
-                                : (
-                                    <span
-                                      className="badge rounded-pill"
-                                      style={{
-                                        backgroundColor: '#d1e7dd',
-                                        color: '#0f5132',
-                                        fontSize: '0.75rem',
-                                        fontWeight: 500,
-                                        padding: '0.35rem 0.65rem',
-                                      }}
-                                    >
-                                      {admin.category.name}
-                                    </span>
-                                  )}
+                              {(() => {
+                                const items: { id: string; name: string }[] = [];
+                                if (admin.category?.id && admin.category?.name) {
+                                  items.push({ id: admin.category.id, name: admin.category.name });
+                                }
+                                if (admin.categories?.length) {
+                                  admin.categories.forEach((c) => {
+                                    if (c.category?.id && c.category?.name && !items.some((i) => i.id === c.category.id)) {
+                                      items.push({ id: c.category.id, name: c.category.name });
+                                    }
+                                  });
+                                }
+                                return items.length > 0
+                                  ? items.map((item) => (
+                                      <span
+                                        key={item.id}
+                                        className="badge rounded-pill"
+                                        style={{
+                                          backgroundColor: '#d1e7dd',
+                                          color: '#0f5132',
+                                          fontSize: '0.75rem',
+                                          fontWeight: 500,
+                                          padding: '0.35rem 0.65rem',
+                                        }}
+                                      >
+                                        {item.name}
+                                      </span>
+                                    ))
+                                  : null;
+                              })()}
                             </div>
                           </td>
                           <td style={{ border: 'none', padding: '0.75rem' }}>
