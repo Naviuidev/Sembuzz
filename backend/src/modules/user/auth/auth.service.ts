@@ -53,8 +53,38 @@ export class UserAuthService {
       const email = dto.email.toLowerCase().trim();
       const existing = await this.prisma.user.findUnique({
         where: { email },
+        include: { school: { select: { id: true, name: true, domain: true } } },
       });
       if (existing) {
+        if (existing.status === 'pending_otp') {
+          const school = existing.school;
+          const otp = Math.floor(100000 + Math.random() * 900000).toString();
+          const otpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+          await this.prisma.user.update({
+            where: { id: existing.id },
+            data: { otp, otpExpiresAt },
+          });
+          try {
+            await this.emailService.sendUserOtp(email, otp, school?.name ?? 'SemBuzz');
+          } catch (emailErr) {
+            const isDevelopment = process.env.NODE_ENV === 'development';
+            if (isDevelopment) {
+              console.warn('[UserAuthService] OTP email failed (dev). User kept for verification.');
+              return { requiresOtp: true, email, devOtp: otp };
+            }
+            console.error('[UserAuthService] OTP email failed on resume:', emailErr);
+            throw new BadRequestException(
+              'We couldn\'t send a new verification email. Please try again later or use Resend OTP on the verification step.',
+            );
+          }
+          const isDevelopment = process.env.NODE_ENV === 'development';
+          return { requiresOtp: true, email, ...(isDevelopment ? { devOtp: otp } : {}) };
+        }
+        if (existing.status === 'pending_approval') {
+          throw new BadRequestException(
+            'Your registration is pending school admin approval. Check your email or contact your school admin.',
+          );
+        }
         throw new BadRequestException('An account with this email already exists');
       }
 
