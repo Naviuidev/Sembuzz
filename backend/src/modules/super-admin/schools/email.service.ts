@@ -138,38 +138,21 @@ export class EmailService {
       console.warn('[EmailService] Admin can log in at /school-admin/login with Ref Number or Email + temp password, then set a custom password.');
     };
 
-    try {
-      // Only send email if SMTP is configured
-      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-        console.warn('[EmailService] ⚠️ SMTP not configured. Onboarding email not sent.');
-        logCredentialsForManualUse();
-        console.warn('[EmailService] Set SMTP_USER and SMTP_PASS in .env to send the email to the admin.');
-        return;
-      }
-
-      console.log(`[EmailService] 📧 Attempting to send onboarding email to ${adminEmail}...`);
-      console.log(`[EmailService] From: ${mailOptions.from}`);
-      console.log(`[EmailService] To: ${mailOptions.to}`);
-      console.log(`[EmailService] Subject: ${mailOptions.subject}`);
-
-      const info = await this.transporter.sendMail(mailOptions);
-      
-      console.log(`[EmailService] ✅ Email sent successfully!`);
-      console.log(`[EmailService] Message ID: ${info.messageId}`);
-      console.log(`[EmailService] Response: ${info.response}`);
-      
-    } catch (error: any) {
-      console.error('[EmailService] ❌ Failed to send onboarding email!');
-      console.error('[EmailService] Error details:', {
-        message: error.message,
-        code: error.code,
-        command: error.command,
-        response: error.response,
-        responseCode: error.responseCode,
-        stack: error.stack,
-      });
+    // Require SMTP so caller gets a clear error (same as approval/rejection emails)
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.error('[EmailService] ⚠️ SMTP not configured. School admin onboarding email not sent.');
       logCredentialsForManualUse();
-      // Don't throw - school creation still succeeds; admin can use credentials from log to log in and set password
+      throw new Error('SMTP is not configured. Set SMTP_USER and SMTP_PASS in .env to send onboarding emails to the school admin.');
+    }
+
+    try {
+      console.log(`[EmailService] 📧 Sending school admin onboarding email to ${adminEmail}...`);
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log(`[EmailService] ✅ School admin onboarding email sent. Message ID: ${info.messageId}`);
+    } catch (error: any) {
+      console.error('[EmailService] ❌ Failed to send school admin onboarding email:', error?.message);
+      logCredentialsForManualUse();
+      throw error;
     }
   }
 
@@ -997,19 +980,16 @@ export class EmailService {
       `,
     };
 
-    const isDev = process.env.NODE_ENV !== 'production';
     if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      if (isDev) {
-        console.warn('[EmailService] ⚠️  SMTP not configured. Ads admin onboarding email not sent.');
-        console.warn(`[EmailService] 📧 Ads Admin ${adminEmail} temp password: ${tempPassword}`);
-        return;
-      }
-      return;
+      console.error('[EmailService] ⚠️ SMTP not configured. Ads admin onboarding email not sent.');
+      throw new Error('SMTP is not configured. Set SMTP_USER and SMTP_PASS in .env to send onboarding emails to the ads admin.');
     }
     try {
-      await this.transporter.sendMail(mailOptions);
+      console.log(`[EmailService] 📧 Sending ads admin onboarding email to ${adminEmail}...`);
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log(`[EmailService] ✅ Ads admin onboarding email sent. Message ID: ${info?.messageId}`);
     } catch (error: any) {
-      if (isDev) console.warn('[EmailService] Ads admin onboarding send failed:', error?.message);
+      console.error('[EmailService] ❌ Failed to send ads admin onboarding email:', error?.message);
       throw error;
     }
   }

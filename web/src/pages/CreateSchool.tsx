@@ -36,6 +36,7 @@ export const CreateSchool = () => {
   const [successModal, setSuccessModal] = useState<{
     isOpen: boolean;
     data: {
+      message?: string;
       refNum: string;
       tempPassword: string;
       adminEmail: string;
@@ -59,6 +60,7 @@ export const CreateSchool = () => {
         setSuccessModal({
           isOpen: true,
           data: {
+            message: response.message,
             refNum: response.credentials.refNum,
             tempPassword: response.credentials.tempPassword,
             adminEmail: response.credentials.adminEmail,
@@ -66,8 +68,8 @@ export const CreateSchool = () => {
             emailError: response.emailError,
             adsAdminEmail: response.credentials.adsAdminEmail,
             adsTempPassword: response.credentials.adsTempPassword,
-            adsEmailSent: response.credentials.adsEmailSent,
-            adsEmailError: response.credentials.adsEmailError,
+            adsEmailSent: response.credentials.adsEmailSent ?? response.credentials.adsAdminEmailSent,
+            adsEmailError: response.credentials.adsEmailError ?? response.credentials.adsAdminEmailError,
           },
         });
       } else {
@@ -234,6 +236,11 @@ export const CreateSchool = () => {
                       School Created Successfully
                     </h3>
                   </div>
+                  {successModal.data.message && (
+                    <p className="text-muted mb-3" style={{ fontSize: '0.95rem' }}>
+                      {successModal.data.message}
+                    </p>
+                  )}
 
                   {!successModal.data.emailSent && (
                     <div className="alert alert-warning mb-3" style={{ borderRadius: '0px' }}>

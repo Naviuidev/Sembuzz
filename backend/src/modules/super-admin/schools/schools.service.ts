@@ -314,12 +314,32 @@ export class SchoolsService {
       refNum,
       tempPassword: result.tempPassword,
       adminEmail,
+      schoolAdminEmailSent: emailSent,
+      ...(emailError ? { schoolAdminEmailError: emailError } : {}),
     };
     if (result.adsAdmin && result.adsTempPassword && adsAdminEmail) {
       credentials.adsAdminEmail = adsAdminEmail.trim();
       credentials.adsTempPassword = result.adsTempPassword;
-      credentials.adsEmailSent = adsEmailSent;
-      if (adsEmailError) credentials.adsEmailError = adsEmailError;
+      credentials.adsAdminEmailSent = adsEmailSent;
+      credentials.adsEmailSent = adsEmailSent; // frontend compatibility
+      if (adsEmailError) credentials.adsAdminEmailError = adsEmailError;
+      if (adsEmailError) credentials.adsEmailError = adsEmailError; // frontend compatibility
+    }
+
+    const hasAds = !!(result.adsAdmin && adsAdminEmail);
+    let message: string;
+    if (emailSent && (!hasAds || adsEmailSent)) {
+      message = hasAds
+        ? 'School created successfully. Onboarding emails sent to School Admin and Ads Admin.'
+        : 'School created successfully. Onboarding email sent to School Admin.';
+    } else if (emailSent && !adsEmailSent) {
+      message = `School created successfully. School Admin email sent. Ads Admin email could not be sent${adsEmailError ? `: ${adsEmailError}` : '.'}`;
+    } else if (!emailSent && hasAds && adsEmailSent) {
+      message = `School created successfully. Ads Admin email sent. School Admin email could not be sent${emailError ? `: ${emailError}` : '.'}`;
+    } else {
+      message = 'School created successfully, but onboarding email(s) could not be sent. Please check SMTP settings and credentials below.';
+      if (emailError) message += ` School Admin: ${emailError}.`;
+      if (adsEmailError) message += ` Ads Admin: ${adsEmailError}.`;
     }
 
     return {
@@ -348,10 +368,10 @@ export class SchoolsService {
       })),
       emailSent,
       emailError,
+      adsEmailSent: hasAds ? adsEmailSent : undefined,
+      adsEmailError: hasAds && adsEmailError ? adsEmailError : undefined,
       credentials,
-      message: emailSent
-        ? 'School created successfully. Onboarding email sent.'
-        : 'School created successfully, but email could not be sent. Please check credentials below.',
+      message,
     };
   }
 
