@@ -50,11 +50,16 @@ export const CategoryAdminPrivacy = () => {
     selectedSubCategoryIds: [],
   });
 
-  const { data: category, isLoading: categoryLoading } = useQuery({
-    queryKey: ['category-admin-category'],
-    queryFn: categoryAdminCategoriesService.getMyCategory,
-    enabled: !!user?.categoryId,
+  const { data: categories, isLoading: categoryLoading } = useQuery({
+    queryKey: ['category-admin-categories'],
+    queryFn: categoryAdminCategoriesService.getMyCategories,
+    enabled: !!token,
   });
+
+  const category = categories?.[0];
+  const allSubcategories = (categories ?? []).flatMap((cat) =>
+    (cat.subcategories ?? []).map((sc) => ({ ...sc, categoryName: cat.name })),
+  );
 
   const { data: subCategoryAdmins, isLoading: adminsLoading, error: adminsError } = useQuery<SubCategoryAdmin[]>({
     queryKey: ['category-admin', 'subcategory-admins', user?.id],
@@ -439,7 +444,7 @@ export const CategoryAdminPrivacy = () => {
           )}
 
           {/* Edit Subcategories Modal */}
-          {editModal.isOpen && editModal.subCategoryAdmin && category && (
+          {editModal.isOpen && editModal.subCategoryAdmin && (categories?.length ?? 0) > 0 && (
             <div
               style={{
                 position: 'fixed',
@@ -488,28 +493,35 @@ export const CategoryAdminPrivacy = () => {
                   </p>
 
                   <div style={{ maxHeight: '400px', overflowY: 'auto', marginBottom: '1.5rem' }}>
-                    {category.subcategories?.map((subcategory) => (
-                      <div key={subcategory.id} className="form-check mb-3">
-                        <input
-                          className="form-check-input"
-                          type="checkbox"
-                          id={`subcategory-${subcategory.id}`}
-                          checked={editModal.selectedSubCategoryIds.includes(subcategory.id)}
-                          onChange={() => handleEditSubCategoryToggle(subcategory.id)}
-                          style={{ borderRadius: '0px', cursor: 'pointer' }}
-                        />
-                        <label
-                          className="form-check-label"
-                          htmlFor={`subcategory-${subcategory.id}`}
-                          style={{
-                            color: '#1a1f2e',
-                            cursor: 'pointer',
-                            marginLeft: '0.5rem',
-                            fontWeight: editModal.selectedSubCategoryIds.includes(subcategory.id) ? '500' : '400',
-                          }}
-                        >
-                          {subcategory.name}
-                        </label>
+                    {(categories ?? []).map((cat) => (
+                      <div key={cat.id} style={{ marginBottom: '1rem' }}>
+                        <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#6c757d', marginBottom: '0.5rem' }}>
+                          {cat.name}
+                        </div>
+                        {(cat.subcategories ?? []).map((subcategory) => (
+                          <div key={subcategory.id} className="form-check mb-2">
+                            <input
+                              className="form-check-input"
+                              type="checkbox"
+                              id={`subcategory-${subcategory.id}`}
+                              checked={editModal.selectedSubCategoryIds.includes(subcategory.id)}
+                              onChange={() => handleEditSubCategoryToggle(subcategory.id)}
+                              style={{ borderRadius: '0px', cursor: 'pointer' }}
+                            />
+                            <label
+                              className="form-check-label"
+                              htmlFor={`subcategory-${subcategory.id}`}
+                              style={{
+                                color: '#1a1f2e',
+                                cursor: 'pointer',
+                                marginLeft: '0.5rem',
+                                fontWeight: editModal.selectedSubCategoryIds.includes(subcategory.id) ? '500' : '400',
+                              }}
+                            >
+                              {subcategory.name}
+                            </label>
+                          </div>
+                        ))}
                       </div>
                     ))}
                   </div>
@@ -750,9 +762,9 @@ export const CategoryAdminPrivacy = () => {
                       style={{ borderRadius: '0px', padding: '0.75rem 1rem' }}
                     >
                       <option value="">Select a subcategory</option>
-                      {category?.subcategories?.map((subcategory) => (
+                      {allSubcategories.map((subcategory) => (
                         <option key={subcategory.id} value={subcategory.id}>
-                          {subcategory.name}
+                          {subcategory.name} ({subcategory.categoryName})
                         </option>
                       ))}
                     </select>
@@ -761,7 +773,7 @@ export const CategoryAdminPrivacy = () => {
                         Loading subcategories...
                       </small>
                     )}
-                    {!categoryLoading && category && (!category.subcategories || category.subcategories.length === 0) && (
+                    {!categoryLoading && allSubcategories.length === 0 && (
                       <small className="text-muted" style={{ fontSize: '0.75rem', color: '#dc3545' }}>
                         No subcategories found. Please create subcategories first.
                       </small>
