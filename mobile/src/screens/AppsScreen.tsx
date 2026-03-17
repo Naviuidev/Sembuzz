@@ -44,11 +44,12 @@ export default function AppsScreen() {
   }, [fetchAccounts]);
 
   const groups = groupAccountsByPage(accounts);
+  const displayTitle = user?.schoolName?.trim() || 'Sembuzz';
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>Sembuzz</Text>
+        <Text style={styles.title}>{displayTitle}</Text>
         <Text style={styles.followTitle}>Follow us</Text>
         {loading ? (
           <ActivityIndicator size="small" color="#1a1f2e" style={{ marginVertical: 24 }} />
@@ -94,19 +95,20 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 24,
     paddingBottom: 100,
+    alignItems: 'flex-start',
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
     color: '#1a1f2e',
-    textAlign: 'center',
+    textAlign: 'left',
     marginBottom: 8,
   },
   followTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1a1f2e',
-    textAlign: 'center',
+    textAlign: 'left',
     marginBottom: 24,
   },
   section: {
@@ -147,7 +149,7 @@ const styles = StyleSheet.create({
   hint: {
     fontSize: 13,
     color: '#8e8e8e',
-    textAlign: 'center',
+    textAlign: 'left',
     marginTop: 8,
   },
 });

@@ -9,6 +9,7 @@ type User = {
   email: string;
   name: string;
   schoolId: string | null;
+  schoolName?: string | null;
 };
 
 type AuthContextType = {

@@ -58,41 +58,49 @@ export interface SavedSocialAccount {
   link: string;
 }
 
-function SembuzzAnimation({ onComplete, durationMs = 2000 }: { onComplete: () => void; durationMs?: number }) {
-  const [key, setKey] = useState(0);
-  useEffect(() => {
-    setKey((k) => k + 1);
-  }, []);
+/** Custom "Adding" popup — same style as Success popup (icon + title + message), no letter animation */
+function AddingPopup({ onComplete, durationMs = 2000 }: { onComplete: () => void; durationMs?: number }) {
   useEffect(() => {
     const t = setTimeout(onComplete, durationMs);
     return () => clearTimeout(t);
   }, [onComplete, durationMs]);
 
   return (
-    <div key={key} className="d-flex flex-column align-items-center justify-content-center" style={{ minHeight: '280px' }}>
-      <div className="d-flex flex-wrap justify-content-center" style={{ gap: '0.15rem' }}>
-        {'Sembuzz'.split('').map((letter, i) => (
-          <span
-            key={i}
-            style={{
-              display: 'inline-block',
-              fontSize: '2rem',
-              color: '#1a1f2e',
-              opacity: 0,
-              animation: 'sembuzz-reveal 0.35s ease forwards',
-              animationDelay: `${i * 0.06}s`,
-            }}
-          >
-            {letter}
-          </span>
-        ))}
+    <div className="d-flex align-items-start gap-3" style={{ minHeight: '120px' }}>
+      <div
+        style={{
+          width: '48px',
+          height: '48px',
+          borderRadius: '50%',
+          backgroundColor: '#e7f1ff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
+        <i
+          className="bi bi-hourglass-split"
+          style={{ fontSize: '1.5rem', color: '#0d6efd' }}
+          aria-hidden
+        />
       </div>
-      <style>{`
-        @keyframes sembuzz-reveal {
-          from { opacity: 0; transform: translateX(-6px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-      `}</style>
+      <div style={{ flex: 1 }}>
+        <h3
+          style={{
+            fontSize: '1.25rem',
+            fontWeight: 600,
+            color: '#1a1f2e',
+            marginBottom: '0.5rem',
+            marginTop: 0,
+          }}
+        >
+          Adding
+        </h3>
+        <p style={{ fontSize: '1rem', color: '#6c757d', marginBottom: 0 }}>
+          Please wait…
+        </p>
+      </div>
     </div>
   );
 }
@@ -637,10 +645,10 @@ export const SchoolAdminSocialShare = () => {
               >
                 <div className="card-body p-4">
                   {step === 'animating' && (
-                    <SembuzzAnimation onComplete={handleAnimatingDone} durationMs={2000} />
+                    <AddingPopup onComplete={handleAnimatingDone} durationMs={2000} />
                   )}
                   {step === 'animating-save' && (
-                    <SembuzzAnimation onComplete={handleAnimatingSaveDone} durationMs={2000} />
+                    <AddingPopup onComplete={handleAnimatingSaveDone} durationMs={2000} />
                   )}
                   {step === 'club-info' && (
                     <>

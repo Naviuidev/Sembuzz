@@ -22,18 +22,8 @@ export const AdsAdminNavbar = () => {
         }}
       >
         <Link className="navbar-brand d-flex align-items-center" to="/ads-admin/dashboard" style={{ fontSize: '1.25rem', fontWeight: '600' }}>
-          <span
-            style={{
-              display: 'inline-block',
-              width: '30px',
-              height: '30px',
-              background: 'linear-gradient(135deg, #ff6b6b, #ffa500)',
-              borderRadius: '6px',
-              marginRight: '10px',
-            }}
-          />
-          <span style={{ color: '#fff' }}>Sem</span>
-          <span style={{ color: '#4dabf7' }}>Buzz</span>
+          <img src="/logo.png" alt="Sembuzz" style={{ height: '28px', width: 'auto', marginRight: '8px' }} />
+          <span style={{ color: '#fff' }}>Sembuzz</span>
           <span style={{ color: '#fff', marginLeft: '8px', fontSize: '0.9rem' }}>Ads Admin</span>
         </Link>
         <button

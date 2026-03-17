@@ -153,15 +153,21 @@ export const Register = () => {
         navigate('/events', { replace: true, state: { openAuth: 'login', bottomNav: 'settings' } });
       }
     } catch (err: unknown) {
-      const data = err && typeof err === 'object' && 'response' in err
-        ? (err as { response?: { data?: { message?: string | string[] } } }).response?.data
+      const ax = err && typeof err === 'object' && 'response' in err
+        ? (err as { response?: { data?: { message?: string | string[] }; status?: number }; message?: string })
         : null;
-      const rawMessage = data?.message;
+      const data = ax?.response?.data;
+      const rawMessage =
+        (data && typeof data === 'object' && 'message' in data && data.message) ||
+        (typeof data === 'string' ? data : null);
       const msg = Array.isArray(rawMessage)
         ? rawMessage.join('. ')
-        : typeof rawMessage === 'string'
+        : typeof rawMessage === 'string' && rawMessage.length > 0
           ? rawMessage
-          : 'Registration failed. Please try again.';
+          : ax?.message ||
+            (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string'
+              ? (err as { message: string }).message
+              : 'Registration failed. Please try again.');
       setError(msg);
     } finally {
       setLoading(false);

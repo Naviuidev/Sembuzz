@@ -25,48 +25,8 @@ export const SubCategoryAdminNavbar = () => {
       }}>
         {/* Brand/Logo */}
         <Link className="navbar-brand d-flex align-items-center" to="/subcategory-admin/dashboard" style={{ fontSize: '1.25rem', fontWeight: '600' }}>
-          <span style={{ 
-            display: 'inline-block',
-            width: '30px',
-            height: '30px',
-            background: 'linear-gradient(135deg, #ff6b6b, #ffa500)',
-            borderRadius: '6px',
-            marginRight: '10px',
-            position: 'relative'
-          }}>
-            <span style={{
-              position: 'absolute',
-              bottom: '4px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: '2px',
-              height: '8px',
-              background: '#fff',
-              borderRadius: '1px'
-            }}></span>
-            <span style={{
-              position: 'absolute',
-              bottom: '4px',
-              left: '40%',
-              transform: 'translateX(-50%)',
-              width: '2px',
-              height: '12px',
-              background: '#fff',
-              borderRadius: '1px'
-            }}></span>
-            <span style={{
-              position: 'absolute',
-              bottom: '4px',
-              left: '60%',
-              transform: 'translateX(-50%)',
-              width: '2px',
-              height: '6px',
-              background: '#fff',
-              borderRadius: '1px'
-            }}></span>
-          </span>
-          <span style={{ color: '#fff' }}>Sem</span>
-          <span style={{ color: '#4dabf7' }}>Buzz</span>
+          <img src="/logo.png" alt="Sembuzz" style={{ height: '28px', width: 'auto', marginRight: '8px' }} />
+          <span style={{ color: '#fff' }}>Sembuzz</span>
         </Link>
 
         {/* Logout Button */}

@@ -70,48 +70,8 @@ export const Navbar = () => {
               }
             }}
           >
-            <span style={{ 
-              display: 'inline-block',
-              width: '30px',
-              height: '30px',
-              background: 'linear-gradient(135deg, #ff6b6b, #ffa500)',
-              borderRadius: '6px',
-              marginRight: '10px',
-              position: 'relative'
-            }}>
-              <span style={{
-                position: 'absolute',
-                bottom: '4px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: '2px',
-                height: '8px',
-                background: '#fff',
-                borderRadius: '1px'
-              }}></span>
-              <span style={{
-                position: 'absolute',
-                bottom: '4px',
-                left: '40%',
-                transform: 'translateX(-50%)',
-                width: '2px',
-                height: '12px',
-                background: '#fff',
-                borderRadius: '1px'
-              }}></span>
-              <span style={{
-                position: 'absolute',
-                bottom: '4px',
-                left: '60%',
-                transform: 'translateX(-50%)',
-                width: '2px',
-                height: '6px',
-                background: '#fff',
-                borderRadius: '1px'
-              }}></span>
-            </span>
-            <span style={{ color: '#fff' }}>Sem</span>
-            <span style={{ color: '#4dabf7' }}>Buzz</span>
+            <img src="/logo.png" alt="Sembuzz" style={{ height: '32px', width: 'auto', marginRight: '8px' }} />
+            <span style={{ color: '#fff' }}>Sembuzz</span>
           </Link>
 
           {/* Desktop Navigation Links - Center */}
@@ -296,7 +256,7 @@ export const Navbar = () => {
             {/* Right: Social icons, Register, Login (or Events page tools + User) */}
             <div className="d-flex align-items-center gap-2 ms-auto">
               <a
-                href="https://www.instagram.com/sembuzzofficial/"
+                href="https://www.instagram.com/sembuzzofficial?igsh=MWRxaHRldjZ1N3Z2cg=="
                 target="_blank"
                 rel="noopener noreferrer"
                 className="d-flex align-items-center justify-content-center"
@@ -320,7 +280,7 @@ export const Navbar = () => {
                 <i className="bi bi-facebook" style={{ fontSize: '1.2rem' }} />
               </a>
               <a
-                href="https://www.linkedin.com/company/sembuzzsdmlhq/posts/"
+                href="https://www.linkedin.com/company/sembuzzsdmlhq/posts/?feedView=all"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="d-flex align-items-center justify-content-center"
@@ -545,48 +505,8 @@ export const Navbar = () => {
               }}
               style={{ fontSize: '1.25rem', fontWeight: '600', textDecoration: 'none' }}
             >
-              <span style={{ 
-                display: 'inline-block',
-                width: '25px',
-                height: '25px',
-                background: 'linear-gradient(135deg, #ff6b6b, #ffa500)',
-                borderRadius: '6px',
-                marginRight: '10px',
-                position: 'relative'
-              }}>
-                <span style={{
-                  position: 'absolute',
-                  bottom: '3px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  width: '2px',
-                  height: '6px',
-                  background: '#fff',
-                  borderRadius: '1px'
-                }}></span>
-                <span style={{
-                  position: 'absolute',
-                  bottom: '3px',
-                  left: '40%',
-                  transform: 'translateX(-50%)',
-                  width: '2px',
-                  height: '10px',
-                  background: '#fff',
-                  borderRadius: '1px'
-                }}></span>
-                <span style={{
-                  position: 'absolute',
-                  bottom: '3px',
-                  left: '60%',
-                  transform: 'translateX(-50%)',
-                  width: '2px',
-                  height: '5px',
-                  background: '#fff',
-                  borderRadius: '1px'
-                }}></span>
-              </span>
-              <span style={{ color: '#fff' }}>Sem</span>
-              <span style={{ color: '#4dabf7' }}>Buzz</span>
+              <img src="/logo.png" alt="Sembuzz" style={{ height: '28px', width: 'auto', marginRight: '8px' }} />
+              <span style={{ color: '#fff' }}>Sembuzz</span>
             </Link>
             <button
               onClick={closeMobileMenu}
@@ -663,13 +583,13 @@ export const Navbar = () => {
               </Link>
             </li>
             <li className="mb-3 d-flex gap-2">
-              <a href="https://www.instagram.com/sembuzzofficial/" target="_blank" rel="noopener noreferrer" style={{ color: '#fff', padding: '0.5rem' }} aria-label="Instagram">
+              <a href="https://www.instagram.com/sembuzzofficial?igsh=MWRxaHRldjZ1N3Z2cg==" target="_blank" rel="noopener noreferrer" style={{ color: '#fff', padding: '0.5rem' }} aria-label="Instagram">
                 <i className="bi bi-instagram" style={{ fontSize: '1.25rem' }} />
               </a>
               <a href="https://www.facebook.com/people/Sembuzzofficial/61555782134710/?ref=1" target="_blank" rel="noopener noreferrer" style={{ color: '#fff', padding: '0.5rem' }} aria-label="Facebook">
                 <i className="bi bi-facebook" style={{ fontSize: '1.25rem' }} />
               </a>
-              <a href="https://www.linkedin.com/company/sembuzzsdmlhq/posts/" target="_blank" rel="noopener noreferrer" style={{ color: '#fff', padding: '0.5rem' }} aria-label="LinkedIn">
+              <a href="https://www.linkedin.com/company/sembuzzsdmlhq/posts/?feedView=all" target="_blank" rel="noopener noreferrer" style={{ color: '#fff', padding: '0.5rem' }} aria-label="LinkedIn">
                 <i className="bi bi-linkedin" style={{ fontSize: '1.25rem' }} />
               </a>
             </li>

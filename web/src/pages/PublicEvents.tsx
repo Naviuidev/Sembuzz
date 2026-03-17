@@ -16,6 +16,7 @@ import {
 import {
   userEventsService,
   type EventCommentResponse,
+  type EngagementResponse,
 } from '../services/user-events.service';
 import { userAuthService } from '../services/user-auth.service';
 import { api } from '../config/api';
@@ -864,18 +865,22 @@ function EventPostCard({
           >
             <i className={isLiked ? 'bi bi-heart-fill' : 'bi bi-heart'} style={{ fontSize: '1.5rem' }} />
           </button>
-          <button
-            type="button"
-            className="btn btn-link p-0 border-0 text-secondary text-decoration-none"
-            title={!currentUserId ? 'Login / signup required to comment' : undefined}
-            onClick={currentUserId ? () => setCommentsOpen((o) => !o) : undefined}
-            style={{ cursor: currentUserId ? 'pointer' : 'default' }}
-            aria-label={currentUserId ? 'Comments' : 'Login / signup required to comment'}
-          >
-            <i className="bi bi-chat" style={{ fontSize: '1.5rem' }} />
-          </button>
+          {event.commentsEnabled && (
+            <>
+              <button
+                type="button"
+                className="btn btn-link p-0 border-0 text-secondary text-decoration-none"
+                title={!currentUserId ? 'Login / signup required to comment' : undefined}
+                onClick={currentUserId ? () => setCommentsOpen((o) => !o) : undefined}
+                style={{ cursor: currentUserId ? 'pointer' : 'default' }}
+                aria-label={currentUserId ? 'Comments' : 'Login / signup required to comment'}
+              >
+                <i className="bi bi-chat" style={{ fontSize: '1.5rem' }} />
+              </button>
+              <span className="text-muted small">{commentCount} Comment{commentCount !== 1 ? 's' : ''}</span>
+            </>
+          )}
           <span className="text-muted small">{likeCount} Like{likeCount !== 1 ? 's' : ''}</span>
-          <span className="text-muted small">{commentCount} Comment{commentCount !== 1 ? 's' : ''}</span>
           <div className="ms-auto">
             <button
               type="button"
@@ -1120,17 +1125,15 @@ export const PublicEvents = () => {
   const [categorySelectionSelectedIds, setCategorySelectionSelectedIds] = useState<string[]>([]);
   const [selectedLikedEvent, setSelectedLikedEvent] = useState<import('../services/user-events.service').LikedEventItem | null>(null);
   const [upcomingDateFilter, setUpcomingDateFilter] = useState<string | null>(null);
-  const [upcomingCalendarOpen, setUpcomingCalendarOpen] = useState(false);
+  const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   /** Pending date in calendar dropdown; only applied when user clicks OK (search runs then). */
   const [calendarPendingDate, setCalendarPendingDate] = useState<string | null>(null);
-  const [calendarLoginTooltipVisible, setCalendarLoginTooltipVisible] = useState(false);
   const [selectedUpcomingPost, setSelectedUpcomingPost] = useState<UpcomingPostPublic | null>(null);
   const [googleCalDropdownPostId, setGoogleCalDropdownPostId] = useState<string | null>(null);
   const [googleCalReturnSuccess, setGoogleCalReturnSuccess] = useState(false);
   const [googleCalReturnError, setGoogleCalReturnError] = useState<string | null>(null);
   const [googleCalDropdownPosition, setGoogleCalDropdownPosition] = useState<{ top: number; left: number } | null>(null);
   const googleCalAnchorRef = useRef<HTMLButtonElement | null>(null);
-  const calendarButtonRef = useRef<HTMLButtonElement>(null);
   const calendarDropdownRef = useRef<HTMLDivElement>(null);
   const [selectedSettingsEvent, setSelectedSettingsEvent] = useState<ApprovedEventPublic | null>(null);
   const [appsScreenKey, setAppsScreenKey] = useState(0);
@@ -1275,14 +1278,14 @@ export const PublicEvents = () => {
     enabled: !!user,
   });
 
-  // When calendar dropdown opens, set default pending date to tomorrow so OK is clickable
+  // When filter dropdown opens (and user logged in), set default calendar pending date to tomorrow
   useEffect(() => {
-    if (upcomingCalendarOpen && user) {
+    if (filterDropdownOpen && user) {
       const d = new Date();
       d.setDate(d.getDate() + 1);
       setCalendarPendingDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
     }
-  }, [upcomingCalendarOpen, user]);
+  }, [filterDropdownOpen, user]);
 
   // Upcoming posts by date (when user selects a date from calendar and clicks OK)
   const { data: upcomingPostsByDate = [] } = useQuery({
@@ -1575,19 +1578,81 @@ export const PublicEvents = () => {
     enabled: !user && eventIds.length > 0,
   });
 
-  const likeMutation = useMutation({
+  const engagementQueryKey = ['public', 'events', 'engagement', eventIds.join(',')] as const;
+  type EngagementContext = { prev: EngagementResponse | undefined; key: readonly [string, string, string, string] };
+
+  const likeMutation = useMutation<
+    { liked: boolean; count: number },
+    Error,
+    string,
+    EngagementContext
+  >({
     mutationFn: (eventId: string) => userEventsService.toggleLike(eventId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['public', 'events', 'engagement'] });
+    onMutate: async (eventId) => {
+      const key = engagementQueryKey;
+      await queryClient.cancelQueries({ queryKey: key });
+      const prev = queryClient.getQueryData<EngagementResponse>(key);
+      if (prev) {
+        const isLiked = prev.likedByMe.includes(eventId);
+        const nextCount = (prev.likes?.[eventId] ?? 0) + (isLiked ? -1 : 1);
+        queryClient.setQueryData<EngagementResponse>(key, {
+          ...prev,
+          likedByMe: isLiked ? prev.likedByMe.filter((id) => id !== eventId) : [...prev.likedByMe, eventId],
+          likes: { ...prev.likes, [eventId]: Math.max(0, nextCount) },
+        });
+      }
+      return { prev, key };
+    },
+    onSuccess: (data, eventId, context) => {
+      const key = context?.key ?? engagementQueryKey;
+      queryClient.setQueryData<EngagementResponse>(key, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          likedByMe: data.liked ? [...old.likedByMe.filter((id) => id !== eventId), eventId] : old.likedByMe.filter((id) => id !== eventId),
+          likes: { ...old.likes, [eventId]: data.count },
+        };
+      });
       queryClient.invalidateQueries({ queryKey: ['user', 'events', 'liked'] });
+    },
+    onError: (_err, _eventId, context) => {
+      if (context?.prev != null && context?.key) queryClient.setQueryData(context.key, context.prev);
     },
   });
 
-  const saveMutation = useMutation({
+  const saveMutation = useMutation<
+    { saved: boolean },
+    Error,
+    string,
+    EngagementContext
+  >({
     mutationFn: (eventId: string) => userEventsService.toggleSave(eventId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['public', 'events', 'engagement'] });
+    onMutate: async (eventId) => {
+      const key = engagementQueryKey;
+      await queryClient.cancelQueries({ queryKey: key });
+      const prev = queryClient.getQueryData<EngagementResponse>(key);
+      if (prev) {
+        const isSaved = prev.savedByMe.includes(eventId);
+        queryClient.setQueryData<EngagementResponse>(key, {
+          ...prev,
+          savedByMe: isSaved ? prev.savedByMe.filter((id) => id !== eventId) : [...prev.savedByMe, eventId],
+        });
+      }
+      return { prev, key };
+    },
+    onSuccess: (data, eventId, context) => {
+      const key = context?.key ?? engagementQueryKey;
+      queryClient.setQueryData<EngagementResponse>(key, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          savedByMe: data.saved ? [...old.savedByMe.filter((id) => id !== eventId), eventId] : old.savedByMe.filter((id) => id !== eventId),
+        };
+      });
       queryClient.invalidateQueries({ queryKey: ['user', 'events', 'saved'] });
+    },
+    onError: (_err, _eventId, context) => {
+      if (context?.prev != null && context?.key) queryClient.setQueryData(context.key, context.prev);
     },
   });
 
@@ -2961,19 +3026,17 @@ export const PublicEvents = () => {
             )}
           </div>
         ) : bottomNavActive === 'apps' ? (
-          /* Apps — Sembuzz animation + social links, centered; animation runs every visit */
+          /* Apps — horizontally centered (left–right), top-aligned (no vertical center); school name when logged in, else Sembuzz */
           <div
-            className="d-flex flex-column align-items-center justify-content-center"
+            className="d-flex flex-column align-items-center justify-content-start"
             style={{
-              maxWidth: '600px',
-              margin: '0 auto',
-              minHeight: 'calc(100vh - 12rem)',
+              width: '100%',
               paddingBottom: '1rem',
             }}
           >
-            <div key={appsScreenKey} className="d-flex flex-column align-items-center mb-4">
+            <div key={appsScreenKey} className="d-flex flex-column align-items-center mb-4" style={{ width: '100%', maxWidth: '600px' }}>
               <div className="d-flex flex-wrap justify-content-center" style={{ gap: '0.15rem' }} aria-hidden="true">
-                {'Sembuzz'.split('').map((letter, i) => (
+                {(user?.schoolName?.trim() || 'Sembuzz').split('').map((letter, i) => (
                   <span
                     key={i}
                     className="sembuzz-letter"
@@ -2991,8 +3054,8 @@ export const PublicEvents = () => {
                 ))}
               </div>
             </div>
-            <h2 className="mb-4 text-center" style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1a1f2e' }}>Follow us</h2>
-            <div className="d-flex flex-column align-items-center w-100" style={{ gap: '1.5rem' }}>
+            <h2 className="mb-4 text-center w-100" style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1a1f2e' }}>Follow us</h2>
+            <div className="d-flex flex-column align-items-center w-100" style={{ gap: '1.5rem', maxWidth: '600px' }}>
               {user && schoolSocialAccounts.length > 0 ? (
                 (() => {
                   const groups = schoolSocialAccounts.reduce<{ key: string; icon: string; pageName: string; accounts: SchoolSocialAccountPublic[] }[]>((acc, account) => {
@@ -3045,7 +3108,7 @@ export const PublicEvents = () => {
               ) : (
                 <div className="d-flex flex-wrap gap-3 justify-content-center">
                   <a
-                    href="https://www.linkedin.com/company/sembuzzsdmlhq/about/"
+                    href="https://www.linkedin.com/company/sembuzzsdmlhq/posts/?feedView=all"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="d-flex align-items-center justify-content-center rounded-3 text-decoration-none"
@@ -3055,7 +3118,7 @@ export const PublicEvents = () => {
                     <i className="bi bi-linkedin" style={{ fontSize: '2rem' }} />
                   </a>
                   <a
-                    href="https://www.facebook.com/sembuzz"
+                    href="https://www.facebook.com/people/Sembuzzofficial/61555782134710/?ref=1"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="d-flex align-items-center justify-content-center rounded-3 text-decoration-none"
@@ -3065,17 +3128,7 @@ export const PublicEvents = () => {
                     <i className="bi bi-facebook" style={{ fontSize: '2rem' }} />
                   </a>
                   <a
-                    href="https://x.com/sembuzz"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="d-flex align-items-center justify-content-center rounded-3 text-decoration-none"
-                    style={{ width: 72, height: 72, color: '#14171a', backgroundColor: 'transparent', transition: 'transform 0.2s ease' }}
-                    aria-label="X (Twitter)"
-                  >
-                    <i className="bi bi-twitter-x" style={{ fontSize: '1.75rem' }} />
-                  </a>
-                  <a
-                    href="https://www.instagram.com/sembuzz"
+                    href="https://www.instagram.com/sembuzzofficial?igsh=MWRxaHRldjZ1N3Z2cg=="
                     target="_blank"
                     rel="noopener noreferrer"
                     className="d-flex align-items-center justify-content-center rounded-3 text-decoration-none"
@@ -3191,43 +3244,54 @@ export const PublicEvents = () => {
                 </>
               )}
             </div>
-            <div className="d-flex align-items-center gap-2 small flex-shrink-0">
-              {user && !showAllSchoolsFeed && (
-                <div className="position-relative">
-                  <button
-                    ref={calendarButtonRef}
-                    type="button"
-                    className="btn border-0 py-1 px-2 rounded d-flex align-items-center"
+            <div className="d-flex align-items-center gap-2 small flex-shrink-0 position-relative">
+              <button
+                type="button"
+                className="btn border-0 py-1 px-2 rounded d-flex align-items-center"
+                style={{
+                  backgroundColor: filterDropdownOpen || upcomingDateFilter || feedSort !== 'latest'
+                    ? 'rgba(13, 202, 240, 0.15)'
+                    : 'transparent',
+                  color: filterDropdownOpen || upcomingDateFilter ? '#087990' : '#6c757d',
+                }}
+                onClick={() => setFilterDropdownOpen((o) => !o)}
+                title="Filter: Calendar, Latest, Popular"
+                aria-label="Filter"
+                aria-expanded={filterDropdownOpen}
+              >
+                <i className="bi bi-funnel" style={{ fontSize: '1.1rem' }} />
+              </button>
+              {filterDropdownOpen && (
+                <>
+                  <div
+                    ref={calendarDropdownRef}
+                    className="shadow-sm border bg-white rounded py-2"
                     style={{
-                      backgroundColor: upcomingDateFilter ? 'rgba(13, 202, 240, 0.2)' : 'transparent',
-                      color: upcomingDateFilter ? '#087990' : '#6c757d',
+                      position: 'absolute',
+                      top: '100%',
+                      right: 0,
+                      marginTop: 4,
+                      minWidth: 260,
+                      zIndex: 1050,
                     }}
-                    onClick={() => setUpcomingCalendarOpen((o) => !o)}
-                    title="Upcoming news by date"
-                    aria-label="Calendar"
                   >
-                    <i className="bi bi-calendar-event" style={{ fontSize: '1.1rem' }} />
-                  </button>
-                  {upcomingCalendarOpen && (
-                    <>
-                      <div
-                        role="presentation"
-                        style={{ position: 'fixed', inset: 0, zIndex: 1040 }}
-                        onClick={() => setUpcomingCalendarOpen(false)}
-                      />
-                      <div
-                        ref={calendarDropdownRef}
-                        className="shadow-sm border bg-white rounded py-2"
-                        style={{
-                          position: 'absolute',
-                          top: '100%',
-                          left: 0,
-                          marginTop: 4,
-                          minWidth: 260,
-                          zIndex: 1050,
-                        }}
+                    <div className="d-flex align-items-center justify-content-between px-3 py-1 small fw-600 text-secondary border-bottom mb-1">
+                      <span>Filter</span>
+                      <button
+                        type="button"
+                        className="btn btn-link p-0 border-0 text-secondary"
+                        style={{ minWidth: 28, minHeight: 28, lineHeight: 1 }}
+                        onClick={() => setFilterDropdownOpen(false)}
+                        aria-label="Close filter"
+                        title="Close"
                       >
-                        <div className="px-3 py-1 small text-muted">What&apos;s happening</div>
+                        <i className="bi bi-x-lg" style={{ fontSize: '1rem' }} />
+                      </button>
+                    </div>
+                    {/* Calendar */}
+                    <div className="px-3 py-1 small text-muted">Calendar</div>
+                    {user && !showAllSchoolsFeed ? (
+                      <>
                         <button
                           type="button"
                           className="btn btn-link text-dark btn-sm text-start w-100 d-block text-decoration-none"
@@ -3250,7 +3314,7 @@ export const PublicEvents = () => {
                         >
                           Day after tomorrow
                         </button>
-                        <div className="px-3 pt-2 pb-2">
+                        <div className="px-3 pt-1 pb-2">
                           <label className="small text-muted d-block mb-1">Custom date</label>
                           <input
                             type="date"
@@ -3264,77 +3328,43 @@ export const PublicEvents = () => {
                           <button
                             type="button"
                             className="btn btn-outline-dark btn-sm rounded-pill w-100"
-                            
                             disabled={!calendarPendingDate}
                             onClick={() => {
                               if (calendarPendingDate) {
                                 setUpcomingDateFilter(calendarPendingDate);
                                 setSelectedUpcomingPost(null);
-                                setUpcomingCalendarOpen(false);
                               }
                             }}
                           >
-                            OK — View Filtred News
+                            OK — View filtered news
                           </button>
                         </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-              {!user && (
-                <span
-                  className="position-relative d-inline-flex"
-                  style={{ cursor: 'not-allowed' }}
-                  onMouseEnter={() => setCalendarLoginTooltipVisible(true)}
-                  onMouseLeave={() => setCalendarLoginTooltipVisible(false)}
-                >
-                  <button
-                    ref={calendarButtonRef}
-                    type="button"
-                    className="btn border-0 py-1 px-2 rounded d-flex align-items-center"
-                    style={{
-                      backgroundColor: 'transparent',
-                      color: '#adb5bd',
-                      opacity: 0.7,
-                      pointerEvents: 'none',
-                    }}
-                    aria-label="Calendar (login required)"
-                  >
-                    <i className="bi bi-calendar-event" style={{ fontSize: '1.1rem' }} />
-                  </button>
-                  {calendarLoginTooltipVisible && (
-                    <span
-                      className="position-absolute start-50 translate-middle-x text-nowrap rounded px-2 py-1 small text-white"
-                      style={{
-                        bottom: '100%',
-                        marginBottom: 6,
-                        backgroundColor: 'rgba(33, 37, 41, 0.95)',
-                        fontSize: '0.75rem',
-                        zIndex: 1060,
-                        pointerEvents: 'none',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                      }}
+                      </>
+                    ) : (
+                      <div className="px-3 pb-2 small text-muted">Login to see upcoming by date</div>
+                    )}
+                    <hr className="my-2" />
+                    {/* Latest / Popular */}
+                    <div className="px-3 py-1 small text-muted">Sort</div>
+                    <button
+                      type="button"
+                      className={`btn btn-link btn-sm text-start w-100 d-block text-decoration-none py-1 ${feedSort === 'latest' ? 'fw-600 text-dark' : 'text-secondary'}`}
+                      onClick={() => setFeedSort('latest')}
                     >
-                      Upcoming events are visible only for logged-in users
-                    </span>
-                  )}
-                </span>
+                      {feedSort === 'latest' && <i className="bi bi-check2 me-2" />}
+                      Latest
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn-link btn-sm text-start w-100 d-block text-decoration-none py-1 ${feedSort === 'popular' ? 'fw-600 text-dark' : 'text-secondary'}`}
+                      onClick={() => setFeedSort('popular')}
+                    >
+                      {feedSort === 'popular' && <i className="bi bi-check2 me-2" />}
+                      Popular
+                    </button>
+                  </div>
+                </>
               )}
-              <button
-                type="button"
-                className={`btn rounded-pill py-1 px-2 text-decoration-none ${feedSort === 'latest' ? 'btn-outline-dark' : 'btn-link border-0 text-muted'}`}
-                onClick={() => setFeedSort('latest')}
-              >
-                Latest
-              </button>
-              <button
-                type="button"
-                className={`btn rounded-pill py-1 px-2 text-decoration-none ${feedSort === 'popular' ? 'btn-outline-dark' : 'btn-link border-0 text-muted'}`}
-                onClick={() => setFeedSort('popular')}
-              >
-                Popular
-              </button>
             </div>
           </div>
 
