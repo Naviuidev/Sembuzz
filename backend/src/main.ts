@@ -2,10 +2,15 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
+import * as express from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bodyParser: false,
+  });
+  app.use(express.json({ limit: '5mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
   // Serve uploaded files (e.g. query attachments)
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads/' });

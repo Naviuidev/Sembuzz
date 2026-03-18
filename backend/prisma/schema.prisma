@@ -572,7 +572,7 @@ model Event {
   subCategoryId      String
   categoryId         String
   schoolId           String
-  title              String
+  title              String   @db.VarChar(500)
   description        String?  @db.Text
   externalLink       String?  @db.VarChar(500)
   commentsEnabled    Boolean  @default(true)

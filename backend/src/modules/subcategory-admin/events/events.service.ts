@@ -1,4 +1,5 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import { Injectable, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import OpenAI from 'openai';
@@ -35,23 +36,37 @@ export class EventsService {
     const imageUrlsJson = dto.imageUrls?.length
       ? JSON.stringify(dto.imageUrls)
       : null;
-    return this.prisma.event.create({
-      data: {
-        subCategoryAdminId,
-        subCategoryId: dto.subCategoryId,
-        categoryId: admin.categoryId,
-        schoolId: admin.schoolId,
-        title: dto.title,
-        description: dto.description ?? null,
-        externalLink: dto.externalLink ?? null,
-        commentsEnabled: dto.commentsEnabled ?? true,
-        imageUrls: imageUrlsJson,
-        status: 'pending',
-      },
-      include: {
-        subCategory: { select: { id: true, name: true } },
-      },
-    });
+    try {
+      return await this.prisma.event.create({
+        data: {
+          subCategoryAdminId,
+          subCategoryId: dto.subCategoryId,
+          categoryId: admin.categoryId,
+          schoolId: admin.schoolId,
+          title: dto.title.trim(),
+          description: dto.description ?? null,
+          externalLink: dto.externalLink ?? null,
+          commentsEnabled: dto.commentsEnabled ?? true,
+          imageUrls: imageUrlsJson,
+          status: 'pending',
+        },
+        include: {
+          subCategory: { select: { id: true, name: true } },
+        },
+      });
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError) {
+        if (e.code === 'P2003') {
+          throw new BadRequestException(
+            'Invalid subcategory. Pick a subcategory you manage and try again.',
+          );
+        }
+        if (e.code === 'P2002') {
+          throw new BadRequestException('Duplicate event. Try again.');
+        }
+      }
+      throw e;
+    }
   }
 
   async findPendingBySubCategoryAdmin(subCategoryAdminId: string) {

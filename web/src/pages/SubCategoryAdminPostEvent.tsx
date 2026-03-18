@@ -190,11 +190,17 @@ export const SubCategoryAdminPostEvent = () => {
       setBannerPreview(null);
       navigate('/subcategory-admin/approvals-pending');
     } catch (err: unknown) {
-      const msg =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : 'Failed to submit. Try again.';
-      setSubmitError(typeof msg === 'string' ? msg : 'Failed to submit.');
+      let text = 'Failed to submit. Try again.';
+      if (err && typeof err === 'object' && 'response' in err) {
+        const res = (err as { response?: { status?: number; data?: { message?: string | string[] } } }).response;
+        const m = res?.data?.message;
+        if (Array.isArray(m)) text = m.join(' ');
+        else if (typeof m === 'string' && m.trim()) text = m;
+        else if (res?.status) text = `Request failed (${res.status}). Check API is running and try again.`;
+      } else if (err instanceof Error && err.message === 'Network Error') {
+        text = 'Network error — cannot reach the API.';
+      }
+      setSubmitError(text);
     } finally {
       setSubmitting(false);
     }
