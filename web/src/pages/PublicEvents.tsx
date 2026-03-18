@@ -24,7 +24,6 @@ import { imageSrc } from '../utils/image';
 import { userHelpService } from '../services/user-help.service';
 import { userSchoolSocialService, type SchoolSocialAccountPublic } from '../services/user-school-social.service';
 import { getUserCategoryDone, getUserSubCategoryIds, setUserCategoryDone, setUserSubCategoryIds } from '../utils/user-category-prefs';
-
 const DESCRIPTION_PREVIEW_LENGTH = 400;
 
 const PLATFORM_COLORS: Record<string, string> = {
@@ -229,25 +228,20 @@ function UpcomingPostDetailCard({ post, onClose }: { post: UpcomingPostPublic; o
         </button>
       </div>
 
-      {/* Image — same as EventPostCard */}
-      {images[0] ? (
-        <div
-          style={{
-            position: 'relative',
-            width: '100%',
-            height: '30%',
-            minHeight: 140,
-            flexShrink: 0,
-            backgroundColor: '#fff',
-            overflow: 'hidden',
-          }}
+      {/* Image — same 200px strip as blogs / news feed */}
+      <div className="position-relative w-100 flex-shrink-0 overflow-hidden bg-light">
+        <span
+          className="position-absolute top-0 start-0 m-2 badge rounded-pill text-white z-2"
+          style={{ backgroundColor: '#1a1f2e', fontSize: '0.7rem', fontWeight: 600 }}
         >
-          <div style={{ overflow: 'hidden', width: '100%', height: '100%' }}>
+          Upcoming
+        </span>
+        {images[0] ? (
+          <div className="w-100 overflow-hidden" style={{ height: 200 }}>
             <div
+              className="d-flex h-100"
               style={{
-                display: 'flex',
                 width: '100%',
-                height: '100%',
                 transform: `translateX(-${slideIndex * 100}%)`,
                 transition: 'transform 0.3s ease-out',
               }}
@@ -255,28 +249,20 @@ function UpcomingPostDetailCard({ post, onClose }: { post: UpcomingPostPublic; o
               {images.map((url, i) => (
                 <div
                   key={i}
-                  style={{
-                    minWidth: '100%',
-                    width: '100%',
-                    height: '100%',
-                    flexShrink: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: '#fff',
-                  }}
+                  className="flex-shrink-0 h-100"
+                  style={{ minWidth: '100%', width: '100%' }}
                 >
                   <img
                     src={imageSrc(url)}
                     alt=""
                     style={{
-                      maxWidth: '100%',
-                      maxHeight: '100%',
-                      width: 'auto',
-                      height: 'auto',
-                      objectFit: 'contain',
-                      objectPosition: 'center',
+                      width: '100%',
+                      height: 200,
+                      objectFit: 'cover',
+                      objectPosition: 'top',
                       display: 'block',
+                      pointerEvents: 'none',
+                      userSelect: 'none',
                     }}
                     draggable={false}
                   />
@@ -284,107 +270,79 @@ function UpcomingPostDetailCard({ post, onClose }: { post: UpcomingPostPublic; o
               ))}
             </div>
           </div>
-          {hasMultipleImages && (
-            <>
-              <button
-                type="button"
-                onClick={goPrev}
-                aria-label="Previous image"
-                style={{
-                  position: 'absolute',
-                  left: 8,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: 32,
-                  height: 32,
-                  borderRadius: '50%',
-                  border: 'none',
-                  background: 'rgba(255,255,255,0.9)',
-                  boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  padding: 0,
-                }}
-              >
-                <i className="bi bi-chevron-left" style={{ fontSize: '1.25rem', color: '#262626' }} />
-              </button>
-              <button
-                type="button"
-                onClick={goNext}
-                aria-label="Next image"
-                style={{
-                  position: 'absolute',
-                  right: 8,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: 32,
-                  height: 32,
-                  borderRadius: '50%',
-                  border: 'none',
-                  background: 'rgba(255,255,255,0.9)',
-                  boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  padding: 0,
-                }}
-              >
-                <i className="bi bi-chevron-right" style={{ fontSize: '1.25rem', color: '#262626' }} />
-              </button>
-              <div
-                style={{
-                  position: 'absolute',
-                  bottom: 8,
-                  left: 0,
-                  right: 0,
-                  display: 'flex',
-                  justifyContent: 'center',
-                  gap: 6,
-                }}
-              >
-                {images.map((_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => setSlideIndex(i)}
-                    aria-label={`Go to image ${i + 1}`}
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: '50%',
-                      border: 'none',
-                      padding: 0,
-                      cursor: 'pointer',
-                      background: slideIndex === i ? '#1a1f2e' : 'rgba(0,0,0,0.2)',
-                      boxShadow: '0 0 2px rgba(0,0,0,0.1)',
-                    }}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      ) : (
-        <div
-          style={{
-            width: '100%',
-            height: '30%',
-            minHeight: 140,
-            flexShrink: 0,
-            backgroundColor: '#fff',
-            borderBottom: '1px solid #f0f0f0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#ccc',
-          }}
-        >
-          <i className="bi bi-image" style={{ fontSize: '2.5rem' }} />
-        </div>
-      )}
+        ) : (
+          <div
+            className="d-flex align-items-center justify-content-center text-muted w-100"
+            style={{ height: 160, backgroundColor: '#f8f9fa' }}
+          >
+            <i className="bi bi-image" style={{ fontSize: '2.5rem' }} />
+          </div>
+        )}
+        {images[0] && hasMultipleImages && (
+          <>
+            <button
+              type="button"
+              onClick={goPrev}
+              aria-label="Previous image"
+              className="position-absolute z-2 border-0 d-flex align-items-center justify-content-center p-0"
+              style={{
+                left: 8,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.9)',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+                cursor: 'pointer',
+              }}
+            >
+              <i className="bi bi-chevron-left" style={{ fontSize: '1.25rem', color: '#262626' }} />
+            </button>
+            <button
+              type="button"
+              onClick={goNext}
+              aria-label="Next image"
+              className="position-absolute z-2 border-0 d-flex align-items-center justify-content-center p-0"
+              style={{
+                right: 8,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.9)',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+                cursor: 'pointer',
+              }}
+            >
+              <i className="bi bi-chevron-right" style={{ fontSize: '1.25rem', color: '#262626' }} />
+            </button>
+            <div
+              className="position-absolute start-0 end-0 d-flex justify-content-center gap-1 z-2"
+              style={{ bottom: 8 }}
+            >
+              {images.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setSlideIndex(i)}
+                  aria-label={`Go to image ${i + 1}`}
+                  className="border-0 p-0"
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    cursor: 'pointer',
+                    background: slideIndex === i ? '#1a1f2e' : 'rgba(0,0,0,0.2)',
+                    boxShadow: '0 0 2px rgba(0,0,0,0.1)',
+                  }}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
 
       {/* Content: title + description — same as EventPostCard */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', backgroundColor: '#fff' }}>
@@ -577,34 +535,25 @@ function EventPostCard({
         </button>
       </div>
 
-      {/* Image — 30% height, white bg, image contained and clearly visible */}
-      {images[0] ? (
-        <div
-          style={{
-            position: 'relative',
-            width: '100%',
-            height: '30%',
-            minHeight: 140,
-            flexShrink: 0,
-            backgroundColor: '#fff',
-            overflow: 'hidden',
-          }}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
+      {/* Image — same strip as blog cards: 200px tall, full width, cover */}
+      <div
+        className="position-relative w-100 flex-shrink-0 overflow-hidden bg-light"
+        style={{ touchAction: 'pan-y' }}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        <span
+          className="position-absolute top-0 start-0 m-2 badge rounded-pill text-white z-2"
+          style={{ backgroundColor: '#1a1f2e', fontSize: '0.7rem', fontWeight: 600 }}
         >
-          <div
-            style={{
-              overflow: 'hidden',
-              width: '100%',
-              height: '100%',
-              touchAction: 'pan-y',
-            }}
-          >
+          News
+        </span>
+        {images[0] ? (
+          <div className="w-100 overflow-hidden" style={{ height: 200 }}>
             <div
+              className="d-flex h-100"
               style={{
-                display: 'flex',
                 width: '100%',
-                height: '100%',
                 transform: `translateX(-${slideIndex * 100}%)`,
                 transition: 'transform 0.3s ease-out',
               }}
@@ -612,27 +561,17 @@ function EventPostCard({
               {images.map((url, i) => (
                 <div
                   key={i}
-                  style={{
-                    minWidth: '100%',
-                    width: '100%',
-                    height: '100%',
-                    flexShrink: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: '#fff',
-                  }}
+                  className="flex-shrink-0 h-100"
+                  style={{ minWidth: '100%', width: '100%' }}
                 >
                   <img
                     src={imageSrc(url)}
                     alt=""
                     style={{
-                      maxWidth: '100%',
-                      maxHeight: '100%',
-                      width: 'auto',
-                      height: 'auto',
-                      objectFit: 'contain',
-                      objectPosition: 'center',
+                      width: '100%',
+                      height: 200,
+                      objectFit: 'cover',
+                      objectPosition: 'top',
                       display: 'block',
                       pointerEvents: 'none',
                       userSelect: 'none',
@@ -643,107 +582,79 @@ function EventPostCard({
               ))}
             </div>
           </div>
-          {hasMultipleImages && (
-            <>
-              <button
-                type="button"
-                onClick={goPrev}
-                aria-label="Previous image"
-                style={{
-                  position: 'absolute',
-                  left: 8,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: 32,
-                  height: 32,
-                  borderRadius: '50%',
-                  border: 'none',
-                  background: 'rgba(255,255,255,0.9)',
-                  boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  padding: 0,
-                }}
-              >
-                <i className="bi bi-chevron-left" style={{ fontSize: '1.25rem', color: '#262626' }} />
-              </button>
-              <button
-                type="button"
-                onClick={goNext}
-                aria-label="Next image"
-                style={{
-                  position: 'absolute',
-                  right: 8,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: 32,
-                  height: 32,
-                  borderRadius: '50%',
-                  border: 'none',
-                  background: 'rgba(255,255,255,0.9)',
-                  boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  padding: 0,
-                }}
-              >
-                <i className="bi bi-chevron-right" style={{ fontSize: '1.25rem', color: '#262626' }} />
-              </button>
-              <div
-                style={{
-                  position: 'absolute',
-                  bottom: 8,
-                  left: 0,
-                  right: 0,
-                  display: 'flex',
-                  justifyContent: 'center',
-                  gap: 6,
-                }}
-              >
-                {images.map((_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => setSlideIndex(i)}
-                    aria-label={`Go to image ${i + 1}`}
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: '50%',
-                      border: 'none',
-                      padding: 0,
-                      cursor: 'pointer',
-                      background: slideIndex === i ? '#1a1f2e' : 'rgba(0,0,0,0.2)',
-                      boxShadow: '0 0 2px rgba(0,0,0,0.1)',
-                    }}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      ) : (
-        <div
-          style={{
-            width: '100%',
-            height: '30%',
-            minHeight: 140,
-            flexShrink: 0,
-            backgroundColor: '#fff',
-            borderBottom: '1px solid #f0f0f0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#ccc',
-          }}
-        >
-          <i className="bi bi-image" style={{ fontSize: '2.5rem' }} />
-        </div>
-      )}
+        ) : (
+          <div
+            className="d-flex align-items-center justify-content-center text-muted w-100"
+            style={{ height: 160, backgroundColor: '#f8f9fa' }}
+          >
+            <i className="bi bi-image" style={{ fontSize: '2.5rem' }} />
+          </div>
+        )}
+        {images[0] && hasMultipleImages && (
+          <>
+            <button
+              type="button"
+              onClick={goPrev}
+              aria-label="Previous image"
+              className="position-absolute z-2 border-0 d-flex align-items-center justify-content-center p-0"
+              style={{
+                left: 8,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.9)',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+                cursor: 'pointer',
+              }}
+            >
+              <i className="bi bi-chevron-left" style={{ fontSize: '1.25rem', color: '#262626' }} />
+            </button>
+            <button
+              type="button"
+              onClick={goNext}
+              aria-label="Next image"
+              className="position-absolute z-2 border-0 d-flex align-items-center justify-content-center p-0"
+              style={{
+                right: 8,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.9)',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+                cursor: 'pointer',
+              }}
+            >
+              <i className="bi bi-chevron-right" style={{ fontSize: '1.25rem', color: '#262626' }} />
+            </button>
+            <div
+              className="position-absolute start-0 end-0 d-flex justify-content-center gap-1 z-2"
+              style={{ bottom: 8 }}
+            >
+              {images.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setSlideIndex(i)}
+                  aria-label={`Go to image ${i + 1}`}
+                  className="border-0 p-0"
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    cursor: 'pointer',
+                    background: slideIndex === i ? '#1a1f2e' : 'rgba(0,0,0,0.2)',
+                    boxShadow: '0 0 2px rgba(0,0,0,0.1)',
+                  }}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
 
       {/* Content — 70%: InShorts-style (source, title, description, likes, comments) */}
       <div
@@ -1520,7 +1431,7 @@ export const PublicEvents = () => {
     }
   }, [events.length, eventsLoading, error]);
 
-  // When user selected a school on HOME: if has news → 3s loader then close filter; if no news → show coming-soon popup. Skip when on Search screen (school filter is search-screen-only).
+  // When user selected a school on HOME: if has news → 3s loader then close filter; if none → coming-soon popup. Skip on Search screen.
   useEffect(() => {
     if (bottomNavActive === 'search') return;
     if (!schoolId || !showSchoolLoadingPopup || eventsLoading || eventsFetching) return;
@@ -1537,7 +1448,14 @@ export const PublicEvents = () => {
     setShowRefreshHint(true);
     const t = setTimeout(() => setShowRefreshHint(false), 3000);
     return () => clearTimeout(t);
-  }, [bottomNavActive, schoolId, showSchoolLoadingPopup, eventsLoading, eventsFetching, events.length]);
+  }, [
+    bottomNavActive,
+    schoolId,
+    showSchoolLoadingPopup,
+    eventsLoading,
+    eventsFetching,
+    events.length,
+  ]);
 
   // Search screen: show "no news" popup only within search UI when selected school has no news
   useEffect(() => {
@@ -1679,13 +1597,14 @@ export const PublicEvents = () => {
     return list;
   }, [filteredEvents, feedSort, likeCountsForSort]);
 
-  type FeedItem = { type: 'event'; event: ApprovedEventPublic } | { type: 'sponsored'; ad: SponsoredAdPublic };
+  type FeedItem =
+    | { type: 'event'; event: ApprovedEventPublic }
+    | { type: 'sponsored'; ad: SponsoredAdPublic };
   const feedItems = useMemo((): FeedItem[] => {
-    const events: FeedItem[] = sortedEvents.map((event) => ({ type: 'event', event }));
     const sponsored: FeedItem[] = [...activeSponsoredAds]
       .sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime())
       .map((ad) => ({ type: 'sponsored' as const, ad }));
-    return [...events, ...sponsored];
+    return [...sortedEvents.map((event) => ({ type: 'event' as const, event })), ...sponsored];
   }, [sortedEvents, activeSponsoredAds]);
 
   const { data: allSchools = [], isLoading: schoolsLoading } = useQuery({
@@ -1699,7 +1618,7 @@ export const PublicEvents = () => {
       return allSchools.map((s) => ({ id: s.id, name: s.name, image: s.image ?? null }));
     }
     const seen = new Set<string>();
-    return events.filter((e) => {
+    const fromEvents = events.filter((e) => {
       if (e.schoolId && !seen.has(e.schoolId)) {
         seen.add(e.schoolId);
         return true;
@@ -1710,6 +1629,7 @@ export const PublicEvents = () => {
       name: e.school?.name ?? 'School',
       image: e.school?.image ?? null,
     }));
+    return fromEvents;
   }, [filterMode, allSchools, events]);
 
   const isLoading = eventsLoading;
@@ -3774,7 +3694,9 @@ export const PublicEvents = () => {
             <button
               type="button"
               className="btn btn-outline-danger btn-sm"
-              onClick={() => queryClient.invalidateQueries({ queryKey: ['public', 'events', 'approved'] })}
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ['public', 'events', 'approved'] });
+              }}
             >
               Retry
             </button>
@@ -3785,14 +3707,14 @@ export const PublicEvents = () => {
               <i className="bi bi-newspaper" style={{ fontSize: '3rem', color: '#6c757d', marginBottom: '1rem' }} />
               <p className="text-muted mb-0">
                 {eventsFilter?.searchQuery?.trim()
-                  ? 'No events match your search.'
+                  ? 'No news matches your search.'
                   : schoolId
                     ? 'No approved news for this school yet.'
-                    : 'No approved posts yet.'}
+                    : 'No approved news yet.'}
               </p>
               {!eventsFilter?.searchQuery?.trim() && !schoolId && (
                 <p className="small text-muted mt-2 mb-0" style={{ maxWidth: '420px', marginLeft: 'auto', marginRight: 'auto' }}>
-                  Only <strong>approved</strong> news from schools appear here. Subcategory admins create posts; category admins approve them. After approval, they will show up on this page.
+                  <strong>Approved</strong> news from schools appears here after category admin approval. Use <strong>Blogs</strong> in the nav for blog posts.
                 </p>
               )}
               {!eventsFilter?.searchQuery?.trim() && schoolId && (

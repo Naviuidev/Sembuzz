@@ -217,6 +217,17 @@ export const Navbar = () => {
               </li>
               <li className="nav-item">
                 <Link
+                  className={`nav-link ${location.pathname.startsWith('/blogs') ? 'active' : ''}`}
+                  to="/blogs"
+                  style={navLinkStyle}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#4dabf7'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#fff'; }}
+                >
+                  Blogs
+                </Link>
+              </li>
+              <li className="nav-item">
+                <Link
                   className="nav-link"
                   to="/#faqs"
                   style={navLinkStyle}
@@ -570,6 +581,11 @@ export const Navbar = () => {
             <li className="mb-3">
               <Link to="/events" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
                 Events
+              </Link>
+            </li>
+            <li className="mb-3">
+              <Link to="/blogs" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
+                Blogs
               </Link>
             </li>
             <li className="mb-3">

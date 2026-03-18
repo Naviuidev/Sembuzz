@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { PublishedBlogsService } from './published-blogs.service';
 import { EventsPublicController } from './events-public.controller';
 import { GoogleAuthController } from './google-auth.controller';
 import { PrismaModule } from './prisma/prisma.module';
@@ -30,6 +31,6 @@ import { ContactModule } from './modules/contact/contact.module';
     ContactModule,
   ],
   controllers: [AppController, GoogleAuthController, EventsPublicController],
-  providers: [AppService],
+  providers: [AppService, PublishedBlogsService],
 })
 export class AppModule {}

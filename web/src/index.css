@@ -1116,3 +1116,24 @@ body {
     transform: translateY(0);
   }
 }
+
+/* Events feed: image area must have real height (Bootstrap .ratio + nested flex collapsed) */
+.events-feed-image-frame {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background-color: #f8f9fa;
+  aspect-ratio: 16 / 10;
+  min-height: 200px;
+}
+@media (min-width: 768px) {
+  .events-feed-image-frame {
+    aspect-ratio: 1 / 1;
+    max-height: min(85vw, 480px);
+  }
+}
+.events-feed-image-frame-inner {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}

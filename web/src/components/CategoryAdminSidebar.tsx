@@ -9,6 +9,7 @@ export const CategoryAdminSidebar = () => {
   const menuItems = [
     { path: '/category-admin/dashboard', label: 'Dashboard', icon: 'bi-speedometer2' },
     { path: '/category-admin/pending-approvals', label: 'Pending approvals', icon: 'bi-clock-history' },
+    { path: '/category-admin/blogs', label: 'View blogs', icon: 'bi-journal-text' },
     { path: '/category-admin/approved-posts', label: 'Approved post', icon: 'bi-check-circle' },
     { path: '/category-admin/analytics', label: 'Analytics', icon: 'bi-graph-up-arrow' },
     { path: '/category-admin/ads', label: 'Ads', icon: 'bi-megaphone' },

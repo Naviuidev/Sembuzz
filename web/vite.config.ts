@@ -12,6 +12,7 @@ export default defineConfig({
     proxy: {
       '/subcategory-admin/auth': { target: 'http://localhost:3000', changeOrigin: true },
       '/subcategory-admin/events': { target: 'http://localhost:3000', changeOrigin: true },
+      '/subcategory-admin/blogs': { target: 'http://localhost:3000', changeOrigin: true },
       '/subcategory-admin/queries': {
         target: 'http://localhost:3000',
         changeOrigin: true,
@@ -21,6 +22,14 @@ export default defineConfig({
       },
       '/category-admin/auth': { target: 'http://localhost:3000', changeOrigin: true },
       '/category-admin/events': { target: 'http://localhost:3000', changeOrigin: true },
+      '/category-admin/blogs': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        bypass: (req) =>
+          req.method === 'GET' && /^\/category-admin\/blogs\/?(\?|$)/.test(req.url || '')
+            ? '/index.html'
+            : undefined,
+      },
       '/category-admin/queries': {
         target: 'http://localhost:3000',
         changeOrigin: true,
@@ -56,6 +65,11 @@ export default defineConfig({
       '/user/event-comment': { target: 'http://localhost:3000', changeOrigin: true },
       '/events/categories': { target: 'http://localhost:3000', changeOrigin: true },
       '/events/approved': { target: 'http://localhost:3000', changeOrigin: true },
+      '/events/blogs': { target: 'http://localhost:3000', changeOrigin: true },
+      '/events/published-blogs': { target: 'http://localhost:3000', changeOrigin: true },
+      '^/events/blog/': { target: 'http://localhost:3000', changeOrigin: true },
+      '/public/blogs': { target: 'http://localhost:3000', changeOrigin: true },
+      '^/public/blog/': { target: 'http://localhost:3000', changeOrigin: true },
       '/events/banner-ads': { target: 'http://localhost:3000', changeOrigin: true },
       '/events/sponsored-ads': { target: 'http://localhost:3000', changeOrigin: true },
       '/uploads': { target: 'http://localhost:3000', changeOrigin: true },

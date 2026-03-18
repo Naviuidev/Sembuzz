@@ -51,6 +51,7 @@ import { CategoryAdminQueries } from './pages/CategoryAdminQueries';
 import { CategoryAdminRaiseRequest } from './pages/CategoryAdminRaiseRequest';
 import { CategoryAdminPrivacy } from './pages/CategoryAdminPrivacy';
 import { CategoryAdminPendingApprovals } from './pages/CategoryAdminPendingApprovals';
+import { CategoryAdminBlogs } from './pages/CategoryAdminBlogs';
 import { CategoryAdminApprovedPosts } from './pages/CategoryAdminApprovedPosts';
 import { CategoryAdminAnalytics } from './pages/CategoryAdminAnalytics.tsx';
 import { CategoryAdminAds } from './pages/CategoryAdminAds.tsx';
@@ -68,6 +69,11 @@ import { SubcategoryAdminAnalytics } from './pages/SubcategoryAdminAnalytics.tsx
 import { SubCategoryAdminRaiseRequest } from './pages/SubCategoryAdminRaiseRequest';
 import { SubCategoryAdminQueries } from './pages/SubCategoryAdminQueries';
 import { SubCategoryAdminReceivedCorrections } from './pages/SubCategoryAdminReceivedCorrections';
+import { SubCategoryAdminPostBlog } from './pages/SubCategoryAdminPostBlog';
+import { SubCategoryAdminBlogPending } from './pages/SubCategoryAdminBlogPending';
+import { SubCategoryAdminBlogApproved } from './pages/SubCategoryAdminBlogApproved';
+import { SubCategoryAdminBlogCorrections } from './pages/SubCategoryAdminBlogCorrections';
+import { SubCategoryAdminBlogRejected } from './pages/SubCategoryAdminBlogRejected';
 import { AdsAdminLogin } from './pages/AdsAdminLogin';
 import { AdsAdminSetPassword } from './pages/AdsAdminSetPassword';
 import { AdsAdminDashboard } from './pages/AdsAdminDashboard';
@@ -81,6 +87,8 @@ import { UpdateVerificationDoc } from './pages/UpdateVerificationDoc';
 import { VerifyApproval } from './pages/VerifyApproval';
 import { Home } from './pages/Home';
 import { PublicEvents } from './pages/PublicEvents';
+import { PublicBlogs } from './pages/PublicBlogs';
+import { PublicBlogDetail } from './pages/PublicBlogDetail';
 import { SavedItems } from './pages/SavedItems';
 
 const queryClient = new QueryClient();
@@ -367,6 +375,14 @@ const CategoryAdminRoutes = () => {
         }
       />
       <Route
+        path="blogs"
+        element={
+          <CategoryAdminProtectedRoute>
+            <CategoryAdminBlogs />
+          </CategoryAdminProtectedRoute>
+        }
+      />
+      <Route
         path="approved-posts"
         element={
           <CategoryAdminProtectedRoute>
@@ -471,6 +487,46 @@ const SubCategoryAdminRoutes = () => {
         }
       />
       <Route
+        path="post-blog"
+        element={
+          <SubCategoryAdminProtectedRoute>
+            <SubCategoryAdminPostBlog />
+          </SubCategoryAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="blog-pending"
+        element={
+          <SubCategoryAdminProtectedRoute>
+            <SubCategoryAdminBlogPending />
+          </SubCategoryAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="blog-approved"
+        element={
+          <SubCategoryAdminProtectedRoute>
+            <SubCategoryAdminBlogApproved />
+          </SubCategoryAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="blog-corrections"
+        element={
+          <SubCategoryAdminProtectedRoute>
+            <SubCategoryAdminBlogCorrections />
+          </SubCategoryAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="blog-rejected"
+        element={
+          <SubCategoryAdminProtectedRoute>
+            <SubCategoryAdminBlogRejected />
+          </SubCategoryAdminProtectedRoute>
+        }
+      />
+      <Route
         path="approvals-pending"
         element={
           <SubCategoryAdminProtectedRoute>
@@ -565,6 +621,8 @@ const AppRoutes = () => {
       {/* Public Routes — Home is placeholder; Events at /events */}
       <Route path="/" element={<Home />} />
       <Route path="/events" element={<PublicEvents />} />
+      <Route path="/blogs" element={<PublicBlogs />} />
+      <Route path="/blogs/:id" element={<PublicBlogDetail />} />
       <Route path="/about" element={<About />} />
       <Route path="/contact" element={<Contact />} />
       <Route path="/faqs" element={<FAQs />} />

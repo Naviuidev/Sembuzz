@@ -1,9 +1,21 @@
-import { Controller, Get, Post, Query, Param, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Query,
+  Param,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
+import { PublishedBlogsService } from './published-blogs.service';
 
 @Controller('events')
 export class EventsPublicController {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private publishedBlogs: PublishedBlogsService,
+  ) {}
 
   @Get('categories')
   async getCategoriesBySchool(@Query('schoolId') schoolId: string) {
@@ -228,5 +240,45 @@ export class EventsPublicController {
     if (!ad) return { ok: false };
     await this.prisma.sponsoredAdEvent.create({ data: { sponsoredAdId: id, eventType: 'click' } });
     return { ok: true, redirectUrl: ad.externalLink ?? null };
+  }
+
+  /** Published blogs — delegates to PublishedBlogsService (same as GET /public/blogs). */
+  @Get('blogs')
+  blogsPublished(
+    @Query('schoolId') schoolId?: string,
+    @Query('q') q?: string,
+    @Query('from') fromStr?: string,
+    @Query('to') toStr?: string,
+    @Query('subCategoryIds') subCategoryIds?: string,
+  ) {
+    return this.publishedBlogs.listPublishedBlogs(
+      schoolId,
+      q,
+      fromStr,
+      toStr,
+      subCategoryIds,
+    );
+  }
+
+  @Get('published-blogs')
+  blogsPublishedLegacy(
+    @Query('schoolId') schoolId?: string,
+    @Query('q') q?: string,
+    @Query('from') fromStr?: string,
+    @Query('to') toStr?: string,
+    @Query('subCategoryIds') subCategoryIds?: string,
+  ) {
+    return this.publishedBlogs.listPublishedBlogs(
+      schoolId,
+      q,
+      fromStr,
+      toStr,
+      subCategoryIds,
+    );
+  }
+
+  @Get('blog/:id')
+  blogById(@Param('id') id: string) {
+    return this.publishedBlogs.getPublishedBlogById(id);
   }
 }

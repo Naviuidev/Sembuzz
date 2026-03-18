@@ -65,6 +65,7 @@ model School {
   upcomingPosts                      UpcomingPost[]
   bannerAds                          BannerAd[]
   sponsoredAds                       SponsoredAd[]
+  blogPosts                          BlogPost[]
 
   @@map("schools")
 }
@@ -373,6 +374,7 @@ model Category {
   subCategoryAdmins       SubCategoryAdmin[]
   categoryAdminToSubCategoryAdminQueries CategoryAdminToSubCategoryAdminQuery[]
   upcomingPosts                          UpcomingPost[]
+  blogPosts                              BlogPost[]
 
   @@map("categories")
 }
@@ -390,6 +392,7 @@ model SubCategory {
   subCategoryAdminSubCategories SubCategoryAdminSubCategory[] @relation("SubCategoryAdminSubCategories")
   events                        Event[]
   upcomingPosts                 UpcomingPost[]
+  blogPosts                     BlogPost[]
 
   @@map("sub_categories")
 }
@@ -477,6 +480,7 @@ model SubCategoryAdmin {
   passwordResetOtps SubCategoryAdminPasswordResetOtp[]
   subCategories     SubCategoryAdminSubCategory[] // Many-to-many relationship
   events            Event[]
+  blogPosts         BlogPost[]
   queries           SubCategoryAdminQuery[]
   queriesToSchoolAdmins SubCategoryAdminToSchoolAdminQuery[]
   queriesToSuperAdmins SubCategoryAdminToSuperAdminQuery[]
@@ -594,6 +598,45 @@ model Event {
   @@index([status])
   @@index([schoolId])
   @@map("events")
+}
+
+// Blog posts by subcategory admin → category admin approval (save vs publish)
+model BlogPost {
+  id                 String   @id @default(uuid())
+  subCategoryAdminId String
+  subCategoryId      String
+  categoryId         String
+  schoolId           String
+  title              String   @db.VarChar(500)
+  content            String   @db.Text
+  coverImageUrl      String?  @db.VarChar(2048)
+  imageUrls          String?  @db.Text // JSON array of extra image URLs
+  // Hero overlay on banner (optional)
+  heroTitle          String?  @db.VarChar(300)
+  heroParagraph      String?  @db.Text
+  heroButtonText     String?  @db.VarChar(120)
+  heroButtonLink     String?  @db.VarChar(2048)
+  // Flexible blocks: [{ type: 'heading'|'paragraph'|'image'|'heading_para', value/heading/paragraph, cols?: 4|8 }]
+  contentBlocks      Json?
+  status             String   @default("pending") // pending | approved | reverted | rejected
+  published          Boolean  @default(false) // when approved: false = draft, true = published
+  publishedAt        DateTime? // set when post goes live (public listing)
+  revertNotes        String?  @db.Text
+  rejectNotes        String?  @db.Text
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  school             School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subCategoryAdmin   SubCategoryAdmin @relation(fields: [subCategoryAdminId], references: [id], onDelete: Cascade)
+  subCategory        SubCategory      @relation(fields: [subCategoryId], references: [id], onDelete: Cascade)
+  category           Category         @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([subCategoryAdminId])
+  @@index([subCategoryId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([schoolId])
+  @@map("blog_posts")
 }
 
 model EventLike {

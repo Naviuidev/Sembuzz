@@ -1,3 +1,4 @@
+import type { Request as ExpressRequest } from 'express';
 import {
   Controller,
   Post,
@@ -16,15 +17,21 @@ import * as fs from 'fs';
 import { SubCategoryAdminGuard } from '../guards/subcategory-admin.guard';
 import { EventsService, AnalyzeBannerResult } from './events.service';
 import { CreateEventDto } from './dto/create-event.dto';
+import { SubCategoryAdminBlogsService } from '../blogs/blogs.service';
+import { parseCreateBlogBody } from '../blogs/dto/parse-create-blog-body';
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const EVENT_IMAGES_DIR = path.join(process.cwd(), 'uploads', 'subcategory-admin-event-images');
+const BLOG_IMAGES_DIR = path.join(process.cwd(), 'uploads', 'subcategory-admin-blog-images');
 
 @Controller('subcategory-admin/events')
 @UseGuards(SubCategoryAdminGuard)
 export class EventsController {
-  constructor(private readonly eventsService: EventsService) {}
+  constructor(
+    private readonly eventsService: EventsService,
+    private readonly blogsService: SubCategoryAdminBlogsService,
+  ) {}
 
   @Post('analyze-banner')
   @UseInterceptors(
@@ -51,15 +58,20 @@ export class EventsController {
     return this.eventsService.analyzeBannerImage(buffer, file.mimetype);
   }
 
+  /** Event images, or blog images when query ?for=blog (same URL so one proxy / one route always works) */
   @Post('upload-image')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: multer.diskStorage({
-        destination: (_req, _file, cb) => {
-          if (!fs.existsSync(EVENT_IMAGES_DIR)) {
-            fs.mkdirSync(EVENT_IMAGES_DIR, { recursive: true });
+        destination: (req: ExpressRequest, _file, cb) => {
+          const forBlog =
+            String(req.query?.for || '') === 'blog' ||
+            String(req.query?.dest || '') === 'blog';
+          const dir = forBlog ? BLOG_IMAGES_DIR : EVENT_IMAGES_DIR;
+          if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
           }
-          cb(null, EVENT_IMAGES_DIR);
+          cb(null, dir);
         },
         filename: (_req, file, cb) => {
           const ext = path.extname(file.originalname) || '.jpg';
@@ -69,15 +81,34 @@ export class EventsController {
       limits: { fileSize: MAX_SIZE },
     }),
   )
-  async uploadEventImage(@UploadedFile() file: Express.Multer.File): Promise<{ url: string }> {
+  async uploadEventImage(
+    @Request() req: ExpressRequest,
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<{ url: string }> {
     if (!file) throw new BadRequestException('File is required');
     if (!ALLOWED_MIMES.includes(file.mimetype)) {
       throw new BadRequestException('Allowed types: JPEG, PNG, GIF, WebP');
     }
+    const forBlog =
+      String(req.query?.for || '') === 'blog' ||
+      String(req.query?.dest || '') === 'blog';
     const baseUrl = process.env.API_URL || 'http://localhost:3000';
+    const sub = forBlog ? 'subcategory-admin-blog-images' : 'subcategory-admin-event-images';
     return {
-      url: `${baseUrl}/uploads/subcategory-admin-event-images/${file.filename}`,
+      url: `${baseUrl}/uploads/${sub}/${file.filename}`,
     };
+  }
+
+  /** Create blog (raw body — avoids ValidationPipe rejecting hero/contentBlocks). */
+  @Post('blog')
+  async createBlog(
+    @Request() req: ExpressRequest & { user: { sub: string } },
+  ) {
+    const dto = parseCreateBlogBody(req.body);
+    if (!dto.subCategoryId?.trim() || !dto.title?.trim()) {
+      throw new BadRequestException('subCategoryId and title are required');
+    }
+    return this.blogsService.create(req.user.sub, dto);
   }
 
   @Post()
