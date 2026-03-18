@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
-    chunkSizeWarningLimit: 600,
+    chunkSizeWarningLimit: 1600,
   },
   server: {
     // Proxy only API path prefixes to backend; frontend routes (dashboard, privacy, events page, etc.) stay with Vite
