@@ -1,35 +1,5 @@
 import axios from 'axios';
-
-// Backend API URL: from build-time env, or runtime fallback when served from production domain
-function getApiBaseUrl(): string {
-  const raw = import.meta.env.VITE_API_URL?.trim() ?? '';
-  // "/" or empty means "same origin" in some setups — that sends API calls to Vite (5173) → "Cannot POST"
-  if (raw && raw !== '/') {
-    const url = raw.replace(/\/$/, '');
-    if (typeof window !== 'undefined') {
-      try {
-        const apiOrigin = new URL(url, window.location.origin).origin;
-        // Dev: never use the Vite dev server as the API
-        if (
-          window.location.port === '5173' &&
-          apiOrigin === window.location.origin
-        ) {
-          return 'http://localhost:3000';
-        }
-      } catch {
-        /* use url as-is below */
-      }
-      return url;
-    }
-    return url;
-  }
-  if (typeof window !== 'undefined') {
-    const origin = window.location.origin;
-    if (origin === 'https://sembuzz.com' || origin === 'https://www.sembuzz.com')
-      return 'https://api.sembuzz.com';
-  }
-  return 'http://localhost:3000';
-}
+import { getApiBaseUrl } from './apiBase';
 
 const API_BASE_URL = getApiBaseUrl();
 
