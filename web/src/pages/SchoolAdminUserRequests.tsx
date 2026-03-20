@@ -17,6 +17,12 @@ function formatDate(iso: string) {
   }
 }
 
+function getDocExt(url: string): string {
+  const clean = url.split('?')[0].split('#')[0];
+  const idx = clean.lastIndexOf('.');
+  return idx >= 0 ? clean.slice(idx + 1).toLowerCase() : '';
+}
+
 export const SchoolAdminUserRequests = () => {
   const [pending, setPending] = useState<PendingUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,6 +34,7 @@ export const SchoolAdminUserRequests = () => {
   const [reuploadType, setReuploadType] = useState<'reupload' | 'additional'>('reupload');
   const [reuploadSending, setReuploadSending] = useState(false);
   const [viewDocUrl, setViewDocUrl] = useState<string | null>(null);
+  const [docPreviewFailed, setDocPreviewFailed] = useState(false);
 
   const fetchPending = () => {
     setLoading(true);
@@ -262,7 +269,10 @@ export const SchoolAdminUserRequests = () => {
                                   type="button"
                                   className="btn btn-outline-secondary btn-sm"
                                   style={{ borderRadius: '6px' }}
-                                  onClick={() => setViewDocUrl(user.verificationDocUrl)}
+                                  onClick={() => {
+                                    setDocPreviewFailed(false);
+                                    setViewDocUrl(user.verificationDocUrl);
+                                  }}
                                   title="View document"
                                 >
                                   <i className="bi bi-eye me-1" />
@@ -274,7 +284,10 @@ export const SchoolAdminUserRequests = () => {
                                   type="button"
                                   className="btn btn-outline-secondary btn-sm"
                                   style={{ borderRadius: '6px' }}
-                                  onClick={() => setViewDocUrl(user.additionalVerificationDocUrl)}
+                                  onClick={() => {
+                                    setDocPreviewFailed(false);
+                                    setViewDocUrl(user.additionalVerificationDocUrl);
+                                  }}
                                   title="View additional document"
                                 >
                                   <i className="bi bi-eye me-1" />
@@ -382,19 +395,50 @@ export const SchoolAdminUserRequests = () => {
                   </button>
                 </div>
                 <div className="card-body p-0" style={{ minHeight: 400 }}>
-                  {/\.(pdf)$/i.test(viewDocUrl) ? (
-                    <iframe
-                      src={viewDocUrl}
-                      title="Document"
-                      style={{ width: '100%', height: 450, border: 'none' }}
-                    />
-                  ) : (
-                    <img
-                      src={viewDocUrl}
-                      alt="Uploaded document"
-                      style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain' }}
-                    />
-                  )}
+                  {(() => {
+                    const ext = getDocExt(viewDocUrl);
+                    const isPdf = ext === 'pdf';
+                    const isBrowserImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext);
+                    const needsFallback = docPreviewFailed || (!isPdf && !isBrowserImage);
+
+                    if (needsFallback) {
+                      return (
+                        <div className="d-flex flex-column align-items-center justify-content-center h-100 p-4 text-center">
+                          <p className="mb-3 text-muted">
+                            Preview is not supported for this file type
+                            {ext ? ` (.${ext})` : ''}. Open or download the file instead.
+                          </p>
+                          <div className="d-flex gap-2">
+                            <a href={viewDocUrl} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm">
+                              Open document
+                            </a>
+                            <a href={viewDocUrl} download className="btn btn-outline-secondary btn-sm">
+                              Download
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (isPdf) {
+                      return (
+                        <iframe
+                          src={viewDocUrl}
+                          title="Document"
+                          style={{ width: '100%', height: 450, border: 'none' }}
+                        />
+                      );
+                    }
+
+                    return (
+                      <img
+                        src={viewDocUrl}
+                        alt="Uploaded document"
+                        style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain' }}
+                        onError={() => setDocPreviewFailed(true)}
+                      />
+                    );
+                  })()}
                 </div>
               </div>
             </div>
