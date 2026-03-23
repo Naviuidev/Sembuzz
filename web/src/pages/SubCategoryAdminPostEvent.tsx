@@ -227,7 +227,25 @@ export const SubCategoryAdminPostEvent = () => {
   };
 
   const renderChooseMode = () => (
-    <div className="d-flex flex-wrap gap-3">
+    <>
+      <p
+        className="mb-3"
+        style={{
+          color: '#495057',
+          fontSize: '0.95rem',
+          lineHeight: 1.5,
+          maxWidth: '48rem',
+          padding: '0.75rem 1rem',
+          backgroundColor: '#f8f9fa',
+          borderLeft: '4px solid #1a1f2e',
+          borderRadius: '4px',
+          marginBottom: '1.25rem',
+        }}
+      >
+        📌 <strong>Note:</strong> For best results, upload images in 1200 × 675 pixels (16:9 ratio). This helps maintain a
+        clean and consistent look across the app.
+      </p>
+      <div className="d-flex flex-wrap gap-3">
       <button
           type="button"
           onClick={() => setMode('manual')}
@@ -271,6 +289,7 @@ export const SubCategoryAdminPostEvent = () => {
         <span>generate with ai</span>
       </button>
     </div>
+    </>
   );
 
   const renderAIBannerStep = () => (

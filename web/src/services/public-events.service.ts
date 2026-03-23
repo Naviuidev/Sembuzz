@@ -107,10 +107,10 @@ export const publicEventsService = {
   },
 
   /** Active banner ads (startAt <= now <= endAt). Optional schoolId to filter by school. For guests and logged-in users. */
-  getActiveBannerAds: async (schoolId?: string | null): Promise<{ id: string; imageUrl: string; externalLink?: string | null; startAt: string; endAt: string; schoolId: string }[]> => {
+  getActiveBannerAds: async (schoolId?: string | null): Promise<BannerAdPublic[]> => {
     const params: Record<string, string> = {};
     if (schoolId != null && String(schoolId).trim()) params.schoolId = String(schoolId).trim();
-    const response = await api.get<{ id: string; imageUrl: string; externalLink?: string | null; startAt: string; endAt: string; schoolId: string }[]>('/events/banner-ads', { params });
+    const response = await api.get<BannerAdPublic[]>('/events/banner-ads', { params });
     return Array.isArray(response.data) ? response.data : [];
   },
 
@@ -152,5 +152,18 @@ export interface SponsoredAdPublic {
   startAt: string;
   endAt: string;
   schoolId: string;
+  /** Used to order the home feed with news (posting sequence). */
+  createdAt?: string;
   school?: { id: string; name: string; image: string | null };
+}
+
+export interface BannerAdPublic {
+  id: string;
+  imageUrl: string;
+  externalLink?: string | null;
+  startAt: string;
+  endAt: string;
+  schoolId: string;
+  /** Used to order the home feed with news (posting sequence). */
+  createdAt?: string;
 }

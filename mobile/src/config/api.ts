@@ -1,13 +1,14 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getApiBaseUrl } from './env';
 
 const TOKEN_KEY = 'user-token';
 
-// For Android emulator use 10.0.2.2:3000; for iOS simulator use localhost:3000; for physical device use your machine's IP.
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+const API_BASE_URL = getApiBaseUrl();
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -21,4 +22,15 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-export const getApiBaseUrl = () => API_BASE_URL;
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const status = error?.response?.status;
+    if (status === 401) {
+      await AsyncStorage.removeItem(TOKEN_KEY);
+    }
+    return Promise.reject(error);
+  },
+);
+
+export { getApiBaseUrl };

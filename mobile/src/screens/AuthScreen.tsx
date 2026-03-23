@@ -14,8 +14,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
+import { getFrontendBaseUrl } from '../config/env';
 
-const REGISTER_URL = process.env.EXPO_PUBLIC_FRONTEND_URL || 'https://sembuzz.com';
+const REGISTER_URL = getFrontendBaseUrl();
 
 export default function AuthScreen() {
   const { user, login, loading: authLoading } = useAuth();
@@ -42,11 +43,17 @@ export default function AuthScreen() {
       await login(email.trim(), password);
       navigation.replace('Events');
     } catch (e: unknown) {
-      const msg =
+      const msgRaw =
         e && typeof e === 'object' && 'response' in e
           ? (e as { response?: { data?: { message?: string } } }).response?.data?.message
           : 'Login failed.';
-      setError(typeof msg === 'string' ? msg : 'Login failed.');
+      if (typeof msgRaw === 'string' && msgRaw.trim()) {
+        setError(msgRaw);
+      } else if (e && typeof e === 'object' && 'message' in e && typeof (e as { message?: string }).message === 'string') {
+        setError((e as { message: string }).message);
+      } else {
+        setError('Login failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

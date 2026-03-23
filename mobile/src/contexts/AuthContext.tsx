@@ -52,7 +52,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const u = res.data;
         setUser(u ? { ...u, schoolId: u.schoolId ?? null } : null);
       } catch {
-        if (!cancelled) await AsyncStorage.removeItem(TOKEN_KEY).then(() => setToken(null));
+        if (!cancelled) {
+          await AsyncStorage.removeItem(TOKEN_KEY);
+          setToken(null);
+          setUser(null);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -67,11 +71,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     const t = res.data?.access_token;
     const u = res.data?.user ?? null;
-    if (t) {
-      await AsyncStorage.setItem(TOKEN_KEY, t);
-      setToken(t);
-      setUser(u ? { ...u, schoolId: u.schoolId ?? null } : null);
+    if (!t || !u) {
+      throw new Error('Invalid login response from server.');
     }
+    await AsyncStorage.setItem(TOKEN_KEY, t);
+    setToken(t);
+    setUser({ ...u, schoolId: u.schoolId ?? null });
   }, []);
 
   return (

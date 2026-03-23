@@ -79,13 +79,36 @@ export class EventsPublicController {
     }
   }
 
-  /** Upcoming/scheduled posts by date (school admin created). Public, no auth. date=YYYY-MM-DD. Visible when date equals scheduledTo. */
+  /** Upcoming/scheduled posts by date/range (school admin created). Public, no auth.
+   * - date=YYYY-MM-DD (single day)
+   * - from=YYYY-MM-DD&to=YYYY-MM-DD (inclusive range)
+   */
   @Get('upcoming')
-  async getUpcomingByDate(@Query('date') dateStr?: string) {
-    if (!dateStr || typeof dateStr !== 'string') return [];
-    const dayStart = new Date(dateStr.trim() + 'T00:00:00.000Z');
-    const dayEnd = new Date(dateStr.trim() + 'T23:59:59.999Z');
-    if (Number.isNaN(dayStart.getTime())) return [];
+  async getUpcomingByDate(
+    @Query('date') dateStr?: string,
+    @Query('from') fromStr?: string,
+    @Query('to') toStr?: string,
+  ) {
+    let dayStart: Date;
+    let dayEnd: Date;
+
+    const from = typeof fromStr === 'string' ? fromStr.trim() : '';
+    const to = typeof toStr === 'string' ? toStr.trim() : '';
+    const date = typeof dateStr === 'string' ? dateStr.trim() : '';
+
+    if (from && to) {
+      dayStart = new Date(`${from}T00:00:00.000Z`);
+      dayEnd = new Date(`${to}T23:59:59.999Z`);
+    } else if (date) {
+      dayStart = new Date(`${date}T00:00:00.000Z`);
+      dayEnd = new Date(`${date}T23:59:59.999Z`);
+    } else {
+      return [];
+    }
+
+    if (Number.isNaN(dayStart.getTime()) || Number.isNaN(dayEnd.getTime())) return [];
+    if (dayStart > dayEnd) return [];
+
     return this.prisma.upcomingPost.findMany({
       where: { scheduledTo: { gte: dayStart, lte: dayEnd } },
       include: {
@@ -169,7 +192,15 @@ export class EventsPublicController {
         endAt: { gte: now },
         ...(sid ? { schoolId: sid } : {}),
       },
-      select: { id: true, imageUrl: true, externalLink: true, startAt: true, endAt: true, schoolId: true },
+      select: {
+        id: true,
+        imageUrl: true,
+        externalLink: true,
+        startAt: true,
+        endAt: true,
+        schoolId: true,
+        createdAt: true,
+      },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });

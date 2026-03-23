@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { getSchoolSocialAccounts, SchoolSocialAccountPublic } from '../services/userSchoolSocial';
@@ -21,6 +21,8 @@ export default function AppsScreen() {
   const { user } = useAuth();
   const [accounts, setAccounts] = useState<SchoolSocialAccountPublic[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchAccounts = useCallback(async () => {
     if (!user) {
@@ -32,8 +34,10 @@ export default function AppsScreen() {
     try {
       const list = await getSchoolSocialAccounts();
       setAccounts(list);
+      setError(null);
     } catch {
       setAccounts([]);
+      setError('Unable to load social accounts right now.');
     } finally {
       setLoading(false);
     }
@@ -45,14 +49,24 @@ export default function AppsScreen() {
 
   const groups = groupAccountsByPage(accounts);
   const displayTitle = user?.schoolName?.trim() || 'Sembuzz';
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchAccounts();
+    setRefreshing(false);
+  }, [fetchAccounts]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         <Text style={styles.title}>{displayTitle}</Text>
         <Text style={styles.followTitle}>Follow us</Text>
         {loading ? (
           <ActivityIndicator size="small" color="#1a1f2e" style={{ marginVertical: 24 }} />
+        ) : error ? (
+          <Text style={styles.errorText}>{error}</Text>
         ) : user && groups.length > 0 ? (
           groups.map((g) => (
             <View key={g.key} style={styles.section}>
@@ -151,5 +165,13 @@ const styles = StyleSheet.create({
     color: '#8e8e8e',
     textAlign: 'left',
     marginTop: 8,
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#842029',
+    backgroundColor: '#f8d7da',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
   },
 });

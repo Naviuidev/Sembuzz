@@ -1,6 +1,5 @@
-import { getApiBaseUrl } from '../config/apiBase';
+import { getApiBaseUrl } from '../config/env';
 
-/** Strip accidental JSON quotes from stored URLs */
 function stripQuotes(raw: string): string {
   let v = raw.trim();
   if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
@@ -10,10 +9,8 @@ function stripQuotes(raw: string): string {
 }
 
 /**
- * Resolve image URL for display.
- * - Paths under /uploads (relative or absolute) always use the current API base. Banner/event
- *   uploads are stored on the API; DB may still have wrong host (site URL, localhost, old env).
- * - Other https URLs (e.g. external CDNs) are left unchanged.
+ * Same as web: /uploads/* always resolved against API base (fixes banner URLs stored with wrong host).
+ * Other https URLs unchanged.
  */
 export function imageSrc(url: string | null | undefined): string {
   const u = stripQuotes(typeof url === 'string' ? url : '');

@@ -14,6 +14,20 @@ function excerpt(text: string, max = 160): string {
   return t.slice(0, max).trim() + '…';
 }
 
+function parseImageUrls(value: string | null | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function blogImage(blog: PublishedBlogListItem): string {
+  if (blog.coverImageUrl) return imageSrc(blog.coverImageUrl);
+  const fallback = parseImageUrls((blog as PublishedBlogListItem & { imageUrls?: string | null }).imageUrls)[0];
+  return fallback ? imageSrc(fallback) : '';
+}
+
 const ALL_CATEGORY = 'all';
 const ALL_SCHOOL = 'all';
 
@@ -392,9 +406,9 @@ export const PublicBlogs = () => {
                             className="ratio ratio-16x10 ratio-md-1x1 bg-light w-100"
                             style={{ minHeight: '100%' }}
                           >
-                            {featuredBlog.coverImageUrl ? (
+                            {blogImage(featuredBlog) ? (
                               <img
-                                src={imageSrc(featuredBlog.coverImageUrl)}
+                                src={blogImage(featuredBlog)}
                                 alt=""
                                 className="object-fit-cover"
                                 style={{ objectFit: 'cover' }}
@@ -479,9 +493,9 @@ export const PublicBlogs = () => {
                             className="ratio ratio-16x9 bg-light"
                             style={{ backgroundColor: '#e9ecef' }}
                           >
-                            {b.coverImageUrl ? (
+                            {blogImage(b) ? (
                               <img
-                                src={imageSrc(b.coverImageUrl)}
+                                src={blogImage(b)}
                                 alt=""
                                 className="object-fit-cover"
                                 style={{ objectFit: 'cover' }}

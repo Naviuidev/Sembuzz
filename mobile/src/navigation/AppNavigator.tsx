@@ -6,9 +6,10 @@ import SearchIcon from 'react-native-bootstrap-icons/icons/search';
 import HouseDoorIcon from 'react-native-bootstrap-icons/icons/house-door';
 import GearIcon from 'react-native-bootstrap-icons/icons/gear';
 import Grid3x3GapIcon from 'react-native-bootstrap-icons/icons/grid-3x3-gap';
+import JournalTextIcon from 'react-native-bootstrap-icons/icons/journal-text';
 
 import GlobalNavbar from '../components/GlobalNavbar';
-import { EventsScreen, SearchScreen, SettingsScreen, AppsScreen, AuthScreen } from '../screens';
+import { EventsScreen, SearchScreen, SettingsScreen, AppsScreen, BlogsScreen } from '../screens';
 
 const Tab = createBottomTabNavigator();
 
@@ -17,6 +18,7 @@ const TAB_CONFIG = [
   { name: 'Events', label: 'Home', Icon: HouseDoorIcon },
   { name: 'Settings', label: 'Settings', Icon: GearIcon },
   { name: 'Apps', label: 'Apps', Icon: Grid3x3GapIcon },
+  { name: 'Blogs', label: 'Blogs', Icon: JournalTextIcon },
 ];
 
 function BottomNavBar({ state, descriptors, navigation }: any) {
@@ -77,6 +79,7 @@ export default function AppNavigator({ onNavigate }: AppNavigatorProps) {
         <GlobalNavbar
           onNavigateToEvents={() => onNavigate?.('Events')}
           onNavigateToSettings={() => onNavigate?.('Settings')}
+          onNavigateToBlogs={() => onNavigate?.('Blogs')}
         />
       </View>
       <View style={styles.content}>
@@ -89,6 +92,7 @@ export default function AppNavigator({ onNavigate }: AppNavigatorProps) {
           <Tab.Screen name="Events" component={EventsScreen} options={{ tabBarLabel: 'Home' }} />
           <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: 'Settings' }} />
           <Tab.Screen name="Apps" component={AppsScreen} options={{ tabBarLabel: 'Apps' }} />
+          <Tab.Screen name="Blogs" component={BlogsScreen} options={{ tabBarLabel: 'Blogs' }} />
         </Tab.Navigator>
       </View>
     </View>

@@ -70,6 +70,11 @@ export const userEventsService = {
     return response.data;
   },
 
+  deleteComment: async (_eventId: string, commentId: string): Promise<{ commentCount: number }> => {
+    const response = await api.delete<{ commentCount: number }>(`/user/event-comment/${commentId}`);
+    return response.data;
+  },
+
   toggleSave: async (eventId: string): Promise<{ saved: boolean }> => {
     const response = await api.post<{ saved: boolean }>(`/user/events/${eventId}/save`);
     return response.data;

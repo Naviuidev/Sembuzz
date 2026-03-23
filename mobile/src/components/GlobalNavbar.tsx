@@ -7,20 +7,32 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  Linking,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { getFrontendBaseUrl } from '../config/env';
 
 type GlobalNavbarProps = {
   onNavigateToEvents?: () => void;
   onNavigateToSettings?: () => void;
+  onNavigateToBlogs?: () => void;
 };
 
 /** Matches web Navbar: dark capsule bar, SemBuzz logo (left), hamburger menu (right). Before login: Register, Log In. After login: user name, Log out. */
-export default function GlobalNavbar({ onNavigateToEvents, onNavigateToSettings }: GlobalNavbarProps) {
+export default function GlobalNavbar({
+  onNavigateToEvents,
+  onNavigateToSettings,
+  onNavigateToBlogs,
+}: GlobalNavbarProps) {
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const baseUrl = getFrontendBaseUrl();
 
   const closeMenu = () => setMenuOpen(false);
+  const openWeb = (path: string) => {
+    const url = `${baseUrl}${path}`;
+    Linking.openURL(url).catch(() => {});
+  };
 
   return (
     <>
@@ -72,11 +84,55 @@ export default function GlobalNavbar({ onNavigateToEvents, onNavigateToSettings 
             </View>
 
             <ScrollView style={styles.menuLinks}>
+              <Text style={styles.menuSection}>SemBuzz</Text>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); openWeb('/#about'); }}>
+                <Text style={styles.menuItemText}>About</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); openWeb('/#for-students'); }}>
+                <Text style={styles.menuItemText}>For Students</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); openWeb('/#for-universities'); }}>
+                <Text style={styles.menuItemText}>For Universities</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); openWeb('/#for-employers'); }}>
+                <Text style={styles.menuItemText}>For Employers</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.menuSection}>Policy</Text>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); openWeb('/#privacy'); }}>
+                <Text style={styles.menuItemText}>Privacy Policy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); openWeb('/#community-guidelines'); }}>
+                <Text style={styles.menuItemText}>Community Guidelines</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); openWeb('/#terms-of-service'); }}>
+                <Text style={styles.menuItemText}>Terms and Conditions</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.menuSection}>Explore</Text>
               <TouchableOpacity
                 style={styles.menuItem}
                 onPress={() => { closeMenu(); onNavigateToEvents?.(); }}
               >
                 <Text style={styles.menuItemText}>Events</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => { closeMenu(); onNavigateToBlogs?.(); }}
+              >
+                <Text style={styles.menuItemText}>Blogs</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => { closeMenu(); openWeb('/#faqs'); }}
+              >
+                <Text style={styles.menuItemText}>FAQs</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => { closeMenu(); openWeb('/#contact-us'); }}
+              >
+                <Text style={styles.menuItemText}>Contact</Text>
               </TouchableOpacity>
               {!user ? (
                 <>
@@ -207,6 +263,16 @@ const styles = StyleSheet.create({
   },
   menuLinks: {
     flex: 1,
+  },
+  menuSection: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    paddingHorizontal: 12,
+    marginTop: 14,
+    marginBottom: 4,
   },
   menuItem: {
     paddingVertical: 14,

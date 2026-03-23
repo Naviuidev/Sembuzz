@@ -20,7 +20,13 @@ import SearchIcon from 'react-native-bootstrap-icons/icons/search';
 import BuildingIcon from 'react-native-bootstrap-icons/icons/building';
 import TagsIcon from 'react-native-bootstrap-icons/icons/tags';
 import FunnelIcon from 'react-native-bootstrap-icons/icons/funnel';
-import { getApprovedEvents, imageSrc, ApprovedEventPublic } from '../services/events';
+import {
+  getApprovedEvents,
+  getCategoriesBySchool,
+  imageSrc,
+  ApprovedEventPublic,
+  CategoryPublic,
+} from '../services/events';
 import { getSchools, SchoolOption } from '../services/userAuth';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -80,7 +86,13 @@ export default function SearchScreen() {
   const [filterPopupOpen, setFilterPopupOpen] = useState(false);
   const [categoryLoginMessage, setCategoryLoginMessage] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [categories, setCategories] = useState<CategoryPublic[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedSubCategoryIds, setSelectedSubCategoryIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [schoolsLoading, setSchoolsLoading] = useState(false);
   const { width } = useWindowDimensions();
@@ -107,21 +119,53 @@ export default function SearchScreen() {
   };
 
   const handleFilterViaCategories = () => {
-    setCategoryLoginMessage(true);
+    if (!user?.schoolId) {
+      setCategoryLoginMessage(true);
+      return;
+    }
+    closeFilterPopup();
+    setCategoryModalVisible(true);
   };
 
   const fetchEvents = useCallback(async () => {
-    const list = await getApprovedEvents(selectedSchoolId ?? undefined, undefined);
-    setEvents(list);
-  }, [selectedSchoolId]);
+    try {
+      const effectiveSchoolId = selectedCategoryId ? user?.schoolId ?? undefined : selectedSchoolId ?? undefined;
+      const list = await getApprovedEvents(effectiveSchoolId, selectedSubCategoryIds.length ? selectedSubCategoryIds : undefined);
+      setEvents(list);
+      setError(null);
+    } catch {
+      setEvents([]);
+      setError('Unable to load search results. Please try again.');
+    }
+  }, [selectedSchoolId, selectedCategoryId, selectedSubCategoryIds, user?.schoolId]);
+
+  const fetchCategories = useCallback(async () => {
+    if (!user?.schoolId) {
+      setCategories([]);
+      return;
+    }
+    setCategoriesLoading(true);
+    try {
+      const rows = await getCategoriesBySchool(user.schoolId);
+      setCategories(rows);
+      setError(null);
+    } catch {
+      setCategories([]);
+      setError('Unable to load categories right now.');
+    } finally {
+      setCategoriesLoading(false);
+    }
+  }, [user?.schoolId]);
 
   const fetchSchools = useCallback(async () => {
     setSchoolsLoading(true);
     try {
       const list = await getSchools();
       setSchools(list);
+      setError(null);
     } catch {
       setSchools([]);
+      setError('Unable to load schools right now.');
     } finally {
       setSchoolsLoading(false);
     }
@@ -135,6 +179,10 @@ export default function SearchScreen() {
   useEffect(() => {
     if (filterModalVisible) fetchSchools();
   }, [filterModalVisible, fetchSchools]);
+
+  useEffect(() => {
+    if (categoryModalVisible) fetchCategories();
+  }, [categoryModalVisible, fetchCategories]);
 
   useEffect(() => {
     if (!filterPopupOpen) setCategoryLoginMessage(false);
@@ -170,6 +218,21 @@ export default function SearchScreen() {
   const clearSchoolFilter = () => {
     setSelectedSchoolId(null);
     setFilterModalVisible(false);
+  };
+
+  const clearCategoryFilter = () => {
+    setSelectedCategoryId(null);
+    setSelectedSubCategoryIds([]);
+    setCategoryModalVisible(false);
+  };
+
+  const selectCategory = (category: CategoryPublic) => {
+    setSelectedCategoryId(category.id);
+    const subIds = (category.subcategories ?? []).map((s) => s.id).filter(Boolean);
+    setSelectedSubCategoryIds(subIds);
+    // Category filtering is based on logged-in user's school only.
+    setSelectedSchoolId(user?.schoolId ?? null);
+    setCategoryModalVisible(false);
   };
 
   const selectSchool = (id: string) => {
@@ -238,7 +301,7 @@ export default function SearchScreen() {
           {item.externalLink ? (
             <TouchableOpacity
               style={styles.linkButton}
-              onPress={() => item.externalLink && Linking.openURL(item.externalLink)}
+              onPress={() => item.externalLink && Linking.openURL(item.externalLink).catch(() => {})}
             >
               <Text style={styles.linkButtonText}>View link</Text>
             </TouchableOpacity>
@@ -285,16 +348,16 @@ export default function SearchScreen() {
           </TouchableOpacity>
         </View>
       )}
-
-      {/* Browse category pill */}
-      <View style={styles.section}>
-        <View style={styles.pill}>
-          <Text style={styles.pillText}>Browse category</Text>
+      {selectedCategoryId && (
+        <View style={styles.schoolActions}>
+          <Text style={styles.schoolActionMuted}>
+            Category: {categories.find((c) => c.id === selectedCategoryId)?.name ?? 'Selected'}
+          </Text>
+          <TouchableOpacity onPress={clearCategoryFilter}>
+            <Text style={styles.schoolActionLink}>Clear category</Text>
+          </TouchableOpacity>
         </View>
-        {!user && (
-          <Text style={styles.signInHint}>Sign in to avail this filter.</Text>
-        )}
-      </View>
+      )}
 
       {/* Results pill */}
       <View style={styles.section}>
@@ -322,6 +385,10 @@ export default function SearchScreen() {
       ) : loading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#1a1f2e" />
+        </View>
+      ) : error ? (
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : filtered.length === 0 ? (
         <View style={styles.centered}>
@@ -441,6 +508,60 @@ export default function SearchScreen() {
                         </View>
                       )}
                       <Text style={styles.schoolItemName}>{s.name}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Category modal: categories from logged-in user's school */}
+      <Modal
+        visible={categoryModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setCategoryModalVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setCategoryModalVisible(false)}>
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select a category</Text>
+              <TouchableOpacity onPress={() => setCategoryModalVisible(false)}>
+                <Text style={styles.modalClose}>Close</Text>
+              </TouchableOpacity>
+            </View>
+            {selectedCategoryId && (
+              <TouchableOpacity style={styles.showAllInModal} onPress={clearCategoryFilter}>
+                <Text style={styles.schoolActionLink}>Show all</Text>
+              </TouchableOpacity>
+            )}
+            {categoriesLoading ? (
+              <ActivityIndicator size="small" color="#1a1f2e" style={{ marginVertical: 24 }} />
+            ) : categories.length === 0 ? (
+              <Text style={styles.noSchools}>No categories found for your school.</Text>
+            ) : (
+              <ScrollView style={styles.schoolsList}>
+                {categories.map((cat) => {
+                  const isSelected = selectedCategoryId === cat.id;
+                  return (
+                    <TouchableOpacity
+                      key={cat.id}
+                      style={[styles.schoolItem, isSelected && styles.schoolItemSelected]}
+                      onPress={() => selectCategory(cat)}
+                    >
+                      <View style={styles.categoryBadge}>
+                        <Text style={styles.categoryBadgeText}>
+                          {cat.name?.charAt(0)?.toUpperCase() ?? '#'}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.schoolItemName}>{cat.name}</Text>
+                        <Text style={styles.categorySubCount}>
+                          {(cat.subcategories ?? []).length} subcategories
+                        </Text>
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
@@ -573,11 +694,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  signInHint: {
-    fontSize: 13,
-    color: '#8e8e8e',
-    marginTop: 8,
-  },
   backLink: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -603,6 +719,12 @@ const styles = StyleSheet.create({
     color: '#6c757d',
     fontSize: 14,
     textAlign: 'center',
+  },
+  errorText: {
+    color: '#842029',
+    fontSize: 14,
+    textAlign: 'center',
+    paddingHorizontal: 16,
   },
   listContent: {
     paddingBottom: 100,
@@ -811,5 +933,24 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#1a1f2e',
     flex: 1,
+  },
+  categoryBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    backgroundColor: 'rgba(26,31,46,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryBadgeText: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1a1f2e',
+  },
+  categorySubCount: {
+    marginLeft: 12,
+    marginTop: 2,
+    fontSize: 12,
+    color: '#8e8e8e',
   },
 });

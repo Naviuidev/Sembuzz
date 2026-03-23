@@ -1,4 +1,6 @@
 import { api, getApiBaseUrl } from '../config/api';
+import { imageSrc } from '../utils/image';
+export { imageSrc };
 
 export interface ApprovedEventPublic {
   id: string;
@@ -40,6 +42,73 @@ export interface EngagementCounts {
   savedCounts: Record<string, number>;
 }
 
+export interface BannerAdPublic {
+  id: string;
+  imageUrl: string;
+  externalLink?: string | null;
+  startAt: string;
+  endAt: string;
+  schoolId: string;
+  /** Home feed ordering with news (posting sequence). */
+  createdAt?: string;
+}
+
+export interface SponsoredAdPublic {
+  id: string;
+  title: string | null;
+  description: string | null;
+  imageUrls: string | null;
+  externalLink: string | null;
+  startAt: string;
+  endAt: string;
+  schoolId: string;
+  /** Home feed ordering with news (posting sequence). */
+  createdAt?: string;
+  school?: { id: string; name: string; image: string | null };
+}
+
+export async function getActiveBannerAds(schoolId?: string | null): Promise<BannerAdPublic[]> {
+  const params: Record<string, string> = {};
+  if (schoolId != null && String(schoolId).trim()) params.schoolId = String(schoolId).trim();
+  const response = await api.get<BannerAdPublic[]>('/events/banner-ads', { params });
+  return Array.isArray(response.data) ? response.data : [];
+}
+
+export async function recordBannerAdView(bannerAdId: string): Promise<{ ok: boolean }> {
+  const response = await api.post<{ ok: boolean }>(`/events/banner-ads/${bannerAdId}/view`);
+  return response.data;
+}
+
+export async function recordBannerAdClick(
+  bannerAdId: string,
+): Promise<{ ok: boolean; redirectUrl?: string | null }> {
+  const response = await api.post<{ ok: boolean; redirectUrl?: string | null }>(
+    `/events/banner-ads/${bannerAdId}/click`,
+  );
+  return response.data;
+}
+
+export async function getActiveSponsoredAds(schoolId?: string | null): Promise<SponsoredAdPublic[]> {
+  const params: Record<string, string> = {};
+  if (schoolId != null && String(schoolId).trim()) params.schoolId = String(schoolId).trim();
+  const response = await api.get<SponsoredAdPublic[]>('/events/sponsored-ads', { params });
+  return Array.isArray(response.data) ? response.data : [];
+}
+
+export async function recordSponsoredAdView(sponsoredAdId: string): Promise<{ ok: boolean }> {
+  const response = await api.post<{ ok: boolean }>(`/events/sponsored-ads/${sponsoredAdId}/view`);
+  return response.data;
+}
+
+export async function recordSponsoredAdClick(
+  sponsoredAdId: string,
+): Promise<{ ok: boolean; redirectUrl?: string | null }> {
+  const response = await api.post<{ ok: boolean; redirectUrl?: string | null }>(
+    `/events/sponsored-ads/${sponsoredAdId}/click`,
+  );
+  return response.data;
+}
+
 export async function getApprovedEvents(
   schoolId?: string | null,
   subCategoryIds?: string[],
@@ -71,6 +140,11 @@ export async function getUpcomingByDate(date: string): Promise<UpcomingPostPubli
   return Array.isArray(response.data) ? response.data : [];
 }
 
+export async function getUpcomingByRange(from: string, to: string): Promise<UpcomingPostPublic[]> {
+  const response = await api.get<UpcomingPostPublic[]>('/events/upcoming', { params: { from, to } });
+  return Array.isArray(response.data) ? response.data : [];
+}
+
 export async function getEngagementCounts(
   eventIds: string[],
   options?: { dateFrom?: string; dateTo?: string },
@@ -86,13 +160,6 @@ export async function getEngagementCounts(
     commentCounts: data?.commentCounts ?? {},
     savedCounts: data?.savedCounts ?? {},
   };
-}
-
-export function imageSrc(url: string | null | undefined): string {
-  if (!url) return '';
-  const base = getApiBaseUrl();
-  if (url.startsWith('http')) return url;
-  return url.startsWith('/') ? `${base}${url}` : `${base}/${url}`;
 }
 
 /** Build backend URL for "Login with Google" to add event to user's calendar (OAuth flow). */

@@ -19,9 +19,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import PersonPlusIcon from 'react-native-bootstrap-icons/icons/person-plus';
 import { useAuth } from '../contexts/AuthContext';
 import { getApprovedEvents, imageSrc, ApprovedEventPublic } from '../services/events';
+import { getFrontendBaseUrl } from '../config/env';
 
-const REGISTER_URL = process.env.EXPO_PUBLIC_FRONTEND_URL || 'https://sembuzz.com';
-const BASE_URL = REGISTER_URL.startsWith('http') ? REGISTER_URL.replace(/\/$/, '') : `https://${REGISTER_URL}`;
+const BASE_URL = getFrontendBaseUrl();
 
 export default function SettingsScreen() {
   const { user, login, logout, loading: authLoading } = useAuth();
@@ -31,7 +31,17 @@ export default function SettingsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [recentEvents, setRecentEvents] = useState<ApprovedEventPublic[]>([]);
   const [recentLoading, setRecentLoading] = useState(false);
+  const [recentError, setRecentError] = useState<string | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [profileImageFailed, setProfileImageFailed] = useState(false);
+
+  const profileImageUrl = (() => {
+    const candidate =
+      (user as { profilePicUrl?: string | null; image?: string | null } | null)?.profilePicUrl ||
+      (user as { profilePicUrl?: string | null; image?: string | null } | null)?.image ||
+      '';
+    return candidate ? imageSrc(candidate) : '';
+  })();
 
   const fetchRecent = useCallback(async () => {
     setRecentLoading(true);
@@ -41,8 +51,10 @@ export default function SettingsScreen() {
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
       setRecentEvents(sorted.slice(0, 10));
+      setRecentError(null);
     } catch {
       setRecentEvents([]);
+      setRecentError('Unable to load recent news right now.');
     } finally {
       setRecentLoading(false);
     }
@@ -51,6 +63,10 @@ export default function SettingsScreen() {
   useEffect(() => {
     fetchRecent();
   }, [fetchRecent]);
+
+  useEffect(() => {
+    setProfileImageFailed(false);
+  }, [user?.id]);
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -89,7 +105,7 @@ export default function SettingsScreen() {
 
   if (authLoading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={['bottom']}>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#1a1f2e" />
         </View>
@@ -99,46 +115,67 @@ export default function SettingsScreen() {
 
   if (user) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={['bottom']}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.profileRow}>
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarLetter}>{user.name?.charAt(0) ?? '?'}</Text>
-            </View>
+            {profileImageUrl && !profileImageFailed ? (
+              <Image
+                source={{ uri: profileImageUrl }}
+                style={styles.avatarImage}
+                onError={() => setProfileImageFailed(true)}
+              />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarLetter}>{user.name?.charAt(0) ?? '?'}</Text>
+              </View>
+            )}
             <View style={styles.profileText}>
               <Text style={styles.userName}>{user.name ?? 'User'}</Text>
               <Text style={styles.userEmail}>{user.email}</Text>
             </View>
           </View>
 
-          <TouchableOpacity style={[styles.actionButton, styles.actionGreen]}>
-            <Text style={styles.actionIcon}>📁</Text>
-            <Text style={styles.actionLabel}>Change categories</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionButton, styles.actionBlue]}>
-            <Text style={styles.actionIcon}>❤️</Text>
-            <Text style={styles.actionLabel}>Liked news</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionButton, styles.actionBlue]}>
-            <Text style={styles.actionIcon}>🔖</Text>
-            <Text style={styles.actionLabel}>Saved news</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionButton, styles.actionOrange]}>
-            <Text style={styles.actionIcon}>?</Text>
-            <Text style={styles.actionLabel}>Help — raise a query to school admin</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionButton, styles.actionRed]} onPress={handleLogout}>
-            <Text style={styles.actionIcon}>↪</Text>
-            <Text style={styles.actionLabel}>Sign out</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionButton, styles.actionGray]} onPress={handleDeleteAccount}>
-            <Text style={styles.actionIcon}>🗑</Text>
-            <Text style={styles.actionLabel}>Delete account</Text>
-          </TouchableOpacity>
+          <View style={styles.actionsGrid}>
+            <TouchableOpacity style={[styles.actionButton, styles.actionGreen]}>
+              <Text style={styles.actionIcon}>📁</Text>
+              <Text style={styles.actionLabel}>Change categories</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.actionBlue]}
+              onPress={() => Linking.openURL(`${BASE_URL}/events`).catch(() => {})}
+            >
+              <Text style={styles.actionIcon}>❤️</Text>
+              <Text style={styles.actionLabel}>Liked news</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.actionBlue]}
+              onPress={() => Linking.openURL(`${BASE_URL}/events`).catch(() => {})}
+            >
+              <Text style={styles.actionIcon}>🔖</Text>
+              <Text style={styles.actionLabel}>Saved news</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionButton, styles.actionRed]} onPress={handleLogout}>
+              <Text style={styles.actionIcon}>↪</Text>
+              <Text style={styles.actionLabel}>Sign out</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.actionOrange]}
+              onPress={() => Linking.openURL(`${BASE_URL}/events`).catch(() => {})}
+            >
+              <Text style={styles.actionIcon}>?</Text>
+              <Text style={styles.actionLabel}>Help — raise a query to school admin</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionButton, styles.actionGray]} onPress={handleDeleteAccount}>
+              <Text style={styles.actionIcon}>🗑</Text>
+              <Text style={styles.actionLabel}>Delete account</Text>
+            </TouchableOpacity>
+          </View>
 
           <Text style={styles.sectionTitle}>Recently added schools / news</Text>
           {recentLoading ? (
             <ActivityIndicator size="small" color="#1a1f2e" style={{ marginVertical: 16 }} />
+          ) : recentError ? (
+            <Text style={styles.errorText}>{recentError}</Text>
           ) : (
             recentEvents.map((ev) => (
               <View key={ev.id} style={styles.recentItem}>
@@ -158,11 +195,11 @@ export default function SettingsScreen() {
           )}
 
           <View style={styles.footerLinks}>
-            <TouchableOpacity onPress={() => Linking.openURL('/privacy').catch(() => {})}>
+            <TouchableOpacity onPress={() => Linking.openURL(`${BASE_URL}/#privacy`).catch(() => {})}>
               <Text style={styles.footerLink}>Privacy policy</Text>
             </TouchableOpacity>
             <Text style={styles.footerDot}> · </Text>
-            <TouchableOpacity onPress={() => Linking.openURL('/terms').catch(() => {})}>
+            <TouchableOpacity onPress={() => Linking.openURL(`${BASE_URL}/#terms-of-service`).catch(() => {})}>
               <Text style={styles.footerLink}>Terms and conditions</Text>
             </TouchableOpacity>
           </View>
@@ -177,7 +214,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.card}>
           <View style={styles.loginPromptRow}>
@@ -209,6 +246,8 @@ export default function SettingsScreen() {
         <Text style={styles.sectionTitle}>Recently added schools / news</Text>
         {recentLoading ? (
           <ActivityIndicator size="small" color="#1a1f2e" style={{ marginVertical: 16 }} />
+        ) : recentError ? (
+          <Text style={styles.errorText}>{recentError}</Text>
         ) : (
           recentEvents.map((ev) => (
             <View key={ev.id} style={styles.recentItem}>
@@ -312,6 +351,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 24,
+    paddingTop: 8,
     paddingBottom: 100,
   },
   centered: {
@@ -432,6 +472,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  avatarImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#e9ecef',
+  },
   avatarLetter: {
     fontSize: 24,
     fontWeight: '700',
@@ -451,13 +497,19 @@ const styles = StyleSheet.create({
     color: '#6c757d',
     marginTop: 4,
   },
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 12,
-    marginBottom: 10,
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
   },
   actionIcon: {
     fontSize: 18,

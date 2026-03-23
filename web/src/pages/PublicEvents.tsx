@@ -9,10 +9,13 @@ import { useEventsFilter } from '../contexts/EventsFilterContext';
 import {
   publicEventsService,
   type ApprovedEventPublic,
+  type BannerAdPublic,
   type CategoryPublic,
   type UpcomingPostPublic,
   type SponsoredAdPublic,
 } from '../services/public-events.service';
+import { buildPublicFeedItems } from '../utils/publicFeed';
+import { InshortsHomeFeed } from '../components/InshortsHomeFeed';
 import {
   userEventsService,
   type EventCommentResponse,
@@ -905,6 +908,58 @@ function EventPostCard({
 
 const SPONSORED_AD_BG = '#e8f4fc';
 
+function BannerAdCard({ banner }: { banner: BannerAdPublic }) {
+  const [imgFailed, setImgFailed] = useState(false);
+
+  useEffect(() => {
+    setImgFailed(false);
+  }, [banner.id, banner.imageUrl]);
+
+  useEffect(() => {
+    publicEventsService.recordBannerAdView(banner.id).catch(() => {});
+  }, [banner.id]);
+
+  const handleClick = () => {
+    publicEventsService.recordBannerAdClick(banner.id).then((r) => {
+      if (r.redirectUrl) window.open(r.redirectUrl, '_blank', 'noopener,noreferrer');
+    }).catch(() => {});
+  };
+
+  const src = imageSrc(banner.imageUrl);
+
+  return (
+    <div
+      className="mb-4 rounded-2 overflow-hidden border shadow-sm"
+      style={{ width: '100%', maxWidth: '600px', margin: '0 auto', backgroundColor: '#fff' }}
+    >
+      <button
+        type="button"
+        className="border-0 p-0 w-100 bg-transparent d-block text-start"
+        onClick={handleClick}
+        aria-label={banner.externalLink ? 'Open ad link' : 'Banner ad'}
+      >
+        {src && !imgFailed ? (
+          <div style={{ width: '100%', maxWidth: '320px', margin: '0 auto', padding: '8px 0' }}>
+            <img
+              src={src}
+              alt="Banner ad"
+              style={{ width: '100%', height: '100px', display: 'block', pointerEvents: 'none', objectFit: 'cover' }}
+              onError={() => setImgFailed(true)}
+            />
+          </div>
+        ) : (
+          <div
+            className="d-flex align-items-center justify-content-center bg-light text-muted small"
+            style={{ width: '100%', maxWidth: '320px', height: '100px', margin: '0 auto' }}
+          >
+            Banner image unavailable
+          </div>
+        )}
+      </button>
+    </div>
+  );
+}
+
 function SponsoredAdCard({ ad }: { ad: SponsoredAdPublic }) {
   const [slideIndex, setSlideIndex] = useState(0);
   const images = useMemo(() => parseImageUrls(ad.imageUrls), [ad.imageUrls]);
@@ -1013,7 +1068,12 @@ export const PublicEvents = () => {
   const [showRefreshHint, setShowRefreshHint] = useState(false);
   const location = useLocation();
   const [bottomNavActive, setBottomNavActive] = useState<'search' | 'home' | 'settings' | 'apps' | 'help' | 'liked'>('home');
+  const [bottomNavVisible, setBottomNavVisible] = useState(true);
   const [showHelpModal, setShowHelpModal] = useState(false);
+  useEffect(() => {
+    if (bottomNavActive !== 'home') setBottomNavVisible(true);
+  }, [bottomNavActive]);
+
   const [helpMessage, setHelpMessage] = useState('');
   const [helpSubmitLoading, setHelpSubmitLoading] = useState(false);
   const [helpSubmitError, setHelpSubmitError] = useState<string | null>(null);
@@ -1037,8 +1097,6 @@ export const PublicEvents = () => {
   const [selectedLikedEvent, setSelectedLikedEvent] = useState<import('../services/user-events.service').LikedEventItem | null>(null);
   const [upcomingDateFilter, setUpcomingDateFilter] = useState<string | null>(null);
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
-  /** Pending date in calendar dropdown; only applied when user clicks OK (search runs then). */
-  const [calendarPendingDate, setCalendarPendingDate] = useState<string | null>(null);
   const [selectedUpcomingPost, setSelectedUpcomingPost] = useState<UpcomingPostPublic | null>(null);
   const [googleCalDropdownPostId, setGoogleCalDropdownPostId] = useState<string | null>(null);
   const [googleCalReturnSuccess, setGoogleCalReturnSuccess] = useState(false);
@@ -1104,12 +1162,10 @@ export const PublicEvents = () => {
     };
   }, [googleCalDropdownPostId]);
 
-  // For logged-in user on home: use their school and saved subcategory preferences for the feed
+  // Logged-in home: same as mobile — only filter by subcategories when the user explicitly selects them in the UI.
+  // (Do not auto-apply saved subcategory prefs to the API; that returned too few posts so ad interleaving never hit 5/8.)
   const isLoggedInHome = !!user && bottomNavActive === 'home';
-  const userCategoryDone = user ? getUserCategoryDone(user.id) : null;
-  const userPreferredSubCategoryIds = isLoggedInHome && user && userCategoryDone === 'true' ? getUserSubCategoryIds(user.id) : null;
   const homeFeedSchoolId = isLoggedInHome && user ? user.schoolId : null;
-  const homeFeedSubCategoryIds = isLoggedInHome ? (userPreferredSubCategoryIds ?? undefined) : undefined;
 
   // When "What's happening in all schools" is on, show all schools' news (effectiveSchoolId = null, no subcategory filter)
   const effectiveSchoolId =
@@ -1118,12 +1174,11 @@ export const PublicEvents = () => {
       : isLoggedInHome && homeFeedSchoolId
         ? homeFeedSchoolId
         : schoolId;
+  /** Match mobile EventsScreen: subcategories only when logged-in + My school + user picked subs (not for guests / all-schools). */
   const effectiveSubCategoryIds =
-    isLoggedInHome && showAllSchoolsFeed
-      ? undefined
-      : selectedSubCategoryIds.length > 0
-        ? selectedSubCategoryIds
-        : (isLoggedInHome ? homeFeedSubCategoryIds : undefined);
+    user && isLoggedInHome && !showAllSchoolsFeed && selectedSubCategoryIds.length > 0
+      ? selectedSubCategoryIds
+      : undefined;
 
   const { data: events = [], isLoading: eventsLoading, isFetching: eventsFetching, error } = useQuery({
     queryKey: ['public', 'events', 'approved', effectiveSchoolId ?? 'all', effectiveSubCategoryIds ?? []],
@@ -1140,23 +1195,6 @@ export const PublicEvents = () => {
     queryFn: () => publicEventsService.getActiveBannerAds(effectiveSchoolId ?? undefined),
     enabled: bottomNavActive === 'home',
   });
-
-  const displayBannerAd = useMemo(() => {
-    if (!activeBannerAds.length) return null;
-    return activeBannerAds[Math.floor(Math.random() * activeBannerAds.length)];
-  }, [activeBannerAds]);
-
-  useEffect(() => {
-    if (!displayBannerAd?.id) return;
-    publicEventsService.recordBannerAdView(displayBannerAd.id).catch(() => {});
-  }, [displayBannerAd?.id]);
-
-  const handleBannerAdClick = () => {
-    if (!displayBannerAd?.id) return;
-    publicEventsService.recordBannerAdClick(displayBannerAd.id).then((r) => {
-      if (r.redirectUrl) window.open(r.redirectUrl, '_blank', 'noopener,noreferrer');
-    }).catch(() => {});
-  };
 
   const { data: activeSponsoredAds = [] } = useQuery({
     queryKey: ['public', 'sponsored-ads', effectiveSchoolId ?? 'all'],
@@ -1188,15 +1226,6 @@ export const PublicEvents = () => {
     queryFn: () => userSchoolSocialService.getForMySchool(),
     enabled: !!user,
   });
-
-  // When filter dropdown opens (and user logged in), set default calendar pending date to tomorrow
-  useEffect(() => {
-    if (filterDropdownOpen && user) {
-      const d = new Date();
-      d.setDate(d.getDate() + 1);
-      setCalendarPendingDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
-    }
-  }, [filterDropdownOpen, user]);
 
   // Upcoming posts by date (when user selects a date from calendar and clicks OK)
   const { data: upcomingPostsByDate = [] } = useQuery({
@@ -1490,10 +1519,12 @@ export const PublicEvents = () => {
     enabled: !!user && eventIds.length > 0,
   });
 
+  /** Guest home: counts for like/comment display. Logged-in + Popular: same /events/engagement-counts as mobile (likes+comments+saves for sort). */
+  /** Home feed: always fetch public counts so like/comment numbers show immediately; merge with user engagement when loaded. */
   const { data: publicEngagementCounts } = useQuery({
     queryKey: ['public', 'events', 'engagement-counts', eventIds.join(',')],
     queryFn: () => publicEventsService.getEngagementCounts(eventIds),
-    enabled: !user && eventIds.length > 0,
+    enabled: eventIds.length > 0 && bottomNavActive === 'home',
   });
 
   const engagementQueryKey = ['public', 'events', 'engagement', eventIds.join(',')] as const;
@@ -1510,15 +1541,19 @@ export const PublicEvents = () => {
       const key = engagementQueryKey;
       await queryClient.cancelQueries({ queryKey: key });
       const prev = queryClient.getQueryData<EngagementResponse>(key);
-      if (prev) {
-        const isLiked = prev.likedByMe.includes(eventId);
-        const nextCount = (prev.likes?.[eventId] ?? 0) + (isLiked ? -1 : 1);
-        queryClient.setQueryData<EngagementResponse>(key, {
-          ...prev,
-          likedByMe: isLiked ? prev.likedByMe.filter((id) => id !== eventId) : [...prev.likedByMe, eventId],
-          likes: { ...prev.likes, [eventId]: Math.max(0, nextCount) },
-        });
-      }
+      const base: EngagementResponse = prev ?? {
+        likes: {},
+        commentCounts: {},
+        likedByMe: [],
+        savedByMe: [],
+      };
+      const isLiked = base.likedByMe.includes(eventId);
+      const nextCount = (base.likes?.[eventId] ?? 0) + (isLiked ? -1 : 1);
+      queryClient.setQueryData<EngagementResponse>(key, {
+        ...base,
+        likedByMe: isLiked ? base.likedByMe.filter((id) => id !== eventId) : [...base.likedByMe, eventId],
+        likes: { ...base.likes, [eventId]: Math.max(0, nextCount) },
+      });
       return { prev, key };
     },
     onSuccess: (data, eventId, context) => {
@@ -1535,6 +1570,7 @@ export const PublicEvents = () => {
     },
     onError: (_err, _eventId, context) => {
       if (context?.prev != null && context?.key) queryClient.setQueryData(context.key, context.prev);
+      else if (context?.key) void queryClient.invalidateQueries({ queryKey: context.key });
     },
   });
 
@@ -1549,13 +1585,17 @@ export const PublicEvents = () => {
       const key = engagementQueryKey;
       await queryClient.cancelQueries({ queryKey: key });
       const prev = queryClient.getQueryData<EngagementResponse>(key);
-      if (prev) {
-        const isSaved = prev.savedByMe.includes(eventId);
-        queryClient.setQueryData<EngagementResponse>(key, {
-          ...prev,
-          savedByMe: isSaved ? prev.savedByMe.filter((id) => id !== eventId) : [...prev.savedByMe, eventId],
-        });
-      }
+      const base: EngagementResponse = prev ?? {
+        likes: {},
+        commentCounts: {},
+        likedByMe: [],
+        savedByMe: [],
+      };
+      const isSaved = base.savedByMe.includes(eventId);
+      queryClient.setQueryData<EngagementResponse>(key, {
+        ...base,
+        savedByMe: isSaved ? base.savedByMe.filter((id) => id !== eventId) : [...base.savedByMe, eventId],
+      });
       return { prev, key };
     },
     onSuccess: (data, eventId, context) => {
@@ -1571,10 +1611,17 @@ export const PublicEvents = () => {
     },
     onError: (_err, _eventId, context) => {
       if (context?.prev != null && context?.key) queryClient.setQueryData(context.key, context.prev);
+      else if (context?.key) void queryClient.invalidateQueries({ queryKey: context.key });
     },
   });
 
+  /**
+   * Match mobile EventsScreen: the home feed is NOT filtered by Navbar search text.
+   * (Mobile has no client-side search on the home list — only API filters + optional date range.)
+   * Search query still applies elsewhere (e.g. filter popup flows) when not on Home.
+   */
   const filteredEvents = useMemo(() => {
+    if (bottomNavActive === 'home') return events;
     if (!eventsFilter?.searchQuery?.trim()) return events;
     const q = eventsFilter.searchQuery.trim().toLowerCase();
     return events.filter(
@@ -1583,29 +1630,33 @@ export const PublicEvents = () => {
         (e.description?.toLowerCase().includes(q) ?? false) ||
         (e.subCategory?.name?.toLowerCase().includes(q) ?? false),
     );
-  }, [events, eventsFilter?.searchQuery]);
-
-  const likeCountsForSort = user ? engagement?.likes : publicEngagementCounts?.likes;
+  }, [events, eventsFilter?.searchQuery, bottomNavActive]);
 
   const sortedEvents = useMemo(() => {
     const list = [...filteredEvents];
     if (feedSort === 'latest') {
       list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } else {
-      list.sort((a, b) => (likeCountsForSort?.[b.id] ?? 0) - (likeCountsForSort?.[a.id] ?? 0));
+      /** Match mobile EventsScreen popular: likes + comments + saves */
+      const score = (id: string) =>
+        publicEngagementCounts
+          ? (publicEngagementCounts.likes[id] ?? 0) +
+            (publicEngagementCounts.commentCounts[id] ?? 0) +
+            (publicEngagementCounts.savedCounts[id] ?? 0)
+          : 0;
+      list.sort((a, b) => {
+        const diff = score(b.id) - score(a.id);
+        if (diff !== 0) return diff;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
     }
     return list;
-  }, [filteredEvents, feedSort, likeCountsForSort]);
+  }, [filteredEvents, feedSort, publicEngagementCounts]);
 
-  type FeedItem =
-    | { type: 'event'; event: ApprovedEventPublic }
-    | { type: 'sponsored'; ad: SponsoredAdPublic };
-  const feedItems = useMemo((): FeedItem[] => {
-    const sponsored: FeedItem[] = [...activeSponsoredAds]
-      .sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime())
-      .map((ad) => ({ type: 'sponsored' as const, ad }));
-    return [...sortedEvents.map((event) => ({ type: 'event' as const, event })), ...sponsored];
-  }, [sortedEvents, activeSponsoredAds]);
+  const feedItems = useMemo(
+    () => buildPublicFeedItems(sortedEvents, activeSponsoredAds, activeBannerAds, feedSort),
+    [sortedEvents, activeSponsoredAds, activeBannerAds, feedSort],
+  );
 
   const { data: allSchools = [], isLoading: schoolsLoading } = useQuery({
     queryKey: ['user', 'auth', 'schools'],
@@ -2215,16 +2266,6 @@ export const PublicEvents = () => {
                       Show all
                     </button>
                   </div>
-                )}
-                <div className="mb-2">
-                  <span className="badge rounded-pill bg-black bg-opacity-100 text-white" style={{ fontSize: '0.8rem' }}>
-                    Browse category
-                  </span>
-                </div>
-                {!user && (
-                  <p className="small text-muted mb-3">
-                    Sign in to avail this filter.
-                  </p>
                 )}
                 <div className="mb-2 mt-3">
                   <span className="badge bg-dark bg-opacity-100 text-white rounded-pill" style={{ fontSize: '0.8rem' }}>
@@ -3169,13 +3210,13 @@ export const PublicEvents = () => {
                 type="button"
                 className="btn border-0 py-1 px-2 rounded d-flex align-items-center"
                 style={{
-                  backgroundColor: filterDropdownOpen || upcomingDateFilter || feedSort !== 'latest'
+                  backgroundColor: filterDropdownOpen || feedSort !== 'latest'
                     ? 'rgba(13, 202, 240, 0.15)'
                     : 'transparent',
-                  color: filterDropdownOpen || upcomingDateFilter ? '#087990' : '#6c757d',
+                  color: filterDropdownOpen ? '#087990' : '#6c757d',
                 }}
                 onClick={() => setFilterDropdownOpen((o) => !o)}
-                title="Filter: Calendar, Latest, Popular"
+                title="Filter: Latest, Popular"
                 aria-label="Filter"
                 aria-expanded={filterDropdownOpen}
               >
@@ -3208,80 +3249,29 @@ export const PublicEvents = () => {
                         <i className="bi bi-x-lg" style={{ fontSize: '1rem' }} />
                       </button>
                     </div>
-                    {/* Calendar */}
-                    <div className="px-3 py-1 small text-muted">Calendar</div>
-                    {user && !showAllSchoolsFeed ? (
-                      <>
-                        <button
-                          type="button"
-                          className="btn btn-link text-dark btn-sm text-start w-100 d-block text-decoration-none"
-                          onClick={() => {
-                            const d = new Date();
-                            d.setDate(d.getDate() + 1);
-                            setCalendarPendingDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
-                          }}
-                        >
-                          Tomorrow
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-link text-dark btn-sm text-start w-100 d-block text-decoration-none"
-                          onClick={() => {
-                            const d = new Date();
-                            d.setDate(d.getDate() + 2);
-                            setCalendarPendingDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
-                          }}
-                        >
-                          Day after tomorrow
-                        </button>
-                        <div className="px-3 pt-1 pb-2">
-                          <label className="small text-muted d-block mb-1">Custom date</label>
-                          <input
-                            type="date"
-                            className="form-control form-control-sm mb-2"
-                            value={calendarPendingDate ?? ''}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              setCalendarPendingDate(v || null);
-                            }}
-                          />
-                          <button
-                            type="button"
-                            className="btn btn-outline-dark btn-sm rounded-pill w-100"
-                            disabled={!calendarPendingDate}
-                            onClick={() => {
-                              if (calendarPendingDate) {
-                                setUpcomingDateFilter(calendarPendingDate);
-                                setSelectedUpcomingPost(null);
-                              }
-                            }}
-                          >
-                            OK — View filtered news
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="px-3 pb-2 small text-muted">Login to see upcoming by date</div>
-                    )}
-                    <hr className="my-2" />
-                    {/* Latest / Popular */}
                     <div className="px-3 py-1 small text-muted">Sort</div>
-                    <button
-                      type="button"
-                      className={`btn btn-link btn-sm text-start w-100 d-block text-decoration-none py-1 ${feedSort === 'latest' ? 'fw-600 text-dark' : 'text-secondary'}`}
-                      onClick={() => setFeedSort('latest')}
-                    >
-                      {feedSort === 'latest' && <i className="bi bi-check2 me-2" />}
-                      Latest
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn btn-link btn-sm text-start w-100 d-block text-decoration-none py-1 ${feedSort === 'popular' ? 'fw-600 text-dark' : 'text-secondary'}`}
-                      onClick={() => setFeedSort('popular')}
-                    >
-                      {feedSort === 'popular' && <i className="bi bi-check2 me-2" />}
-                      Popular
-                    </button>
+                    <div className="px-3 pt-1 pb-2 d-flex align-items-center gap-2">
+                      <button
+                        type="button"
+                        className={`btn btn-sm rounded-pill ${feedSort === 'latest' ? 'btn-dark' : 'btn-outline-dark'}`}
+                        onClick={() => {
+                          setFeedSort('latest');
+                          setFilterDropdownOpen(false);
+                        }}
+                      >
+                        Latest
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn btn-sm rounded-pill ${feedSort === 'popular' ? 'btn-dark' : 'btn-outline-dark'}`}
+                        onClick={() => {
+                          setFeedSort('popular');
+                          setFilterDropdownOpen(false);
+                        }}
+                      >
+                        Popular
+                      </button>
+                    </div>
                   </div>
                 </>
               )}
@@ -3830,9 +3820,48 @@ export const PublicEvents = () => {
               );
             })()}
           </div>
+        ) : bottomNavActive === 'home' ? (
+          <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+            <InshortsHomeFeed
+              feedItems={feedItems}
+              onFeedSwipeDirection={(direction) => {
+                setBottomNavVisible(direction === 'down');
+              }}
+              userId={user?.id}
+              likeCount={(id) =>
+                user
+                  ? (engagement?.likes?.[id] ?? publicEngagementCounts?.likes?.[id] ?? 0)
+                  : (publicEngagementCounts?.likes?.[id] ?? 0)}
+              commentCount={(id) =>
+                user
+                  ? (engagement?.commentCounts?.[id] ?? publicEngagementCounts?.commentCounts?.[id] ?? 0)
+                  : (publicEngagementCounts?.commentCounts?.[id] ?? 0)}
+              isLiked={(id) => !!user && (engagement?.likedByMe?.includes(id) ?? false)}
+              isSaved={(id) => !!user && (engagement?.savedByMe?.includes(id) ?? false)}
+              onLike={(eventId) => likeMutation.mutate(eventId)}
+              onSave={(eventId) => saveMutation.mutate(eventId)}
+              onCommentAdded={() => queryClient.invalidateQueries({ queryKey: ['public', 'events', 'engagement'] })}
+              onSponsoredClick={async (ad) => {
+                try {
+                  const r = await publicEventsService.recordSponsoredAdClick(ad.id);
+                  if (r.redirectUrl) window.open(r.redirectUrl, '_blank', 'noopener');
+                } catch {
+                  /* ignore */
+                }
+              }}
+              onBannerClick={async (b) => {
+                try {
+                  const r = await publicEventsService.recordBannerAdClick(b.id);
+                  if (r.redirectUrl) window.open(r.redirectUrl, '_blank', 'noopener');
+                } catch {
+                  /* ignore */
+                }
+              }}
+            />
+          </div>
         ) : (
           <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-            {feedItems.map((item) =>
+            {feedItems.map((item, feedIndex) =>
               item.type === 'event' ? (
                 <EventPostCard
                   key={item.event.id}
@@ -3846,21 +3875,11 @@ export const PublicEvents = () => {
                   onSave={() => saveMutation.mutate(item.event.id)}
                   onCommentAdded={() => queryClient.invalidateQueries({ queryKey: ['public', 'events', 'engagement'] })}
                 />
+              ) : item.type === 'sponsored' ? (
+                <SponsoredAdCard key={`sponsored-${feedIndex}-${item.ad.id}`} ad={item.ad} />
               ) : (
-                <SponsoredAdCard key={`sponsored-${item.ad.id}`} ad={item.ad} />
+                <BannerAdCard key={`banner-${feedIndex}-${item.banner.id}`} banner={item.banner} />
               ),
-            )}
-            {displayBannerAd && (
-              <div className="mt-3 mb-3 rounded-2 overflow-hidden border shadow-sm" style={{ backgroundColor: '#fff' }}>
-                <button
-                  type="button"
-                  className="border-0 p-0 w-100 bg-transparent d-block text-start"
-                  onClick={handleBannerAdClick}
-                  aria-label={displayBannerAd.externalLink ? 'Open ad link' : 'Ad'}
-                >
-                  <img src={imageSrc(displayBannerAd.imageUrl)} alt="Ad" style={{ width: '100%', height: 'auto', display: 'block', pointerEvents: 'none' }} />
-                </button>
-              </div>
             )}
           </div>
         )}
@@ -3883,6 +3902,10 @@ export const PublicEvents = () => {
           justifyContent: 'center',
           paddingLeft: '1rem',
           paddingRight: '1rem',
+          transform: bottomNavVisible ? 'translateY(0)' : 'translateY(120%)',
+          opacity: bottomNavVisible ? 1 : 0,
+          transition: 'transform 260ms ease, opacity 260ms ease',
+          pointerEvents: bottomNavVisible ? 'auto' : 'none',
         }}
       >
         <div
