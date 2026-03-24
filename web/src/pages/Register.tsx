@@ -268,7 +268,7 @@ export const Register = () => {
                       <div className="col-md-6">
                         <button
                           type="button"
-                          className="btn btn-outline-primary w-100 py-4 d-flex flex-column align-items-center"
+                          className="btn btn-outline-dark w-100 py-4 d-flex flex-column align-items-center"
                           style={{ borderRadius: '12px', borderWidth: '2px' }}
                           onClick={() => handleMethodSelect('school_domain')}
                         >

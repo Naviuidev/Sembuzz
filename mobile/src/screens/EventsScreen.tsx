@@ -3,6 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
+  Image,
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
@@ -17,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import FunnelIcon from 'react-native-bootstrap-icons/icons/funnel';
 import NewspaperIcon from 'react-native-bootstrap-icons/icons/newspaper';
+import BuildingIcon from 'react-native-bootstrap-icons/icons/building';
 import {
   getApprovedEvents,
   getCategoriesBySchool,
@@ -65,17 +67,23 @@ export default function EventsScreen() {
 
   const schoolId = user?.schoolId ?? null;
   const showCategories = !!user && !showAllSchools;
+  /** Logged-in All schools tab: show Latest/Popular as category-style pills, not the funnel menu. */
+  const allSchoolsSortInline = !!user && showAllSchools;
   const isMySchoolFeed = !!user && !showAllSchools && !!schoolId;
 
   const clearSubCategoryFilter = useCallback(() => setSelectedSubCategoryIds([]), []);
 
-  const onBannerAdPress = useCallback(async (banner: BannerAdPublic) => {
-    try {
-      const r = await recordBannerAdClick(banner.id);
-      if (r.redirectUrl) Linking.openURL(r.redirectUrl).catch(() => {});
-    } catch {
-      /* ignore */
+  /** Open URL immediately; record click in background (same redirect URL as API; avoids network delay). */
+  const onBannerAdPress = useCallback((banner: BannerAdPublic) => {
+    const url = banner.externalLink?.trim();
+    if (url) {
+      Linking.openURL(url).catch(() => {});
     }
+    void recordBannerAdClick(banner.id)
+      .then((r) => {
+        if (!url && r.redirectUrl) Linking.openURL(r.redirectUrl).catch(() => {});
+      })
+      .catch(() => {});
   }, []);
 
   const fetchEvents = useCallback(async () => {
@@ -213,6 +221,10 @@ export default function EventsScreen() {
   useEffect(() => {
     if (!showCategories) setExpandedCategoryId(null);
   }, [showCategories]);
+
+  useEffect(() => {
+    if (user && showAllSchools) setHomeFilterMenuOpen(false);
+  }, [user, showAllSchools]);
 
   const [engagementCounts, setEngagementCounts] = useState<{
     likes: Record<string, number>;
@@ -453,8 +465,14 @@ export default function EventsScreen() {
     );
   };
 
+  const mySchoolLogo = useMemo(() => {
+    if (!schoolId) return '';
+    const hit = events.find((e) => e.schoolId === schoolId && e.school?.image);
+    return hit?.school?.image ? imageSrc(hit.school.image) : '';
+  }, [events, schoolId]);
+
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* My school / All schools tabs — same order as web (above category + filter row) */}
       {user ? (
         <View style={styles.tabBar}>
@@ -462,24 +480,40 @@ export default function EventsScreen() {
             style={[styles.tab, showAllSchools ? null : styles.tabActive]}
             onPress={() => setShowAllSchools(false)}
           >
-            <Text style={[styles.tabText, showAllSchools ? styles.tabTextInactive : styles.tabTextActive]}>
-              My school
-            </Text>
+            <View style={styles.tabContent}>
+              {mySchoolLogo ? (
+                <Image source={{ uri: mySchoolLogo }} style={styles.tabSchoolLogo} />
+              ) : (
+                <View style={styles.tabSchoolLogoFallback}>
+                  <Text style={styles.tabSchoolLogoFallbackText}>
+                    {(user?.name?.trim()?.charAt(0) || 'S').toUpperCase()}
+                  </Text>
+                </View>
+              )}
+              <Text style={[styles.tabText, showAllSchools ? styles.tabTextInactive : styles.tabTextActive]}>
+                My school
+              </Text>
+            </View>
             {!showAllSchools && <View style={styles.tabUnderline} />}
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, showAllSchools ? styles.tabActive : null]}
             onPress={() => setShowAllSchools(true)}
           >
-            <Text style={[styles.tabText, showAllSchools ? styles.tabTextActive : styles.tabTextInactive]}>
-              All schools
-            </Text>
+            <View style={styles.tabContent}>
+              <View style={styles.tabSchoolLogoFallback}>
+                <BuildingIcon width={14} height={14} fill="#4b5563" />
+              </View>
+              <Text style={[styles.tabText, showAllSchools ? styles.tabTextActive : styles.tabTextInactive]}>
+                All schools
+              </Text>
+            </View>
             {showAllSchools && <View style={styles.tabUnderline} />}
           </TouchableOpacity>
         </View>
       ) : null}
 
-      {/* Categories + funnel — web: category pills open subcategory dropdown; funnel = Latest/Popular only */}
+      {/* My school: category pills + funnel (Latest/Popular). All schools (logged in): Latest/Popular pills only, no funnel. */}
       <View style={styles.homeFilterRow}>
         <ScrollView
           horizontal
@@ -487,98 +521,141 @@ export default function EventsScreen() {
           style={styles.categoriesStrip}
           contentContainerStyle={styles.categoriesStripContent}
         >
-          {showCategories && homeContentCategories.length > 0 && selectedSubCategoryIds.length > 0 ? (
-            <TouchableOpacity onPress={clearSubCategoryFilter} style={styles.clearCatsBtn}>
-              <Text style={styles.clearCatsText}>All</Text>
+          {allSchoolsSortInline ? (
+            <>
+              <TouchableOpacity
+                style={[
+                  styles.categoryMainPill,
+                  feedSort === 'latest' && styles.categoryMainPillEmphasis,
+                ]}
+                onPress={() => setFeedSort('latest')}
+                accessibilityLabel="Sort by latest"
+              >
+                <Text
+                  style={[
+                    styles.categoryMainPillText,
+                    feedSort === 'latest' && styles.categoryMainPillTextEmphasis,
+                  ]}
+                >
+                  Latest
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.categoryMainPill,
+                  feedSort === 'popular' && styles.categoryMainPillEmphasis,
+                ]}
+                onPress={() => setFeedSort('popular')}
+                accessibilityLabel="Sort by popular"
+              >
+                <Text
+                  style={[
+                    styles.categoryMainPillText,
+                    feedSort === 'popular' && styles.categoryMainPillTextEmphasis,
+                  ]}
+                >
+                  Popular
+                </Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              {showCategories && homeContentCategories.length > 0 && selectedSubCategoryIds.length > 0 ? (
+                <TouchableOpacity onPress={clearSubCategoryFilter} style={styles.clearCatsBtn}>
+                  <Text style={styles.clearCatsText}>All</Text>
+                </TouchableOpacity>
+              ) : null}
+              {showCategories && homeContentCategories.length > 0
+                ? homeContentCategories.map((cat) => {
+                    const hasSelection = selectedSubCategoryIds.some((id) =>
+                      (cat.subcategories ?? []).some((s) => s.id === id),
+                    );
+                    const isOpen = expandedCategoryId === cat.id;
+                    return (
+                      <TouchableOpacity
+                        key={cat.id}
+                        style={[
+                          styles.categoryMainPill,
+                          (hasSelection || isOpen) && styles.categoryMainPillEmphasis,
+                        ]}
+                        onPress={() => {
+                          setExpandedCategoryId((prev) => (prev === cat.id ? null : cat.id));
+                        }}
+                        accessibilityLabel={`Category ${cat.name}`}
+                      >
+                        <Text
+                          style={[
+                            styles.categoryMainPillText,
+                            (hasSelection || isOpen) && styles.categoryMainPillTextEmphasis,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {cat.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })
+                : null}
+            </>
+          )}
+        </ScrollView>
+        {!allSchoolsSortInline ? (
+          <View style={styles.filterFunnelWrap}>
+            <TouchableOpacity
+              style={[
+                styles.homeFilterBtn,
+                (homeFilterMenuOpen || feedSort !== 'latest') && styles.homeFilterBtnActive,
+              ]}
+              onPress={() => setHomeFilterMenuOpen((o) => !o)}
+              accessibilityLabel="Filter: Latest, Popular"
+            >
+              <FunnelIcon
+                width={22}
+                height={22}
+                fill={homeFilterMenuOpen ? '#087990' : '#6c757d'}
+              />
             </TouchableOpacity>
-          ) : null}
-          {showCategories && homeContentCategories.length > 0
-            ? homeContentCategories.map((cat) => {
-                const hasSelection = selectedSubCategoryIds.some((id) =>
-                  (cat.subcategories ?? []).some((s) => s.id === id),
-                );
-                const isOpen = expandedCategoryId === cat.id;
-                return (
+            {homeFilterMenuOpen ? (
+              <View style={styles.sortDropdown} pointerEvents="box-none">
+                <View style={styles.sortDropdownHeaderRow}>
+                  <Text style={styles.sortDropdownLabel}>Filter</Text>
                   <TouchableOpacity
-                    key={cat.id}
-                    style={[
-                      styles.categoryMainPill,
-                      (hasSelection || isOpen) && styles.categoryMainPillEmphasis,
-                    ]}
-                    onPress={() => {
-                      setExpandedCategoryId((prev) => (prev === cat.id ? null : cat.id));
-                    }}
-                    accessibilityLabel={`Category ${cat.name}`}
+                    onPress={() => setHomeFilterMenuOpen(false)}
+                    hitSlop={8}
+                    accessibilityLabel="Close filter"
                   >
-                    <Text
-                      style={[
-                        styles.categoryMainPillText,
-                        (hasSelection || isOpen) && styles.categoryMainPillTextEmphasis,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {cat.name}
+                    <Text style={styles.sortDropdownClose}>×</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.sortDropdownSubLabel}>Sort</Text>
+                <View style={styles.sortPillRow}>
+                  <TouchableOpacity
+                    style={[styles.sortPillSm, feedSort === 'latest' && styles.sortPillSmActive]}
+                    onPress={() => {
+                      setFeedSort('latest');
+                      setHomeFilterMenuOpen(false);
+                    }}
+                  >
+                    <Text style={[styles.sortPillSmText, feedSort === 'latest' && styles.sortPillSmTextActive]}>
+                      Latest
                     </Text>
                   </TouchableOpacity>
-                );
-              })
-            : null}
-        </ScrollView>
-        <View style={styles.filterFunnelWrap}>
-          <TouchableOpacity
-            style={[
-              styles.homeFilterBtn,
-              (homeFilterMenuOpen || feedSort !== 'latest') && styles.homeFilterBtnActive,
-            ]}
-            onPress={() => setHomeFilterMenuOpen((o) => !o)}
-            accessibilityLabel="Filter: Latest, Popular"
-          >
-            <FunnelIcon
-              width={22}
-              height={22}
-              fill={homeFilterMenuOpen ? '#087990' : '#6c757d'}
-            />
-          </TouchableOpacity>
-          {homeFilterMenuOpen ? (
-            <View style={styles.sortDropdown} pointerEvents="box-none">
-              <View style={styles.sortDropdownHeaderRow}>
-                <Text style={styles.sortDropdownLabel}>Filter</Text>
-                <TouchableOpacity
-                  onPress={() => setHomeFilterMenuOpen(false)}
-                  hitSlop={8}
-                  accessibilityLabel="Close filter"
-                >
-                  <Text style={styles.sortDropdownClose}>×</Text>
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.sortPillSm, feedSort === 'popular' && styles.sortPillSmActive]}
+                    onPress={() => {
+                      setFeedSort('popular');
+                      setHomeFilterMenuOpen(false);
+                    }}
+                  >
+                    <Text style={[styles.sortPillSmText, feedSort === 'popular' && styles.sortPillSmTextActive]}>
+                      Popular
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-              <Text style={styles.sortDropdownSubLabel}>Sort</Text>
-              <View style={styles.sortPillRow}>
-                <TouchableOpacity
-                  style={[styles.sortPillSm, feedSort === 'latest' && styles.sortPillSmActive]}
-                  onPress={() => {
-                    setFeedSort('latest');
-                    setHomeFilterMenuOpen(false);
-                  }}
-                >
-                  <Text style={[styles.sortPillSmText, feedSort === 'latest' && styles.sortPillSmTextActive]}>
-                    Latest
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.sortPillSm, feedSort === 'popular' && styles.sortPillSmActive]}
-                  onPress={() => {
-                    setFeedSort('popular');
-                    setHomeFilterMenuOpen(false);
-                  }}
-                >
-                  <Text style={[styles.sortPillSmText, feedSort === 'popular' && styles.sortPillSmTextActive]}>
-                    Popular
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : null}
-        </View>
+            ) : null}
+          </View>
+        ) : null}
       </View>
 
       {error ? (
@@ -1048,6 +1125,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tabActive: {},
+  tabContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  tabSchoolLogo: {
+    width: 20,
+    height: 20,
+    borderRadius: 999,
+    backgroundColor: '#fff',
+  },
+  tabSchoolLogoFallback: {
+    width: 20,
+    height: 20,
+    borderRadius: 999,
+    backgroundColor: '#e5e7eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabSchoolLogoFallbackText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#374151',
+  },
   tabText: {
     fontSize: 15,
     fontWeight: '600',

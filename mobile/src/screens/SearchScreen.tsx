@@ -316,7 +316,7 @@ export default function SearchScreen() {
   const showFullCards = selectedSchoolId && !selectedEvent;
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Search bar row: search input then filter button on the right (opens filter popup) */}
       <View style={styles.headerStrip}>
         <TextInput
@@ -333,7 +333,7 @@ export default function SearchScreen() {
           onPress={openFilterPopup}
           accessibilityLabel="Filter options"
         >
-          <FunnelIcon width={FILTER_ICON_SIZE} height={FILTER_ICON_SIZE} fill="#fff" />
+          <FunnelIcon width={FILTER_ICON_SIZE} height={FILTER_ICON_SIZE} fill="#1a1f2e" />
         </TouchableOpacity>
       </View>
 
@@ -586,13 +586,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     gap: 10,
-    marginTop: 4,
+    marginTop: 2,
   },
   headerFilterBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#000',
+    width: 44,
+    height: 44,
+    borderRadius: 999,
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#eceef2',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,

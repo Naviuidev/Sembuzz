@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,29 +14,45 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
-  DeviceEventEmitter,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import PersonPlusIcon from 'react-native-bootstrap-icons/icons/person-plus';
 import { FontAwesome5 } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import type { RootStackParamList } from '../navigation/types';
 import { useAuth } from '../contexts/AuthContext';
-import { getApprovedEvents, getCategoriesBySchool, imageSrc, ApprovedEventPublic, CategoryPublic } from '../services/events';
+import { getApprovedEvents, imageSrc, ApprovedEventPublic } from '../services/events';
 import { getFrontendBaseUrl } from '../config/env';
-import {
-  getUserSubCategoryIds,
-  setUserCategoryDone,
-  setUserSubCategoryIds,
-} from '../utils/userCategoryPrefs';
-import { userNotificationsService } from '../services/userNotifications';
 import { userHelpService, type UserHelpQueryItem } from '../services/userHelp';
-import { CATEGORY_PREFS_CHANGED } from '../constants/appEvents';
+import SignUpModal from '../components/SignUpModal';
+import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 
 const BASE_URL = getFrontendBaseUrl();
+
+/** Gradient ring + inner circle — makes the avatar read clearly as a tappable control. */
+const PROFILE_AVATAR_RING = 64;
+const PROFILE_AVATAR_STROKE = 6;
+const PROFILE_AVATAR_INNER = 52;
+/** Circle radius (stroke is centered on this path). */
+const PROFILE_AVATAR_R = PROFILE_AVATAR_RING / 2 - PROFILE_AVATAR_STROKE / 2;
+const PROFILE_AVATAR_GRAD_ID = 'settingsProfileAvatarRing';
 
 export default function SettingsScreen() {
   const navigation = useNavigation();
   const { user, login, logout, loading: authLoading } = useAuth();
+
+  /** Root stack screens (Liked/Saved/Profile) — Settings lives in a nested stack under the tab. */
+  const navigateRoot = useCallback(
+    <K extends keyof RootStackParamList>(name: K) => {
+      const tab = navigation.getParent();
+      const root = tab?.getParent?.();
+      if (root && typeof (root as { navigate?: unknown }).navigate === 'function') {
+        (root as { navigate: (n: K) => void }).navigate(name);
+      }
+    },
+    [navigation],
+  );
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -45,12 +61,9 @@ export default function SettingsScreen() {
   const [recentLoading, setRecentLoading] = useState(false);
   const [recentError, setRecentError] = useState<string | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showSignUpModal, setShowSignUpModal] = useState(false);
+  const [loginInfoMessage, setLoginInfoMessage] = useState<string | null>(null);
   const [profileImageFailed, setProfileImageFailed] = useState(false);
-
-  const [showChangeCategoryModal, setShowChangeCategoryModal] = useState(false);
-  const [categoriesForModal, setCategoriesForModal] = useState<CategoryPublic[]>([]);
-  const [categoriesModalLoading, setCategoriesModalLoading] = useState(false);
-  const [changeCategorySelectedIds, setChangeCategorySelectedIds] = useState<string[]>([]);
 
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [helpMessage, setHelpMessage] = useState('');
@@ -58,6 +71,8 @@ export default function SettingsScreen() {
   const [helpError, setHelpError] = useState<string | null>(null);
   const [helpQueries, setHelpQueries] = useState<UserHelpQueryItem[]>([]);
   const [helpQueriesLoading, setHelpQueriesLoading] = useState(false);
+  const [selectedAction, setSelectedAction] = useState<'categories' | 'liked' | 'saved' | 'help'>('categories');
+  const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState(false);
 
   const profileImageUrl = (() => {
     const candidate =
@@ -112,81 +127,14 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleLogout = () => {
-    Alert.alert('Log out', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Log out', style: 'destructive', onPress: logout },
-    ]);
-  };
-
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete account',
-      'Account deletion must be done on the web. Open SemBuzz in a browser to delete your account.',
-      [{ text: 'OK' }],
-    );
-  };
-
-  const openChangeCategoryModal = useCallback(async () => {
-    if (!user?.schoolId) {
-      Alert.alert('School required', 'Your account must be linked to a school to change categories.');
-      return;
+  const confirmLogout = useCallback(async () => {
+    setShowLogoutConfirmModal(false);
+    await logout();
+    const tabNav = navigation.getParent();
+    if (tabNav && typeof (tabNav as { navigate?: unknown }).navigate === 'function') {
+      (tabNav as { navigate: (name: string) => void }).navigate('Events');
     }
-    if (!user?.id) return;
-    setCategoriesModalLoading(true);
-    try {
-      const cats = await getCategoriesBySchool(user.schoolId);
-      let ids = await getUserSubCategoryIds(user.id);
-      try {
-        const remote = await userNotificationsService.getSubcategories();
-        if (remote.subCategoryIds.length > 0) {
-          ids = remote.subCategoryIds;
-          await setUserSubCategoryIds(user.id, ids);
-        }
-      } catch {
-        /* offline or API unavailable — keep local prefs */
-      }
-      setCategoriesForModal(Array.isArray(cats) ? cats : []);
-      setChangeCategorySelectedIds(ids);
-      setShowChangeCategoryModal(true);
-    } catch {
-      Alert.alert('Error', 'Could not load categories. Try again.');
-    } finally {
-      setCategoriesModalLoading(false);
-    }
-  }, [user?.id, user?.schoolId]);
-
-  const toggleChangeCategorySub = useCallback((subId: string) => {
-    setChangeCategorySelectedIds((prev) =>
-      prev.includes(subId) ? prev.filter((id) => id !== subId) : [...prev, subId],
-    );
-  }, []);
-
-  const saveChangeCategory = useCallback(async () => {
-    if (!user?.id) return;
-    setCategoriesModalLoading(true);
-    try {
-      await setUserCategoryDone(user.id, 'true');
-      await setUserSubCategoryIds(user.id, changeCategorySelectedIds);
-      try {
-        await userNotificationsService.setSubcategories(changeCategorySelectedIds);
-      } catch {
-        /* feed prefs still saved locally; push targeting may be out of sync until next successful sync */
-      }
-      setShowChangeCategoryModal(false);
-      DeviceEventEmitter.emit(CATEGORY_PREFS_CHANGED);
-      Alert.alert('Saved', 'Your category preferences were updated.');
-    } catch {
-      Alert.alert('Error', 'Could not save. Try again.');
-    } finally {
-      setCategoriesModalLoading(false);
-    }
-  }, [user?.id, changeCategorySelectedIds]);
-
-  const closeChangeCategoryModal = useCallback(() => {
-    setShowChangeCategoryModal(false);
-    setChangeCategorySelectedIds([]);
-  }, []);
+  }, [logout, navigation]);
 
   const loadHelpQueries = useCallback(async () => {
     setHelpQueriesLoading(true);
@@ -229,9 +177,49 @@ export default function SettingsScreen() {
     }
   }, [helpMessage, loadHelpQueries]);
 
+  const runSelectedAction = useCallback(() => {
+    if (selectedAction === 'categories') {
+      if (!user?.schoolId) {
+        Alert.alert('School required', 'Your account must be linked to a school to change categories.');
+        return;
+      }
+      navigation.navigate('ChangeCategories' as never);
+      return;
+    }
+    if (selectedAction === 'liked') {
+      navigateRoot('LikedNews');
+      return;
+    }
+    if (selectedAction === 'saved') {
+      navigateRoot('SavedNews');
+      return;
+    }
+    if (selectedAction === 'help') {
+      openHelpModal();
+      return;
+    }
+  }, [selectedAction, user?.schoolId, navigation, navigateRoot, openHelpModal]);
+
+  const selectedActionMeta = useMemo(() => {
+    switch (selectedAction) {
+      case 'categories':
+        return {
+          title: 'Change categories',
+          subtitle: 'Update your preferred categories and subcategories.',
+          cta: 'Open categories',
+        };
+      case 'liked':
+        return { title: 'Liked news', subtitle: 'Review news posts you have liked.', cta: 'Open liked news' };
+      case 'saved':
+        return { title: 'Saved news', subtitle: 'Open your saved news collection.', cta: 'Open saved news' };
+      case 'help':
+        return { title: 'Help', subtitle: 'Raise a query to your school admin.', cta: 'Raise query' };
+    }
+  }, [selectedAction]);
+
   if (authLoading) {
     return (
-      <SafeAreaView style={styles.container} edges={['bottom']}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#1a1f2e" />
         </View>
@@ -241,60 +229,102 @@ export default function SettingsScreen() {
 
   if (user) {
     return (
-      <SafeAreaView style={styles.container} edges={['bottom']}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.profileRow}>
-            {profileImageUrl && !profileImageFailed ? (
-              <Image
-                source={{ uri: profileImageUrl }}
-                style={styles.avatarImage}
-                onError={() => setProfileImageFailed(true)}
-              />
-            ) : (
-              <View style={styles.avatarPlaceholder}>
-                <Text style={styles.avatarLetter}>{user.name?.charAt(0) ?? '?'}</Text>
+            <TouchableOpacity
+              onPress={() => navigateRoot('Profile')}
+              activeOpacity={0.85}
+              accessibilityLabel="Open profile screen"
+              accessibilityRole="button"
+              style={styles.avatarRingTouchable}
+            >
+              <View style={styles.avatarRingOuter}>
+                <Svg
+                  width={PROFILE_AVATAR_RING}
+                  height={PROFILE_AVATAR_RING}
+                  style={styles.avatarRingSvg}
+                >
+                  <Defs>
+                    <LinearGradient id={PROFILE_AVATAR_GRAD_ID} x1="0%" y1="0%" x2="100%" y2="100%">
+                      <Stop offset="0%" stopColor="#ff8c42" />
+                      <Stop offset="45%" stopColor="#4dabf7" />
+                      <Stop offset="100%" stopColor="#a855f7" />
+                    </LinearGradient>
+                  </Defs>
+                  <Circle
+                    cx={PROFILE_AVATAR_RING / 2}
+                    cy={PROFILE_AVATAR_RING / 2}
+                    r={PROFILE_AVATAR_R}
+                    stroke={`url(#${PROFILE_AVATAR_GRAD_ID})`}
+                    strokeWidth={PROFILE_AVATAR_STROKE}
+                    fill="none"
+                  />
+                </Svg>
+                {profileImageUrl && !profileImageFailed ? (
+                  <Image
+                    source={{ uri: profileImageUrl }}
+                    style={styles.avatarImageInner}
+                    onError={() => setProfileImageFailed(true)}
+                  />
+                ) : (
+                  <View style={styles.avatarPlaceholderInner}>
+                    <Text style={styles.avatarLetter}>{user.name?.charAt(0) ?? '?'}</Text>
+                  </View>
+                )}
               </View>
-            )}
+            </TouchableOpacity>
             <View style={styles.profileText}>
-              <Text style={styles.userName}>{user.name ?? 'User'}</Text>
+              <View style={styles.nameRow}>
+                <Text style={styles.userName} numberOfLines={1}>
+                  {user.name ?? 'User'}
+                </Text>
+                <TouchableOpacity
+                  style={styles.logoutHeaderBtn}
+                  onPress={() => setShowLogoutConfirmModal(true)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityLabel="Log out"
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="log-out-outline" size={22} color="#1a1f2e" />
+                </TouchableOpacity>
+              </View>
               <Text style={styles.userEmail}>{user.email}</Text>
             </View>
           </View>
 
-          <View style={styles.actionsGrid}>
+          <View style={styles.actionsIconRow}>
             <TouchableOpacity
-              style={[styles.actionButton, styles.actionGreen]}
-              onPress={openChangeCategoryModal}
-              disabled={categoriesModalLoading}
+              style={[styles.actionIconBtn, selectedAction === 'categories' && styles.actionIconBtnActive]}
+              onPress={() => setSelectedAction('categories')}
             >
-              <Text style={styles.actionIcon}>📁</Text>
-              <Text style={styles.actionLabel}>Change categories</Text>
+              <Ionicons name={selectedAction === 'categories' ? 'folder' : 'folder-outline'} size={20} color="#1a1f2e" />
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.actionButton, styles.actionBlue]}
-              onPress={() => navigation.navigate('LikedNews' as never)}
+              style={[styles.actionIconBtn, selectedAction === 'liked' && styles.actionIconBtnActive]}
+              onPress={() => setSelectedAction('liked')}
             >
-              <Text style={styles.actionIcon}>❤️</Text>
-              <Text style={styles.actionLabel}>Liked news</Text>
+              <Ionicons name={selectedAction === 'liked' ? 'heart' : 'heart-outline'} size={20} color="#1a1f2e" />
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.actionButton, styles.actionBlue]}
-              onPress={() => navigation.navigate('SavedNews' as never)}
+              style={[styles.actionIconBtn, selectedAction === 'saved' && styles.actionIconBtnActive]}
+              onPress={() => setSelectedAction('saved')}
             >
-              <Text style={styles.actionIcon}>🔖</Text>
-              <Text style={styles.actionLabel}>Saved news</Text>
+              <Ionicons name={selectedAction === 'saved' ? 'bookmark' : 'bookmark-outline'} size={20} color="#1a1f2e" />
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionButton, styles.actionRed]} onPress={handleLogout}>
-              <Text style={styles.actionIcon}>↪</Text>
-              <Text style={styles.actionLabel}>Sign out</Text>
+            <TouchableOpacity
+              style={[styles.actionIconBtn, selectedAction === 'help' && styles.actionIconBtnActive]}
+              onPress={() => setSelectedAction('help')}
+            >
+              <Ionicons name={selectedAction === 'help' ? 'help-circle' : 'help-circle-outline'} size={20} color="#1a1f2e" />
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionButton, styles.actionOrange]} onPress={openHelpModal}>
-              <Text style={styles.actionIcon}>?</Text>
-              <Text style={styles.actionLabel}>Help — raise a query to school admin</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionButton, styles.actionGray]} onPress={handleDeleteAccount}>
-              <Text style={styles.actionIcon}>🗑</Text>
-              <Text style={styles.actionLabel}>Delete account</Text>
+          </View>
+
+          <View style={styles.selectedActionPanel}>
+            <Text style={styles.selectedActionTitle}>{selectedActionMeta.title}</Text>
+            <Text style={styles.selectedActionSubtitle}>{selectedActionMeta.subtitle}</Text>
+            <TouchableOpacity style={styles.selectedActionCta} onPress={runSelectedAction}>
+              <Text style={styles.selectedActionCtaText}>{selectedActionMeta.cta}</Text>
             </TouchableOpacity>
           </View>
 
@@ -335,75 +365,31 @@ export default function SettingsScreen() {
           </View>
         </ScrollView>
 
-        {/* Change categories — same data as web / Events first-login; stays on Settings */}
         <Modal
-          visible={showChangeCategoryModal}
+          visible={showLogoutConfirmModal}
           animationType="fade"
           transparent
-          onRequestClose={closeChangeCategoryModal}
+          onRequestClose={() => setShowLogoutConfirmModal(false)}
         >
-          <View style={styles.overlayDim}>
-            <ScrollView
-              style={styles.categoryModalScroll}
-              contentContainerStyle={styles.categoryModalScrollContent}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              <View style={styles.categoryModalHeaderRow}>
-                <Text style={styles.categoryModalTitle}>Change your categories</Text>
-                <TouchableOpacity onPress={closeChangeCategoryModal} hitSlop={12} accessibilityLabel="Close">
-                  <Text style={styles.categoryModalClose}>×</Text>
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.categoryModalDesc}>
-                Choose the categories and subcategories you want to see in your home feed.
+          <Pressable style={styles.overlayDim} onPress={() => setShowLogoutConfirmModal(false)}>
+            <Pressable style={styles.logoutNotifyCard} onPress={(e) => e.stopPropagation()}>
+              <Text style={styles.logoutNotifyTitle}>Log out</Text>
+              <Text style={styles.logoutNotifyMessage}>
+                Are you sure you want to log out from your account?
               </Text>
-              {categoriesModalLoading && categoriesForModal.length === 0 ? (
-                <ActivityIndicator color="#1a1f2e" style={{ marginVertical: 24 }} />
-              ) : categoriesForModal.length === 0 ? (
-                <Text style={styles.mutedSmall}>No categories available for your school yet.</Text>
-              ) : (
-                categoriesForModal.map((cat) => (
-                  <View key={cat.id} style={styles.categoryBlock}>
-                    <Text style={styles.categoryBlockTitle}>{cat.name}</Text>
-                    <View style={styles.categorySubRow}>
-                      {(cat.subcategories ?? []).map((sub) => {
-                        const isSelected = changeCategorySelectedIds.includes(sub.id);
-                        return (
-                          <TouchableOpacity
-                            key={sub.id}
-                            style={[styles.subCatPill, isSelected ? styles.subCatPillOn : styles.subCatPillOff]}
-                            onPress={() => toggleChangeCategorySub(sub.id)}
-                            activeOpacity={0.85}
-                          >
-                            <Text style={[styles.subCatPillText, isSelected && styles.subCatPillTextOn]}>
-                              {sub.name}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  </View>
-                ))
-              )}
-              <View style={styles.categoryModalActions}>
+              <View style={styles.logoutNotifyActions}>
                 <TouchableOpacity
-                  style={styles.catCancelBtn}
-                  onPress={closeChangeCategoryModal}
-                  disabled={categoriesModalLoading}
+                  style={styles.logoutNotifyCancel}
+                  onPress={() => setShowLogoutConfirmModal(false)}
                 >
-                  <Text style={styles.catCancelBtnText}>Cancel</Text>
+                  <Text style={styles.logoutNotifyCancelText}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.catSaveBtn, categoriesModalLoading && styles.buttonDisabled]}
-                  onPress={saveChangeCategory}
-                  disabled={categoriesModalLoading}
-                >
-                  <Text style={styles.catSaveBtnText}>{categoriesModalLoading ? 'Saving…' : 'Save'}</Text>
+                <TouchableOpacity style={styles.logoutNotifyConfirm} onPress={() => void confirmLogout()}>
+                  <Text style={styles.logoutNotifyConfirmText}>Log out</Text>
                 </TouchableOpacity>
               </View>
-            </ScrollView>
-          </View>
+            </Pressable>
+          </Pressable>
         </Modal>
 
         {/* Help — raise query (same API as web) */}
@@ -471,11 +457,20 @@ export default function SettingsScreen() {
 
   const openRegister = () => {
     setShowLoginModal(false);
-    Linking.openURL(`${BASE_URL}/register`).catch(() => {});
+    setShowSignUpModal(true);
+  };
+
+  const handleSignUpCompleteGoToLogin = (payload: { email: string; infoMessage?: string }) => {
+    setShowSignUpModal(false);
+    setEmail(payload.email);
+    setPassword('');
+    setLoginInfoMessage(payload.infoMessage ?? null);
+    setError(null);
+    setShowLoginModal(true);
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.card}>
           <View style={styles.loginPromptRow}>
@@ -490,14 +485,17 @@ export default function SettingsScreen() {
           <View style={styles.loginButtonsRow}>
             <TouchableOpacity
               style={styles.loginButton}
-              onPress={() => setShowLoginModal(true)}
+              onPress={() => {
+                setLoginInfoMessage(null);
+                setShowLoginModal(true);
+              }}
             >
               <FontAwesome5 name="sign-in-alt" size={16} color="#fff" />
               <Text style={styles.loginButtonText}>Login</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.signUpButton}
-              onPress={openRegister}
+              onPress={() => setShowSignUpModal(true)}
             >
               <PersonPlusIcon width={18} height={18} fill="#1a1f2e" />
               <Text style={[styles.signUpButtonText, { marginLeft: 6 }]}>Sign up</Text>
@@ -543,24 +541,47 @@ export default function SettingsScreen() {
       </ScrollView>
 
       {/* Login modal — matches web: Sembuzz, Login to your Account, Email, Password, Sign in, Create new account? Sign up, Privacy, Terms, Cancel */}
+      <SignUpModal
+        visible={showSignUpModal}
+        onClose={() => setShowSignUpModal(false)}
+        onCompleteGoToLogin={handleSignUpCompleteGoToLogin}
+      />
+
       <Modal visible={showLoginModal} transparent animationType="fade">
-        <Pressable style={styles.modalOverlay} onPress={() => setShowLoginModal(false)}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => {
+            setLoginInfoMessage(null);
+            setShowLoginModal(false);
+          }}
+        >
           <Pressable style={styles.modalBox} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
               <View style={{ flex: 1 }} />
-              <TouchableOpacity onPress={() => setShowLoginModal(false)} hitSlop={12}>
+              <TouchableOpacity
+                onPress={() => {
+                  setLoginInfoMessage(null);
+                  setShowLoginModal(false);
+                }}
+                hitSlop={12}
+              >
                 <Text style={styles.modalClose}>×</Text>
               </TouchableOpacity>
             </View>
             <Text style={styles.modalBrand}>Sembuzz</Text>
             <Text style={styles.modalTitle}>Login to your Account</Text>
+            {loginInfoMessage ? <Text style={styles.modalInfoBanner}>{loginInfoMessage}</Text> : null}
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
               <TextInput
                 style={styles.modalInput}
                 placeholder="Email"
                 placeholderTextColor="#8e8e8e"
                 value={email}
-                onChangeText={(t) => { setEmail(t); setError(null); }}
+                onChangeText={(t) => {
+                  setEmail(t);
+                  setError(null);
+                  setLoginInfoMessage(null);
+                }}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 autoComplete="email"
@@ -570,7 +591,11 @@ export default function SettingsScreen() {
                 placeholder="Password"
                 placeholderTextColor="#8e8e8e"
                 value={password}
-                onChangeText={(t) => { setPassword(t); setError(null); }}
+                onChangeText={(t) => {
+                  setPassword(t);
+                  setError(null);
+                  setLoginInfoMessage(null);
+                }}
                 secureTextEntry
                 autoComplete="password"
               />
@@ -596,7 +621,13 @@ export default function SettingsScreen() {
                 <Text style={styles.modalLegalLink}>Terms and conditions</Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={() => setShowLoginModal(false)} style={styles.modalCancel}>
+            <TouchableOpacity
+              onPress={() => {
+                setLoginInfoMessage(null);
+                setShowLoginModal(false);
+              }}
+              style={styles.modalCancel}
+            >
               <Text style={styles.modalCancelText}>Cancel</Text>
             </TouchableOpacity>
           </Pressable>
@@ -730,18 +761,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  avatarPlaceholder: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  avatarRingTouchable: {
+    borderRadius: PROFILE_AVATAR_RING / 2,
+  },
+  avatarRingOuter: {
+    width: PROFILE_AVATAR_RING,
+    height: PROFILE_AVATAR_RING,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarRingSvg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
+  avatarPlaceholderInner: {
+    width: PROFILE_AVATAR_INNER,
+    height: PROFILE_AVATAR_INNER,
+    borderRadius: PROFILE_AVATAR_INNER / 2,
     backgroundColor: '#e9ecef',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarImage: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  avatarImageInner: {
+    width: PROFILE_AVATAR_INNER,
+    height: PROFILE_AVATAR_INNER,
+    borderRadius: PROFILE_AVATAR_INNER / 2,
     backgroundColor: '#e9ecef',
   },
   avatarLetter: {
@@ -752,21 +797,78 @@ const styles = StyleSheet.create({
   profileText: {
     marginLeft: 16,
     flex: 1,
+    minWidth: 0,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
   },
   userName: {
+    flex: 1,
     fontSize: 18,
     fontWeight: '700',
     color: '#1a1f2e',
+  },
+  logoutHeaderBtn: {
+    padding: 4,
+    borderRadius: 8,
   },
   userEmail: {
     fontSize: 14,
     color: '#6c757d',
     marginTop: 4,
   },
-  actionsGrid: {
+  actionsIconRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     gap: 10,
+    marginBottom: 12,
+  },
+  actionIconBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#eef1f6',
+  },
+  actionIconBtnActive: {
+    backgroundColor: '#dbe7ff',
+  },
+  selectedActionPanel: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#e4e7ee',
+    backgroundColor: '#f9fbff',
+    padding: 14,
+    marginBottom: 4,
+  },
+  selectedActionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1a1f2e',
+    marginBottom: 4,
+  },
+  selectedActionSubtitle: {
+    fontSize: 13,
+    color: '#5f6b7a',
+    lineHeight: 18,
+  },
+  selectedActionCta: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: '#1a1f2e',
+  },
+  selectedActionCtaText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
   },
   actionButton: {
     flexDirection: 'row',
@@ -886,9 +988,6 @@ const styles = StyleSheet.create({
     shadowRadius: 32,
     elevation: 8,
   },
-  signupModalBox: {
-    maxWidth: 420,
-  },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -912,6 +1011,17 @@ const styles = StyleSheet.create({
     color: '#495057',
     textAlign: 'center',
     marginBottom: 20,
+  },
+  modalInfoBanner: {
+    fontSize: 14,
+    color: '#0f5132',
+    backgroundColor: '#d1e7dd',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+    lineHeight: 20,
+    textAlign: 'center',
   },
   modalInput: {
     borderWidth: 1,
@@ -976,108 +1086,59 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 100,
   },
-  categoryModalScroll: {
-    maxHeight: '88%',
-  },
-  categoryModalScrollContent: {
+  logoutNotifyCard: {
+    width: '100%',
+    maxWidth: 340,
+    alignSelf: 'center',
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 8,
     borderWidth: 1,
-    borderColor: '#eee',
+    borderColor: '#eef0f3',
   },
-  categoryModalHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  categoryModalTitle: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: '600',
+  logoutNotifyTitle: {
+    fontSize: 17,
+    fontWeight: '700',
     color: '#1a1f2e',
-    paddingRight: 8,
-  },
-  categoryModalClose: {
-    fontSize: 26,
-    color: '#6c757d',
-    lineHeight: 28,
-  },
-  categoryModalDesc: {
-    fontSize: 14,
-    color: '#6c757d',
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  mutedSmall: {
-    fontSize: 14,
-    color: '#6c757d',
-    marginBottom: 12,
-  },
-  categoryBlock: {
-    marginBottom: 14,
-  },
-  categoryBlockTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#212529',
     marginBottom: 8,
   },
-  categorySubRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  logoutNotifyMessage: {
+    fontSize: 14,
+    color: '#5f6b7a',
+    lineHeight: 20,
+    marginBottom: 18,
   },
-  subCatPill: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  subCatPillOff: {
-    borderColor: '#212529',
-    backgroundColor: 'transparent',
-  },
-  subCatPillOn: {
-    borderColor: '#212529',
-    backgroundColor: '#212529',
-  },
-  subCatPillText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#212529',
-  },
-  subCatPillTextOn: {
-    color: '#fff',
-  },
-  categoryModalActions: {
+  logoutNotifyActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    alignItems: 'center',
     gap: 10,
-    marginTop: 20,
-    flexWrap: 'wrap',
   },
-  catCancelBtn: {
+  logoutNotifyCancel: {
     paddingVertical: 10,
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#212529',
+    borderColor: '#ced4da',
     backgroundColor: '#fff',
   },
-  catCancelBtnText: {
+  logoutNotifyCancelText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
+    color: '#6c757d',
   },
-  catSaveBtn: {
+  logoutNotifyConfirm: {
     paddingVertical: 10,
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     borderRadius: 10,
-    backgroundColor: '#212529',
+    backgroundColor: '#dc3545',
   },
-  catSaveBtnText: {
+  logoutNotifyConfirmText: {
     fontSize: 15,
     fontWeight: '600',
     color: '#fff',
@@ -1177,53 +1238,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#fff',
     fontWeight: '600',
-  },
-  signupModalHeading: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1f2e',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  signupModalSub: {
-    fontSize: 14,
-    color: '#6c757d',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  signupOption: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#212529',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 12,
-    alignItems: 'center',
-  },
-  signupOptionOutline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#212529',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    alignItems: 'center',
-  },
-  signupOptionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1f2e',
-    marginBottom: 4,
-  },
-  signupOptionDesc: {
-    fontSize: 13,
-    color: '#6c757d',
-    textAlign: 'center',
-  },
-  signupOptionG: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1a1f2e',
-    marginBottom: 8,
   },
 });

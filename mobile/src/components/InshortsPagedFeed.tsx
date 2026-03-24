@@ -353,9 +353,13 @@ function InshortsSponsoredPage({ ad, pageHeight }: { ad: SponsoredAdPublic; page
   }, [ad.id]);
 
   const onPress = () => {
-    recordSponsoredAdClick(ad.id)
+    const url = ad.externalLink?.trim();
+    if (url) {
+      Linking.openURL(url).catch(() => {});
+    }
+    void recordSponsoredAdClick(ad.id)
       .then((r) => {
-        if (r.redirectUrl) Linking.openURL(r.redirectUrl).catch(() => {});
+        if (!url && r.redirectUrl) Linking.openURL(r.redirectUrl).catch(() => {});
       })
       .catch(() => {});
   };

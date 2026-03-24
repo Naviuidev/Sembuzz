@@ -3,6 +3,8 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,9 +17,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
 import { api } from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
+import type { RootStackParamList } from '../navigation/types';
 import { imageSrc } from '../utils/image';
+import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
+
+const EDIT_AVATAR_RING = 64;
+const EDIT_AVATAR_STROKE = 6;
+const EDIT_AVATAR_INNER = 52;
+const EDIT_AVATAR_R = EDIT_AVATAR_RING / 2 - EDIT_AVATAR_STROKE / 2;
+const EDIT_AVATAR_GRAD_ID = 'editProfileAvatarRing';
 
 type UpdateProfileResponse = {
   id: string;
@@ -32,7 +45,8 @@ type UpdateProfileResponse = {
 };
 
 export default function EditProfileScreen() {
-  const { user, setUser } = useAuth();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { user, setUser, logout } = useAuth();
   const [firstName, setFirstName] = useState(
     user?.firstName?.trim() || user?.name?.split(' ').slice(0, 1).join(' ') || '',
   );
@@ -117,6 +131,8 @@ export default function EditProfileScreen() {
       }
     }
 
+    const passwordChangeRequested = changePassword;
+
     setSaving(true);
     setError(null);
     try {
@@ -126,7 +142,7 @@ export default function EditProfileScreen() {
         profilePicUrl: profilePicUrl.trim(),
       };
 
-      if (changePassword) {
+      if (passwordChangeRequested) {
         payload.currentPassword = currentPassword;
         payload.newPassword = newPassword;
         payload.confirmPassword = confirmPassword;
@@ -134,6 +150,26 @@ export default function EditProfileScreen() {
 
       const res = await api.post<UpdateProfileResponse>('/user/auth/update-profile', payload);
       const updatedUser = res.data;
+
+      if (passwordChangeRequested) {
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        setChangePassword(false);
+        await logout();
+        Alert.alert('Password updated', 'Please sign in again with your new password.', [
+          {
+            text: 'OK',
+            onPress: () =>
+              navigation.navigate(
+                'MainTabs',
+                { screen: 'Settings', params: { screen: 'SettingsMain' } } as never,
+              ),
+          },
+        ]);
+        return;
+      }
+
       setUser({
         id: updatedUser.id,
         name: updatedUser.name,
@@ -146,10 +182,6 @@ export default function EditProfileScreen() {
         profilePicUrl: updatedUser.profilePicUrl,
       });
 
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setChangePassword(false);
       Alert.alert('Profile updated', 'Your profile details were saved successfully.');
     } catch (e: unknown) {
       const msg =
@@ -163,18 +195,57 @@ export default function EditProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Edit profile</Text>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <KeyboardAvoidingView
+        style={styles.keyboardWrap}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 82 : 0}
+      >
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.title}>Edit profile</Text>
 
         <View style={styles.picRow}>
-          {resolvedImageUrl ? (
-            <Image source={{ uri: resolvedImageUrl }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Ionicons name="person" size={36} color="#8b9198" />
+          <TouchableOpacity
+            onPress={handleUploadPhoto}
+            disabled={uploading}
+            activeOpacity={0.85}
+            accessibilityLabel="Change profile photo"
+            accessibilityRole="button"
+            style={styles.avatarRingTouchable}
+          >
+            <View style={styles.avatarRingOuter}>
+              <Svg width={EDIT_AVATAR_RING} height={EDIT_AVATAR_RING} style={styles.avatarRingSvg}>
+                <Defs>
+                  <LinearGradient id={EDIT_AVATAR_GRAD_ID} x1="0%" y1="0%" x2="100%" y2="100%">
+                    <Stop offset="0%" stopColor="#ff8c42" />
+                    <Stop offset="45%" stopColor="#4dabf7" />
+                    <Stop offset="100%" stopColor="#a855f7" />
+                  </LinearGradient>
+                </Defs>
+                <Circle
+                  cx={EDIT_AVATAR_RING / 2}
+                  cy={EDIT_AVATAR_RING / 2}
+                  r={EDIT_AVATAR_R}
+                  stroke={`url(#${EDIT_AVATAR_GRAD_ID})`}
+                  strokeWidth={EDIT_AVATAR_STROKE}
+                  fill="none"
+                />
+              </Svg>
+              {resolvedImageUrl ? (
+                <Image source={{ uri: resolvedImageUrl }} style={styles.avatarInner} />
+              ) : (
+                <View style={styles.avatarPlaceholderInner}>
+                  <Ionicons name="person" size={32} color="#8b9198" />
+                </View>
+              )}
             </View>
-          )}
+          </TouchableOpacity>
           <TouchableOpacity style={styles.uploadBtn} onPress={handleUploadPhoto} disabled={uploading}>
             {uploading ? (
               <ActivityIndicator size="small" color="#111" />
@@ -259,32 +330,56 @@ export default function EditProfileScreen() {
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-        <TouchableOpacity
-          style={[styles.submitBtn, (saving || uploading) && styles.submitBtnDisabled]}
-          onPress={handleSubmit}
-          disabled={saving || uploading}
-        >
-          <Text style={styles.submitBtnText}>{saving ? 'Submitting...' : 'Submit'}</Text>
-        </TouchableOpacity>
-      </ScrollView>
+          <TouchableOpacity
+            style={[styles.submitBtn, (saving || uploading) && styles.submitBtnDisabled]}
+            onPress={handleSubmit}
+            disabled={saving || uploading}
+          >
+            <Text style={styles.submitBtnText}>{saving ? 'Submitting...' : 'Submit'}</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
-  content: { padding: 18, paddingBottom: 40 },
-  title: { fontSize: 22, fontWeight: '700', color: '#1a1f2e', marginBottom: 18 },
+  keyboardWrap: { flex: 1 },
+  content: { paddingHorizontal: 18, paddingTop: 4, paddingBottom: 140, flexGrow: 1 },
+  title: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1a1f2e',
+    marginBottom: 16,
+    textAlign: 'center',
+    width: '100%',
+  },
   picRow: { alignItems: 'center', marginBottom: 20 },
-  avatar: { width: 92, height: 92, borderRadius: 46, backgroundColor: '#e9ecef', marginBottom: 10 },
-  avatarPlaceholder: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
+  avatarRingTouchable: {
+    borderRadius: EDIT_AVATAR_RING / 2,
+    marginBottom: 10,
+  },
+  avatarRingOuter: {
+    width: EDIT_AVATAR_RING,
+    height: EDIT_AVATAR_RING,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarRingSvg: { position: 'absolute', top: 0, left: 0 },
+  avatarInner: {
+    width: EDIT_AVATAR_INNER,
+    height: EDIT_AVATAR_INNER,
+    borderRadius: EDIT_AVATAR_INNER / 2,
+    backgroundColor: '#e9ecef',
+  },
+  avatarPlaceholderInner: {
+    width: EDIT_AVATAR_INNER,
+    height: EDIT_AVATAR_INNER,
+    borderRadius: EDIT_AVATAR_INNER / 2,
     backgroundColor: '#eef1f4',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
   },
   uploadBtn: {
     borderWidth: 1,

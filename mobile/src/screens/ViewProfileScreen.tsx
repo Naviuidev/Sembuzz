@@ -11,7 +11,7 @@ export default function ViewProfileScreen() {
   const avatarUrl = useMemo(() => imageSrc(user?.profilePicUrl || ''), [user?.profilePicUrl]);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>View profile</Text>
 
@@ -52,19 +52,23 @@ export default function ViewProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-  content: { padding: 18, paddingBottom: 32 },
-  title: { fontSize: 22, fontWeight: '700', color: '#1a1f2e', marginBottom: 14 },
+  content: { paddingHorizontal: 18, paddingTop: 4, paddingBottom: 32 },
+  title: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1a1f2e',
+    marginBottom: 14,
+    textAlign: 'center',
+    width: '100%',
+  },
   heroCard: {
-    borderWidth: 1,
-    borderColor: '#edf0f2',
-    borderRadius: 14,
-    backgroundColor: '#fafbfd',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 24,
+    paddingVertical: 20,
     marginBottom: 14,
+    backgroundColor: '#ffffff',
   },
-  avatar: { width: 170, height: 170, borderRadius: 85, backgroundColor: '#f0f2f4' },
+  avatar: { width: 170, height: 170, borderRadius: 85, backgroundColor: '#ffffff' },
   avatarPlaceholder: {
     width: 170,
     height: 170,

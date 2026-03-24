@@ -8,7 +8,6 @@ import { Ionicons } from '@expo/vector-icons';
 import {
   EventsScreen,
   SearchScreen,
-  SettingsScreen,
   AppsScreen,
   BlogsScreen,
   LikedNewsScreen,
@@ -17,6 +16,7 @@ import {
 import ProfileScreen from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import ViewProfileScreen from '../screens/ViewProfileScreen';
+import SettingsStackNavigator from './SettingsStack';
 import type { MainTabParamList, RootStackParamList } from './types';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -83,7 +83,7 @@ function MainTabsNavigator() {
     >
       <Tab.Screen name="Search" component={SearchScreen} options={{ tabBarLabel: 'Search' }} />
       <Tab.Screen name="Events" component={EventsScreen} options={{ tabBarLabel: 'Home' }} />
-      <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: 'Settings' }} />
+      <Tab.Screen name="Settings" component={SettingsStackNavigator} options={{ tabBarLabel: 'Settings' }} />
       <Tab.Screen name="Apps" component={AppsScreen} options={{ tabBarLabel: 'Apps' }} />
       <Tab.Screen name="Blogs" component={BlogsScreen} options={{ tabBarLabel: 'Blogs' }} />
     </Tab.Navigator>

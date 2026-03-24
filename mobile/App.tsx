@@ -18,7 +18,10 @@ export default function App() {
     navRef.current?.dispatch(
       CommonActions.navigate({
         name: 'MainTabs',
-        params: { screen: name },
+        params:
+          name === 'Settings'
+            ? { screen: 'Settings', params: { screen: 'SettingsMain' } }
+            : { screen: name },
       }),
     );
   };

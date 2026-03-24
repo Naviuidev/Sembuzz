@@ -921,8 +921,10 @@ function BannerAdCard({ banner }: { banner: BannerAdPublic }) {
   }, [banner.id]);
 
   const handleClick = () => {
-    publicEventsService.recordBannerAdClick(banner.id).then((r) => {
-      if (r.redirectUrl) window.open(r.redirectUrl, '_blank', 'noopener,noreferrer');
+    const url = banner.externalLink?.trim();
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+    void publicEventsService.recordBannerAdClick(banner.id).then((r) => {
+      if (!url && r.redirectUrl) window.open(r.redirectUrl, '_blank', 'noopener,noreferrer');
     }).catch(() => {});
   };
 
@@ -973,8 +975,10 @@ function SponsoredAdCard({ ad }: { ad: SponsoredAdPublic }) {
   }, [ad.id]);
 
   const handleClick = () => {
-    publicEventsService.recordSponsoredAdClick(ad.id).then((r) => {
-      if (r.redirectUrl) window.open(r.redirectUrl, '_blank', 'noopener,noreferrer');
+    const url = ad.externalLink?.trim();
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+    void publicEventsService.recordSponsoredAdClick(ad.id).then((r) => {
+      if (!url && r.redirectUrl) window.open(r.redirectUrl, '_blank', 'noopener,noreferrer');
     }).catch(() => {});
   };
 
@@ -1109,6 +1113,10 @@ export const PublicEvents = () => {
   const [appsScreenKey, setAppsScreenKey] = useState(0);
   const [feedSort, setFeedSort] = useState<'latest' | 'popular'>('latest');
   const [showAllSchoolsFeed, setShowAllSchoolsFeed] = useState(false);
+
+  useEffect(() => {
+    if (user && showAllSchoolsFeed) setFilterDropdownOpen(false);
+  }, [user, showAllSchoolsFeed]);
   const [contentExpandedCategoryId, setContentExpandedCategoryId] = useState<string | null>(null);
   const categoryButtonRefForContent = useRef<HTMLButtonElement | null>(null);
   const categoryDropdownRefForContent = useRef<HTMLDivElement | null>(null);
@@ -1288,6 +1296,7 @@ export const PublicEvents = () => {
 
   const saveCategorySelection = (skip: boolean) => {
     if (!user?.id) return;
+    const openedFromChangeCategories = showChangeCategoryModal;
     if (skip) {
       setUserCategoryDone(user.id, 'skip');
       setUserSubCategoryIds(user.id, []);
@@ -1299,6 +1308,7 @@ export const PublicEvents = () => {
     setShowChangeCategoryModal(false);
     setCategorySelectionSelectedIds([]);
     queryClient.invalidateQueries({ queryKey: ['public', 'events', 'approved'] });
+    if (openedFromChangeCategories) setBottomNavActive('home');
   };
 
   const openChangeCategoryModal = () => {
@@ -2518,27 +2528,42 @@ export const PublicEvents = () => {
               <>
                 <div className="d-flex align-items-center gap-3 mb-4">
                   <div
+                    title="Profile"
                     style={{
-                      width: 56,
-                      height: 56,
+                      width: 64,
+                      height: 64,
                       borderRadius: '50%',
-                      backgroundColor: 'rgb(26 31 46 / 8%)',
+                      background: 'linear-gradient(135deg, #ff8c42 0%, #4dabf7 45%, #a855f7 100%)',
+                      padding: 6,
+                      boxSizing: 'border-box',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       flexShrink: 0,
-                      overflow: 'hidden',
                     }}
                   >
-                    {user.profilePicUrl ? (
-                      <img
-                        src={imageSrc(user.profilePicUrl)}
-                        alt=""
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <i className="bi bi-person-fill" style={{ fontSize: '1.75rem', color: '#1a1f2e' }} />
-                    )}
+                    <div
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        borderRadius: '50%',
+                        backgroundColor: 'rgb(26 31 46 / 8%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {user.profilePicUrl ? (
+                        <img
+                          src={imageSrc(user.profilePicUrl)}
+                          alt=""
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <i className="bi bi-person-fill" style={{ fontSize: '1.65rem', color: '#1a1f2e' }} />
+                      )}
+                    </div>
                   </div>
                   <div className="min-width-0">
                     <div className="fw-semibold text-truncate" style={{ fontSize: '1.05rem', color: '#1a1f2e' }}>{user.name}</div>
@@ -3173,48 +3198,71 @@ export const PublicEvents = () => {
                 marginRight: '0.5rem',
               }}
             >
-              {user && !showAllSchoolsFeed && homeContentCategories.length > 0 && (
+              {user && showAllSchoolsFeed ? (
                 <>
-                  {selectedSubCategoryIds.length > 0 && (
-                    <button
-                      type="button"
-                      className="btn btn-link btn-sm text-muted p-0 text-nowrap"
-                      style={{ fontSize: '0.8rem', textDecoration: 'none', flexShrink: 0 }}
-                      onClick={clearContentCategoryFilter}
-                    >
-                      All
-                    </button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm rounded-pill flex-shrink-0 text-nowrap ${feedSort === 'latest' ? 'btn-dark' : 'btn-outline-dark'}`}
+                    style={{ fontWeight: feedSort === 'latest' ? 600 : 400, padding: '0.35rem 0.75rem', fontSize: '0.875rem' }}
+                    onClick={() => setFeedSort('latest')}
+                  >
+                    Latest
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm rounded-pill flex-shrink-0 text-nowrap ${feedSort === 'popular' ? 'btn-dark' : 'btn-outline-dark'}`}
+                    style={{ fontWeight: feedSort === 'popular' ? 600 : 400, padding: '0.35rem 0.75rem', fontSize: '0.875rem' }}
+                    onClick={() => setFeedSort('popular')}
+                  >
+                    Popular
+                  </button>
+                </>
+              ) : (
+                <>
+                  {user && !showAllSchoolsFeed && homeContentCategories.length > 0 && (
+                    <>
+                      {selectedSubCategoryIds.length > 0 && (
+                        <button
+                          type="button"
+                          className="btn btn-link btn-sm text-muted p-0 text-nowrap"
+                          style={{ fontSize: '0.8rem', textDecoration: 'none', flexShrink: 0 }}
+                          onClick={clearContentCategoryFilter}
+                        >
+                          All
+                        </button>
+                      )}
+                      {homeContentCategories.map((cat: CategoryPublic) => {
+                        const hasSelection = selectedSubCategoryIds.some((id: string) =>
+                          cat.subcategories.some((s: { id: string }) => s.id === id),
+                        );
+                        return (
+                          <button
+                            key={cat.id}
+                            ref={contentExpandedCategoryId === cat.id ? categoryButtonRefForContent : null}
+                            type="button"
+                            className="btn btn-sm btn-rounded-pill rounded-pill flex-shrink-0 btn-outline-dark text-nowrap"
+                            style={{
+                              fontWeight: hasSelection ? 600 : 400,
+                              padding: '0.35rem 0.75rem',
+                              fontSize: '0.875rem',
+                            }}
+                            onClick={() => {
+                              const next = contentExpandedCategoryId === cat.id ? null : cat.id;
+                              setContentExpandedCategoryId(next);
+                              if (next) eventsFilter?.setSelectedCategory(cat.id, cat.name);
+                            }}
+                            title={cat.name}
+                          >
+                            {cat.name}
+                          </button>
+                        );
+                      })}
+                    </>
                   )}
-                  {homeContentCategories.map((cat: CategoryPublic) => {
-                    const hasSelection = selectedSubCategoryIds.some((id: string) =>
-                      cat.subcategories.some((s: { id: string }) => s.id === id),
-                    );
-                    return (
-                      <button
-                        key={cat.id}
-                        ref={contentExpandedCategoryId === cat.id ? categoryButtonRefForContent : null}
-                        type="button"
-                        className="btn btn-sm btn-rounded-pill rounded-pill flex-shrink-0 btn-outline-dark text-nowrap"
-                        style={{
-                          
-                          fontWeight: hasSelection ? 600 : 400,
-                          padding: '0.35rem 0.75rem',
-                          fontSize: '0.875rem',
-                        }}
-                        onClick={() => {
-                          const next = contentExpandedCategoryId === cat.id ? null : cat.id;
-                          setContentExpandedCategoryId(next);
-                          if (next) eventsFilter?.setSelectedCategory(cat.id, cat.name);
-                        }}
-                        title={cat.name}
-                      >
-                        {cat.name}
-                      </button>
-                    );
-                  })}
                 </>
               )}
             </div>
+            {!(user && showAllSchoolsFeed) && (
             <div className="d-flex align-items-center gap-2 small flex-shrink-0 position-relative">
               <button
                 type="button"
@@ -3286,6 +3334,7 @@ export const PublicEvents = () => {
                 </>
               )}
             </div>
+            )}
           </div>
 
         {/* Category subcategory dropdown — right above the news, portal */}
@@ -3851,21 +3900,19 @@ export const PublicEvents = () => {
               onLike={(eventId) => likeMutation.mutate(eventId)}
               onSave={(eventId) => saveMutation.mutate(eventId)}
               onCommentAdded={() => queryClient.invalidateQueries({ queryKey: ['public', 'events', 'engagement'] })}
-              onSponsoredClick={async (ad) => {
-                try {
-                  const r = await publicEventsService.recordSponsoredAdClick(ad.id);
-                  if (r.redirectUrl) window.open(r.redirectUrl, '_blank', 'noopener');
-                } catch {
-                  /* ignore */
-                }
+              onSponsoredClick={(ad) => {
+                const url = ad.externalLink?.trim();
+                if (url) window.open(url, '_blank', 'noopener,noreferrer');
+                void publicEventsService.recordSponsoredAdClick(ad.id).then((r) => {
+                  if (!url && r.redirectUrl) window.open(r.redirectUrl, '_blank', 'noopener,noreferrer');
+                }).catch(() => {});
               }}
-              onBannerClick={async (b) => {
-                try {
-                  const r = await publicEventsService.recordBannerAdClick(b.id);
-                  if (r.redirectUrl) window.open(r.redirectUrl, '_blank', 'noopener');
-                } catch {
-                  /* ignore */
-                }
+              onBannerClick={(b) => {
+                const url = b.externalLink?.trim();
+                if (url) window.open(url, '_blank', 'noopener,noreferrer');
+                void publicEventsService.recordBannerAdClick(b.id).then((r) => {
+                  if (!url && r.redirectUrl) window.open(r.redirectUrl, '_blank', 'noopener,noreferrer');
+                }).catch(() => {});
               }}
             />
           </div>
