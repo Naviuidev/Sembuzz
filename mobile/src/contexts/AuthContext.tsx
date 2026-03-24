@@ -9,8 +9,12 @@ type User = {
   id: string;
   email: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
+  profilePicUrl?: string;
   schoolId: string | null;
   schoolName?: string | null;
+  schoolImage?: string;
 };
 
 type AuthContextType = {
@@ -19,6 +23,7 @@ type AuthContextType = {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshMe: () => Promise<void>;
   setUser: (u: User | null) => void;
 };
 
@@ -53,6 +58,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const u = res.data;
     setUser(u ? { ...u, schoolId: u.schoolId ?? null } : null);
   }, []);
+
+  const refreshMe = useCallback(async () => {
+    if (!token) return;
+    const res = await api.get<User>('/user/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const u = res.data;
+    setUser(u ? { ...u, schoolId: u.schoolId ?? null } : null);
+  }, [token]);
 
   useEffect(() => {
     let cancelled = false;
@@ -134,7 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout, setUser }}>
+    <AuthContext.Provider value={{ user, token, loading, login, logout, refreshMe, setUser }}>
       {children}
     </AuthContext.Provider>
   );

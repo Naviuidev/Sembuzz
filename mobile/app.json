@@ -39,7 +39,18 @@
           "sounds": []
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow SemBuzz to access your photos so you can upload a profile picture."
+        }
+      ],
       "@react-native-community/datetimepicker"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "41f1dbef-773e-4cc9-a467-f9e03ecfbf81"
+      }
+    }
   }
 }

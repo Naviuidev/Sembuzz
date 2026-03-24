@@ -20,6 +20,7 @@ import { LoginDto } from '../dto/login.dto';
 import { VerifyOtpDto } from '../dto/verify-otp.dto';
 import { ResendOtpDto } from '../dto/resend-otp.dto';
 import { DeleteAccountDto } from '../dto/delete-account.dto';
+import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { UserGuard } from '../guards/user.guard';
 
 const REGISTRATION_DOCS_DIR = path.join(process.cwd(), 'uploads', 'registration-docs');
@@ -173,5 +174,14 @@ export class UserAuthController {
     @Body() dto: DeleteAccountDto,
   ) {
     return this.authService.deleteAccount(req.user.sub, dto.password);
+  }
+
+  @Post('update-profile')
+  @UseGuards(UserGuard)
+  async updateProfile(
+    @Request() req: { user: { sub: string } },
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.authService.updateProfile(req.user.sub, dto);
   }
 }

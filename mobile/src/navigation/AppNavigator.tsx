@@ -1,15 +1,10 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import SearchIcon from 'react-native-bootstrap-icons/icons/search';
-import HouseDoorIcon from 'react-native-bootstrap-icons/icons/house-door';
-import GearIcon from 'react-native-bootstrap-icons/icons/gear';
-import Grid3x3GapIcon from 'react-native-bootstrap-icons/icons/grid-3x3-gap';
-import JournalTextIcon from 'react-native-bootstrap-icons/icons/journal-text';
+import { Ionicons } from '@expo/vector-icons';
 
-import GlobalNavbar from '../components/GlobalNavbar';
 import {
   EventsScreen,
   SearchScreen,
@@ -19,17 +14,20 @@ import {
   LikedNewsScreen,
   SavedNewsScreen,
 } from '../screens';
+import ProfileScreen from '../screens/ProfileScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
+import ViewProfileScreen from '../screens/ViewProfileScreen';
 import type { MainTabParamList, RootStackParamList } from './types';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const TAB_CONFIG = [
-  { name: 'Search' as const, label: 'Search', Icon: SearchIcon },
-  { name: 'Events' as const, label: 'Home', Icon: HouseDoorIcon },
-  { name: 'Settings' as const, label: 'Settings', Icon: GearIcon },
-  { name: 'Apps' as const, label: 'Apps', Icon: Grid3x3GapIcon },
-  { name: 'Blogs' as const, label: 'Blogs', Icon: JournalTextIcon },
+  { name: 'Search' as const, label: 'Search', inactiveIconName: 'search-outline', activeIconName: 'search' },
+  { name: 'Events' as const, label: 'Home', inactiveIconName: 'home-outline', activeIconName: 'home' },
+  { name: 'Settings' as const, label: 'Settings', inactiveIconName: 'settings-outline', activeIconName: 'settings' },
+  { name: 'Apps' as const, label: 'Apps', inactiveIconName: 'grid-outline', activeIconName: 'grid' },
+  { name: 'Blogs' as const, label: 'Blogs', inactiveIconName: 'newspaper-outline', activeIconName: 'newspaper' },
 ];
 
 function BottomNavBar({ state, descriptors, navigation }: any) {
@@ -38,8 +36,10 @@ function BottomNavBar({ state, descriptors, navigation }: any) {
     <View style={[styles.tabBar, { paddingBottom: Math.max(10, insets.bottom) }]}>
       {state.routes.map((route: { key: string; name: string }, index: number) => {
         const focused = state.index === index;
-        const config = TAB_CONFIG.find((c) => c.name === route.name) ?? { label: route.name, Icon: null };
-        const { label, Icon } = config;
+        const config =
+          TAB_CONFIG.find((c) => c.name === route.name) ??
+          { label: route.name, inactiveIconName: 'ellipse-outline', activeIconName: 'ellipse' };
+        const { label, inactiveIconName, activeIconName } = config;
 
         const onPress = () => {
           const event = navigation.emit({
@@ -62,10 +62,11 @@ function BottomNavBar({ state, descriptors, navigation }: any) {
             accessibilityState={focused ? { selected: true } : {}}
             accessibilityLabel={label}
           >
-            {Icon ? (
-              <Icon width={22} height={22} fill={focused ? '#1a1f2e' : '#6c757d'} />
-            ) : null}
-            {focused ? <Text style={styles.tabLabelActive}>{label}</Text> : null}
+            <Ionicons
+              name={(focused ? activeIconName : inactiveIconName) as any}
+              size={22}
+              color={focused ? '#1a1f2e' : '#6c757d'}
+            />
           </TouchableOpacity>
         );
       })}
@@ -94,17 +95,8 @@ type AppNavigatorProps = {
 };
 
 export default function AppNavigator({ onNavigate }: AppNavigatorProps) {
-  const insets = useSafeAreaInsets();
-
   return (
     <View style={styles.appContainer}>
-      <View style={[styles.navbarWrapper, { paddingTop: insets.top }]} pointerEvents="box-none">
-        <GlobalNavbar
-          onNavigateToEvents={() => onNavigate?.('Events')}
-          onNavigateToSettings={() => onNavigate?.('Settings')}
-          onNavigateToBlogs={() => onNavigate?.('Blogs')}
-        />
-      </View>
       <View style={styles.content}>
         <Stack.Navigator>
           <Stack.Screen name="MainTabs" component={MainTabsNavigator} options={{ headerShown: false }} />
@@ -126,6 +118,33 @@ export default function AppNavigator({ onNavigate }: AppNavigatorProps) {
               headerBackTitle: 'Back',
             }}
           />
+          <Stack.Screen
+            name="Profile"
+            component={ProfileScreen}
+            options={{
+              headerShown: true,
+              title: 'Profile',
+              headerBackTitle: 'Back',
+            }}
+          />
+          <Stack.Screen
+            name="EditProfile"
+            component={EditProfileScreen}
+            options={{
+              headerShown: true,
+              title: 'Edit profile',
+              headerBackTitle: 'Back',
+            }}
+          />
+          <Stack.Screen
+            name="ViewProfile"
+            component={ViewProfileScreen}
+            options={{
+              headerShown: true,
+              title: 'View profile',
+              headerBackTitle: 'Back',
+            }}
+          />
         </Stack.Navigator>
       </View>
     </View>
@@ -135,10 +154,6 @@ export default function AppNavigator({ onNavigate }: AppNavigatorProps) {
 const styles = StyleSheet.create({
   appContainer: {
     flex: 1,
-  },
-  navbarWrapper: {
-    backgroundColor: 'transparent',
-    zIndex: 10,
   },
   content: {
     flex: 1,
@@ -161,14 +176,12 @@ const styles = StyleSheet.create({
   },
   tabButton: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
     paddingHorizontal: 10,
     marginHorizontal: 4,
     borderRadius: 999,
-    gap: 6,
     backgroundColor: 'transparent',
   },
   tabButtonActive: {
@@ -178,10 +191,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 6,
     elevation: 2,
-  },
-  tabLabelActive: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#1a1f2e',
   },
 });

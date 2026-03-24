@@ -10,6 +10,7 @@ import * as bcrypt from 'bcrypt';
 import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
 import { VerifyOtpDto } from '../dto/verify-otp.dto';
+import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { EmailService } from '../../super-admin/schools/email.service';
 
 const OTP_EXPIRY_MINUTES = 10;
@@ -37,14 +38,26 @@ export class UserAuthService {
     private emailService: EmailService,
   ) {}
 
-  private userResponse(user: { id: string; name: string; email: string; schoolId: string; school: { id: string; name: string; image: string | null } }) {
+  private userResponse(user: {
+    id: string;
+    name: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+    schoolId: string;
+    profilePicUrl: string | null;
+    school: { id: string; name: string; image: string | null };
+  }) {
     return {
       id: user.id,
       name: user.name,
+      firstName: user.firstName ?? undefined,
+      lastName: user.lastName ?? undefined,
       email: user.email,
       schoolId: user.schoolId,
       schoolName: user.school.name,
       schoolImage: user.school.image ?? undefined,
+      profilePicUrl: user.profilePicUrl ?? undefined,
     };
   }
 
@@ -321,12 +334,74 @@ export class UserAuthService {
     return {
       id: user.id,
       name: user.name,
+      firstName: user.firstName ?? undefined,
+      lastName: user.lastName ?? undefined,
       email: user.email,
       schoolId: user.schoolId,
       schoolName: user.school.name,
       schoolImage: user.school.image ?? undefined,
       profilePicUrl: user.profilePicUrl ?? undefined,
     };
+  }
+
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        school: { select: { id: true, name: true, image: true } },
+      },
+    });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const firstName = dto.firstName?.trim();
+    const lastName = dto.lastName?.trim();
+    const profilePicUrl = dto.profilePicUrl?.trim();
+
+    const wantsPasswordChange =
+      !!dto.currentPassword?.trim() || !!dto.newPassword?.trim() || !!dto.confirmPassword?.trim();
+
+    if (wantsPasswordChange) {
+      if (!dto.currentPassword?.trim() || !dto.newPassword?.trim() || !dto.confirmPassword?.trim()) {
+        throw new BadRequestException(
+          'Current password, new password and confirm password are required to change password.',
+        );
+      }
+      const currentMatch = await bcrypt.compare(dto.currentPassword, user.password);
+      if (!currentMatch) {
+        throw new BadRequestException('Current password is incorrect.');
+      }
+      if (dto.newPassword !== dto.confirmPassword) {
+        throw new BadRequestException('New password and confirm password do not match.');
+      }
+      if (dto.newPassword === dto.currentPassword) {
+        throw new BadRequestException('New password must be different from current password.');
+      }
+    }
+
+    const nextFirstName = firstName ?? user.firstName ?? user.name.split(' ')[0] ?? '';
+    const nextLastName =
+      lastName ??
+      user.lastName ??
+      (user.name.split(' ').length > 1 ? user.name.split(' ').slice(1).join(' ') : '');
+    const nextName = `${nextFirstName} ${nextLastName}`.trim() || user.name;
+
+    const updated = await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        firstName: nextFirstName || null,
+        lastName: nextLastName || null,
+        name: nextName,
+        profilePicUrl: profilePicUrl !== undefined ? (profilePicUrl || null) : user.profilePicUrl,
+        ...(wantsPasswordChange ? { password: await bcrypt.hash(dto.newPassword!, 10) } : {}),
+      },
+      include: {
+        school: { select: { id: true, name: true, image: true } },
+      },
+    });
+
+    return this.userResponse(updated);
   }
 
   async getSchools() {
