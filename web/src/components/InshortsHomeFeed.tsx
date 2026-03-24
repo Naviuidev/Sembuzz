@@ -166,6 +166,8 @@ function EventSlideWithEngagement({
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
+  const [authHintVisible, setAuthHintVisible] = useState(false);
+  const authHintTimerRef = useRef<number | null>(null);
 
   const imgs = parseImages(event.imageUrls);
 
@@ -199,6 +201,25 @@ function EventSlideWithEngagement({
     if (!commentsOpen) setCommentText('');
   }, [commentsOpen]);
 
+  useEffect(
+    () => () => {
+      if (authHintTimerRef.current) {
+        window.clearTimeout(authHintTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  const showAuthHint = () => {
+    setAuthHintVisible(true);
+    if (authHintTimerRef.current) {
+      window.clearTimeout(authHintTimerRef.current);
+    }
+    authHintTimerRef.current = window.setTimeout(() => {
+      setAuthHintVisible(false);
+    }, 1500);
+  };
+
   return (
     <article className="inshorts-slide" data-slide-index={slideIndex}>
       <div className="inshorts-card inshorts-card--event">
@@ -215,8 +236,7 @@ function EventSlideWithEngagement({
               type="button"
               className={`inshorts-engage-pill-btn ${isLiked ? 'inshorts-engage-pill-btn--liked' : ''}`}
               title={!currentUserId ? 'Sign in to like' : undefined}
-              onClick={currentUserId ? onLike : undefined}
-              disabled={!currentUserId}
+              onClick={currentUserId ? onLike : showAuthHint}
               aria-label={isLiked ? 'Unlike' : 'Like'}
             >
               <i className={isLiked ? 'bi bi-heart-fill' : 'bi bi-heart'} aria-hidden />
@@ -226,8 +246,7 @@ function EventSlideWithEngagement({
               type="button"
               className={`inshorts-engage-pill-btn ${isSaved ? 'inshorts-engage-pill-btn--saved' : ''}`}
               title={!currentUserId ? 'Sign in to save' : undefined}
-              onClick={currentUserId ? onSave : undefined}
-              disabled={!currentUserId}
+              onClick={currentUserId ? onSave : showAuthHint}
               aria-label={isSaved ? 'Unsave' : 'Save'}
             >
               <i className={isSaved ? 'bi bi-bookmark-fill' : 'bi bi-bookmark'} aria-hidden />
@@ -247,6 +266,7 @@ function EventSlideWithEngagement({
                 <span className="inshorts-engage-pill-count">{commentCount}</span>
               </>
             ) : null}
+            {authHintVisible ? <span className="inshorts-auth-hint-bubble">Login required</span> : null}
           </div>
         </div>
         <div className="inshorts-meta">

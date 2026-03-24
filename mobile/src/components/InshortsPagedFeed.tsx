@@ -102,6 +102,8 @@ function InshortsEventPage({
   const [commentText, setCommentText] = React.useState('');
   const [posting, setPosting] = React.useState(false);
   const [deleteId, setDeleteId] = React.useState<string | null>(null);
+  const [authHintVisible, setAuthHintVisible] = React.useState(false);
+  const authHintTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const openLink = () => {
     if (event.externalLink) Linking.openURL(event.externalLink).catch(() => {});
@@ -110,6 +112,25 @@ function InshortsEventPage({
   React.useEffect(() => {
     if (banner?.id) recordBannerAdView(banner.id).catch(() => {});
   }, [banner?.id]);
+
+  React.useEffect(
+    () => () => {
+      if (authHintTimerRef.current) {
+        clearTimeout(authHintTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  const showAuthHint = React.useCallback(() => {
+    setAuthHintVisible(true);
+    if (authHintTimerRef.current) {
+      clearTimeout(authHintTimerRef.current);
+    }
+    authHintTimerRef.current = setTimeout(() => {
+      setAuthHintVisible(false);
+    }, 1500);
+  }, []);
 
   React.useEffect(() => {
     if (!commentsOpen || !event.commentsEnabled) return;
@@ -162,8 +183,7 @@ function InshortsEventPage({
           )}
           <View style={styles.engagePill} pointerEvents="box-none">
             <TouchableOpacity
-              onPress={userId ? onLike : undefined}
-              disabled={!userId}
+              onPress={userId ? onLike : showAuthHint}
               style={styles.engagePillBtn}
               hitSlop={8}
               accessibilityLabel={isLiked ? 'Unlike' : 'Like'}
@@ -176,8 +196,7 @@ function InshortsEventPage({
             </TouchableOpacity>
             <Text style={styles.engagePillCount}>{likeCount}</Text>
             <TouchableOpacity
-              onPress={userId ? onSave : undefined}
-              disabled={!userId}
+              onPress={userId ? onSave : showAuthHint}
               style={styles.engagePillBtn}
               hitSlop={8}
               accessibilityLabel={isSaved ? 'Unsave' : 'Save'}
@@ -191,8 +210,7 @@ function InshortsEventPage({
             {event.commentsEnabled ? (
               <>
                 <TouchableOpacity
-                  onPress={userId ? () => setCommentsOpen(true) : undefined}
-                  disabled={!userId}
+                  onPress={userId ? () => setCommentsOpen(true) : showAuthHint}
                   style={styles.engagePillBtn}
                   hitSlop={8}
                   accessibilityLabel="Comments"
@@ -202,6 +220,7 @@ function InshortsEventPage({
                 <Text style={styles.engagePillCount}>{commentCount}</Text>
               </>
             ) : null}
+            {authHintVisible ? <Text style={styles.authHintBubble}>Login required</Text> : null}
           </View>
         </View>
         <View style={styles.metaRow}>
@@ -549,6 +568,16 @@ const styles = StyleSheet.create({
     color: '#1a1f2e',
     marginRight: 4,
     minWidth: 14,
+  },
+  authHintBubble: {
+    marginLeft: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: 'rgba(15, 23, 42, 0.82)',
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
   },
   metaRow: {
     flexDirection: 'row',
