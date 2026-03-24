@@ -15,12 +15,25 @@ async function bootstrap() {
   // Serve uploaded files (e.g. query attachments)
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads/' });
 
-  // CORS: use CORS_ORIGIN from env; always add localhost so local dev (frontend :5173 → API :3000) works
+  // CORS: merge CORS_ORIGIN from env with apex + www production frontends (common prod miss: only one is set).
   const corsOrigin = process.env.CORS_ORIGIN;
   const fromEnv = corsOrigin
     ? corsOrigin.split(',').map((o) => o.trim()).filter(Boolean)
     : [];
-  const origins = [...new Set([...fromEnv, 'http://localhost:5173', 'http://localhost:3000'])];
+  const defaultSembuzzFrontends = [
+    'https://sembuzz.com',
+    'https://www.sembuzz.com',
+    'http://sembuzz.com',
+    'http://www.sembuzz.com',
+  ];
+  const origins = [
+    ...new Set([
+      ...fromEnv,
+      ...defaultSembuzzFrontends,
+      'http://localhost:5173',
+      'http://localhost:3000',
+    ]),
+  ];
   app.enableCors({
     origin: origins,
     credentials: true,
