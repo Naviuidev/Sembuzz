@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "140412452062",
+    "project_id": "sembuzz-411fa",
+    "storage_bucket": "sembuzz-411fa.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:140412452062:android:b64e102683d3541fb3d64f",
+        "android_client_info": {
+          "package_name": "com.sembuzz.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCNRGlM_-ISf_vwZQNg_QMNNd_Ahhi-Dwg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

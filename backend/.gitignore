@@ -45,6 +45,9 @@ lerna-debug.log*
 # Google OAuth refresh token (do not commit)
 .google-refresh-token
 
+# Firebase Admin service account (do not commit)
+firebase-service-account.json
+
 # temp directory
 .temp
 .tmp

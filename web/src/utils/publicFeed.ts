@@ -18,6 +18,66 @@ function tsBanner(b: BannerAdPublic): number {
   return new Date(b.createdAt || b.startAt).getTime();
 }
 
+/** Slides used by Inshorts (banners stripped). Same shape as `feedItems.filter(type !== 'banner')`. */
+export type NonBannerFeedItem = Exclude<PublicFeedItem, { type: 'banner' }>;
+
+/**
+ * Inshorts only renders inline banners on **event** cards (not sponsored-only slides).
+ * At most **one** banner per event slide: the next banner in feed order goes on the **next** event
+ * card after the anchor (forward in feed order), not stacked on the same card.
+ */
+export function assignBannersToEventSlides(
+  feedItems: PublicFeedItem[],
+  slides: NonBannerFeedItem[],
+): Map<number, BannerAdPublic> {
+  const eventSlideIndices: number[] = [];
+  slides.forEach((item, i) => {
+    if (item.type === 'event') eventSlideIndices.push(i);
+  });
+  const bySlide = new Map<number, BannerAdPublic>();
+  if (eventSlideIndices.length === 0) return bySlide;
+
+  let slideIdx = 0;
+  let lastEventSlideIdx = -1;
+
+  for (const item of feedItems) {
+    if (item.type === 'banner') {
+      const anchor = lastEventSlideIdx >= 0 ? lastEventSlideIdx : eventSlideIndices[0];
+      let startEi = eventSlideIndices.indexOf(anchor);
+      if (startEi < 0) startEi = 0;
+
+      let placed = false;
+      for (let k = 0; k < eventSlideIndices.length; k++) {
+        const ei = startEi + k;
+        if (ei >= eventSlideIndices.length) break;
+        const si = eventSlideIndices[ei];
+        if (!bySlide.has(si)) {
+          bySlide.set(si, item.banner);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        for (let k = 0; k < startEi; k++) {
+          const si = eventSlideIndices[k];
+          if (!bySlide.has(si)) {
+            bySlide.set(si, item.banner);
+            placed = true;
+            break;
+          }
+        }
+      }
+      if (!placed) {
+        bySlide.set(eventSlideIndices[startEi], item.banner);
+      }
+    } else {
+      if (item.type === 'event') lastEventSlideIdx = slideIdx;
+      slideIdx += 1;
+    }
+  }
+  return bySlide;
+}
+
 /** Single timeline: news + sponsored + banners by posted time (newest first). */
 function mergeChronological(
   sortedEvents: ApprovedEventPublic[],
@@ -39,10 +99,18 @@ function mergeChronological(
     parts.push({ k: 'b', t: tsBanner(banner), banner });
   }
   const pri = { e: 0, s: 1, b: 2 };
+  const idOf = (p: Tag): string => {
+    if (p.k === 'e') return p.event.id;
+    if (p.k === 's') return p.ad.id;
+    return p.banner.id;
+  };
+  /** Newest first (latest tab). Stable tie-break: type priority, then id. */
   parts.sort((a, b) => {
     const dt = b.t - a.t;
     if (dt !== 0) return dt;
-    return pri[a.k] - pri[b.k];
+    const tp = pri[a.k] - pri[b.k];
+    if (tp !== 0) return tp;
+    return idOf(a).localeCompare(idOf(b));
   });
   return parts.map((p) => {
     if (p.k === 'e') return { type: 'event' as const, event: p.event };
@@ -109,19 +177,17 @@ function weaveRestIntoBase(base: PublicFeedItem[], rest: PublicFeedItem[]): Publ
 }
 
 /**
- * Latest: one timeline by posted time (news / sponsored / banner interleaved by createdAt).
- * Popular: events stay sorted by engagement; sponsored/banner every N/M; leftovers woven in, not stacked at end.
+ * Builds the feed with sponsored + banner slots every N/M news events, **cycling** ad lists with modulo
+ * so the same ads can appear multiple times as the user scrolls.
+ * **Latest vs Popular:** only the order of `sortedEvents` differs (caller sorts by newest vs engagement).
+ * `mergeChronological` is kept for ads-only feeds (no events).
+ * Inshorts maps inline banners onto **event** slides only (`assignBannersToEventSlides`).
  */
-export function buildPublicFeedItems(
+function buildInsertionFeed(
   sortedEvents: ApprovedEventPublic[],
   sponsoredAds: SponsoredAdPublic[],
   bannerAds: BannerAdPublic[],
-  feedSort: 'latest' | 'popular',
 ): PublicFeedItem[] {
-  if (feedSort === 'latest') {
-    return mergeChronological(sortedEvents, sponsoredAds, bannerAds);
-  }
-
   const n = sortedEvents.length;
 
   if (n === 0) {
@@ -160,4 +226,13 @@ export function buildPublicFeedItems(
 
   const rest = alternateRest(restSponsored, restBanner);
   return weaveRestIntoBase(out, rest);
+}
+
+export function buildPublicFeedItems(
+  sortedEvents: ApprovedEventPublic[],
+  sponsoredAds: SponsoredAdPublic[],
+  bannerAds: BannerAdPublic[],
+  _feedSort: 'latest' | 'popular',
+): PublicFeedItem[] {
+  return buildInsertionFeed(sortedEvents, sponsoredAds, bannerAds);
 }

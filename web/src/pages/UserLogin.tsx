@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { useUserAuth } from '../contexts/UserAuthContext';
+import { isMobileBrowser, openSembuzzAppWithToken } from '../utils/openSembuzzApp';
 
 export const UserLogin = () => {
   const navigate = useNavigate();
@@ -25,6 +26,10 @@ export const UserLogin = () => {
     setLoading(true);
     try {
       await login(email, password);
+      const t = typeof localStorage !== 'undefined' ? localStorage.getItem('user-token') : null;
+      if (t && isMobileBrowser()) {
+        openSembuzzAppWithToken(t);
+      }
       navigate('/events', { replace: true });
     } catch (err: unknown) {
       const msg =

@@ -27,6 +27,7 @@ import { imageSrc } from '../utils/image';
 import { userHelpService } from '../services/user-help.service';
 import { userSchoolSocialService, type SchoolSocialAccountPublic } from '../services/user-school-social.service';
 import { getUserCategoryDone, getUserSubCategoryIds, setUserCategoryDone, setUserSubCategoryIds } from '../utils/user-category-prefs';
+import { isMobileBrowser, openSembuzzAppWithToken } from '../utils/openSembuzzApp';
 const DESCRIPTION_PREVIEW_LENGTH = 400;
 
 const PLATFORM_COLORS: Record<string, string> = {
@@ -1715,6 +1716,10 @@ export const PublicEvents = () => {
     setSettingsLoginLoading(true);
     try {
       await login(settingsLoginEmail.trim(), settingsLoginPassword);
+      const t = typeof localStorage !== 'undefined' ? localStorage.getItem('user-token') : null;
+      if (t && isMobileBrowser()) {
+        openSembuzzAppWithToken(t);
+      }
       setShowSettingsLoginPopup(false);
       setSettingsLoginEmail('');
       setSettingsLoginPassword('');
@@ -1791,8 +1796,22 @@ export const PublicEvents = () => {
         </div>
         </div>
       )}
-      <div className="container py-4" style={{ paddingBottom: '5rem', backgroundColor: (bottomNavActive === 'search' || bottomNavActive === 'settings' || bottomNavActive === 'liked' || bottomNavActive === 'help' || bottomNavActive === 'apps') ? '#fff' : undefined }}>
-        {/* First-login / Change category selection — categories (light blue), subcategories (light green), Skip + Next or Save; visible on any tab */}
+      <div
+        className="container py-4"
+        style={{
+          /* Home uses Inshorts snap feed inside the viewport — avoid extra gap above fixed bottom nav */
+          paddingBottom: bottomNavActive === 'home' ? 'env(safe-area-inset-bottom, 0px)' : '5rem',
+          backgroundColor:
+            bottomNavActive === 'search' ||
+            bottomNavActive === 'settings' ||
+            bottomNavActive === 'liked' ||
+            bottomNavActive === 'help' ||
+            bottomNavActive === 'apps'
+              ? '#fff'
+              : undefined,
+        }}
+      >
+        {/* First-login / Change category selection — category titles text-dark; subcategories btn-sm outline-dark / dark; Skip outline-dark; Next/Save dark */}
         {(showFirstLoginCategories || showChangeCategoryModal) && user?.schoolId && (
           <div
             role="dialog"
@@ -1846,10 +1865,7 @@ export const PublicEvents = () => {
                 <div className="mb-4">
                   {categoriesForSelection.map((cat: CategoryPublic) => (
                     <div key={cat.id} className="mb-3">
-                      <span
-                        className="badge mb-2"
-                        style={{ backgroundColor: 'rgba(13, 202, 240, 0.2)', color: '#0dcaf0', fontSize: '0.9rem', fontWeight: 600 }}
-                      >
+                      <span className="mb-2 d-block text-dark fw-semibold" style={{ fontSize: '0.9rem' }}>
                         {cat.name}
                       </span>
                       <div className="d-flex flex-wrap gap-2">
@@ -1859,13 +1875,7 @@ export const PublicEvents = () => {
                             <button
                               key={sub.id}
                               type="button"
-                              className="badge border-0"
-                              style={{
-                                backgroundColor: isSelected ? 'rgba(25, 135, 84, 0.35)' : 'rgba(25, 135, 84, 0.15)',
-                                color: isSelected ? '#0d6b3d' : '#198754',
-                                fontSize: '0.85rem',
-                                cursor: 'pointer',
-                              }}
+                              className={`btn btn-sm ${isSelected ? 'btn-dark' : 'btn-outline-dark'}`}
                               onClick={() => toggleCategorySelectionSub(sub.id)}
                             >
                               {sub.name}
@@ -1881,7 +1891,7 @@ export const PublicEvents = () => {
                 {showChangeCategoryModal && (
                   <button
                     type="button"
-                    className="btn btn-outline-secondary"
+                    className="btn btn-outline-dark"
                     style={{ borderRadius: '10px' }}
                     onClick={() => { setShowChangeCategoryModal(false); setCategorySelectionSelectedIds([]); }}
                   >
@@ -1891,7 +1901,7 @@ export const PublicEvents = () => {
                 {showFirstLoginCategories && (
                   <button
                     type="button"
-                    className="btn btn-outline-secondary"
+                    className="btn btn-outline-dark"
                     style={{ borderRadius: '10px' }}
                     onClick={() => saveCategorySelection(true)}
                   >
@@ -1900,8 +1910,8 @@ export const PublicEvents = () => {
                 )}
                 <button
                   type="button"
-                  className="btn btn-primary"
-                  style={{ borderRadius: '10px', backgroundColor: '#198754' }}
+                  className="btn btn-dark"
+                  style={{ borderRadius: '10px' }}
                   onClick={() => saveCategorySelection(false)}
                 >
                   {showChangeCategoryModal ? 'Save' : 'Next'}

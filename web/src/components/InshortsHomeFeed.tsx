@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ApprovedEventPublic, SponsoredAdPublic, BannerAdPublic } from '../services/public-events.service';
-import type { PublicFeedItem } from '../utils/publicFeed';
+import { assignBannersToEventSlides, type PublicFeedItem } from '../utils/publicFeed';
 import { imageSrc } from '../utils/image';
 import { userEventsService, type EventCommentResponse } from '../services/user-events.service';
 
@@ -449,19 +449,8 @@ export function InshortsHomeFeed({
 }: InshortsHomeFeedProps) {
   const slides = useMemo(() => feedItems.filter((item) => item.type !== 'banner'), [feedItems]);
   const lastScrollTopRef = useRef(0);
-  const bannerBySlideIndex = useMemo(() => {
-    const bySlide = new Map<number, BannerAdPublic>();
-    let nonBannerIdx = -1;
-    for (const item of feedItems) {
-      if (item.type === 'banner') {
-        const target = nonBannerIdx >= 0 ? nonBannerIdx : 0;
-        if (!bySlide.has(target)) bySlide.set(target, item.banner);
-      } else {
-        nonBannerIdx += 1;
-      }
-    }
-    return bySlide;
-  }, [feedItems]);
+  /** One banner per event slide; extras flow to the next event card — see `assignBannersToEventSlides`. */
+  const bannerBySlideIndex = useMemo(() => assignBannersToEventSlides(feedItems, slides), [feedItems, slides]);
 
   return (
     <div

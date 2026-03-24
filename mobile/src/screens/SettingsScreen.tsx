@@ -14,16 +14,28 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
+  DeviceEventEmitter,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import PersonPlusIcon from 'react-native-bootstrap-icons/icons/person-plus';
+import { FontAwesome5 } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
-import { getApprovedEvents, imageSrc, ApprovedEventPublic } from '../services/events';
+import { getApprovedEvents, getCategoriesBySchool, imageSrc, ApprovedEventPublic, CategoryPublic } from '../services/events';
 import { getFrontendBaseUrl } from '../config/env';
+import {
+  getUserSubCategoryIds,
+  setUserCategoryDone,
+  setUserSubCategoryIds,
+} from '../utils/userCategoryPrefs';
+import { userNotificationsService } from '../services/userNotifications';
+import { userHelpService, type UserHelpQueryItem } from '../services/userHelp';
+import { CATEGORY_PREFS_CHANGED } from '../constants/appEvents';
 
 const BASE_URL = getFrontendBaseUrl();
 
 export default function SettingsScreen() {
+  const navigation = useNavigation();
   const { user, login, logout, loading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -34,6 +46,18 @@ export default function SettingsScreen() {
   const [recentError, setRecentError] = useState<string | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [profileImageFailed, setProfileImageFailed] = useState(false);
+
+  const [showChangeCategoryModal, setShowChangeCategoryModal] = useState(false);
+  const [categoriesForModal, setCategoriesForModal] = useState<CategoryPublic[]>([]);
+  const [categoriesModalLoading, setCategoriesModalLoading] = useState(false);
+  const [changeCategorySelectedIds, setChangeCategorySelectedIds] = useState<string[]>([]);
+
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [helpMessage, setHelpMessage] = useState('');
+  const [helpSubmitLoading, setHelpSubmitLoading] = useState(false);
+  const [helpError, setHelpError] = useState<string | null>(null);
+  const [helpQueries, setHelpQueries] = useState<UserHelpQueryItem[]>([]);
+  const [helpQueriesLoading, setHelpQueriesLoading] = useState(false);
 
   const profileImageUrl = (() => {
     const candidate =
@@ -103,6 +127,108 @@ export default function SettingsScreen() {
     );
   };
 
+  const openChangeCategoryModal = useCallback(async () => {
+    if (!user?.schoolId) {
+      Alert.alert('School required', 'Your account must be linked to a school to change categories.');
+      return;
+    }
+    if (!user?.id) return;
+    setCategoriesModalLoading(true);
+    try {
+      const cats = await getCategoriesBySchool(user.schoolId);
+      let ids = await getUserSubCategoryIds(user.id);
+      try {
+        const remote = await userNotificationsService.getSubcategories();
+        if (remote.subCategoryIds.length > 0) {
+          ids = remote.subCategoryIds;
+          await setUserSubCategoryIds(user.id, ids);
+        }
+      } catch {
+        /* offline or API unavailable — keep local prefs */
+      }
+      setCategoriesForModal(Array.isArray(cats) ? cats : []);
+      setChangeCategorySelectedIds(ids);
+      setShowChangeCategoryModal(true);
+    } catch {
+      Alert.alert('Error', 'Could not load categories. Try again.');
+    } finally {
+      setCategoriesModalLoading(false);
+    }
+  }, [user?.id, user?.schoolId]);
+
+  const toggleChangeCategorySub = useCallback((subId: string) => {
+    setChangeCategorySelectedIds((prev) =>
+      prev.includes(subId) ? prev.filter((id) => id !== subId) : [...prev, subId],
+    );
+  }, []);
+
+  const saveChangeCategory = useCallback(async () => {
+    if (!user?.id) return;
+    setCategoriesModalLoading(true);
+    try {
+      await setUserCategoryDone(user.id, 'true');
+      await setUserSubCategoryIds(user.id, changeCategorySelectedIds);
+      try {
+        await userNotificationsService.setSubcategories(changeCategorySelectedIds);
+      } catch {
+        /* feed prefs still saved locally; push targeting may be out of sync until next successful sync */
+      }
+      setShowChangeCategoryModal(false);
+      DeviceEventEmitter.emit(CATEGORY_PREFS_CHANGED);
+      Alert.alert('Saved', 'Your category preferences were updated.');
+    } catch {
+      Alert.alert('Error', 'Could not save. Try again.');
+    } finally {
+      setCategoriesModalLoading(false);
+    }
+  }, [user?.id, changeCategorySelectedIds]);
+
+  const closeChangeCategoryModal = useCallback(() => {
+    setShowChangeCategoryModal(false);
+    setChangeCategorySelectedIds([]);
+  }, []);
+
+  const loadHelpQueries = useCallback(async () => {
+    setHelpQueriesLoading(true);
+    try {
+      const list = await userHelpService.getMyQueries();
+      setHelpQueries(Array.isArray(list) ? list : []);
+    } catch {
+      setHelpQueries([]);
+    } finally {
+      setHelpQueriesLoading(false);
+    }
+  }, []);
+
+  const openHelpModal = useCallback(() => {
+    setHelpMessage('');
+    setHelpError(null);
+    setShowHelpModal(true);
+    void loadHelpQueries();
+  }, [loadHelpQueries]);
+
+  const submitHelpQuery = useCallback(async () => {
+    const text = helpMessage.trim();
+    if (!text) return;
+    setHelpSubmitLoading(true);
+    setHelpError(null);
+    try {
+      await userHelpService.create(text);
+      setHelpMessage('');
+      setShowHelpModal(false);
+      Alert.alert('Sent', 'Your school admin will see your query in the Users help section.');
+      void loadHelpQueries();
+    } catch (e: unknown) {
+      const msg =
+        e && typeof e === 'object' && 'response' in e
+          ? (e as { response?: { data?: { message?: string } } }).response?.data?.message
+          : null;
+      setHelpError(typeof msg === 'string' ? msg : 'Failed to submit. Try again.');
+    } finally {
+      setHelpSubmitLoading(false);
+    }
+  }, [helpMessage, loadHelpQueries]);
+
   if (authLoading) {
     return (
       <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -136,20 +262,24 @@ export default function SettingsScreen() {
           </View>
 
           <View style={styles.actionsGrid}>
-            <TouchableOpacity style={[styles.actionButton, styles.actionGreen]}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.actionGreen]}
+              onPress={openChangeCategoryModal}
+              disabled={categoriesModalLoading}
+            >
               <Text style={styles.actionIcon}>📁</Text>
               <Text style={styles.actionLabel}>Change categories</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionButton, styles.actionBlue]}
-              onPress={() => Linking.openURL(`${BASE_URL}/events`).catch(() => {})}
+              onPress={() => navigation.navigate('LikedNews' as never)}
             >
               <Text style={styles.actionIcon}>❤️</Text>
               <Text style={styles.actionLabel}>Liked news</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionButton, styles.actionBlue]}
-              onPress={() => Linking.openURL(`${BASE_URL}/events`).catch(() => {})}
+              onPress={() => navigation.navigate('SavedNews' as never)}
             >
               <Text style={styles.actionIcon}>🔖</Text>
               <Text style={styles.actionLabel}>Saved news</Text>
@@ -158,10 +288,7 @@ export default function SettingsScreen() {
               <Text style={styles.actionIcon}>↪</Text>
               <Text style={styles.actionLabel}>Sign out</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.actionOrange]}
-              onPress={() => Linking.openURL(`${BASE_URL}/events`).catch(() => {})}
-            >
+            <TouchableOpacity style={[styles.actionButton, styles.actionOrange]} onPress={openHelpModal}>
               <Text style={styles.actionIcon}>?</Text>
               <Text style={styles.actionLabel}>Help — raise a query to school admin</Text>
             </TouchableOpacity>
@@ -171,11 +298,14 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           </View>
 
+          <View style={styles.sectionDivider} />
           <Text style={styles.sectionTitle}>Recently added schools / news</Text>
           {recentLoading ? (
             <ActivityIndicator size="small" color="#1a1f2e" style={{ marginVertical: 16 }} />
           ) : recentError ? (
             <Text style={styles.errorText}>{recentError}</Text>
+          ) : recentEvents.length === 0 ? (
+            <Text style={styles.emptyRecentText}>No news yet.</Text>
           ) : (
             recentEvents.map((ev) => (
               <View key={ev.id} style={styles.recentItem}>
@@ -194,16 +324,147 @@ export default function SettingsScreen() {
             ))
           )}
 
+          <View style={styles.sectionDivider} />
           <View style={styles.footerLinks}>
             <TouchableOpacity onPress={() => Linking.openURL(`${BASE_URL}/#privacy`).catch(() => {})}>
               <Text style={styles.footerLink}>Privacy policy</Text>
             </TouchableOpacity>
-            <Text style={styles.footerDot}> · </Text>
             <TouchableOpacity onPress={() => Linking.openURL(`${BASE_URL}/#terms-of-service`).catch(() => {})}>
               <Text style={styles.footerLink}>Terms and conditions</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
+
+        {/* Change categories — same data as web / Events first-login; stays on Settings */}
+        <Modal
+          visible={showChangeCategoryModal}
+          animationType="fade"
+          transparent
+          onRequestClose={closeChangeCategoryModal}
+        >
+          <View style={styles.overlayDim}>
+            <ScrollView
+              style={styles.categoryModalScroll}
+              contentContainerStyle={styles.categoryModalScrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.categoryModalHeaderRow}>
+                <Text style={styles.categoryModalTitle}>Change your categories</Text>
+                <TouchableOpacity onPress={closeChangeCategoryModal} hitSlop={12} accessibilityLabel="Close">
+                  <Text style={styles.categoryModalClose}>×</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.categoryModalDesc}>
+                Choose the categories and subcategories you want to see in your home feed.
+              </Text>
+              {categoriesModalLoading && categoriesForModal.length === 0 ? (
+                <ActivityIndicator color="#1a1f2e" style={{ marginVertical: 24 }} />
+              ) : categoriesForModal.length === 0 ? (
+                <Text style={styles.mutedSmall}>No categories available for your school yet.</Text>
+              ) : (
+                categoriesForModal.map((cat) => (
+                  <View key={cat.id} style={styles.categoryBlock}>
+                    <Text style={styles.categoryBlockTitle}>{cat.name}</Text>
+                    <View style={styles.categorySubRow}>
+                      {(cat.subcategories ?? []).map((sub) => {
+                        const isSelected = changeCategorySelectedIds.includes(sub.id);
+                        return (
+                          <TouchableOpacity
+                            key={sub.id}
+                            style={[styles.subCatPill, isSelected ? styles.subCatPillOn : styles.subCatPillOff]}
+                            onPress={() => toggleChangeCategorySub(sub.id)}
+                            activeOpacity={0.85}
+                          >
+                            <Text style={[styles.subCatPillText, isSelected && styles.subCatPillTextOn]}>
+                              {sub.name}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ))
+              )}
+              <View style={styles.categoryModalActions}>
+                <TouchableOpacity
+                  style={styles.catCancelBtn}
+                  onPress={closeChangeCategoryModal}
+                  disabled={categoriesModalLoading}
+                >
+                  <Text style={styles.catCancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.catSaveBtn, categoriesModalLoading && styles.buttonDisabled]}
+                  onPress={saveChangeCategory}
+                  disabled={categoriesModalLoading}
+                >
+                  <Text style={styles.catSaveBtnText}>{categoriesModalLoading ? 'Saving…' : 'Save'}</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </Modal>
+
+        {/* Help — raise query (same API as web) */}
+        <Modal visible={showHelpModal} animationType="fade" transparent onRequestClose={() => setShowHelpModal(false)}>
+          <Pressable style={styles.overlayDim} onPress={() => !helpSubmitLoading && setShowHelpModal(false)}>
+            <Pressable style={styles.helpModalBox} onPress={(e) => e.stopPropagation()}>
+              <Text style={styles.helpModalTitle}>Raise a query</Text>
+              <Text style={styles.helpModalDesc}>
+                Describe your issue. Your school admin will see it in the Users help section.
+              </Text>
+              <TextInput
+                style={styles.helpTextArea}
+                placeholder="Your message…"
+                placeholderTextColor="#8e8e8e"
+                value={helpMessage}
+                onChangeText={(t) => {
+                  setHelpMessage(t);
+                  setHelpError(null);
+                }}
+                multiline
+                numberOfLines={5}
+                textAlignVertical="top"
+              />
+              {helpError ? <Text style={styles.helpError}>{helpError}</Text> : null}
+              {helpQueriesLoading ? (
+                <ActivityIndicator size="small" color="#1a1f2e" style={{ marginBottom: 12 }} />
+              ) : helpQueries.length > 0 ? (
+                <View style={styles.helpHistory}>
+                  <Text style={styles.helpHistoryTitle}>Your recent queries</Text>
+                  {helpQueries.slice(0, 5).map((q) => (
+                    <View key={q.id} style={styles.helpHistoryItem}>
+                      <Text style={styles.helpHistoryDate}>
+                        {new Date(q.createdAt).toLocaleString()}
+                      </Text>
+                      <Text style={styles.helpHistoryMsg} numberOfLines={3}>
+                        {q.message}
+                      </Text>
+                      <Text style={styles.helpHistoryStatus}>{q.status}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+              <View style={styles.helpActions}>
+                <TouchableOpacity
+                  style={styles.helpCancelBtn}
+                  onPress={() => !helpSubmitLoading && setShowHelpModal(false)}
+                  disabled={helpSubmitLoading}
+                >
+                  <Text style={styles.helpCancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.helpSendBtn, (!helpMessage.trim() || helpSubmitLoading) && styles.buttonDisabled]}
+                  onPress={submitHelpQuery}
+                  disabled={helpSubmitLoading || !helpMessage.trim()}
+                >
+                  <Text style={styles.helpSendBtnText}>{helpSubmitLoading ? 'Sending…' : 'Send'}</Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
       </SafeAreaView>
     );
   }
@@ -219,7 +480,7 @@ export default function SettingsScreen() {
         <View style={styles.card}>
           <View style={styles.loginPromptRow}>
             <View style={styles.personIconWrap}>
-              <Text style={styles.loginPromptIcon}>👤</Text>
+              <FontAwesome5 name="user" size={20} color="#6c757d" />
             </View>
             <Text style={styles.loginPromptText}>
               To get filterised categories and subcategories news, like comment and saved options
@@ -231,6 +492,7 @@ export default function SettingsScreen() {
               style={styles.loginButton}
               onPress={() => setShowLoginModal(true)}
             >
+              <FontAwesome5 name="sign-in-alt" size={16} color="#fff" />
               <Text style={styles.loginButtonText}>Login</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -243,11 +505,14 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        <View style={styles.sectionDivider} />
         <Text style={styles.sectionTitle}>Recently added schools / news</Text>
         {recentLoading ? (
           <ActivityIndicator size="small" color="#1a1f2e" style={{ marginVertical: 16 }} />
         ) : recentError ? (
           <Text style={styles.errorText}>{recentError}</Text>
+        ) : recentEvents.length === 0 ? (
+          <Text style={styles.emptyRecentText}>No news yet.</Text>
         ) : (
           recentEvents.map((ev) => (
             <View key={ev.id} style={styles.recentItem}>
@@ -266,11 +531,11 @@ export default function SettingsScreen() {
           ))
         )}
 
+        <View style={styles.sectionDivider} />
         <View style={styles.footerLinks}>
           <TouchableOpacity onPress={() => Linking.openURL(`${BASE_URL}/#privacy`).catch(() => {})}>
             <Text style={styles.footerLink}>Privacy policy</Text>
           </TouchableOpacity>
-          <Text style={styles.footerDot}> · </Text>
           <TouchableOpacity onPress={() => Linking.openURL(`${BASE_URL}/#terms-of-service`).catch(() => {})}>
             <Text style={styles.footerLink}>Terms and conditions</Text>
           </TouchableOpacity>
@@ -372,12 +637,8 @@ const styles = StyleSheet.create({
   },
   loginPromptRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 16,
-  },
-  loginPromptIcon: {
-    fontSize: 24,
-    marginRight: 10,
   },
   loginPromptText: {
     flex: 1,
@@ -396,6 +657,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 24,
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   personIconWrap: {
     width: 48,
@@ -437,6 +702,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+    marginLeft: 6,
   },
   errorText: {
     color: '#dc3545',
@@ -529,8 +795,19 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     color: '#1a1f2e',
-    marginTop: 24,
+    marginTop: 0,
     marginBottom: 12,
+  },
+  sectionDivider: {
+    borderTopWidth: 1,
+    borderTopColor: '#e9ecef',
+    marginVertical: 16,
+  },
+  emptyRecentText: {
+    fontSize: 13,
+    color: '#6c757d',
+    textAlign: 'left',
+    marginBottom: 8,
   },
   recentItem: {
     flexDirection: 'row',
@@ -574,9 +851,12 @@ const styles = StyleSheet.create({
   footerLinks: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 24,
+    justifyContent: 'flex-start',
+    marginTop: 0,
     flexWrap: 'wrap',
+    columnGap: 14,
+    rowGap: 8,
+    width: '100%',
   },
   footerLink: {
     fontSize: 14,
@@ -688,6 +968,215 @@ const styles = StyleSheet.create({
   modalCancelText: {
     fontSize: 14,
     color: '#6c757d',
+  },
+  overlayDim: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    padding: 16,
+    paddingBottom: 100,
+  },
+  categoryModalScroll: {
+    maxHeight: '88%',
+  },
+  categoryModalScrollContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  categoryModalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  categoryModalTitle: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1a1f2e',
+    paddingRight: 8,
+  },
+  categoryModalClose: {
+    fontSize: 26,
+    color: '#6c757d',
+    lineHeight: 28,
+  },
+  categoryModalDesc: {
+    fontSize: 14,
+    color: '#6c757d',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  mutedSmall: {
+    fontSize: 14,
+    color: '#6c757d',
+    marginBottom: 12,
+  },
+  categoryBlock: {
+    marginBottom: 14,
+  },
+  categoryBlockTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#212529',
+    marginBottom: 8,
+  },
+  categorySubRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  subCatPill: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  subCatPillOff: {
+    borderColor: '#212529',
+    backgroundColor: 'transparent',
+  },
+  subCatPillOn: {
+    borderColor: '#212529',
+    backgroundColor: '#212529',
+  },
+  subCatPillText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#212529',
+  },
+  subCatPillTextOn: {
+    color: '#fff',
+  },
+  categoryModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 20,
+    flexWrap: 'wrap',
+  },
+  catCancelBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#212529',
+    backgroundColor: '#fff',
+  },
+  catCancelBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#212529',
+  },
+  catSaveBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    backgroundColor: '#212529',
+  },
+  catSaveBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  helpModalBox: {
+    width: '100%',
+    maxWidth: 400,
+    alignSelf: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    maxHeight: '85%',
+  },
+  helpModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1a1f2e',
+    marginBottom: 8,
+  },
+  helpModalDesc: {
+    fontSize: 13,
+    color: '#6c757d',
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  helpTextArea: {
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 15,
+    color: '#1a1f2e',
+    minHeight: 100,
+    marginBottom: 8,
+  },
+  helpError: {
+    fontSize: 13,
+    color: '#dc3545',
+    marginBottom: 8,
+  },
+  helpHistory: {
+    marginBottom: 12,
+    maxHeight: 160,
+  },
+  helpHistoryTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6c757d',
+    marginBottom: 8,
+  },
+  helpHistoryItem: {
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#eee',
+  },
+  helpHistoryDate: {
+    fontSize: 11,
+    color: '#8e8e8e',
+    marginBottom: 4,
+  },
+  helpHistoryMsg: {
+    fontSize: 14,
+    color: '#1a1f2e',
+  },
+  helpHistoryStatus: {
+    fontSize: 11,
+    color: '#6c757d',
+    marginTop: 4,
+    textTransform: 'capitalize',
+  },
+  helpActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 8,
+  },
+  helpCancelBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#ced4da',
+    backgroundColor: '#fff',
+  },
+  helpCancelBtnText: {
+    fontSize: 15,
+    color: '#6c757d',
+    fontWeight: '500',
+  },
+  helpSendBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    backgroundColor: '#0d6efd',
+  },
+  helpSendBtnText: {
+    fontSize: 15,
+    color: '#fff',
+    fontWeight: '600',
   },
   signupModalHeading: {
     fontSize: 18,

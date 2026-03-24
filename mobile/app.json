@@ -5,7 +5,7 @@
     "scheme": "sembuzz",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/sembuzz-icon.png",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -14,20 +14,32 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.sembuzz.mobile"
+      "bundleIdentifier": "com.sembuzz.mobile",
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "package": "com.sembuzz.mobile",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
+        "backgroundColor": "#ffffff",
+        "foregroundImage": "./assets/sembuzz-icon.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/sembuzz-icon.png",
+          "color": "#ffffff",
+          "sounds": []
+        }
+      ],
+      "@react-native-community/datetimepicker"
+    ]
   }
 }

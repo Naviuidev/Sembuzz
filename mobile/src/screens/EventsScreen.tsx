@@ -4,47 +4,47 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  FlatList,
   ActivityIndicator,
   RefreshControl,
-  Image,
   Linking,
   ScrollView,
   Modal,
   Pressable,
   Alert,
-  Platform,
+  DeviceEventEmitter,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import CalendarEventIcon from 'react-native-bootstrap-icons/icons/calendar-event';
-import CalendarPlusIcon from 'react-native-bootstrap-icons/icons/calendar-plus';
+import { useNavigation } from '@react-navigation/native';
 import FunnelIcon from 'react-native-bootstrap-icons/icons/funnel';
+import NewspaperIcon from 'react-native-bootstrap-icons/icons/newspaper';
 import {
   getApprovedEvents,
   getCategoriesBySchool,
   getEngagementCounts,
-  getUpcomingByDate,
-  getUpcomingByRange,
   getActiveBannerAds,
   getActiveSponsoredAds,
-  buildGoogleCalendarAddAuthUrl,
+  recordBannerAdClick,
   imageSrc,
   ApprovedEventPublic,
   CategoryPublic,
-  UpcomingPostPublic,
   SponsoredAdPublic,
   BannerAdPublic,
 } from '../services/events';
 import { useAuth } from '../contexts/AuthContext';
-import { getFrontendBaseUrl } from '../config/env';
 import { buildPublicFeedItems, type PublicFeedItem } from '../utils/publicFeed';
 import { InshortsPagedFeed } from '../components/InshortsPagedFeed';
 import { userEventsService } from '../services/userEvents';
-
-const RETURN_URL = getFrontendBaseUrl();
+import {
+  getUserCategoryDone,
+  getUserSubCategoryIds,
+  setUserCategoryDone,
+  setUserSubCategoryIds,
+} from '../utils/userCategoryPrefs';
+import { userNotificationsService } from '../services/userNotifications';
+import { CATEGORY_PREFS_CHANGED } from '../constants/appEvents';
 
 export default function EventsScreen() {
+  const navigation = useNavigation();
   const { user } = useAuth();
   const [showAllSchools, setShowAllSchools] = useState(false);
   const [events, setEvents] = useState<ApprovedEventPublic[]>([]);
@@ -54,24 +54,29 @@ export default function EventsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [calendarModalOpen, setCalendarModalOpen] = useState(false);
-  const [categoryFilterModalOpen, setCategoryFilterModalOpen] = useState(false);
-  const [calendarPendingDate, setCalendarPendingDate] = useState<string | null>(null);
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
-  const [dateRangeOpen, setDateRangeOpen] = useState(false);
-  const [datePickerField, setDatePickerField] = useState<'from' | 'to' | null>(null);
-  const [rangeFromDraft, setRangeFromDraft] = useState<string | null>(null);
-  const [rangeToDraft, setRangeToDraft] = useState<string | null>(null);
-  const [rangeFromApplied, setRangeFromApplied] = useState<string | null>(null);
-  const [rangeToApplied, setRangeToApplied] = useState<string | null>(null);
-  const [upcomingRangePosts, setUpcomingRangePosts] = useState<UpcomingPostPublic[]>([]);
-  const [upcomingByDate, setUpcomingByDate] = useState<UpcomingPostPublic[]>([]);
-  const [upcomingLoading, setUpcomingLoading] = useState(false);
-  const [calendarHasFetched, setCalendarHasFetched] = useState(false);
   const [feedListHeight, setFeedListHeight] = useState(0);
+  const [homeFilterMenuOpen, setHomeFilterMenuOpen] = useState(false);
+  const [showFirstLoginCategories, setShowFirstLoginCategories] = useState(false);
+  const [categoryModalSelectedIds, setCategoryModalSelectedIds] = useState<string[]>([]);
+  /** Subcategory ids saved at first-login / Settings — used only to decide which category pills appear (matches web). */
+  const [persistedPrefSubIds, setPersistedPrefSubIds] = useState<string[]>([]);
+  const [expandedCategoryId, setExpandedCategoryId] = useState<string | null>(null);
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
 
   const schoolId = user?.schoolId ?? null;
   const showCategories = !!user && !showAllSchools;
+  const isMySchoolFeed = !!user && !showAllSchools && !!schoolId;
+
+  const clearSubCategoryFilter = useCallback(() => setSelectedSubCategoryIds([]), []);
+
+  const onBannerAdPress = useCallback(async (banner: BannerAdPublic) => {
+    try {
+      const r = await recordBannerAdClick(banner.id);
+      if (r.redirectUrl) Linking.openURL(r.redirectUrl).catch(() => {});
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const fetchEvents = useCallback(async () => {
     const school = showAllSchools ? null : schoolId ?? null;
@@ -93,10 +98,121 @@ export default function EventsScreen() {
     }
   }, [showCategories, schoolId]);
 
+  /** Load saved subcategory filter + first-login gate (same prefs as web). */
+  useEffect(() => {
+    if (!user?.id) {
+      setPrefsLoaded(false);
+      setShowFirstLoginCategories(false);
+      setSelectedSubCategoryIds([]);
+      setPersistedPrefSubIds([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const done = await getUserCategoryDone(user.id);
+      if (cancelled) return;
+      if (done === 'true' || done === 'skip') {
+        let ids = await getUserSubCategoryIds(user.id);
+        try {
+          const remote = await userNotificationsService.getSubcategories();
+          if (remote.subCategoryIds.length > 0) {
+            ids = remote.subCategoryIds;
+            await setUserSubCategoryIds(user.id, ids);
+          }
+        } catch {
+          /* offline */
+        }
+        if (!cancelled) {
+          setSelectedSubCategoryIds(ids);
+          setPersistedPrefSubIds(ids);
+        }
+        setShowFirstLoginCategories(false);
+      } else if (done === null && user.schoolId) {
+        setShowFirstLoginCategories(true);
+        setCategoryModalSelectedIds([]);
+        setPersistedPrefSubIds([]);
+      } else {
+        setShowFirstLoginCategories(false);
+      }
+      if (!cancelled) setPrefsLoaded(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.schoolId]);
+
+  /** When Settings saves category prefs, refresh strip + filter without resetting first-login flow. */
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(CATEGORY_PREFS_CHANGED, async () => {
+      if (!user?.id) return;
+      const done = await getUserCategoryDone(user.id);
+      if (done === 'true' || done === 'skip') {
+        const ids = await getUserSubCategoryIds(user.id);
+        setPersistedPrefSubIds(ids);
+        setSelectedSubCategoryIds(ids);
+      }
+    });
+    return () => sub.remove();
+  }, [user?.id]);
+
+  const toggleCategoryModalSub = useCallback((subId: string) => {
+    setCategoryModalSelectedIds((prev) =>
+      prev.includes(subId) ? prev.filter((id) => id !== subId) : [...prev, subId],
+    );
+  }, []);
+
+  const saveCategorySelectionMobile = useCallback(
+    async (skip: boolean) => {
+      if (!user?.id) return;
+      if (skip) {
+        await setUserCategoryDone(user.id, 'skip');
+        await setUserSubCategoryIds(user.id, []);
+        try {
+          await userNotificationsService.setSubcategories([]);
+        } catch {
+          /* ignore */
+        }
+        setSelectedSubCategoryIds([]);
+        setPersistedPrefSubIds([]);
+      } else {
+        await setUserCategoryDone(user.id, 'true');
+        await setUserSubCategoryIds(user.id, categoryModalSelectedIds);
+        try {
+          await userNotificationsService.setSubcategories(categoryModalSelectedIds);
+        } catch {
+          /* ignore */
+        }
+        setSelectedSubCategoryIds(categoryModalSelectedIds);
+        setPersistedPrefSubIds(categoryModalSelectedIds);
+      }
+      setShowFirstLoginCategories(false);
+      setCategoryModalSelectedIds([]);
+    },
+    [user?.id, categoryModalSelectedIds],
+  );
+
+  /** Same as web `homeContentCategories`: filter category pills by first-login prefs, not live filter toggles. */
+  const homeContentCategories = useMemo(() => {
+    if (!categories.length) return [];
+    if (persistedPrefSubIds.length === 0) return categories;
+    return categories.filter((cat) =>
+      (cat.subcategories ?? []).some((s) => persistedPrefSubIds.includes(s.id)),
+    );
+  }, [categories, persistedPrefSubIds]);
+
+  const expandedCategory = useMemo(
+    () => (expandedCategoryId ? homeContentCategories.find((c) => c.id === expandedCategoryId) ?? null : null),
+    [expandedCategoryId, homeContentCategories],
+  );
+
   useEffect(() => {
     setLoading(true);
     fetchEvents().finally(() => setLoading(false));
   }, [fetchEvents]);
+
+  useEffect(() => {
+    if (!showCategories) setExpandedCategoryId(null);
+  }, [showCategories]);
 
   const [engagementCounts, setEngagementCounts] = useState<{
     likes: Record<string, number>;
@@ -267,25 +383,18 @@ export default function EventsScreen() {
   }, [eventIds.join(','), feedSort]);
 
   const sortedEvents = useMemo(() => {
-    const inRange = events.filter((e) => {
-      if (!rangeFromApplied || !rangeToApplied) return true;
-      const d = new Date(e.updatedAt);
-      const from = new Date(`${rangeFromApplied}T00:00:00`);
-      const to = new Date(`${rangeToApplied}T23:59:59`);
-      return d >= from && d <= to;
-    });
     if (feedSort === 'latest') {
-      return [...inRange].sort(
+      return [...events].sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
     }
     const { likes, commentCounts, savedCounts } = engagementCounts;
-    return [...inRange].sort((a, b) => {
+    return [...events].sort((a, b) => {
       const scoreA = (likes[a.id] ?? 0) + (commentCounts[a.id] ?? 0) + (savedCounts[a.id] ?? 0);
       const scoreB = (likes[b.id] ?? 0) + (commentCounts[b.id] ?? 0) + (savedCounts[b.id] ?? 0);
       return scoreB - scoreA;
     });
-  }, [events, feedSort, engagementCounts, rangeFromApplied, rangeToApplied]);
+  }, [events, feedSort, engagementCounts]);
 
   const [activeBannerAds, setActiveBannerAds] = useState<BannerAdPublic[]>([]);
   const [activeSponsoredAds, setActiveSponsoredAds] = useState<SponsoredAdPublic[]>([]);
@@ -336,83 +445,17 @@ export default function EventsScreen() {
     );
   };
 
-  useEffect(() => {
-    if (calendarModalOpen && user && !calendarPendingDate) {
-      const d = new Date();
-      d.setDate(d.getDate() + 1);
-      setCalendarPendingDate(
-        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
-      );
-    }
-    if (!calendarModalOpen) setCalendarHasFetched(false);
-  }, [calendarModalOpen, user, calendarPendingDate]);
-
-  const fetchUpcomingForDate = useCallback(async () => {
-    if (!calendarPendingDate) return;
-    setCalendarHasFetched(true);
-    setUpcomingLoading(true);
-    try {
-      const list = await getUpcomingByDate(calendarPendingDate);
-      setUpcomingByDate(list);
-    } catch {
-      setUpcomingByDate([]);
-    } finally {
-      setUpcomingLoading(false);
-    }
-  }, [calendarPendingDate]);
-
-  const fetchUpcomingForRange = useCallback(async (from: string, to: string) => {
-    try {
-      const list = await getUpcomingByRange(from, to);
-      setUpcomingRangePosts(list);
-    } catch {
-      setUpcomingRangePosts([]);
-    }
-  }, []);
-
-  const openAddToCalendar = (post: UpcomingPostPublic) => {
-    const returnUrl = `${RETURN_URL.replace(/\/$/, '')}/events`;
-    const url = buildGoogleCalendarAddAuthUrl(post, returnUrl);
-    Linking.openURL(url).catch(() => {
-      Alert.alert('Unable to open calendar link', 'Please try again in a moment.');
-    });
-  };
-
-  const toISODate = (date: Date): string => {
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-  };
-
-  const pendingDateObject = useMemo(() => {
-    if (!calendarPendingDate) return new Date();
-    const d = new Date(`${calendarPendingDate}T12:00:00`);
-    return Number.isNaN(d.getTime()) ? new Date() : d;
-  }, [calendarPendingDate]);
-
-  const onPickCustomDate = (_event: DateTimePickerEvent, selectedDate?: Date) => {
-    if (Platform.OS === 'android') setDatePickerOpen(false);
-    if (selectedDate) {
-      const value = toISODate(selectedDate);
-      if (datePickerField === 'from') setRangeFromDraft(value);
-      if (datePickerField === 'to') setRangeToDraft(value);
-      if (!datePickerField) setCalendarPendingDate(value);
-    }
-  };
-
-  const formatDate = (dateStr: string) => {
-    try {
-      return new Date(dateStr).toLocaleDateString(undefined, {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      });
-    } catch {
-      return dateStr;
-    }
+  const openSchoolEmptyMessage = () => {
+    Alert.alert(
+      'News from this school',
+      'News of this school will be coming soon.\n\nApproved news from this school will appear here once category admins approve posts.',
+      [{ text: 'OK' }],
+    );
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      {/* My school / All schools tabs - same as web */}
+      {/* My school / All schools tabs — same order as web (above category + filter row) */}
       {user ? (
         <View style={styles.tabBar}>
           <TouchableOpacity
@@ -436,41 +479,107 @@ export default function EventsScreen() {
         </View>
       ) : null}
 
-      {/* Categories strip (My school only) */}
-      {showCategories && categories.length > 0 ? (
-        <View style={styles.categoriesRow}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.categoriesStrip}
-            contentContainerStyle={styles.categoriesStripContent}
-          >
-            {categories.flatMap((cat) =>
-              cat.subcategories.map((sub) => {
-                const isSelected = selectedSubCategoryIds.includes(sub.id);
+      {/* Categories + funnel — web: category pills open subcategory dropdown; funnel = Latest/Popular only */}
+      <View style={styles.homeFilterRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoriesStrip}
+          contentContainerStyle={styles.categoriesStripContent}
+        >
+          {showCategories && homeContentCategories.length > 0 && selectedSubCategoryIds.length > 0 ? (
+            <TouchableOpacity onPress={clearSubCategoryFilter} style={styles.clearCatsBtn}>
+              <Text style={styles.clearCatsText}>All</Text>
+            </TouchableOpacity>
+          ) : null}
+          {showCategories && homeContentCategories.length > 0
+            ? homeContentCategories.map((cat) => {
+                const hasSelection = selectedSubCategoryIds.some((id) =>
+                  (cat.subcategories ?? []).some((s) => s.id === id),
+                );
+                const isOpen = expandedCategoryId === cat.id;
                 return (
                   <TouchableOpacity
-                    key={sub.id}
-                    style={[styles.categoryPill, isSelected && styles.categoryPillActive]}
-                    onPress={() => toggleSubCategory(sub.id)}
+                    key={cat.id}
+                    style={[
+                      styles.categoryMainPill,
+                      (hasSelection || isOpen) && styles.categoryMainPillEmphasis,
+                    ]}
+                    onPress={() => {
+                      setExpandedCategoryId((prev) => (prev === cat.id ? null : cat.id));
+                    }}
+                    accessibilityLabel={`Category ${cat.name}`}
                   >
-                    <Text style={[styles.categoryPillText, isSelected && styles.categoryPillTextActive]}>
-                      {sub.name}
+                    <Text
+                      style={[
+                        styles.categoryMainPillText,
+                        (hasSelection || isOpen) && styles.categoryMainPillTextEmphasis,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {cat.name}
                     </Text>
                   </TouchableOpacity>
                 );
-              }),
-            )}
-          </ScrollView>
+              })
+            : null}
+        </ScrollView>
+        <View style={styles.filterFunnelWrap}>
           <TouchableOpacity
-            style={styles.categoryFilterBtn}
-            onPress={() => setCategoryFilterModalOpen(true)}
-            accessibilityLabel="Category filters"
+            style={[
+              styles.homeFilterBtn,
+              (homeFilterMenuOpen || feedSort !== 'latest') && styles.homeFilterBtnActive,
+            ]}
+            onPress={() => setHomeFilterMenuOpen((o) => !o)}
+            accessibilityLabel="Filter: Latest, Popular"
           >
-            <FunnelIcon width={18} height={18} fill="#1a1f2e" />
+            <FunnelIcon
+              width={22}
+              height={22}
+              fill={homeFilterMenuOpen ? '#087990' : '#6c757d'}
+            />
           </TouchableOpacity>
+          {homeFilterMenuOpen ? (
+            <View style={styles.sortDropdown} pointerEvents="box-none">
+              <View style={styles.sortDropdownHeaderRow}>
+                <Text style={styles.sortDropdownLabel}>Filter</Text>
+                <TouchableOpacity
+                  onPress={() => setHomeFilterMenuOpen(false)}
+                  hitSlop={8}
+                  accessibilityLabel="Close filter"
+                >
+                  <Text style={styles.sortDropdownClose}>×</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.sortDropdownSubLabel}>Sort</Text>
+              <View style={styles.sortPillRow}>
+                <TouchableOpacity
+                  style={[styles.sortPillSm, feedSort === 'latest' && styles.sortPillSmActive]}
+                  onPress={() => {
+                    setFeedSort('latest');
+                    setHomeFilterMenuOpen(false);
+                  }}
+                >
+                  <Text style={[styles.sortPillSmText, feedSort === 'latest' && styles.sortPillSmTextActive]}>
+                    Latest
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.sortPillSm, feedSort === 'popular' && styles.sortPillSmActive]}
+                  onPress={() => {
+                    setFeedSort('popular');
+                    setHomeFilterMenuOpen(false);
+                  }}
+                >
+                  <Text style={[styles.sortPillSmText, feedSort === 'popular' && styles.sortPillSmTextActive]}>
+                    Popular
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : null}
         </View>
-      ) : null}
+      </View>
 
       {error ? (
         <View style={styles.errorBox}>
@@ -482,43 +591,49 @@ export default function EventsScreen() {
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#1a1f2e" />
         </View>
-      ) : upcomingRangePosts.length > 0 ? (
-        <FlatList
-          data={upcomingRangePosts}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                {item.school?.image ? (
-                  <Image source={{ uri: imageSrc(item.school.image) }} style={styles.avatar} />
-                ) : (
-                  <View style={styles.avatarPlaceholder}>
-                    <Text style={styles.avatarLetter}>{item.school?.name?.charAt(0) ?? '?'}</Text>
-                  </View>
-                )}
-                <View style={styles.cardHeaderText}>
-                  <Text style={styles.schoolName}>{item.school?.name ?? 'School'}</Text>
-                  <Text style={styles.subCategory}>{item.subCategory?.name ?? item.category?.name ?? ''}</Text>
-                </View>
-              </View>
-              <View style={styles.cardBody}>
-                <Text style={styles.title}>{item.title}</Text>
-                {item.description ? <Text style={styles.description}>{item.description}</Text> : null}
-                <Text style={styles.date}>{formatDate(item.scheduledTo)}</Text>
-              </View>
-            </View>
-          )}
-          contentContainerStyle={styles.listContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        />
-      ) : rangeFromApplied && rangeToApplied ? (
-        <View style={styles.centered}>
-          <Text style={styles.emptyText}>No upcoming news for selected date range.</Text>
-        </View>
       ) : feedItems.length === 0 ? (
-        <View style={styles.centered}>
-          <Text style={styles.emptyText}>No news yet.</Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={styles.emptyFeedScroll}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.emptyFeedCard}>
+            <View style={styles.emptyFeedIconWrap}>
+              <NewspaperIcon width={40} height={40} fill="#6c757d" />
+            </View>
+            <Text style={styles.emptyFeedPrimary}>
+              {isMySchoolFeed ? 'No approved news for this school yet.' : 'No approved news yet.'}
+            </Text>
+            {isMySchoolFeed ? (
+              <TouchableOpacity onPress={openSchoolEmptyMessage} style={styles.emptyFeedViewMsg}>
+                <Text style={styles.emptyFeedViewMsgText}>View message</Text>
+              </TouchableOpacity>
+            ) : (
+              <>
+                <Text style={styles.emptyFeedSecondary}>
+                  <Text style={styles.emptyFeedStrong}>Approved</Text>
+                  {' '}
+                  news from schools appears here after category admin approval. Use{' '}
+                  <Text
+                    style={styles.emptyFeedLink}
+                    onPress={() => {
+                      (navigation as { navigate: (name: string) => void }).navigate('Blogs');
+                    }}
+                  >
+                    Blogs
+                  </Text>
+                  {' '}
+                  in the nav for blog posts.
+                </Text>
+                {!user ? (
+                  <Text style={styles.emptyFeedSecondary}>
+                    Sign in or register with your school to like, comment, and save.
+                  </Text>
+                ) : null}
+              </>
+            )}
+          </View>
+        </ScrollView>
       ) : (
         <View
           style={styles.inshortsFeedHost}
@@ -538,229 +653,120 @@ export default function EventsScreen() {
               onLike={onInshortsLike}
               onSave={onInshortsSave}
               onCommentAdded={onInshortsCommentAdded}
+              onBannerClick={onBannerAdPress}
             />
           ) : (
             <View style={styles.centered}>
-              <ActivityIndicator size="large" color="#fff" />
+              <ActivityIndicator size="large" color="#1a1f2e" />
             </View>
           )}
         </View>
       )}
 
-      {/* Calendar / Upcoming by date modal */}
+      {/* Subcategory dropdown (same behavior as web portal under category pill) */}
       <Modal
-        visible={calendarModalOpen}
+        visible={!!expandedCategory && showCategories}
         transparent
         animationType="fade"
-        onRequestClose={() => setCalendarModalOpen(false)}
+        onRequestClose={() => setExpandedCategoryId(null)}
       >
-        <Pressable style={styles.modalOverlay} onPress={() => setCalendarModalOpen(false)}>
-          <Pressable style={styles.calendarModalBox} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.calendarModalHeader}>
-              <Text style={styles.calendarModalTitle}>What&apos;s happening</Text>
-              <TouchableOpacity onPress={() => setCalendarModalOpen(false)} hitSlop={12}>
-                <Text style={styles.calendarModalClose}>×</Text>
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity
-              style={styles.calendarQuickBtn}
-              onPress={() => {
-                const d = new Date();
-                d.setDate(d.getDate() + 1);
-                setCalendarPendingDate(
-                  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
-                );
-              }}
-            >
-              <Text style={styles.calendarQuickBtnText}>Tomorrow</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.calendarQuickBtn}
-              onPress={() => {
-                const d = new Date();
-                d.setDate(d.getDate() + 2);
-                setCalendarPendingDate(
-                  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
-                );
-              }}
-            >
-              <Text style={styles.calendarQuickBtnText}>Day after tomorrow</Text>
-            </TouchableOpacity>
-            <View style={styles.calendarOkRow}>
-              <TouchableOpacity
-                style={[styles.calendarOkBtn, !calendarPendingDate && styles.calendarOkBtnDisabled]}
-                disabled={!calendarPendingDate}
-                onPress={fetchUpcomingForDate}
-              >
-                <Text style={styles.calendarOkBtnText}>OK — View filtered news</Text>
-              </TouchableOpacity>
-            </View>
-            {upcomingLoading ? (
-              <ActivityIndicator size="small" color="#1a1f2e" style={{ marginVertical: 16 }} />
-            ) : upcomingByDate.length > 0 ? (
-              <ScrollView style={styles.upcomingList} nestedScrollEnabled>
-                {upcomingByDate.map((post) => (
-                  <View key={post.id} style={styles.upcomingItem}>
-                    <View style={styles.upcomingItemText}>
-                      <Text style={styles.upcomingItemTitle} numberOfLines={1}>{post.title}</Text>
-                      <Text style={styles.upcomingItemSub} numberOfLines={1}>{post.school?.name ?? 'School'}</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.addToCalBtn}
-                      onPress={() => openAddToCalendar(post)}
-                    >
-                      <CalendarPlusIcon width={20} height={20} fill="#fff" />
-                      <Text style={styles.addToCalBtnText}>Add to Google Calendar</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </ScrollView>
-            ) : calendarHasFetched && !upcomingLoading && upcomingByDate.length === 0 ? (
-              <Text style={styles.upcomingEmpty}>No upcoming events for this date.</Text>
+        <Pressable style={styles.modalOverlay} onPress={() => setExpandedCategoryId(null)}>
+          <Pressable style={styles.subCatDropdownBox} onPress={(e) => e.stopPropagation()}>
+            {expandedCategory ? (
+              <>
+                <Text style={styles.subCatDropdownHeader}>{expandedCategory.name}</Text>
+                {(expandedCategory.subcategories ?? []).length === 0 ? (
+                  <Text style={styles.subCatDropdownEmpty}>No subcategories</Text>
+                ) : (
+                  <ScrollView style={styles.subCatDropdownScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                    {(expandedCategory.subcategories ?? []).map((sub) => {
+                      const checked = selectedSubCategoryIds.includes(sub.id);
+                      return (
+                        <TouchableOpacity
+                          key={sub.id}
+                          style={styles.subCatDropdownRow}
+                          onPress={() => toggleSubCategory(sub.id)}
+                          activeOpacity={0.7}
+                        >
+                          <View style={[styles.checkbox, checked && styles.checkboxOn]}>
+                            {checked ? <Text style={styles.checkboxTick}>✓</Text> : null}
+                          </View>
+                          <Text style={styles.subCatDropdownRowText}>{sub.name}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                )}
+              </>
             ) : null}
           </Pressable>
         </Pressable>
       </Modal>
 
+      {/* First login — same structure as web PublicEvents (glass overlay + white card) */}
       <Modal
-        visible={categoryFilterModalOpen}
-        transparent
+        visible={showFirstLoginCategories && !!user?.schoolId && prefsLoaded}
         animationType="fade"
-        onRequestClose={() => setCategoryFilterModalOpen(false)}
+        transparent
+        onRequestClose={() => {}}
       >
-        <Pressable style={styles.modalOverlay} onPress={() => setCategoryFilterModalOpen(false)}>
-          <Pressable style={styles.categoryFilterModalBox} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.categoryFilterModalTitle}>Filter options</Text>
-            <View style={styles.whatsHappeningRow}>
-              <View style={styles.whatsHappeningBox}>
-                <Text style={styles.whatsHappeningTitle}>What&apos;s happening</Text>
-                <TouchableOpacity
-                  style={styles.whatsHappeningOption}
-                  onPress={() => {
-                    const d = new Date();
-                    d.setDate(d.getDate() + 1);
-                    const value = toISODate(d);
-                    setRangeFromDraft(value);
-                    setRangeToDraft(value);
-                  }}
-                >
-                  <Text style={styles.categoryFilterActionText}>Tomorrow</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.whatsHappeningOption}
-                  onPress={() => {
-                    const d = new Date();
-                    d.setDate(d.getDate() + 2);
-                    const value = toISODate(d);
-                    setRangeFromDraft(value);
-                    setRangeToDraft(value);
-                  }}
-                >
-                  <Text style={styles.categoryFilterActionText}>Day after tomorrow</Text>
-                </TouchableOpacity>
-              </View>
+        <View style={styles.categorySelectOverlay}>
+          <ScrollView
+            style={styles.categorySelectScroll}
+            contentContainerStyle={styles.categorySelectScrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={styles.categorySelectTitle} accessibilityRole="header">
+              Select your categories
+            </Text>
+            <Text style={styles.categorySelectDesc}>
+              Choose the categories and subcategories for your school. Your home feed will show news from your selections. You can skip and see all school news, or change this later in Settings.
+            </Text>
+            {categories.length === 0 ? (
+              <ActivityIndicator color="#1a1f2e" style={{ marginVertical: 24 }} />
+            ) : (
+              categories.map((cat) => (
+                <View key={cat.id} style={styles.categorySelectBlock}>
+                  <Text style={styles.categorySelectCatTitle}>{cat.name}</Text>
+                  <View style={styles.categorySelectSubRow}>
+                    {(cat.subcategories ?? []).map((sub) => {
+                      const isSelected = categoryModalSelectedIds.includes(sub.id);
+                      return (
+                        <TouchableOpacity
+                          key={sub.id}
+                          style={[styles.subCatBtn, isSelected ? styles.subCatBtnDark : styles.subCatBtnOutline]}
+                          onPress={() => toggleCategoryModalSub(sub.id)}
+                          activeOpacity={0.85}
+                        >
+                          <Text style={[styles.subCatBtnText, isSelected && styles.subCatBtnTextOnDark]}>
+                            {sub.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              ))
+            )}
+            <View style={styles.categorySelectActions}>
               <TouchableOpacity
-                style={styles.calendarIconOnlyBtn}
-                onPress={() => setDateRangeOpen((v) => !v)}
-                accessibilityLabel="Open date range picker"
+                style={styles.catModalBtnOutline}
+                onPress={() => saveCategorySelectionMobile(true)}
+                activeOpacity={0.85}
               >
-                <CalendarEventIcon width={20} height={20} fill="#087990" />
+                <Text style={styles.catModalBtnOutlineText}>Skip</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.catModalBtnDark}
+                onPress={() => saveCategorySelectionMobile(false)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.catModalBtnDarkText}>Next</Text>
               </TouchableOpacity>
             </View>
-
-            {dateRangeOpen ? (
-              <View style={styles.dateRangeBox}>
-                <TouchableOpacity
-                  style={styles.dateFieldBtn}
-                  onPress={() => {
-                    setDatePickerField('from');
-                    setDatePickerOpen(true);
-                  }}
-                >
-                  <Text style={styles.dateFieldLabel}>From: {rangeFromDraft ?? 'Pick date'}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.dateFieldBtn}
-                  onPress={() => {
-                    setDatePickerField('to');
-                    setDatePickerOpen(true);
-                  }}
-                >
-                  <Text style={styles.dateFieldLabel}>To: {rangeToDraft ?? 'Pick date'}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.calendarOkBtn}
-                  onPress={() => {
-                    if (rangeFromDraft && rangeToDraft) {
-                      setRangeFromApplied(rangeFromDraft);
-                      setRangeToApplied(rangeToDraft);
-                      fetchUpcomingForRange(rangeFromDraft, rangeToDraft);
-                    }
-                    setCategoryFilterModalOpen(false);
-                  }}
-                >
-                  <Text style={styles.calendarOkBtnText}>OK — Start search</Text>
-                </TouchableOpacity>
-              </View>
-            ) : null}
-
-            <View style={styles.sortButtonsInFilter}>
-              <TouchableOpacity
-                style={[styles.sortPill, styles.sortPillOutlineDark, feedSort === 'latest' && styles.sortPillActive]}
-                onPress={() => {
-                  setFeedSort('latest');
-                  setDateRangeOpen(false);
-                  setDatePickerOpen(false);
-                  setRangeFromApplied(null);
-                  setRangeToApplied(null);
-                  setUpcomingRangePosts([]);
-                  setCategoryFilterModalOpen(false);
-                }}
-              >
-                <Text style={[styles.sortPillText, feedSort === 'latest' && styles.sortPillTextActive]}>
-                  Latest
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.sortPill, styles.sortPillOutlineDark, feedSort === 'popular' && styles.sortPillActive]}
-                onPress={() => {
-                  setFeedSort('popular');
-                  setDateRangeOpen(false);
-                  setDatePickerOpen(false);
-                  setRangeFromApplied(null);
-                  setRangeToApplied(null);
-                  setUpcomingRangePosts([]);
-                  setCategoryFilterModalOpen(false);
-                }}
-              >
-                <Text style={[styles.sortPillText, feedSort === 'popular' && styles.sortPillTextActive]}>
-                  Popular
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  setDateRangeOpen(false);
-                  setDatePickerOpen(false);
-                  setDatePickerField(null);
-                  setRangeFromApplied(null);
-                  setRangeToApplied(null);
-                  setUpcomingRangePosts([]);
-                }}
-                style={styles.clearFilterTextBtn}
-              >
-                <Text style={styles.clearFilterText}>Clear</Text>
-              </TouchableOpacity>
-            </View>
-            {datePickerOpen ? (
-              <DateTimePicker
-                value={pendingDateObject}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                onChange={onPickCustomDate}
-              />
-            ) : null}
-          </Pressable>
-        </Pressable>
+          </ScrollView>
+        </View>
       </Modal>
 
     </SafeAreaView>
@@ -770,8 +776,263 @@ export default function EventsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fafafa',
+    backgroundColor: '#f5f7fb',
     position: 'relative',
+  },
+  homeFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#eee',
+    paddingRight: 8,
+    paddingLeft: 4,
+    zIndex: 20,
+  },
+  filterFunnelWrap: {
+    position: 'relative',
+    zIndex: 30,
+  },
+  homeFilterBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  homeFilterBtnActive: {
+    backgroundColor: 'rgba(13, 202, 240, 0.15)',
+  },
+  sortDropdown: {
+    position: 'absolute',
+    top: 42,
+    right: 0,
+    minWidth: 260,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e9f0',
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  sortDropdownHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 8,
+    marginBottom: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#dee2e6',
+  },
+  sortDropdownLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6c757d',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  sortDropdownClose: {
+    fontSize: 18,
+    color: '#6c757d',
+    lineHeight: 22,
+    paddingHorizontal: 4,
+  },
+  sortDropdownSubLabel: {
+    fontSize: 12,
+    color: '#6c757d',
+    marginBottom: 8,
+  },
+  sortPillRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  sortPillSm: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#212529',
+    backgroundColor: 'transparent',
+  },
+  sortPillSmActive: {
+    backgroundColor: '#212529',
+    borderColor: '#212529',
+  },
+  sortPillSmText: {
+    fontSize: 13,
+    color: '#212529',
+    fontWeight: '500',
+  },
+  sortPillSmTextActive: {
+    color: '#fff',
+  },
+  clearCatsBtn: {
+    marginRight: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+  },
+  clearCatsText: {
+    fontSize: 12,
+    color: '#6c757d',
+    fontWeight: '500',
+  },
+  /** Web `btn-sm rounded-pill btn-outline-dark` category chip */
+  categoryMainPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#343a40',
+    backgroundColor: 'transparent',
+    marginRight: 8,
+    maxWidth: 260,
+  },
+  categoryMainPillEmphasis: {
+    borderColor: '#212529',
+  },
+  categoryMainPillText: {
+    fontSize: 14,
+    color: '#212529',
+    fontWeight: '400',
+  },
+  categoryMainPillTextEmphasis: {
+    fontWeight: '600',
+  },
+  subCatDropdownBox: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    width: '100%',
+    maxWidth: 320,
+    maxHeight: '70%',
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 12,
+  },
+  subCatDropdownHeader: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6c757d',
+    paddingHorizontal: 14,
+    paddingBottom: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#dee2e6',
+  },
+  subCatDropdownScroll: {
+    maxHeight: 360,
+  },
+  subCatDropdownEmpty: {
+    fontSize: 13,
+    color: '#6c757d',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  subCatDropdownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  subCatDropdownRowText: {
+    fontSize: 14,
+    color: '#212529',
+    flex: 1,
+  },
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#6c757d',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  checkboxOn: {
+    backgroundColor: '#212529',
+    borderColor: '#212529',
+  },
+  checkboxTick: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 13,
+  },
+  emptyFeedScroll: {
+    flexGrow: 1,
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingBottom: 100,
+  },
+  emptyFeedCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingVertical: 36,
+    paddingHorizontal: 20,
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+    alignItems: 'flex-start',
+  },
+  emptyFeedIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 16,
+    backgroundColor: '#e9ecef',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyFeedPrimary: {
+    fontSize: 16,
+    color: '#6c757d',
+    textAlign: 'left',
+    width: '100%',
+  },
+  emptyFeedSecondary: {
+    fontSize: 13,
+    color: '#6c757d',
+    lineHeight: 20,
+    textAlign: 'left',
+    marginTop: 12,
+    width: '100%',
+  },
+  emptyFeedStrong: {
+    fontWeight: '700',
+    color: '#6c757d',
+  },
+  emptyFeedLink: {
+    fontSize: 13,
+    color: '#0d6efd',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  emptyFeedViewMsg: {
+    marginTop: 12,
+    alignSelf: 'flex-start',
+  },
+  emptyFeedViewMsgText: {
+    fontSize: 14,
+    color: '#0d6efd',
+    fontWeight: '500',
   },
   tabBar: {
     flexDirection: 'row',
@@ -806,39 +1067,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 2,
   },
-  categoriesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    paddingRight: 10,
-  },
   categoriesStrip: {
-    maxHeight: 44,
+    minHeight: 50,
     backgroundColor: '#fff',
     flex: 1,
+    minWidth: 0,
   },
   categoriesStripContent: {
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
     gap: 8,
     flexDirection: 'row',
     alignItems: 'center',
   },
   categoryPill: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: '#343a40',
+    backgroundColor: 'transparent',
     marginRight: 8,
   },
   categoryPillActive: {
     backgroundColor: '#1a1f2e',
+    borderColor: '#1a1f2e',
   },
   categoryPillText: {
     fontSize: 14,
-    color: '#495057',
+    color: '#212529',
     fontWeight: '500',
   },
   categoryPillTextActive: {
@@ -1099,7 +1356,9 @@ const styles = StyleSheet.create({
   },
   inshortsFeedHost: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#f5f7fb',
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   centered: {
     flex: 1,
@@ -1258,5 +1517,107 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 120,
     backgroundColor: '#e9ecef',
+  },
+  categorySelectOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+    justifyContent: 'center',
+    padding: 16,
+    paddingBottom: 88,
+  },
+  categorySelectScroll: {
+    maxHeight: '100%',
+  },
+  categorySelectScrollContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    maxHeight: '85%',
+    borderWidth: 1,
+    borderColor: '#eee',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  categorySelectTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1a1f2e',
+    marginBottom: 8,
+  },
+  categorySelectDesc: {
+    fontSize: 14,
+    color: '#6c757d',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  categorySelectBlock: {
+    marginBottom: 14,
+  },
+  categorySelectCatTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#212529',
+    marginBottom: 8,
+  },
+  categorySelectSubRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  subCatBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  subCatBtnOutline: {
+    borderColor: '#212529',
+    backgroundColor: 'transparent',
+  },
+  subCatBtnDark: {
+    borderColor: '#212529',
+    backgroundColor: '#212529',
+  },
+  subCatBtnText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#212529',
+  },
+  subCatBtnTextOnDark: {
+    color: '#fff',
+  },
+  categorySelectActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 20,
+    flexWrap: 'wrap',
+  },
+  catModalBtnOutline: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#212529',
+    backgroundColor: '#fff',
+  },
+  catModalBtnOutlineText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#212529',
+  },
+  catModalBtnDark: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    backgroundColor: '#212529',
+  },
+  catModalBtnDarkText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
   },
 });

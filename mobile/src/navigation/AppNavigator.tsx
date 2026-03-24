@@ -1,5 +1,6 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SearchIcon from 'react-native-bootstrap-icons/icons/search';
@@ -9,16 +10,26 @@ import Grid3x3GapIcon from 'react-native-bootstrap-icons/icons/grid-3x3-gap';
 import JournalTextIcon from 'react-native-bootstrap-icons/icons/journal-text';
 
 import GlobalNavbar from '../components/GlobalNavbar';
-import { EventsScreen, SearchScreen, SettingsScreen, AppsScreen, BlogsScreen } from '../screens';
+import {
+  EventsScreen,
+  SearchScreen,
+  SettingsScreen,
+  AppsScreen,
+  BlogsScreen,
+  LikedNewsScreen,
+  SavedNewsScreen,
+} from '../screens';
+import type { MainTabParamList, RootStackParamList } from './types';
 
-const Tab = createBottomTabNavigator();
+const Tab = createBottomTabNavigator<MainTabParamList>();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const TAB_CONFIG = [
-  { name: 'Search', label: 'Search', Icon: SearchIcon },
-  { name: 'Events', label: 'Home', Icon: HouseDoorIcon },
-  { name: 'Settings', label: 'Settings', Icon: GearIcon },
-  { name: 'Apps', label: 'Apps', Icon: Grid3x3GapIcon },
-  { name: 'Blogs', label: 'Blogs', Icon: JournalTextIcon },
+  { name: 'Search' as const, label: 'Search', Icon: SearchIcon },
+  { name: 'Events' as const, label: 'Home', Icon: HouseDoorIcon },
+  { name: 'Settings' as const, label: 'Settings', Icon: GearIcon },
+  { name: 'Apps' as const, label: 'Apps', Icon: Grid3x3GapIcon },
+  { name: 'Blogs' as const, label: 'Blogs', Icon: JournalTextIcon },
 ];
 
 function BottomNavBar({ state, descriptors, navigation }: any) {
@@ -52,11 +63,7 @@ function BottomNavBar({ state, descriptors, navigation }: any) {
             accessibilityLabel={label}
           >
             {Icon ? (
-              <Icon
-                width={22}
-                height={22}
-                fill={focused ? '#1a1f2e' : '#6c757d'}
-              />
+              <Icon width={22} height={22} fill={focused ? '#1a1f2e' : '#6c757d'} />
             ) : null}
             {focused ? <Text style={styles.tabLabelActive}>{label}</Text> : null}
           </TouchableOpacity>
@@ -66,8 +73,24 @@ function BottomNavBar({ state, descriptors, navigation }: any) {
   );
 }
 
+function MainTabsNavigator() {
+  return (
+    <Tab.Navigator
+      tabBar={(props) => <BottomNavBar {...props} />}
+      screenOptions={{ headerShown: false }}
+      initialRouteName="Events"
+    >
+      <Tab.Screen name="Search" component={SearchScreen} options={{ tabBarLabel: 'Search' }} />
+      <Tab.Screen name="Events" component={EventsScreen} options={{ tabBarLabel: 'Home' }} />
+      <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: 'Settings' }} />
+      <Tab.Screen name="Apps" component={AppsScreen} options={{ tabBarLabel: 'Apps' }} />
+      <Tab.Screen name="Blogs" component={BlogsScreen} options={{ tabBarLabel: 'Blogs' }} />
+    </Tab.Navigator>
+  );
+}
+
 type AppNavigatorProps = {
-  onNavigate?: (name: string) => void;
+  onNavigate?: (name: keyof MainTabParamList) => void;
 };
 
 export default function AppNavigator({ onNavigate }: AppNavigatorProps) {
@@ -83,17 +106,27 @@ export default function AppNavigator({ onNavigate }: AppNavigatorProps) {
         />
       </View>
       <View style={styles.content}>
-        <Tab.Navigator
-          tabBar={(props) => <BottomNavBar {...props} />}
-          screenOptions={{ headerShown: false }}
-          initialRouteName="Events"
-        >
-          <Tab.Screen name="Search" component={SearchScreen} options={{ tabBarLabel: 'Search' }} />
-          <Tab.Screen name="Events" component={EventsScreen} options={{ tabBarLabel: 'Home' }} />
-          <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: 'Settings' }} />
-          <Tab.Screen name="Apps" component={AppsScreen} options={{ tabBarLabel: 'Apps' }} />
-          <Tab.Screen name="Blogs" component={BlogsScreen} options={{ tabBarLabel: 'Blogs' }} />
-        </Tab.Navigator>
+        <Stack.Navigator>
+          <Stack.Screen name="MainTabs" component={MainTabsNavigator} options={{ headerShown: false }} />
+          <Stack.Screen
+            name="LikedNews"
+            component={LikedNewsScreen}
+            options={{
+              headerShown: true,
+              title: 'Liked news',
+              headerBackTitle: 'Back',
+            }}
+          />
+          <Stack.Screen
+            name="SavedNews"
+            component={SavedNewsScreen}
+            options={{
+              headerShown: true,
+              title: 'Saved news',
+              headerBackTitle: 'Back',
+            }}
+          />
+        </Stack.Navigator>
       </View>
     </View>
   );

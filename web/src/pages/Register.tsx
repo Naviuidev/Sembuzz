@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { useUserAuth } from '../contexts/UserAuthContext';
 import { userAuthService } from '../services/user-auth.service';
+import { isMobileBrowser, openSembuzzAppWithToken } from '../utils/openSembuzzApp';
 import type { SchoolOption } from '../services/user-auth.service';
 
 type Step = 'method' | 'form' | 'otp' | 'pending';
@@ -150,6 +151,11 @@ export const Register = () => {
       } else if ('pendingApproval' in response && response.pendingApproval) {
         setStep('pending');
       } else if ('access_token' in response && response.access_token) {
+        const t =
+          typeof localStorage !== 'undefined' ? localStorage.getItem('user-token') : null;
+        if (t && isMobileBrowser()) {
+          openSembuzzAppWithToken(t);
+        }
         navigate('/events', { replace: true, state: { openAuth: 'login', bottomNav: 'settings' } });
       }
     } catch (err: unknown) {

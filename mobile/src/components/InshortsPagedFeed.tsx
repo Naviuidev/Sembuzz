@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import {
   ActivityIndicator,
   type ListRenderItem,
 } from 'react-native';
-import type { PublicFeedItem } from '../utils/publicFeed';
+import { assignBannersToEventSlides, type PublicFeedItem } from '../utils/publicFeed';
 import type { ApprovedEventPublic, SponsoredAdPublic, BannerAdPublic } from '../services/events';
 import { imageSrc } from '../utils/image';
 import {
@@ -30,7 +30,13 @@ import BookmarkIcon from 'react-native-bootstrap-icons/icons/bookmark';
 import BookmarkFillIcon from 'react-native-bootstrap-icons/icons/bookmark-fill';
 import ChatIcon from 'react-native-bootstrap-icons/icons/chat';
 
-const SPONSORED_AD_BG = '#0d1f2d';
+const SPONSORED_AD_BG = '#f1f7ff';
+
+function truncateWords(text: string, maxWords: number): string {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) return text;
+  return `${words.slice(0, maxWords).join(' ')}…`;
+}
 
 function parseImageUrlsJson(value: string | null | undefined): string[] {
   if (!value) return [];
@@ -71,6 +77,8 @@ function InshortsEventPage({
   onLike,
   onSave,
   onCommentAdded,
+  banner,
+  onBannerClick,
 }: {
   event: ApprovedEventPublic;
   pageHeight: number;
@@ -82,6 +90,8 @@ function InshortsEventPage({
   onLike: () => void;
   onSave: () => void;
   onCommentAdded: () => void;
+  banner?: BannerAdPublic | null;
+  onBannerClick: (b: BannerAdPublic) => void;
 }) {
   const images = event.imageUrls ? parseImageUrlsJson(event.imageUrls) : [];
   const firstImage = images[0];
@@ -96,6 +106,10 @@ function InshortsEventPage({
   const openLink = () => {
     if (event.externalLink) Linking.openURL(event.externalLink).catch(() => {});
   };
+
+  React.useEffect(() => {
+    if (banner?.id) recordBannerAdView(banner.id).catch(() => {});
+  }, [banner?.id]);
 
   React.useEffect(() => {
     if (!commentsOpen || !event.commentsEnabled) return;
@@ -157,7 +171,7 @@ function InshortsEventPage({
               {isLiked ? (
                 <HeartFillIcon width={20} height={20} fill="#ff4d6a" />
               ) : (
-                <HeartIcon width={20} height={20} fill="#ffffff" />
+                <HeartIcon width={20} height={20} fill="#475569" />
               )}
             </TouchableOpacity>
             <Text style={styles.engagePillCount}>{likeCount}</Text>
@@ -169,9 +183,9 @@ function InshortsEventPage({
               accessibilityLabel={isSaved ? 'Unsave' : 'Save'}
             >
               {isSaved ? (
-                <BookmarkFillIcon width={19} height={19} fill="#ffffff" />
+                <BookmarkFillIcon width={19} height={19} fill="#111827" />
               ) : (
-                <BookmarkIcon width={19} height={19} fill="#ffffff" />
+                <BookmarkIcon width={19} height={19} fill="#475569" />
               )}
             </TouchableOpacity>
             {event.commentsEnabled ? (
@@ -183,7 +197,7 @@ function InshortsEventPage({
                   hitSlop={8}
                   accessibilityLabel="Comments"
                 >
-                  <ChatIcon width={19} height={19} fill="#ffffff" />
+                  <ChatIcon width={19} height={19} fill="#475569" />
                 </TouchableOpacity>
                 <Text style={styles.engagePillCount}>{commentCount}</Text>
               </>
@@ -203,25 +217,39 @@ function InshortsEventPage({
           </Text>
         </View>
         <View style={styles.textBlock}>
-          <Text style={styles.headline}>{event.title}</Text>
+          <View style={styles.titleRow}>
+            <Text style={[styles.headline, styles.titleInRow]} numberOfLines={4}>
+              {event.title}
+            </Text>
+            {event.externalLink ? (
+              <TouchableOpacity style={styles.knowMorePill} onPress={openLink} activeOpacity={0.85}>
+                <Text style={styles.knowMorePillText}>Know more</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
           {event.description ? (
             <Text style={styles.summary} numberOfLines={8}>
-              {event.description}
+              {truncateWords(event.description, 25)}
             </Text>
           ) : null}
           <Text style={styles.timeAgo}>{formatRelativeTime(event.updatedAt || event.createdAt)}</Text>
+          {banner ? (
+            <TouchableOpacity
+              style={styles.inlineBannerBlock}
+              onPress={() => onBannerClick(banner)}
+              activeOpacity={0.9}
+              accessibilityRole="button"
+              accessibilityLabel="Open banner ad"
+            >
+              <Text style={styles.inlineBannerTag}>Ad Banner</Text>
+              <Image
+                source={{ uri: imageSrc(banner.imageUrl) }}
+                style={styles.inlineBannerImg}
+                resizeMode="cover"
+              />
+            </TouchableOpacity>
+          ) : null}
         </View>
-
-        {event.externalLink ? (
-          <TouchableOpacity style={styles.tapMore} onPress={openLink} activeOpacity={0.85}>
-            <Text style={styles.tapMoreText}>Tap to read more</Text>
-            <Text style={styles.tapMoreSub}>Opens in browser</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.tapMoreMuted}>
-            <Text style={styles.swipeHint}>Swipe up for next</Text>
-          </View>
-        )}
       </View>
 
       <Modal visible={commentsOpen} animationType="slide" transparent onRequestClose={() => setCommentsOpen(false)}>
@@ -347,57 +375,12 @@ function InshortsSponsoredPage({ ad, pageHeight }: { ad: SponsoredAdPublic; page
           {ad.title?.trim() ? <Text style={styles.headline}>{ad.title}</Text> : null}
           {ad.description?.trim() ? (
             <Text style={styles.summary} numberOfLines={6}>
-              {ad.description}
+              {truncateWords(ad.description, 25)}
             </Text>
           ) : null}
           <Text style={styles.timeAgo}>{formatRelativeTime(ad.createdAt || ad.startAt)}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.tapMore} onPress={onPress} activeOpacity={0.85}>
-          <Text style={styles.tapMoreText}>Tap to know more</Text>
-          {ad.externalLink ? <Text style={styles.tapMoreSub} numberOfLines={1}>{ad.externalLink}</Text> : null}
-        </TouchableOpacity>
       </View>
-    </View>
-  );
-}
-
-function InshortsBannerPage({ banner, pageHeight }: { banner: BannerAdPublic; pageHeight: number }) {
-  const uri = imageSrc(banner.imageUrl);
-  const [failed, setFailed] = React.useState(false);
-  const imgH = Math.max(200, Math.round(pageHeight * 0.55));
-
-  React.useEffect(() => {
-    recordBannerAdView(banner.id).catch(() => {});
-  }, [banner.id]);
-
-  const onPress = () => {
-    recordBannerAdClick(banner.id)
-      .then((r) => {
-        if (r.redirectUrl) Linking.openURL(r.redirectUrl).catch(() => {});
-      })
-      .catch(() => {});
-  };
-
-  return (
-    <View style={[styles.pageRoot, { minHeight: pageHeight }]}>
-      <TouchableOpacity style={styles.card} activeOpacity={0.95} onPress={onPress}>
-        <Text style={styles.bannerTag}>Advertisement</Text>
-        {uri && !failed ? (
-          <Image
-            source={{ uri }}
-            style={[styles.heroImage, { height: imgH }]}
-            resizeMode="cover"
-            onError={() => setFailed(true)}
-          />
-        ) : (
-          <View style={[styles.heroPlaceholder, { height: imgH }]}>
-            <Text style={styles.heroPlaceholderText}>Banner</Text>
-          </View>
-        )}
-        <View style={styles.tapMoreMuted}>
-          <Text style={styles.swipeHint}>Tap to open link · Swipe up for next</Text>
-        </View>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -417,6 +400,8 @@ type Props = {
   onLike: (eventId: string) => void;
   onSave: (eventId: string) => void;
   onCommentAdded: () => void;
+  /** Same as web InshortsHomeFeed: banner items map onto event slides as inline ads. */
+  onBannerClick: (banner: BannerAdPublic) => void;
 };
 
 export function InshortsPagedFeed({
@@ -429,9 +414,19 @@ export function InshortsPagedFeed({
   onLike,
   onSave,
   onCommentAdded,
+  onBannerClick,
 }: Props) {
-  const renderItem: ListRenderItem<PublicFeedItem> = useCallback(
-    ({ item }) => (
+  /** Match web: do not render standalone banner slides — map banners onto news cards. */
+  const slides = useMemo(
+    () => feedItems.filter((item) => item.type !== 'banner') as Exclude<PublicFeedItem, { type: 'banner' }>[],
+    [feedItems],
+  );
+
+  /** One banner per event slide; extras flow to the next event card — see `assignBannersToEventSlides`. */
+  const bannerBySlideIndex = useMemo(() => assignBannersToEventSlides(feedItems, slides), [feedItems, slides]);
+
+  const renderItem: ListRenderItem<Exclude<PublicFeedItem, { type: 'banner' }>> = useCallback(
+    ({ item, index }) => (
       <View style={{ height: pageHeight, justifyContent: 'center' }}>
         {item.type === 'event' ? (
           <InshortsEventPage
@@ -442,21 +437,20 @@ export function InshortsPagedFeed({
             onLike={() => onLike(item.event.id)}
             onSave={() => onSave(item.event.id)}
             onCommentAdded={onCommentAdded}
+            banner={bannerBySlideIndex.get(index)}
+            onBannerClick={onBannerClick}
           />
-        ) : item.type === 'sponsored' ? (
-          <InshortsSponsoredPage ad={item.ad} pageHeight={pageHeight} />
         ) : (
-          <InshortsBannerPage banner={item.banner} pageHeight={pageHeight} />
+          <InshortsSponsoredPage ad={item.ad} pageHeight={pageHeight} />
         )}
       </View>
     ),
-    [pageHeight, userId, getEventEngagement, onLike, onSave, onCommentAdded],
+    [pageHeight, userId, getEventEngagement, onLike, onSave, onCommentAdded, bannerBySlideIndex, onBannerClick],
   );
 
-  const keyExtractor = useCallback((item: PublicFeedItem, index: number) => {
+  const keyExtractor = useCallback((item: Exclude<PublicFeedItem, { type: 'banner' }>, index: number) => {
     if (item.type === 'event') return `e-${item.event.id}`;
-    if (item.type === 'sponsored') return `s-${index}-${item.ad.id}`;
-    return `b-${index}-${item.banner.id}`;
+    return `s-${index}-${item.ad.id}`;
   }, []);
 
   const getItemLayout = useCallback(
@@ -472,7 +466,7 @@ export function InshortsPagedFeed({
 
   return (
     <FlatList
-      data={feedItems}
+      data={slides}
       renderItem={renderItem}
       keyExtractor={keyExtractor}
       getItemLayout={getItemLayout}
@@ -483,7 +477,7 @@ export function InshortsPagedFeed({
       showsVerticalScrollIndicator={false}
       bounces
       overScrollMode="never"
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1a1f2e" />}
     />
   );
 }
@@ -493,26 +487,29 @@ const styles = StyleSheet.create({
     width: '100%',
     justifyContent: 'center',
     paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   card: {
     flex: 1,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#161616',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e5e9f0',
     maxHeight: '100%',
   },
   heroImage: {
     width: '100%',
-    backgroundColor: '#222',
+    backgroundColor: '#eef2f7',
   },
   heroPlaceholder: {
     width: '100%',
-    backgroundColor: '#222',
+    backgroundColor: '#eef2f7',
     alignItems: 'center',
     justifyContent: 'center',
   },
   heroPlaceholderText: {
-    color: '#555',
+    color: '#64748b',
     fontSize: 18,
     fontWeight: '700',
   },
@@ -530,13 +527,13 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 999,
-    backgroundColor: 'rgba(0,0,0,0.62)',
+    backgroundColor: 'rgba(255,255,255,0.9)',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: 'rgba(15,23,42,0.12)',
     gap: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.16,
     shadowRadius: 6,
     elevation: 4,
   },
@@ -549,7 +546,7 @@ const styles = StyleSheet.create({
   engagePillCount: {
     fontSize: 12,
     fontWeight: '700',
-    color: 'rgba(255,255,255,0.95)',
+    color: '#1a1f2e',
     marginRight: 4,
     minWidth: 14,
   },
@@ -557,7 +554,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
-    paddingTop: 12,
+    paddingTop: 8,
+    paddingBottom: 0,
     gap: 10,
   },
   smallLogo: {
@@ -569,69 +567,129 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 6,
-    backgroundColor: '#333',
+    backgroundColor: '#e5e7eb',
     alignItems: 'center',
     justifyContent: 'center',
   },
   smallLogoLetter: {
-    color: '#ccc',
+    color: '#475569',
     fontWeight: '700',
     fontSize: 14,
   },
   sourceName: {
     flex: 1,
-    color: '#e8e8e8',
+    color: '#1f2937',
     fontSize: 14,
     fontWeight: '600',
   },
   textBlock: {
     paddingHorizontal: 14,
-    paddingTop: 10,
+    paddingTop: 0,
     paddingBottom: 8,
     flexGrow: 1,
   },
-  headline: {
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 8,
+  },
+  titleInRow: {
+    flex: 1,
+    minWidth: 0,
+    marginBottom: 0,
+  },
+  knowMorePill: {
+    backgroundColor: '#212529',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    flexShrink: 0,
+    alignSelf: 'flex-start',
+  },
+  knowMorePillText: {
     color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  headline: {
+    color: '#111827',
     fontSize: 20,
     fontWeight: '700',
     lineHeight: 26,
     marginBottom: 8,
   },
+  inlineBannerBlock: {
+    position: 'relative',
+    width: '100%',
+    height: 100,
+    marginTop: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e9f0',
+    overflow: 'hidden',
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  inlineBannerTag: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    zIndex: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  inlineBannerImg: {
+    width: '100%',
+    height: '100%',
+  },
   summary: {
-    color: '#b8b8b8',
+    color: '#475569',
     fontSize: 15,
     lineHeight: 22,
   },
   timeAgo: {
     marginTop: 10,
-    color: '#666',
+    color: '#64748b',
     fontSize: 12,
   },
   tapMore: {
     paddingHorizontal: 14,
     paddingVertical: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e9f0',
+    backgroundColor: '#f8fbff',
   },
   tapMoreMuted: {
     paddingHorizontal: 14,
     paddingVertical: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e9f0',
+    backgroundColor: '#fff',
   },
   tapMoreText: {
-    color: '#7ec8ff',
+    color: '#0d6efd',
     fontSize: 15,
     fontWeight: '600',
   },
   tapMoreSub: {
-    color: '#888',
+    color: '#64748b',
     fontSize: 12,
     marginTop: 4,
   },
   swipeHint: {
-    color: '#666',
+    color: '#64748b',
     fontSize: 13,
     textAlign: 'center',
   },
@@ -646,25 +704,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: '#dbeafe',
   },
   adBadgeText: {
-    color: '#aee',
+    color: '#1457a6',
     fontSize: 11,
     fontWeight: '800',
   },
   adLabel: {
-    color: '#8ab',
+    color: '#4e6a8a',
     fontSize: 12,
-  },
-  bannerTag: {
-    color: '#888',
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    paddingHorizontal: 14,
-    paddingTop: 12,
   },
   modalOverlay: {
     flex: 1,

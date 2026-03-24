@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../config/api';
 
@@ -23,6 +24,15 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+/** Web login opens `sembuzz://auth?token=<jwt>` so the native app can reuse the session. */
+function extractTokenFromSembuzzUrl(url: string): string | null {
+  if (!url.startsWith('sembuzz://')) return null;
+  const q = url.indexOf('?');
+  if (q === -1) return null;
+  const params = new URLSearchParams(url.slice(q + 1));
+  return params.get('token');
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -34,10 +44,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  const applyBearerToken = useCallback(async (t: string) => {
+    await AsyncStorage.setItem(TOKEN_KEY, t);
+    setToken(t);
+    const res = await api.get<User>('/user/auth/me', {
+      headers: { Authorization: `Bearer ${t}` },
+    });
+    const u = res.data;
+    setUser(u ? { ...u, schoolId: u.schoolId ?? null } : null);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
+        const initialUrl = await Linking.getInitialURL();
+        const deepToken = initialUrl ? extractTokenFromSembuzzUrl(initialUrl) : null;
+        if (deepToken) {
+          try {
+            await applyBearerToken(deepToken);
+          } catch {
+            if (!cancelled) {
+              await AsyncStorage.removeItem(TOKEN_KEY);
+              setToken(null);
+              setUser(null);
+            }
+          } finally {
+            if (!cancelled) setLoading(false);
+          }
+          return;
+        }
+
         const t = await AsyncStorage.getItem(TOKEN_KEY);
         if (cancelled) return;
         if (!t) {
@@ -62,7 +99,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [applyBearerToken]);
+
+  useEffect(() => {
+    const sub = Linking.addEventListener('url', ({ url }) => {
+      const deepToken = extractTokenFromSembuzzUrl(url);
+      if (!deepToken) return;
+      void (async () => {
+        try {
+          await applyBearerToken(deepToken);
+        } catch {
+          await AsyncStorage.removeItem(TOKEN_KEY);
+          setToken(null);
+          setUser(null);
+        }
+      })();
+    });
+    return () => sub.remove();
+  }, [applyBearerToken]);
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await api.post<{ access_token: string; user: User }>('/user/auth/login', {

@@ -18,6 +18,62 @@ function tsBanner(b: BannerAdPublic): number {
   return new Date(b.createdAt || b.startAt).getTime();
 }
 
+/** Keep in sync with web/src/utils/publicFeed.ts */
+export type NonBannerFeedItem = Exclude<PublicFeedItem, { type: 'banner' }>;
+
+/** Keep in sync with web/src/utils/publicFeed.ts */
+export function assignBannersToEventSlides(
+  feedItems: PublicFeedItem[],
+  slides: NonBannerFeedItem[],
+): Map<number, BannerAdPublic> {
+  const eventSlideIndices: number[] = [];
+  slides.forEach((item, i) => {
+    if (item.type === 'event') eventSlideIndices.push(i);
+  });
+  const bySlide = new Map<number, BannerAdPublic>();
+  if (eventSlideIndices.length === 0) return bySlide;
+
+  let slideIdx = 0;
+  let lastEventSlideIdx = -1;
+
+  for (const item of feedItems) {
+    if (item.type === 'banner') {
+      const anchor = lastEventSlideIdx >= 0 ? lastEventSlideIdx : eventSlideIndices[0];
+      let startEi = eventSlideIndices.indexOf(anchor);
+      if (startEi < 0) startEi = 0;
+
+      let placed = false;
+      for (let k = 0; k < eventSlideIndices.length; k++) {
+        const ei = startEi + k;
+        if (ei >= eventSlideIndices.length) break;
+        const si = eventSlideIndices[ei];
+        if (!bySlide.has(si)) {
+          bySlide.set(si, item.banner);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        for (let k = 0; k < startEi; k++) {
+          const si = eventSlideIndices[k];
+          if (!bySlide.has(si)) {
+            bySlide.set(si, item.banner);
+            placed = true;
+            break;
+          }
+        }
+      }
+      if (!placed) {
+        bySlide.set(eventSlideIndices[startEi], item.banner);
+      }
+    } else {
+      if (item.type === 'event') lastEventSlideIdx = slideIdx;
+      slideIdx += 1;
+    }
+  }
+  return bySlide;
+}
+
 function mergeChronological(
   sortedEvents: ApprovedEventPublic[],
   sponsoredAds: SponsoredAdPublic[],
@@ -38,10 +94,17 @@ function mergeChronological(
     parts.push({ k: 'b', t: tsBanner(banner), banner });
   }
   const pri = { e: 0, s: 1, b: 2 };
+  const idOf = (p: Tag): string => {
+    if (p.k === 'e') return p.event.id;
+    if (p.k === 's') return p.ad.id;
+    return p.banner.id;
+  };
   parts.sort((a, b) => {
     const dt = b.t - a.t;
     if (dt !== 0) return dt;
-    return pri[a.k] - pri[b.k];
+    const tp = pri[a.k] - pri[b.k];
+    if (tp !== 0) return tp;
+    return idOf(a).localeCompare(idOf(b));
   });
   return parts.map((p) => {
     if (p.k === 'e') return { type: 'event' as const, event: p.event };
@@ -105,17 +168,12 @@ function weaveRestIntoBase(base: PublicFeedItem[], rest: PublicFeedItem[]): Publ
   return result;
 }
 
-/** Same as web: Latest = chronological; Popular = engagement order + woven ads. */
-export function buildPublicFeedItems(
-  sortedEvents: ApprovedEventPublic[],
+/** Keep in sync with web/src/utils/publicFeed.ts */
+function buildInsertionFeed(
+  sortedEvents: ApprovedEventPublic[], 
   sponsoredAds: SponsoredAdPublic[],
   bannerAds: BannerAdPublic[],
-  feedSort: 'latest' | 'popular',
 ): PublicFeedItem[] {
-  if (feedSort === 'latest') {
-    return mergeChronological(sortedEvents, sponsoredAds, bannerAds);
-  }
-
   const n = sortedEvents.length;
 
   if (n === 0) {
@@ -154,4 +212,13 @@ export function buildPublicFeedItems(
 
   const rest = alternateRest(restSponsored, restBanner);
   return weaveRestIntoBase(out, rest);
+}
+
+export function buildPublicFeedItems(
+  sortedEvents: ApprovedEventPublic[],
+  sponsoredAds: SponsoredAdPublic[],
+  bannerAds: BannerAdPublic[],
+  _feedSort: 'latest' | 'popular',
+): PublicFeedItem[] {
+  return buildInsertionFeed(sortedEvents, sponsoredAds, bannerAds);
 }

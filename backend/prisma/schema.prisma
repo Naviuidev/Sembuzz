@@ -393,6 +393,7 @@ model SubCategory {
   events                        Event[]
   upcomingPosts                 UpcomingPost[]
   blogPosts                     BlogPost[]
+  userNotificationPrefs         UserNotificationSubCategory[]
 
   @@map("sub_categories")
 }
@@ -810,6 +811,8 @@ model User {
   eventComments  EventComment[]
   savedEvents    UserSavedEvent[]
   helpQueries    UserHelpQuery[]
+  pushDevices                 UserPushDevice[]
+  notificationSubCategories UserNotificationSubCategory[]
 
   @@index([schoolId])
   @@index([email])
@@ -832,6 +835,36 @@ model UserHelpQuery {
   @@index([schoolId])
   @@index([userId])
   @@map("user_help_queries")
+}
+
+// FCM / device tokens for push (Expo getDevicePushTokenAsync).
+model UserPushDevice {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @db.VarChar(500)
+  platform  String   @db.VarChar(20) // android | ios | web
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, token])
+  @@index([userId])
+  @@map("user_push_devices")
+}
+
+// Empty set = user opted out of category notifications (no pushes for news).
+model UserNotificationSubCategory {
+  userId        String
+  subCategoryId String
+  createdAt     DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subCategory SubCategory @relation(fields: [subCategoryId], references: [id], onDelete: Cascade)
+
+  @@id([userId, subCategoryId])
+  @@index([subCategoryId])
+  @@map("user_notification_sub_categories")
 }
 
 model SchoolSocialAccount {

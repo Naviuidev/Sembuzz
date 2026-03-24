@@ -1,10 +1,14 @@
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { UpdateEventDto } from './dto/update-event.dto';
+import { PushNotificationService } from '../../push/push-notification.service';
 
 @Injectable()
 export class CategoryAdminEventsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private pushNotifications: PushNotificationService,
+  ) {}
 
   private async getCategoryAdminCategoryIds(categoryAdminId: string): Promise<string[]> {
     const admin = await this.prisma.categoryAdmin.findUnique({
@@ -128,7 +132,7 @@ export class CategoryAdminEventsService {
     if (!event || event.status !== 'pending') {
       throw new ForbiddenException('Only pending events can be approved');
     }
-    return this.prisma.event.update({
+    const updated = await this.prisma.event.update({
       where: { id: eventId },
       data: { status: 'approved' },
       include: {
@@ -136,5 +140,16 @@ export class CategoryAdminEventsService {
         subCategoryAdmin: { select: { id: true, name: true, email: true } },
       },
     });
+    void this.pushNotifications
+      .notifyUsersForApprovedEvent({
+        id: updated.id,
+        schoolId: updated.schoolId,
+        subCategoryId: updated.subCategoryId,
+        title: updated.title,
+      })
+      .catch((err) => {
+        console.error('[CategoryAdminEvents] push notify failed', err);
+      });
+    return updated;
   }
 }
