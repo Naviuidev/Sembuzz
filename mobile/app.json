@@ -45,7 +45,8 @@
           "photosPermission": "Allow SemBuzz to access your photos so you can upload a profile picture."
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-font"
     ],
     "extra": {
       "eas": {
