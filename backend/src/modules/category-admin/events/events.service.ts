@@ -136,6 +136,7 @@ export class CategoryAdminEventsService {
       where: { id: eventId },
       data: { status: 'approved' },
       include: {
+        school: { select: { name: true, image: true } },
         subCategory: { select: { id: true, name: true } },
         subCategoryAdmin: { select: { id: true, name: true, email: true } },
       },
@@ -146,6 +147,8 @@ export class CategoryAdminEventsService {
         schoolId: updated.schoolId,
         subCategoryId: updated.subCategoryId,
         title: updated.title,
+        schoolName: updated.school?.name ?? undefined,
+        schoolLogoUrl: updated.school?.image ?? null,
       })
       .catch((err) => {
         console.error('[CategoryAdminEvents] push notify failed', err);

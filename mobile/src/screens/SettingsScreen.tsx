@@ -19,24 +19,24 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import PersonPlusIcon from 'react-native-bootstrap-icons/icons/person-plus';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/types';
 import { useAuth } from '../contexts/AuthContext';
 import { getApprovedEvents, imageSrc, ApprovedEventPublic } from '../services/events';
 import { getFrontendBaseUrl } from '../config/env';
 import { userHelpService, type UserHelpQueryItem } from '../services/userHelp';
+import { userNotificationsService } from '../services/userNotifications';
 import SignUpModal from '../components/SignUpModal';
-import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Svg, { Circle } from 'react-native-svg';
 
 const BASE_URL = getFrontendBaseUrl();
 
 /** Gradient ring + inner circle — makes the avatar read clearly as a tappable control. */
 const PROFILE_AVATAR_RING = 64;
-const PROFILE_AVATAR_STROKE = 6;
+const PROFILE_AVATAR_STROKE = 3;
 const PROFILE_AVATAR_INNER = 52;
 /** Circle radius (stroke is centered on this path). */
 const PROFILE_AVATAR_R = PROFILE_AVATAR_RING / 2 - PROFILE_AVATAR_STROKE / 2;
-const PROFILE_AVATAR_GRAD_ID = 'settingsProfileAvatarRing';
 
 export default function SettingsScreen() {
   const navigation = useNavigation();
@@ -71,16 +71,20 @@ export default function SettingsScreen() {
   const [helpError, setHelpError] = useState<string | null>(null);
   const [helpQueries, setHelpQueries] = useState<UserHelpQueryItem[]>([]);
   const [helpQueriesLoading, setHelpQueriesLoading] = useState(false);
-  const [selectedAction, setSelectedAction] = useState<'categories' | 'liked' | 'saved' | 'help'>('categories');
+  const [selectedAction, setSelectedAction] = useState<'categories' | 'liked' | 'notifications' | 'saved' | 'help'>('categories');
+  const [unreadCount, setUnreadCount] = useState(0);
   const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState(false);
 
-  const profileImageUrl = (() => {
-    const candidate =
-      (user as { profilePicUrl?: string | null; image?: string | null } | null)?.profilePicUrl ||
-      (user as { profilePicUrl?: string | null; image?: string | null } | null)?.image ||
-      '';
-    return candidate ? imageSrc(candidate) : '';
-  })();
+  /** Settings header = user photo only (school logo stays on bottom tab). */
+  const profileImageUrl = useMemo(() => {
+    const u = user as { profilePicUrl?: string | null; image?: string | null } | null;
+    const raw = u?.profilePicUrl?.trim() || u?.image?.trim() || '';
+    return raw ? imageSrc(raw) : '';
+  }, [user]);
+
+  useEffect(() => {
+    setProfileImageFailed(false);
+  }, [profileImageUrl, user?.id]);
 
   const fetchRecent = useCallback(async () => {
     setRecentLoading(true);
@@ -103,9 +107,26 @@ export default function SettingsScreen() {
     fetchRecent();
   }, [fetchRecent]);
 
-  useEffect(() => {
-    setProfileImageFailed(false);
-  }, [user?.id]);
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      if (!user?.id) {
+        setUnreadCount(0);
+        return () => {
+          active = false;
+        };
+      }
+      void userNotificationsService
+        .getUnreadCount()
+        .then((r) => {
+          if (active) setUnreadCount(r.unreadCount || 0);
+        })
+        .catch(() => {});
+      return () => {
+        active = false;
+      };
+    }, [user?.id]),
+  );
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -194,6 +215,10 @@ export default function SettingsScreen() {
       navigateRoot('SavedNews');
       return;
     }
+    if (selectedAction === 'notifications') {
+      navigateRoot('Notifications');
+      return;
+    }
     if (selectedAction === 'help') {
       openHelpModal();
       return;
@@ -212,6 +237,12 @@ export default function SettingsScreen() {
         return { title: 'Liked news', subtitle: 'Review news posts you have liked.', cta: 'Open liked news' };
       case 'saved':
         return { title: 'Saved news', subtitle: 'Open your saved news collection.', cta: 'Open saved news' };
+      case 'notifications':
+        return {
+          title: 'Notifications',
+          subtitle: 'Review notifications triggered for your selected categories.',
+          cta: 'Open notifications',
+        };
       case 'help':
         return { title: 'Help', subtitle: 'Raise a query to your school admin.', cta: 'Raise query' };
     }
@@ -245,33 +276,33 @@ export default function SettingsScreen() {
                   height={PROFILE_AVATAR_RING}
                   style={styles.avatarRingSvg}
                 >
-                  <Defs>
-                    <LinearGradient id={PROFILE_AVATAR_GRAD_ID} x1="0%" y1="0%" x2="100%" y2="100%">
-                      <Stop offset="0%" stopColor="#ff8c42" />
-                      <Stop offset="45%" stopColor="#4dabf7" />
-                      <Stop offset="100%" stopColor="#a855f7" />
-                    </LinearGradient>
-                  </Defs>
                   <Circle
                     cx={PROFILE_AVATAR_RING / 2}
                     cy={PROFILE_AVATAR_RING / 2}
                     r={PROFILE_AVATAR_R}
-                    stroke={`url(#${PROFILE_AVATAR_GRAD_ID})`}
+                    stroke="#0b4a99"
                     strokeWidth={PROFILE_AVATAR_STROKE}
                     fill="none"
                   />
                 </Svg>
                 {profileImageUrl && !profileImageFailed ? (
                   <Image
+                    key={profileImageUrl}
                     source={{ uri: profileImageUrl }}
                     style={styles.avatarImageInner}
-                    onError={() => setProfileImageFailed(true)}
+                    onError={() => {
+                      if (__DEV__) {
+                        console.warn('[SettingsScreen] profile image failed', profileImageUrl);
+                      }
+                      setProfileImageFailed(true);
+                    }}
                   />
                 ) : (
                   <View style={styles.avatarPlaceholderInner}>
                     <Text style={styles.avatarLetter}>{user.name?.charAt(0) ?? '?'}</Text>
                   </View>
                 )}
+                <View style={styles.avatarOnlineBadge} />
               </View>
             </TouchableOpacity>
             <View style={styles.profileText}>
@@ -305,6 +336,21 @@ export default function SettingsScreen() {
               onPress={() => setSelectedAction('liked')}
             >
               <Ionicons name={selectedAction === 'liked' ? 'heart' : 'heart-outline'} size={20} color="#1a1f2e" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionIconBtn, selectedAction === 'notifications' && styles.actionIconBtnActive]}
+              onPress={() => setSelectedAction('notifications')}
+            >
+              <Ionicons
+                name={selectedAction === 'notifications' ? 'notifications' : 'notifications-outline'}
+                size={20}
+                color="#1a1f2e"
+              />
+              {unreadCount > 0 ? (
+                <View style={styles.actionNotifBadgeBlack}>
+                  <Text style={styles.actionNotifBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                </View>
+              ) : null}
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionIconBtn, selectedAction === 'saved' && styles.actionIconBtnActive]}
@@ -598,6 +644,11 @@ export default function SettingsScreen() {
                 }}
                 secureTextEntry
                 autoComplete="password"
+                autoCapitalize="none"
+                autoCorrect={false}
+                textContentType="password"
+                cursorColor="#1a1f2e"
+                selectionColor="rgba(26, 31, 46, 0.25)"
               />
               {error ? <Text style={styles.modalError}>{error}</Text> : null}
               <TouchableOpacity
@@ -789,6 +840,17 @@ const styles = StyleSheet.create({
     borderRadius: PROFILE_AVATAR_INNER / 2,
     backgroundColor: '#e9ecef',
   },
+  avatarOnlineBadge: {
+    position: 'absolute',
+    right: 1,
+    top: 1,
+    width: 14,
+    height: 14,
+    borderRadius: 999,
+    backgroundColor: '#22c55e',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
   avatarLetter: {
     fontSize: 24,
     fontWeight: '700',
@@ -834,9 +896,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#eef1f6',
+    position: 'relative',
   },
   actionIconBtnActive: {
     backgroundColor: '#dbe7ff',
+  },
+  actionNotifBadgeBlack: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 999,
+    backgroundColor: '#111315',
+    borderWidth: 1.5,
+    borderColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  actionNotifBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '700',
   },
   selectedActionPanel: {
     borderRadius: 14,
@@ -1032,6 +1114,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 12,
     backgroundColor: '#fff',
+    /** Required on many Android devices or password bullets render white/invisible. */
+    color: '#1a1f2e',
   },
   modalError: {
     fontSize: 14,

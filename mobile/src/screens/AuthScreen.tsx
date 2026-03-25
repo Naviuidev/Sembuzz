@@ -107,6 +107,11 @@ export default function AuthScreen() {
               onChangeText={setPassword}
               secureTextEntry
               autoComplete="password"
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="password"
+              cursorColor="#1a1f2e"
+              selectionColor="rgba(26, 31, 46, 0.25)"
             />
 
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -180,6 +185,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 12,
     backgroundColor: '#fff',
+    /** Required on many Android devices or password bullets render white/invisible. */
+    color: '#1a1f2e',
   },
   errorText: {
     color: '#dc3545',

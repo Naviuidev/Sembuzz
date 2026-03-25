@@ -4,6 +4,7 @@ import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Navbar } from '../components/Navbar';
 import { SchoolNavbar } from '../components/SchoolNavbar';
+import { EventsBottomNav, type EventsBottomNavTab } from '../components/EventsBottomNav';
 import { useUserAuth } from '../contexts/UserAuthContext';
 import { useEventsFilter } from '../contexts/EventsFilterContext';
 import {
@@ -28,6 +29,7 @@ import { userHelpService } from '../services/user-help.service';
 import { userSchoolSocialService, type SchoolSocialAccountPublic } from '../services/user-school-social.service';
 import { getUserCategoryDone, getUserSubCategoryIds, setUserCategoryDone, setUserSubCategoryIds } from '../utils/user-category-prefs';
 import { isMobileBrowser, openSembuzzAppWithToken } from '../utils/openSembuzzApp';
+import { userNotificationsService, USER_NOTIFICATIONS_UNREAD_QUERY_KEY } from '../services/user-notifications.service';
 const DESCRIPTION_PREVIEW_LENGTH = 400;
 
 const PLATFORM_COLORS: Record<string, string> = {
@@ -1083,6 +1085,11 @@ export const PublicEvents = () => {
   const [helpSubmitLoading, setHelpSubmitLoading] = useState(false);
   const [helpSubmitError, setHelpSubmitError] = useState<string | null>(null);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState(false);
+  const [settingsSelectedAction, setSettingsSelectedAction] = useState<
+    'categories' | 'liked' | 'notifications' | 'saved' | 'help'
+  >('categories');
+  const [settingsAvatarFailed, setSettingsAvatarFailed] = useState(false);
   const [deleteAccountPassword, setDeleteAccountPassword] = useState('');
   const [deleteAccountStatus, setDeleteAccountStatus] = useState<'idle' | 'loading' | 'success' | 'failure'>('idle');
   const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
@@ -1118,8 +1125,6 @@ export const PublicEvents = () => {
     if (user && showAllSchoolsFeed) setFilterDropdownOpen(false);
   }, [user, showAllSchoolsFeed]);
   const [contentExpandedCategoryId, setContentExpandedCategoryId] = useState<string | null>(null);
-  const categoryButtonRefForContent = useRef<HTMLButtonElement | null>(null);
-  const categoryDropdownRefForContent = useRef<HTMLDivElement | null>(null);
   const contentCategoriesRef = useRef<HTMLDivElement | null>(null);
   const selectedSubCategoryIds = eventsFilter?.selectedSubCategoryIds ?? [];
   const queryClient = useQueryClient();
@@ -1199,6 +1204,15 @@ export const PublicEvents = () => {
     enabled: true,
   });
 
+  /** Same as mobile EventsScreen tab: prefer logo from feed, else user.schoolImage. */
+  const mySchoolTabLogoUrl = useMemo(() => {
+    if (!user?.schoolId) return '';
+    const hit = events.find((e: ApprovedEventPublic) => e.schoolId === user.schoolId && e.school?.image);
+    if (hit?.school?.image) return imageSrc(hit.school.image);
+    if (user.schoolImage) return imageSrc(user.schoolImage);
+    return '';
+  }, [events, user?.schoolId, user?.schoolImage]);
+
   const { data: activeBannerAds = [] } = useQuery({
     queryKey: ['public', 'banner-ads', effectiveSchoolId ?? 'all'],
     queryFn: () => publicEventsService.getActiveBannerAds(effectiveSchoolId ?? undefined),
@@ -1265,7 +1279,18 @@ export const PublicEvents = () => {
         )
       : homeCategories;
 
-  const [categoryDropdownPosition, setCategoryDropdownPosition] = useState<{ top: number; left: number } | null>(null);
+  const selectedSubCategoryMeta = useMemo(() => {
+    if (!selectedSubCategoryIds.length || !homeCategories.length) return [];
+    const byId = new Map<string, { id: string; name: string }>();
+    homeCategories.forEach((cat: CategoryPublic) => {
+      cat.subcategories.forEach((sub: { id: string; name: string }) => {
+        byId.set(sub.id, { id: sub.id, name: sub.name });
+      });
+    });
+    return selectedSubCategoryIds
+      .map((id) => byId.get(id))
+      .filter((v): v is { id: string; name: string } => !!v);
+  }, [selectedSubCategoryIds, homeCategories]);
 
   const toggleSubCategoryForContent = (subId: string, subName: string) => {
     const current = new Set(eventsFilter?.selectedSubCategoryIds ?? []);
@@ -1317,26 +1342,75 @@ export const PublicEvents = () => {
   };
 
   useEffect(() => {
-    if (!contentExpandedCategoryId) {
-      setCategoryDropdownPosition(null);
-      return;
+    setSettingsAvatarFailed(false);
+  }, [user?.id]);
+
+  const settingsActionMeta = useMemo(() => {
+    switch (settingsSelectedAction) {
+      case 'categories':
+        return {
+          title: 'Change categories',
+          subtitle: 'Update your preferred categories and subcategories.',
+          cta: 'Open categories',
+        };
+      case 'liked':
+        return { title: 'Liked news', subtitle: 'Review news posts you have liked.', cta: 'Open liked news' };
+      case 'saved':
+        return { title: 'Saved news', subtitle: 'Open your saved news collection.', cta: 'Open saved news' };
+      case 'notifications':
+        return {
+          title: 'Notifications',
+          subtitle: 'Review notifications triggered for your selected categories.',
+          cta: 'Open notifications',
+        };
+      case 'help':
+        return { title: 'Help', subtitle: 'Raise a query to your school admin.', cta: 'Raise query' };
+      default:
+        return { title: '', subtitle: '', cta: '' };
     }
-    const el = categoryButtonRefForContent.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    setCategoryDropdownPosition({ top: rect.bottom + 4, left: rect.left });
-  }, [contentExpandedCategoryId]);
+  }, [settingsSelectedAction]);
+
+  const runSettingsSelectedAction = () => {
+    switch (settingsSelectedAction) {
+      case 'categories':
+        if (!user?.schoolId) {
+          window.alert('Your account must be linked to a school to change categories.');
+          return;
+        }
+        openChangeCategoryModal();
+        return;
+      case 'liked':
+        setBottomNavActive('liked');
+        return;
+      case 'saved':
+        navigate('/saved');
+        return;
+      case 'notifications':
+        navigate('/notifications');
+        return;
+      case 'help':
+        setShowHelpModal(true);
+        return;
+      default:
+    }
+  };
+
+  const handleConfirmLogout = () => {
+    setShowLogoutConfirmModal(false);
+    logout();
+    navigate('/events');
+  };
+
+  /** Settings header avatar — user profile only (same as mobile SettingsScreen). */
+  const settingsProfilePicUrl = useMemo(() => {
+    const u = user as { profilePicUrl?: string | null; image?: string | null } | null;
+    const c = u?.profilePicUrl || u?.image || '';
+    return c ? imageSrc(c) : '';
+  }, [user]);
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      const inside = contentCategoriesRef.current?.contains(target) ?? false;
-      const insideDropdown = categoryDropdownRefForContent.current?.contains(target) ?? false;
-      if (!inside && !insideDropdown) setContentExpandedCategoryId(null);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    setSettingsAvatarFailed(false);
+  }, [settingsProfilePicUrl, user?.id]);
 
   const { data: likedEventsRaw, isLoading: likedEventsLoading, error: likedEventsError, refetch: refetchLikedEvents } = useQuery({
     queryKey: ['user', 'events', 'liked'],
@@ -1347,6 +1421,40 @@ export const PublicEvents = () => {
     enabled: !!user,
   });
   const likedEvents = likedEventsRaw ?? [];
+
+  const { data: unreadNotifData } = useQuery({
+    queryKey: USER_NOTIFICATIONS_UNREAD_QUERY_KEY,
+    queryFn: () => userNotificationsService.getUnreadCount(),
+    enabled: !!user,
+    refetchInterval: 15_000,
+  });
+  const notifUnreadCount = unreadNotifData?.unreadCount ?? 0;
+
+  const eventsBottomNavActiveTab: EventsBottomNavTab = useMemo(() => {
+    if (bottomNavActive === 'search') return 'search';
+    if (bottomNavActive === 'home') return 'home';
+    if (bottomNavActive === 'apps') return 'apps';
+    if (
+      bottomNavActive === 'settings' ||
+      bottomNavActive === 'liked' ||
+      bottomNavActive === 'help'
+    ) {
+      return 'settings';
+    }
+    return 'home';
+  }, [bottomNavActive]);
+
+  const handleEventsBottomNavSelect = (tab: EventsBottomNavTab) => {
+    if (tab === 'blogs') {
+      navigate('/blogs');
+      return;
+    }
+    setSelectedSettingsEvent(null);
+    if (tab === 'search') setBottomNavActive('search');
+    else if (tab === 'home') setBottomNavActive('home');
+    else if (tab === 'settings') setBottomNavActive('settings');
+    else if (tab === 'apps') setBottomNavActive('apps');
+  };
 
   const { data: myHelpQueries = [] } = useQuery({
     queryKey: ['user', 'help'],
@@ -1988,6 +2096,56 @@ export const PublicEvents = () => {
           </div>
         )}
 
+        {/* Log out confirmation — matches mobile SettingsScreen */}
+        {showLogoutConfirmModal && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="logout-confirm-title"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 1060,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '1rem',
+              backgroundColor: 'rgba(0,0,0,0.45)',
+            }}
+            onClick={() => setShowLogoutConfirmModal(false)}
+          >
+            <div
+              style={{
+                width: '100%',
+                maxWidth: 360,
+                background: '#fff',
+                borderRadius: 16,
+                padding: '1.25rem',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 id="logout-confirm-title" className="h5 mb-2" style={{ fontWeight: 700, color: '#1a1f2e' }}>
+                Log out
+              </h2>
+              <p className="small text-muted pb-3 mb-0">Are you sure you want to log out from your account?</p>
+              <div className="d-flex gap-2 justify-content-end">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  style={{ borderRadius: 10 }}
+                  onClick={() => setShowLogoutConfirmModal(false)}
+                >
+                  Cancel
+                </button>
+                <button type="button" className="btn btn-dark" style={{ borderRadius: 10 }} onClick={handleConfirmLogout}>
+                  Log out
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Delete account modal */}
         {showDeleteAccountModal && (
           <div
@@ -2151,12 +2309,12 @@ export const PublicEvents = () => {
               />
               <button
                 type="button"
-                className="btn btn-outline-secondary border rounded-circle d-flex align-items-center justify-content-center"
-                style={{ width: 48, height: 48, flexShrink: 0 }}
+                className="btn border-0 bg-transparent p-2 d-flex align-items-center justify-content-center"
+                style={{ flexShrink: 0, minWidth: 44, minHeight: 44 }}
                 onClick={() => { setFilterPopupOpen(true); setCategoryLoginMessage(false); }}
                 aria-label="Filter options"
               >
-                <i className="bi bi-funnel" style={{ fontSize: '1.1rem' }} />
+                <i className="bi bi-funnel" style={{ fontSize: '1.1rem', color: '#1a1f2e' }} />
               </button>
             </div>
 
@@ -2524,108 +2682,163 @@ export const PublicEvents = () => {
                 </div>
               </>
             ) : (
-              /* Logged in: profile pic with name and email beside it; action buttons with light Bootstrap bg colors */
+              /* Logged in — matches mobile SettingsScreen: profile row, 5 icon actions, detail card, recent list */
               <>
-                <div className="d-flex align-items-center gap-3 mb-4">
-                  <div
-                    title="Profile"
-                    style={{
-                      width: 64,
-                      height: 64,
-                      borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #ff8c42 0%, #4dabf7 45%, #a855f7 100%)',
-                      padding: 6,
-                      boxSizing: 'border-box',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        borderRadius: '50%',
-                        backgroundColor: 'rgb(26 31 46 / 8%)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        overflow: 'hidden',
-                      }}
+                <div className="d-flex align-items-center mb-4" style={{ gap: '1rem' }}>
+                  <div className="position-relative flex-shrink-0" style={{ width: 64, height: 64 }}>
+                    <button
+                      type="button"
+                      className="border-0 bg-transparent p-0 position-relative"
+                      style={{ width: 64, height: 64, cursor: 'pointer' }}
+                      onClick={() => navigate('/profile')}
+                      aria-label="Open profile screen"
                     >
-                      {user.profilePicUrl ? (
-                        <img
-                          src={imageSrc(user.profilePicUrl)}
-                          alt=""
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                      ) : (
-                        <i className="bi bi-person-fill" style={{ fontSize: '1.65rem', color: '#1a1f2e' }} />
-                      )}
+                      <div
+                        className="d-flex align-items-center justify-content-center"
+                        style={{
+                          width: 64,
+                          height: 64,
+                          borderRadius: '50%',
+                          border: '3px solid #0b4a99',
+                          backgroundColor: '#fff',
+                          boxSizing: 'border-box',
+                        }}
+                        aria-hidden
+                      >
+                        <div
+                          className="d-flex align-items-center justify-content-center overflow-hidden"
+                          style={{
+                            width: 52,
+                            height: 52,
+                            borderRadius: '50%',
+                            backgroundColor: '#e9ecef',
+                          }}
+                        >
+                          {settingsProfilePicUrl && !settingsAvatarFailed ? (
+                            <img
+                              key={settingsProfilePicUrl}
+                              src={settingsProfilePicUrl}
+                              alt=""
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              onError={() => setSettingsAvatarFailed(true)}
+                            />
+                          ) : (
+                            <span style={{ fontSize: '1.35rem', fontWeight: 700, color: '#6c757d' }}>
+                              {(user.name?.trim()?.charAt(0) || '?').toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span
+                        className="position-absolute rounded-circle border border-2 border-white"
+                        style={{
+                          width: 14,
+                          height: 14,
+                          backgroundColor: '#22c55e',
+                          right: 1,
+                          bottom: 1,
+                        }}
+                        title="Online"
+                        aria-hidden
+                      />
+                    </button>
+                  </div>
+                  <div className="min-width-0 flex-grow-1">
+                    <div className="d-flex align-items-center justify-content-between gap-2">
+                      <div className="fw-bold text-truncate" style={{ fontSize: '1.125rem', color: '#1a1f2e' }}>
+                        {user.name ?? 'User'}
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-link p-1 border-0"
+                        style={{ lineHeight: 1 }}
+                        onClick={() => setShowLogoutConfirmModal(true)}
+                        aria-label="Log out"
+                      >
+                        <i className="bi bi-box-arrow-right" style={{ fontSize: '1.35rem', color: '#1a1f2e' }} />
+                      </button>
                     </div>
-                  </div>
-                  <div className="min-width-0">
-                    <div className="fw-semibold text-truncate" style={{ fontSize: '1.05rem', color: '#1a1f2e' }}>{user.name}</div>
-                    <div className="small text-muted text-truncate">{user.email}</div>
+                    <div className="small text-muted text-truncate mt-1">{user.email}</div>
                   </div>
                 </div>
-                <div className="d-flex flex-wrap gap-2 mb-4" style={{ gap: '0.5rem' }}>
+
+                <div className="d-flex justify-content-between align-items-center gap-2 mb-3" style={{ marginBottom: '0.75rem' }}>
+                  {(
+                    [
+                      { key: 'categories' as const, icon: 'bi-folder', iconFill: 'bi-folder-fill' },
+                      { key: 'liked' as const, icon: 'bi-heart', iconFill: 'bi-heart-fill' },
+                      { key: 'notifications' as const, icon: 'bi-bell', iconFill: 'bi-bell-fill' },
+                      { key: 'saved' as const, icon: 'bi-bookmark', iconFill: 'bi-bookmark-fill' },
+                      { key: 'help' as const, icon: 'bi-question-circle', iconFill: 'bi-question-circle-fill' },
+                    ] as const
+                  ).map(({ key, icon, iconFill }) => {
+                    const active = settingsSelectedAction === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        className="border-0 d-flex align-items-center justify-content-center position-relative"
+                        style={{
+                          width: 46,
+                          height: 46,
+                          borderRadius: '50%',
+                          backgroundColor: active ? '#dbe7ff' : '#eef1f6',
+                          flexShrink: 0,
+                          transition: 'background 0.2s ease',
+                        }}
+                        onClick={() => setSettingsSelectedAction(key)}
+                        aria-label={key}
+                        aria-pressed={active}
+                      >
+                        <i className={`bi ${active ? iconFill : icon}`} style={{ fontSize: '1.15rem', color: '#1a1f2e' }} />
+                        {key === 'notifications' && notifUnreadCount > 0 ? (
+                          <span
+                            className="position-absolute rounded-pill text-white d-flex align-items-center justify-content-center"
+                            style={{
+                              top: -4,
+                              right: -4,
+                              minWidth: 17,
+                              height: 17,
+                              fontSize: 9,
+                              fontWeight: 700,
+                              backgroundColor: '#111315',
+                              border: '1.5px solid #fff',
+                              padding: '0 3px',
+                            }}
+                          >
+                            {notifUnreadCount > 99 ? '99+' : notifUnreadCount}
+                          </span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div
+                  className="mb-4"
+                  style={{
+                    borderRadius: 14,
+                    border: '1px solid #e4e7ee',
+                    backgroundColor: '#f9fbff',
+                    padding: 14,
+                  }}
+                >
+                  <div className="fw-bold mb-1" style={{ fontSize: '1rem', color: '#1a1f2e' }}>
+                    {settingsActionMeta.title}
+                  </div>
+                  <div className="small mb-0" style={{ color: '#5f6b7a', lineHeight: 1.35 }}>
+                    {settingsActionMeta.subtitle}
+                  </div>
                   <button
                     type="button"
-                    className="btn text-start btn-outline-dark rounded-pill d-flex align-items-center gap-2 py-2 px-3"
-                    style={{ borderRadius: '10px', flex: '0 0 auto', whiteSpace: 'nowrap' }}
-                    onClick={openChangeCategoryModal}
+                    className="btn btn-sm btn-dark mt-2"
+                    style={{ borderRadius: 10, fontWeight: 600 }}
+                    onClick={runSettingsSelectedAction}
                   >
-                    <i className="bi bi-folder" />
-                    Change categories
-                  </button>
-                  <button
-                    type="button"
-                    className="btn text-start btn-outline-dark  rounded-pill d-flex align-items-center gap-2 py-2 px-3"
-                    style={{ borderRadius: '10px', flex: '0 0 auto', whiteSpace: 'nowrap' }}
-                    onClick={() => setBottomNavActive('liked')}
-                  >
-                    <i className="bi bi-heart" />
-                    Liked news
-                  </button>
-                  <button
-                    type="button"
-                    className="btn text-start  btn-outline-dark rounded-pill d-flex align-items-center gap-2 py-2 px-3"
-                    style={{ borderRadius: '10px',  flex: '0 0 auto', whiteSpace: 'nowrap' }}
-                    onClick={() => navigate('/saved')}
-                  >
-                    <i className="bi bi-bookmark" />
-                    Saved news
-                  </button>
-                  <button
-                    type="button"
-                    className="btn text-start  btn-outline-dark rounded-pill d-flex align-items-center gap-2 py-2 px-3"
-                    style={{ borderRadius: '10px', flex: '0 0 auto', whiteSpace: 'nowrap' }}
-                    onClick={() => setShowHelpModal(true)}
-                  >
-                    <i className="bi bi-question-circle" />
-                    Help — raise a query to school admin
-                  </button>
-                  <button
-                    type="button"
-                    className="btn text-start btn-dark rounded-pill border d-flex align-items-center gap-2 py-2 px-3"
-                    style={{ borderRadius: '10px',  flex: '0 0 auto', whiteSpace: 'nowrap' }}
-                    onClick={() => { logout(); navigate('/events'); }}
-                  >
-                    <i className="bi bi-box-arrow-right" />
-                    Sign out
-                  </button>
-                  <button
-                    type="button"
-                    className="btn text-start  btn-outline-danger rounded-pill d-flex align-items-center gap-2 py-2 px-3"
-                    style={{ borderRadius: '10px',  flex: '0 0 auto', whiteSpace: 'nowrap' }}
-                    onClick={() => setShowDeleteAccountModal(true)}
-                  >
-                    <i className="bi bi-trash" />
-                    Delete account
+                    {settingsActionMeta.cta}
                   </button>
                 </div>
+
                 <hr className="my-4" />
                 <h6 className="fw-semibold mb-3" style={{ color: '#1a1f2e' }}>Recently added schools / news</h6>
                 {settingsRecentSorted.length === 0 ? (
@@ -2692,6 +2905,16 @@ export const PublicEvents = () => {
                   <a href="https://sembuzz.com/#terms-of-service" target="_blank" rel="noopener noreferrer" className="text-secondary">
                     Terms and conditions
                   </a>
+                </div>
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    className="btn btn-link btn-sm text-danger p-0 border-0"
+                    style={{ textDecoration: 'none', fontWeight: 600 }}
+                    onClick={() => setShowDeleteAccountModal(true)}
+                  >
+                    Delete account
+                  </button>
                 </div>
               </>
             )}
@@ -3157,30 +3380,70 @@ export const PublicEvents = () => {
             .content-categories-scroll { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.2) transparent; }
             .feed-tab-slide { animation: feedTabSlide 0.3s ease-out; }
             @keyframes feedTabSlide { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
-            .home-feed-tabs { display: flex; background: #000; border-bottom: 1px solid rgba(255,255,255,0.1); }
+            .home-feed-tabs-row { display: flex; align-items: stretch; background: #000; border-bottom: 1px solid rgba(255,255,255,0.1); }
+            .home-feed-tabs-gear { flex: 0 0 52px; border: none; background: transparent; display: flex; align-items: center; justify-content: center; padding: 0.75rem 0.5rem; cursor: pointer; color: #fff; transition: background 0.2s ease; }
+            .home-feed-tabs-gear:hover { background: rgba(255,255,255,0.08); }
+            .home-feed-tabs-gear i { font-size: 1.25rem; }
+            .home-feed-tabs { flex: 1; display: flex; min-width: 0; }
             .home-feed-tabs .home-feed-tab { flex: 1; border: none; background: none; padding: 0.75rem 1rem; font-size: 0.95rem; font-weight: 600; color: #8e8e8e; cursor: pointer; position: relative; transition: color 0.2s ease; }
             .home-feed-tabs .home-feed-tab:hover { color: #b0b0b0; }
             .home-feed-tabs .home-feed-tab.active { color: #fff; }
             .home-feed-tabs .home-feed-tab.active::after { content: ''; position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 70%; height: 3px; background: #fff; border-radius: 3px 3px 0 0; }
+            .home-feed-tab-inner { display: inline-flex; align-items: center; gap: 8px; }
+            .home-feed-tab-logo { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; background: #fff; flex-shrink: 0; }
+            .home-feed-tab-logo-fallback { width: 20px; height: 20px; border-radius: 50%; background: #e5e7eb; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #374151; flex-shrink: 0; }
           `}</style>
           {user && bottomNavActive === 'home' && (
-            <div className="home-feed-tabs" style={{ marginBottom: '0.5rem', borderRadius: '8px 8px 0 0', overflow: 'hidden' }}>
+            <div className="home-feed-tabs-row" style={{ marginBottom: '0.5rem', borderRadius: '8px 8px 0 0', overflow: 'hidden' }}>
               <button
                 type="button"
-                className={`home-feed-tab ${!showAllSchoolsFeed ? 'active' : ''}`}
-                onClick={() => { setShowAllSchoolsFeed(false); setUpcomingDateFilter(null); setSelectedUpcomingPost(null); }}
-                aria-pressed={!showAllSchoolsFeed}
+                className="home-feed-tabs-gear"
+                onClick={() => setBottomNavActive('settings')}
+                aria-label="Settings"
+                title="Settings"
               >
-                My school
+                <i className="bi bi-gear-fill" aria-hidden />
               </button>
-              <button
-                type="button"
-                className={`home-feed-tab ${showAllSchoolsFeed ? 'active' : ''}`}
-                onClick={() => { setShowAllSchoolsFeed(true); setUpcomingDateFilter(null); setSelectedUpcomingPost(null); }}
-                aria-pressed={showAllSchoolsFeed}
-              >
-                All schools
-              </button>
+              <div className="home-feed-tabs" role="tablist" aria-label="School feed">
+                <button
+                  type="button"
+                  role="tab"
+                  className={`home-feed-tab ${!showAllSchoolsFeed ? 'active' : ''}`}
+                  onClick={() => { setShowAllSchoolsFeed(false); setUpcomingDateFilter(null); setSelectedUpcomingPost(null); }}
+                  aria-pressed={!showAllSchoolsFeed}
+                >
+                  <span className="home-feed-tab-inner">
+                    {mySchoolTabLogoUrl ? (
+                      <img src={mySchoolTabLogoUrl} alt="" className="home-feed-tab-logo" />
+                    ) : (
+                      <span className="home-feed-tab-logo-fallback" aria-hidden>
+                        {(user.name?.trim()?.charAt(0) || 'S').toUpperCase()}
+                      </span>
+                    )}
+                    <span>My school</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  className={`home-feed-tab ${showAllSchoolsFeed ? 'active' : ''}`}
+                  onClick={() => { setShowAllSchoolsFeed(true); setUpcomingDateFilter(null); setSelectedUpcomingPost(null); }}
+                  aria-pressed={showAllSchoolsFeed}
+                >
+                  <span className="home-feed-tab-inner">
+                    <i
+                      className="bi bi-building"
+                      style={{
+                        fontSize: '14px',
+                        color: showAllSchoolsFeed ? '#fff' : '#6b7280',
+                        flexShrink: 0,
+                      }}
+                      aria-hidden
+                    />
+                    <span>All schools</span>
+                  </span>
+                </button>
+              </div>
             </div>
           )}
           <div className="d-flex justify-content-between align-items-center gap-2">
@@ -3224,27 +3487,29 @@ export const PublicEvents = () => {
                       {selectedSubCategoryIds.length > 0 && (
                         <button
                           type="button"
-                          className="btn btn-link btn-sm text-muted p-0 text-nowrap"
-                          style={{ fontSize: '0.8rem', textDecoration: 'none', flexShrink: 0 }}
+                          className="btn btn-sm rounded-pill flex-shrink-0 btn-outline-dark text-nowrap"
+                          style={{ fontWeight: 600, padding: '0.35rem 0.75rem', fontSize: '0.8125rem' }}
                           onClick={clearContentCategoryFilter}
                         >
-                          All
+                          Reset All
                         </button>
                       )}
                       {homeContentCategories.map((cat: CategoryPublic) => {
                         const hasSelection = selectedSubCategoryIds.some((id: string) =>
                           cat.subcategories.some((s: { id: string }) => s.id === id),
                         );
+                        const isOpen = contentExpandedCategoryId === cat.id;
+                        const emphasis = hasSelection || isOpen;
                         return (
                           <button
                             key={cat.id}
-                            ref={contentExpandedCategoryId === cat.id ? categoryButtonRefForContent : null}
                             type="button"
-                            className="btn btn-sm btn-rounded-pill rounded-pill flex-shrink-0 btn-outline-dark text-nowrap"
+                            className="btn btn-sm rounded-pill flex-shrink-0 btn-outline-dark text-nowrap"
                             style={{
-                              fontWeight: hasSelection ? 600 : 400,
+                              fontWeight: emphasis ? 600 : 400,
                               padding: '0.35rem 0.75rem',
                               fontSize: '0.875rem',
+                              borderColor: emphasis ? '#212529' : '#343a40',
                             }}
                             onClick={() => {
                               const next = contentExpandedCategoryId === cat.id ? null : cat.id;
@@ -3252,6 +3517,7 @@ export const PublicEvents = () => {
                               if (next) eventsFilter?.setSelectedCategory(cat.id, cat.name);
                             }}
                             title={cat.name}
+                            aria-expanded={isOpen}
                           >
                             {cat.name}
                           </button>
@@ -3337,52 +3603,150 @@ export const PublicEvents = () => {
             )}
           </div>
 
-        {/* Category subcategory dropdown — right above the news, portal */}
+          {user && !showAllSchoolsFeed && selectedSubCategoryMeta.length > 0 && (
+            <div
+              className="d-flex flex-wrap gap-2 px-2 py-2"
+              style={{
+                backgroundColor: '#fff',
+                borderRadius: '0 0 8px 8px',
+                marginTop: -1,
+              }}
+            >
+              {selectedSubCategoryMeta.map((sub) => (
+                <button
+                  key={sub.id}
+                  type="button"
+                  className="d-inline-flex align-items-center gap-2 border-0 rounded-pill"
+                  style={{
+                    backgroundColor: '#212529',
+                    color: '#fff',
+                    fontSize: '0.8125rem',
+                    fontWeight: 600,
+                    padding: '7px 8px 7px 12px',
+                  }}
+                  onClick={() => toggleSubCategoryForContent(sub.id, sub.name)}
+                  aria-label={`Remove ${sub.name}`}
+                >
+                  <span>{sub.name}</span>
+                  <span
+                    className="d-inline-flex align-items-center justify-content-center rounded-circle"
+                    style={{
+                      width: 18,
+                      height: 18,
+                      backgroundColor: 'rgba(255,255,255,0.24)',
+                      fontSize: 13,
+                      fontWeight: 700,
+                      lineHeight: 1,
+                    }}
+                    aria-hidden
+                  >
+                    ×
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+        {/* Subcategory picker — glass modal (matches mobile EventsScreen) */}
         {contentExpandedCategoryId &&
-          categoryDropdownPosition &&
           (() => {
             const cat = homeCategories.find((c: CategoryPublic) => c.id === contentExpandedCategoryId);
             if (!cat) return null;
-            return createPortal(
+            return (
               <div
-                ref={categoryDropdownRefForContent}
-                className="dropdown-menu show shadow-sm border py-1 bg-white"
+                role="presentation"
+                className="subcat-glass-overlay"
                 style={{
                   position: 'fixed',
-                  top: categoryDropdownPosition.top,
-                  left: categoryDropdownPosition.left,
-                  borderRadius: '8px',
-                  minWidth: '200px',
-                  maxHeight: '70vh',
-                  overflowY: 'auto',
-                  zIndex: 1050,
+                  inset: 0,
+                  zIndex: 1060,
+                  backgroundColor: 'rgba(0,0,0,0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 20,
                 }}
+                onClick={() => setContentExpandedCategoryId(null)}
               >
-                {cat.subcategories.length === 0 ? (
-                  <div className="dropdown-item-text small text-muted">No subcategories</div>
-                ) : (
-                  <>
-                    <div className="dropdown-item-text small fw-600 text-secondary border-bottom">
-                      {cat.name}
+                <div
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="subcat-modal-title"
+                  className="subcat-glass-modal"
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.82)',
+                    backdropFilter: 'blur(12px)',
+                    WebkitBackdropFilter: 'blur(12px)',
+                    borderRadius: 22,
+                    border: '1px solid rgba(208,220,243,0.9)',
+                    width: '100%',
+                    maxWidth: 340,
+                    maxHeight: '78vh',
+                    boxShadow: '0 10px 30px rgba(31, 77, 168, 0.22)',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h2
+                    id="subcat-modal-title"
+                    className="mb-0 pb-2 border-bottom"
+                    style={{
+                      fontSize: '1.05rem',
+                      fontWeight: 700,
+                      color: '#0b1f3f',
+                      padding: '12px 18px 10px',
+                      borderColor: 'rgba(176,190,215,0.5)',
+                    }}
+                  >
+                    {cat.name}
+                  </h2>
+                  {cat.subcategories.length === 0 ? (
+                    <p className="small mb-0 px-3 py-3" style={{ color: '#0f2b52' }}>
+                      No subcategories
+                    </p>
+                  ) : (
+                    <div className="flex-grow-1 overflow-auto" style={{ maxHeight: 360 }}>
+                      {cat.subcategories.map((sub: { id: string; name: string }) => {
+                        const checked = selectedSubCategoryIds.includes(sub.id);
+                        return (
+                          <button
+                            key={sub.id}
+                            type="button"
+                            className="w-100 d-flex align-items-center gap-3 border-0 text-start bg-transparent"
+                            style={{
+                              padding: '11px 18px',
+                              borderBottom: '1px solid rgba(176,190,215,0.42)',
+                              cursor: 'pointer',
+                            }}
+                            onClick={() => toggleSubCategoryForContent(sub.id, sub.name)}
+                          >
+                            <span
+                              className="d-inline-flex align-items-center justify-content-center flex-shrink-0"
+                              style={{
+                                width: 18,
+                                height: 18,
+                                borderRadius: 4,
+                                border: '1px solid rgba(11,31,63,0.48)',
+                                backgroundColor: checked ? '#212529' : 'rgba(255,255,255,0.92)',
+                                color: '#fff',
+                                fontSize: 11,
+                                fontWeight: 700,
+                              }}
+                            >
+                              {checked ? '✓' : ''}
+                            </span>
+                            <span className="fw-semibold" style={{ fontSize: 15, color: '#0b1f3f' }}>
+                              {sub.name}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
-                    {cat.subcategories.map((sub: { id: string; name: string }) => (
-                      <label
-                        key={sub.id}
-                        className="dropdown-item small d-flex align-items-center gap-2 mb-0"
-                        style={{ cursor: 'pointer', minHeight: 'unset' }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedSubCategoryIds.includes(sub.id)}
-                          onChange={() => toggleSubCategoryForContent(sub.id, sub.name)}
-                        />
-                        {sub.name}
-                      </label>
-                    ))}
-                  </>
-                )}
-              </div>,
-              document.body,
+                  )}
+                </div>
+              </div>
             );
           })()}
 
@@ -3947,112 +4311,24 @@ export const PublicEvents = () => {
         )}
       </div>
 
-      {/* Bottom fixed menu: above login/signup overlays so users can navigate during auth flows */}
-      <div
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          zIndex: showSettingsLoginPopup || showSignupPopup || showFirstLoginCategories || showChangeCategoryModal || showHelpModal || showDeleteAccountModal ? 1070 : 1030,
-          display: 'flex',
-          justifyContent: 'center',
-          paddingLeft: '1rem',
-          paddingRight: '1rem',
-          transform: bottomNavVisible ? 'translateY(0)' : 'translateY(120%)',
-          opacity: bottomNavVisible ? 1 : 0,
-          transition: 'transform 260ms ease, opacity 260ms ease',
-          pointerEvents: bottomNavVisible ? 'auto' : 'none',
-        }}
-      >
-        <div
-          className="bottom-nav-bar bottom-nav-white"
-          style={{
-            width: '100%',
-            maxWidth: '600px',
-          }}
-        >
-          <div className="d-flex justify-content-between align-items-center py-2 px-2">
-            <button
-              type="button"
-              className={`bottom-nav-btn ${bottomNavActive === 'search' ? 'active' : ''}`}
-              aria-label="Search"
-              onClick={() => setBottomNavActive('search')}
-            >
-              <i className="bi bi-search" style={{ fontSize: '1.35rem' }} />
-              {bottomNavActive === 'search' && <span className="bottom-nav-label">Search</span>}
-            </button>
-            <button
-              type="button"
-              className={`bottom-nav-btn ${bottomNavActive === 'home' ? 'active' : ''}`}
-              aria-label="Home"
-              onClick={() => { setSelectedSettingsEvent(null); setBottomNavActive('home'); }}
-            >
-              <i className="bi bi-house-door" style={{ fontSize: '1.35rem' }} />
-              {bottomNavActive === 'home' && <span className="bottom-nav-label">Home</span>}
-            </button>
-            <button
-              type="button"
-              className={`bottom-nav-btn ${bottomNavActive === 'settings' ? 'active' : ''}`}
-              aria-label="Settings"
-              onClick={() => setBottomNavActive('settings')}
-            >
-              <i className="bi bi-gear" style={{ fontSize: '1.35rem' }} />
-              {bottomNavActive === 'settings' && <span className="bottom-nav-label">Settings</span>}
-            </button>
-            <button
-              type="button"
-              className={`bottom-nav-btn ${bottomNavActive === 'apps' ? 'active' : ''}`}
-              aria-label="Apps"
-              onClick={() => setBottomNavActive('apps')}
-            >
-              <i className="bi bi-grid-3x3-gap" style={{ fontSize: '1.35rem' }} />
-              {bottomNavActive === 'apps' && <span className="bottom-nav-label">Apps</span>}
-            </button>
-          </div>
-        </div>
-      </div>
-      <style>{`
-        .bottom-nav-bar.bottom-nav-white {
-          background: #fff;
-          border-top-left-radius: 24px;
-          border-top-right-radius: 24px;
-          box-shadow: 0 -2px 16px rgba(0,0,0,0.08);
+      {/* Bottom nav — matches mobile: 5 icons, no labels, profile + badge on account */}
+      <EventsBottomNav
+        activeTab={eventsBottomNavActiveTab}
+        onSelectTab={handleEventsBottomNavSelect}
+        notifUnreadCount={notifUnreadCount}
+        visible={bottomNavVisible}
+        zIndex={
+          showSettingsLoginPopup ||
+          showSignupPopup ||
+          showFirstLoginCategories ||
+          showChangeCategoryModal ||
+          showHelpModal ||
+          showDeleteAccountModal ||
+          showLogoutConfirmModal
+            ? 1070
+            : 1030
         }
-        .bottom-nav-bar.bottom-nav-white .bottom-nav-btn {
-          background: none;
-          border: none;
-          padding: 0.5rem 0.75rem;
-          cursor: pointer;
-          color: #1a1f2e;
-          transition: color 0.2s ease, background 0.3s ease, box-shadow 0.3s ease, opacity 0.2s ease;
-          border-radius: 999px;
-          display: inline-flex;
-          align-items: center;
-          gap: 0.4rem;
-        }
-        .bottom-nav-bar.bottom-nav-white .bottom-nav-btn:hover {
-          color: #d5d1c3;
-        }
-        .bottom-nav-bar.bottom-nav-white .bottom-nav-btn.active {
-          background: #f0f0f0;
-          color: #1a1f2e;
-          box-shadow: 0 1px 6px rgba(0,0,0,0.08);
-        }
-        .bottom-nav-bar.bottom-nav-white .bottom-nav-btn.active:hover {
-          color: #1a1f2e;
-        }
-        .bottom-nav-bar.bottom-nav-white .bottom-nav-label {
-          font-size: 0.875rem;
-          font-weight: 500;
-          color: #1a1f2e;
-          animation: bottom-nav-label-in 0.25s ease;
-        }
-        @keyframes bottom-nav-label-in {
-          from { opacity: 0; transform: scale(0.92); }
-          to { opacity: 1; transform: scale(1); }
-        }
-      `}</style>
+      />
     </div>
   );
 }

@@ -6,3 +6,4 @@ export { default as AppsScreen } from './AppsScreen';
 export { default as BlogsScreen } from './BlogsScreen';
 export { default as LikedNewsScreen } from './LikedNewsScreen';
 export { default as SavedNewsScreen } from './SavedNewsScreen';
+export { default as NotificationsScreen } from './NotificationsScreen';

@@ -145,6 +145,11 @@ export default function ProfileScreen() {
                 setDeleteError(null);
               }}
               secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="password"
+              cursorColor="#1a1f2e"
+              selectionColor="rgba(26, 31, 46, 0.25)"
             />
             {deleteError ? <Text style={styles.errorText}>{deleteError}</Text> : null}
             <View style={styles.actionsRow}>

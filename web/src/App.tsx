@@ -90,6 +90,10 @@ import { PublicEvents } from './pages/PublicEvents';
 import { PublicBlogs } from './pages/PublicBlogs';
 import { PublicBlogDetail } from './pages/PublicBlogDetail';
 import { SavedItems } from './pages/SavedItems';
+import { Notifications } from './pages/Notifications';
+import { AccountProfile } from './pages/AccountProfile';
+import { EditProfile } from './pages/EditProfile';
+import { ViewProfile } from './pages/ViewProfile';
 
 const queryClient = new QueryClient();
 
@@ -631,7 +635,11 @@ const AppRoutes = () => {
       <Route path="/verify-approval" element={<VerifyApproval />} />
       <Route path="/login" element={<Navigate to="/events" state={{ openAuth: 'login' }} replace />} />
       <Route path="/saved" element={<SavedItems />} />
-      
+      <Route path="/notifications" element={<Notifications />} />
+      <Route path="/profile" element={<AccountProfile />} />
+      <Route path="/profile/edit" element={<EditProfile />} />
+      <Route path="/profile/view" element={<ViewProfile />} />
+
       {/* Super Admin Routes */}
       <Route path="/super-admin/*" element={<SuperAdminRoutes />} />
       

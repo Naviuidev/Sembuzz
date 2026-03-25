@@ -18,6 +18,7 @@ export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
   LikedNews: undefined;
   SavedNews: undefined;
+  Notifications: undefined;
   Profile: undefined;
   EditProfile: undefined;
   ViewProfile: undefined;

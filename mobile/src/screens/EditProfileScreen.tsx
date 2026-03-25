@@ -4,6 +4,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -56,6 +57,7 @@ export default function EditProfileScreen() {
   const [profilePicUrl, setProfilePicUrl] = useState(user?.profilePicUrl || '');
   const [showEmailTooltip, setShowEmailTooltip] = useState(false);
   const [changePassword, setChangePassword] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -208,7 +210,7 @@ export default function EditProfileScreen() {
           automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.title}>Edit profile</Text>
+         
 
         <View style={styles.picRow}>
           <TouchableOpacity
@@ -291,41 +293,28 @@ export default function EditProfileScreen() {
 
         <View style={styles.passwordToggleRow}>
           <Text style={styles.fieldLabel}>Change password</Text>
-          <Pressable onPress={() => setChangePassword((prev) => !prev)} style={styles.toggleBtn}>
+          <Pressable
+            onPress={() => {
+              if (changePassword) {
+                setChangePassword(false);
+                setCurrentPassword('');
+                setNewPassword('');
+                setConfirmPassword('');
+                return;
+              }
+              setChangePassword(true);
+              setShowPasswordModal(true);
+            }}
+            style={styles.toggleBtn}
+          >
             <Text style={styles.toggleBtnText}>{changePassword ? 'Selected' : 'Select'}</Text>
           </Pressable>
         </View>
 
         {changePassword ? (
-          <View style={styles.passwordFieldsWrap}>
-            <Text style={styles.fieldLabel}>Current password</Text>
-            <TextInput
-              style={styles.input}
-              secureTextEntry
-              value={currentPassword}
-              onChangeText={setCurrentPassword}
-              placeholder="Current password"
-              placeholderTextColor="#9aa0a6"
-            />
-            <Text style={styles.fieldLabel}>New password</Text>
-            <TextInput
-              style={styles.input}
-              secureTextEntry
-              value={newPassword}
-              onChangeText={setNewPassword}
-              placeholder="New password"
-              placeholderTextColor="#9aa0a6"
-            />
-            <Text style={styles.fieldLabel}>Confirm password</Text>
-            <TextInput
-              style={styles.input}
-              secureTextEntry
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              placeholder="Confirm password"
-              placeholderTextColor="#9aa0a6"
-            />
-          </View>
+          <Pressable style={styles.passwordHintPill} onPress={() => setShowPasswordModal(true)}>
+            <Text style={styles.passwordHintText}>Password fields added. Tap to edit.</Text>
+          </Pressable>
         ) : null}
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -338,6 +327,77 @@ export default function EditProfileScreen() {
             <Text style={styles.submitBtnText}>{saving ? 'Submitting...' : 'Submit'}</Text>
           </TouchableOpacity>
         </ScrollView>
+
+        <Modal
+          visible={showPasswordModal}
+          animationType="fade"
+          transparent
+          onRequestClose={() => setShowPasswordModal(false)}
+        >
+          <Pressable style={styles.passwordModalOverlay} onPress={() => setShowPasswordModal(false)}>
+            <Pressable style={styles.passwordModalCard} onPress={(e) => e.stopPropagation()}>
+              <Text style={styles.passwordModalTitle}>Change password</Text>
+              <Text style={styles.passwordModalDesc}>Enter current and new password details.</Text>
+
+              <View style={styles.passwordModalFieldBlock}>
+                <Text style={styles.passwordModalFieldLabel}>Current password</Text>
+                <TextInput
+                  style={styles.passwordModalInput}
+                  secureTextEntry
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  placeholder="Current password"
+                  placeholderTextColor="#9aa0a6"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  textContentType="password"
+                  cursorColor="#1a1f2e"
+                  selectionColor="rgba(26, 31, 46, 0.25)"
+                />
+              </View>
+
+              <View style={styles.passwordModalFieldBlock}>
+                <Text style={styles.passwordModalFieldLabel}>New password</Text>
+                <TextInput
+                  style={styles.passwordModalInput}
+                  secureTextEntry
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  placeholder="New password"
+                  placeholderTextColor="#9aa0a6"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  textContentType="newPassword"
+                  cursorColor="#1a1f2e"
+                  selectionColor="rgba(26, 31, 46, 0.25)"
+                />
+              </View>
+
+              <View style={styles.passwordModalFieldBlock}>
+                <Text style={styles.passwordModalFieldLabel}>Confirm password</Text>
+                <TextInput
+                  style={styles.passwordModalInput}
+                  secureTextEntry
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  placeholder="Confirm password"
+                  placeholderTextColor="#9aa0a6"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  textContentType="newPassword"
+                  cursorColor="#1a1f2e"
+                  selectionColor="rgba(26, 31, 46, 0.25)"
+                />
+              </View>
+
+              <View style={styles.passwordModalActions}>
+                <TouchableOpacity style={styles.passwordModalCancelBtn} onPress={() => setShowPasswordModal(false)}>
+                  <Text style={styles.passwordModalCancelText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -416,7 +476,92 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
   },
   toggleBtnText: { fontSize: 12, color: '#1a1f2e', fontWeight: '600' },
-  passwordFieldsWrap: { marginTop: 4 },
+  passwordHintPill: {
+    marginTop: 4,
+    marginBottom: 10,
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#dde2e8',
+    backgroundColor: '#f6f8fb',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  passwordHintText: {
+    fontSize: 12,
+    color: '#5f6b7a',
+    fontWeight: '600',
+  },
+  passwordModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    padding: 18,
+  },
+  passwordModalCard: {
+    backgroundColor: 'rgba(255,255,255,0.82)',
+    borderRadius: 22,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(208,220,243,0.9)',
+    shadowColor: '#1f4da8',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 30,
+    elevation: 14,
+  },
+  passwordModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0b1f3f',
+    marginBottom: 4,
+    fontFamily: 'Poppins-SemiBold',
+  },
+  passwordModalDesc: {
+    fontSize: 13,
+    color: '#0f2b52',
+    marginBottom: 12,
+    fontFamily: 'Poppins-Regular',
+  },
+  passwordModalFieldBlock: {
+    marginTop: 6,
+    marginBottom: 10,
+  },
+  passwordModalFieldLabel: {
+    fontSize: 13,
+    color: '#0f2b52',
+    marginBottom: 8,
+    fontWeight: '600',
+    fontFamily: 'Poppins-SemiBold',
+  },
+  passwordModalInput: {
+    borderWidth: 1,
+    borderColor: '#dfe6ef',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    color: '#1a1f2e',
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    fontFamily: 'Poppins-Regular',
+  },
+  passwordModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  passwordModalCancelBtn: {
+    backgroundColor: '#111315',
+    borderRadius: 12,
+    paddingVertical: 12,
+    width: '100%',
+    alignItems: 'center',
+  },
+  passwordModalCancelText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+    fontFamily: 'Poppins-SemiBold',
+  },
   errorText: { color: '#dc3545', fontSize: 13, marginBottom: 12 },
   submitBtn: {
     marginTop: 8,

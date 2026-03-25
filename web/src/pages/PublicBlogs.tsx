@@ -1,7 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Navbar } from '../components/Navbar';
+import { EventsBottomNav } from '../components/EventsBottomNav';
+import { useUserAuth } from '../contexts/UserAuthContext';
+import { userNotificationsService, USER_NOTIFICATIONS_UNREAD_QUERY_KEY } from '../services/user-notifications.service';
 import {
   publicBlogsService,
   type PublishedBlogListItem,
@@ -32,6 +35,8 @@ const ALL_CATEGORY = 'all';
 const ALL_SCHOOL = 'all';
 
 export const PublicBlogs = () => {
+  const navigate = useNavigate();
+  const { user } = useUserAuth();
   const [searchParams] = useSearchParams();
   /** Optional URL filter; omit to list blogs from all schools (browse by school in sidebar). */
   const schoolIdFromUrl = searchParams.get('schoolId') || undefined;
@@ -57,6 +62,14 @@ export const PublicBlogs = () => {
         q: debouncedSearch || undefined,
       }),
   });
+
+  const { data: unreadNotifData } = useQuery({
+    queryKey: USER_NOTIFICATIONS_UNREAD_QUERY_KEY,
+    queryFn: () => userNotificationsService.getUnreadCount(),
+    enabled: !!user,
+    refetchInterval: 15_000,
+  });
+  const notifUnreadCount = unreadNotifData?.unreadCount ?? 0;
 
   const categories = useMemo(() => {
     const seen = new Map<string, string>();
@@ -116,7 +129,7 @@ export const PublicBlogs = () => {
   const gridBlogs = filteredBlogs.slice(1);
 
   return (
-    <div className="min-vh-100" style={{ backgroundColor: '#f4f5f7' }}>
+    <div className="min-vh-100" style={{ backgroundColor: '#f4f5f7', paddingBottom: '5.5rem' }}>
       <Navbar />
 
       {/* Header: pill + H1 + subtext */}
@@ -560,6 +573,15 @@ export const PublicBlogs = () => {
           box-shadow: 0 12px 28px rgba(26,31,46,0.12) !important;
         }
       `}</style>
+
+      <EventsBottomNav
+        activeTab="blogs"
+        onSelectTab={(tab) => {
+          if (tab === 'blogs') return;
+          navigate('/events', { state: { bottomNav: tab } });
+        }}
+        notifUnreadCount={notifUnreadCount}
+      />
     </div>
   );
 };

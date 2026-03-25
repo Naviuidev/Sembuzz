@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { SchoolNavbar } from '../components/SchoolNavbar';
+import { EventsBottomNav, type EventsBottomNavTab } from '../components/EventsBottomNav';
 import { useUserAuth } from '../contexts/UserAuthContext';
 import { userEventsService, type SavedEventItem } from '../services/user-events.service';
+import { userNotificationsService, USER_NOTIFICATIONS_UNREAD_QUERY_KEY } from '../services/user-notifications.service';
 import { imageSrc } from '../utils/image';
 
 function parseImageUrls(imageUrls: string | null): string[] {
@@ -96,7 +98,7 @@ function SavedEventDetail({ event, onBack }: { event: SavedEventItem; onBack: ()
   );
 }
 
-/** Compact row: school logo + title + location (no full news). */
+/** Compact row — same layout as Liked news list in PublicEvents */
 function SavedEventRow({ event, onSelect }: { event: SavedEventItem; onSelect: () => void }) {
   const schoolName = event.school?.name ?? 'School';
   const schoolLogo = event.school?.image ?? null;
@@ -107,6 +109,14 @@ function SavedEventRow({ event, onSelect }: { event: SavedEventItem; onSelect: (
       className="d-flex align-items-center gap-3 p-3 rounded-3 border bg-white"
       style={{ borderColor: '#eee', cursor: 'pointer' }}
       onClick={onSelect}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
     >
       {schoolLogo ? (
         <img src={imageSrc(schoolLogo)} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
@@ -119,7 +129,7 @@ function SavedEventRow({ event, onSelect }: { event: SavedEventItem; onSelect: (
         <div style={{ fontWeight: 600, color: '#1a1f2e', fontSize: '0.95rem' }}>{event.title}</div>
         <div style={{ fontSize: '0.8rem', color: '#6c757d' }}>{location}</div>
       </div>
-      <i className="bi bi-chevron-right text-muted" style={{ fontSize: '1rem' }} />
+      <i className="bi bi-chevron-right text-muted" style={{ fontSize: '1rem' }} aria-hidden />
     </div>
   );
 }
@@ -129,127 +139,97 @@ export const SavedItems = () => {
   const navigate = useNavigate();
   const [selectedEvent, setSelectedEvent] = useState<SavedEventItem | null>(null);
 
-  const { data: savedEvents = [], isLoading, error } = useQuery({
+  const { data: savedEvents = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['user', 'events', 'saved'],
     queryFn: () => userEventsService.getSavedEvents(),
     enabled: !!user,
   });
+
+  const { data: unreadNotifData } = useQuery({
+    queryKey: USER_NOTIFICATIONS_UNREAD_QUERY_KEY,
+    queryFn: () => userNotificationsService.getUnreadCount(),
+    enabled: !!user,
+    refetchInterval: 15_000,
+  });
+  const notifUnreadCount = unreadNotifData?.unreadCount ?? 0;
+
+  const handleBottomNav = (tab: EventsBottomNavTab) => {
+    if (tab === 'blogs') {
+      navigate('/blogs');
+      return;
+    }
+    navigate('/events', { state: { bottomNav: tab } });
+  };
 
   if (!user) {
     navigate('/events', { replace: true, state: { openAuth: 'login' } });
     return null;
   }
 
+  const loadError = isError ? 'Could not load saved news. Pull down to try again.' : null;
+
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fafafa', paddingBottom: '5rem' }}>
+    <div className="min-h-screen" style={{ backgroundColor: '#fafafa', paddingBottom: '5.5rem' }}>
       <SchoolNavbar />
-      <div className="container py-4">
+      <div className="container py-4" style={{ maxWidth: 640 }}>
         {selectedEvent ? (
           <SavedEventDetail event={selectedEvent} onBack={() => setSelectedEvent(null)} />
         ) : (
           <>
-        <div className="d-flex align-items-center gap-2 mb-3">
-          <button
-            type="button"
-            className="btn btn-link p-0 text-decoration-none d-flex align-items-center"
-            onClick={() => navigate('/events', { state: { bottomNav: 'settings' } })}
-            aria-label="Back to Settings"
-          >
-            <i className="bi bi-arrow-left" style={{ fontSize: '1.25rem', color: '#1a1f2e' }} />
-          </button>
-          <h1 className="mb-0" style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1a1f2e' }}>
-            Saved items
-          </h1>
-        </div>
-        {isLoading ? (
-          <div className="text-center py-5">
-            <div className="spinner-border text-secondary" role="status" />
-            <p className="mt-2 mb-0 text-muted">Loading saved posts…</p>
-          </div>
-        ) : error ? (
-          <div className="alert alert-danger" style={{ borderRadius: '8px' }}>
-            Failed to load saved items.
-          </div>
-        ) : savedEvents.length === 0 ? (
-          <div className="card border-0 shadow-sm" style={{ borderRadius: '12px' }}>
-            <div className="card-body text-center py-5">
-              <i className="bi bi-bookmark" style={{ fontSize: '3rem', color: '#8e8e8e', marginBottom: '1rem' }} />
-              <p className="text-muted mb-0">No saved posts yet. Save posts from the feed to see them here.</p>
+            <div className="d-flex align-items-center gap-2 mb-3">
               <button
                 type="button"
-                className="btn btn-primary mt-3"
-                style={{ borderRadius: '8px' }}
-                onClick={() => navigate('/events')}
+                className="btn btn-link p-0 text-decoration-none d-flex align-items-center"
+                onClick={() => navigate('/events', { state: { bottomNav: 'settings' } })}
+                aria-label="Back to Settings"
               >
-                Go to Feeds
+                <i className="bi bi-arrow-left" style={{ fontSize: '1.25rem', color: '#1a1f2e' }} />
               </button>
+              <h1 className="mb-0" style={{ fontSize: '1.5rem', fontWeight: 600, color: '#1a1f2e' }}>
+                Saved news
+              </h1>
             </div>
-          </div>
-        ) : (
-          <div className="d-flex flex-column gap-2" style={{ maxWidth: '600px', margin: '0 auto' }}>
-            {savedEvents.map((event: SavedEventItem) => (
-              <SavedEventRow key={event.id} event={event} onSelect={() => setSelectedEvent(event)} />
-            ))}
-          </div>
-        )}
+
+            {isLoading ? (
+              <div className="text-center py-5">
+                <div className="spinner-border text-secondary" role="status" />
+                <p className="mt-2 mb-0 text-muted small">Loading…</p>
+              </div>
+            ) : loadError && savedEvents.length === 0 ? (
+              <div className="text-center py-5">
+                <p className="text-muted small mb-3">{loadError}</p>
+                <button type="button" className="btn btn-outline-primary btn-sm rounded-pill" onClick={() => void refetch()}>
+                  Try again
+                </button>
+              </div>
+            ) : savedEvents.length === 0 ? (
+              <p className="text-muted text-center py-5 small mb-0">
+                No saved posts yet. Save posts from your home feed to see them here.
+              </p>
+            ) : (
+              <div className="d-flex flex-column gap-2" style={{ maxWidth: 600, margin: '0 auto' }}>
+                {savedEvents.map((event: SavedEventItem) => (
+                  <SavedEventRow key={event.id} event={event} onSelect={() => setSelectedEvent(event)} />
+                ))}
+              </div>
+            )}
+
+            {!isLoading && savedEvents.length > 0 && (
+              <div className="text-center mt-3">
+                <button type="button" className="btn btn-link btn-sm text-muted" onClick={() => void refetch()}>
+                  Refresh
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
 
-      {/* Bottom nav — same as PublicEvents (Search, Home, Settings, Apps) */}
-      <div
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          zIndex: 1030,
-          display: 'flex',
-          justifyContent: 'center',
-          paddingLeft: '1rem',
-          paddingRight: '1rem',
-        }}
-      >
-        <div className="bottom-nav-bar bottom-nav-white" style={{ width: '100%', maxWidth: '600px' }}>
-          <div className="d-flex justify-content-between align-items-center py-2 px-2">
-            <button type="button" className="bottom-nav-btn" aria-label="Search" onClick={() => navigate('/events', { state: { bottomNav: 'search' } })}>
-              <i className="bi bi-search" style={{ fontSize: '1.35rem' }} />
-            </button>
-            <button type="button" className="bottom-nav-btn" aria-label="Home" onClick={() => navigate('/events', { state: { bottomNav: 'home' } })}>
-              <i className="bi bi-house-door" style={{ fontSize: '1.35rem' }} />
-            </button>
-            <button type="button" className="bottom-nav-btn" aria-label="Settings" onClick={() => navigate('/events', { state: { bottomNav: 'settings' } })}>
-              <i className="bi bi-gear" style={{ fontSize: '1.35rem' }} />
-            </button>
-            <button type="button" className="bottom-nav-btn" aria-label="Apps" onClick={() => navigate('/events', { state: { bottomNav: 'apps' } })}>
-              <i className="bi bi-grid-3x3-gap" style={{ fontSize: '1.35rem' }} />
-            </button>
-          </div>
-        </div>
-      </div>
-      <style>{`
-        .bottom-nav-bar.bottom-nav-white {
-          background: #fff;
-          border-top-left-radius: 24px;
-          border-top-right-radius: 24px;
-          box-shadow: 0 -2px 16px rgba(0,0,0,0.08);
-        }
-        .bottom-nav-bar.bottom-nav-white .bottom-nav-btn {
-          background: none;
-          border: none;
-          padding: 0.5rem 0.75rem;
-          cursor: pointer;
-          color: #1a1f2e;
-          transition: color 0.2s ease, background 0.3s ease;
-          border-radius: 999px;
-          display: inline-flex;
-          align-items: center;
-          gap: 0.4rem;
-        }
-        .bottom-nav-bar.bottom-nav-white .bottom-nav-btn:hover {
-          color: #d5d1c3;
-        }
-      `}</style>
+      <EventsBottomNav
+        activeTab="settings"
+        onSelectTab={handleBottomNav}
+        notifUnreadCount={notifUnreadCount}
+      />
     </div>
   );
 };

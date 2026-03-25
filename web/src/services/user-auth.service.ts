@@ -3,11 +3,22 @@ import { api } from '../config/api';
 export interface UserAuthUser {
   id: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
   schoolId: string;
   schoolName: string;
   schoolImage?: string;
   profilePicUrl?: string;
+}
+
+export interface UpdateProfilePayload {
+  firstName: string;
+  lastName: string;
+  profilePicUrl: string;
+  currentPassword?: string;
+  newPassword?: string;
+  confirmPassword?: string;
 }
 
 export interface RegisterDto {
@@ -85,6 +96,11 @@ export const userAuthService = {
 
   getMe: async (): Promise<UserAuthUser> => {
     const response = await api.get<UserAuthUser>('/user/auth/me');
+    return response.data;
+  },
+
+  updateProfile: async (payload: UpdateProfilePayload): Promise<UserAuthUser> => {
+    const response = await api.post<UserAuthUser>('/user/auth/update-profile', payload);
     return response.data;
   },
 

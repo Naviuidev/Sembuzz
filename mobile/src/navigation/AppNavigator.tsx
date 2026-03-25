@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { AppState, View, StyleSheet, TouchableOpacity, Image, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -12,12 +12,16 @@ import {
   BlogsScreen,
   LikedNewsScreen,
   SavedNewsScreen,
+  NotificationsScreen,
 } from '../screens';
 import ProfileScreen from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import ViewProfileScreen from '../screens/ViewProfileScreen';
 import SettingsStackNavigator from './SettingsStack';
 import type { MainTabParamList, RootStackParamList } from './types';
+import { useAuth } from '../contexts/AuthContext';
+import { imageSrc } from '../utils/image';
+import { userNotificationsService } from '../services/userNotifications';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -32,6 +36,53 @@ const TAB_CONFIG = [
 
 function BottomNavBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
+  const { user, token } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const refreshUnread = useCallback(async () => {
+    if (!user?.id || !token) {
+      setUnreadCount(0);
+      return;
+    }
+    try {
+      const res = await userNotificationsService.getUnreadCount();
+      setUnreadCount(res.unreadCount || 0);
+    } catch {
+      /* Keep last count on failure (network / transient error) — do not force 0. */
+    }
+  }, [user?.id, token]);
+
+  useEffect(() => {
+    void refreshUnread();
+  }, [refreshUnread, state.index]);
+
+  /** When root stack state changes (e.g. pop back from Notifications), refetch immediately. */
+  useEffect(() => {
+    const parent = navigation.getParent?.() as
+      | { addListener?: (e: string, cb: () => void) => () => void }
+      | undefined;
+    if (!parent?.addListener) return;
+    const unsub = parent.addListener('state', () => {
+      void refreshUnread();
+    });
+    return unsub;
+  }, [navigation, refreshUnread]);
+
+  useEffect(() => {
+    if (!user?.id || !token) return;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refreshUnread();
+    });
+    return () => sub.remove();
+  }, [user?.id, token, refreshUnread]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const id = setInterval(() => {
+      void refreshUnread();
+    }, 15000);
+    return () => clearInterval(id);
+  }, [user?.id, refreshUnread]);
   return (
     <View style={[styles.tabBar, { paddingBottom: Math.max(10, insets.bottom) }]}>
       {state.routes.map((route: { key: string; name: string }, index: number) => {
@@ -62,11 +113,35 @@ function BottomNavBar({ state, descriptors, navigation }: any) {
             accessibilityState={focused ? { selected: true } : {}}
             accessibilityLabel={label}
           >
-            <Ionicons
-              name={(focused ? activeIconName : inactiveIconName) as any}
-              size={22}
-              color={focused ? '#1a1f2e' : '#6c757d'}
-            />
+            {route.name === 'Settings' ? (
+              <View style={styles.profileAvatarWrap}>
+                {user?.schoolImage ? (
+                  <Image source={{ uri: imageSrc(user.schoolImage) }} style={styles.profileAvatar} />
+                ) : user?.profilePicUrl || (user as { image?: string | null } | null)?.image ? (
+                  <Image
+                    source={{ uri: imageSrc(user?.profilePicUrl || (user as { image?: string | null }).image || '') }}
+                    style={styles.profileAvatar}
+                  />
+                ) : (
+                  <View style={styles.profileAvatarPlaceholder}>
+                    <Text style={styles.profileAvatarLetter}>
+                      {(user?.schoolName?.trim()?.charAt(0) || user?.name?.trim()?.charAt(0) || '?').toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+                {unreadCount > 0 ? (
+                  <View style={styles.profileBadge}>
+                    <Text style={styles.profileBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                  </View>
+                ) : null}
+              </View>
+            ) : (
+              <Ionicons
+                name={(focused ? activeIconName : inactiveIconName) as any}
+                size={22}
+                color={focused ? '#1a1f2e' : '#6c757d'}
+              />
+            )}
           </TouchableOpacity>
         );
       })}
@@ -119,6 +194,15 @@ export default function AppNavigator({ onNavigate }: AppNavigatorProps) {
             }}
           />
           <Stack.Screen
+            name="Notifications"
+            component={NotificationsScreen}
+            options={{
+              headerShown: true,
+              title: 'Notifications',
+              headerBackTitle: 'Back',
+            }}
+          />
+          <Stack.Screen
             name="Profile"
             component={ProfileScreen}
             options={{
@@ -163,8 +247,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-around',
     backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.08,
@@ -173,6 +255,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 8,
     paddingBottom: 10,
+    overflow: 'visible',
   },
   tabButton: {
     flex: 1,
@@ -181,15 +264,62 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 10,
     marginHorizontal: 4,
-    borderRadius: 999,
+    borderRadius: 14,
     backgroundColor: 'transparent',
+    overflow: 'visible',
   },
   tabButtonActive: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#f3f6ff',
+    borderWidth: 1,
+    borderColor: '#dbe4ff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
     shadowRadius: 6,
     elevation: 2,
+  },
+  profileAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 999,
+    backgroundColor: '#e9ecef',
+  },
+  profileAvatarWrap: {
+    position: 'relative',
+    overflow: 'visible',
+  },
+  profileAvatarPlaceholder: {
+    width: 24,
+    height: 24,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#eef1f6',
+  },
+  profileAvatarLetter: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1a1f2e',
+  },
+  profileBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -8,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 999,
+    backgroundColor: '#dc3545',
+    borderWidth: 1.5,
+    borderColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    zIndex: 10,
+    elevation: 12,
+  },
+  profileBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '700',
   },
 });

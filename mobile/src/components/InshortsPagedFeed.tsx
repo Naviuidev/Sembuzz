@@ -182,33 +182,37 @@ function InshortsEventPage({
             </View>
           )}
           <View style={styles.engagePill} pointerEvents="box-none">
-            <TouchableOpacity
-              onPress={userId ? onLike : showAuthHint}
-              style={styles.engagePillBtn}
-              hitSlop={8}
-              accessibilityLabel={isLiked ? 'Unlike' : 'Like'}
-            >
-              {isLiked ? (
-                <HeartFillIcon width={20} height={20} fill="#ff4d6a" />
-              ) : (
-                <HeartIcon width={20} height={20} fill="#475569" />
-              )}
-            </TouchableOpacity>
-            <Text style={styles.engagePillCount}>{likeCount}</Text>
-            <TouchableOpacity
-              onPress={userId ? onSave : showAuthHint}
-              style={styles.engagePillBtn}
-              hitSlop={8}
-              accessibilityLabel={isSaved ? 'Unsave' : 'Save'}
-            >
-              {isSaved ? (
-                <BookmarkFillIcon width={19} height={19} fill="#111827" />
-              ) : (
-                <BookmarkIcon width={19} height={19} fill="#475569" />
-              )}
-            </TouchableOpacity>
+            <View style={styles.engageActionGroup}>
+              <TouchableOpacity
+                onPress={userId ? onLike : showAuthHint}
+                style={styles.engagePillBtn}
+                hitSlop={8}
+                accessibilityLabel={isLiked ? 'Unlike' : 'Like'}
+              >
+                {isLiked ? (
+                  <HeartFillIcon width={20} height={20} fill="#ff4d6a" />
+                ) : (
+                  <HeartIcon width={20} height={20} fill="#475569" />
+                )}
+              </TouchableOpacity>
+              <Text style={styles.engagePillCount}>{likeCount}</Text>
+            </View>
+            <View style={styles.engageActionGroup}>
+              <TouchableOpacity
+                onPress={userId ? onSave : showAuthHint}
+                style={styles.engagePillBtn}
+                hitSlop={8}
+                accessibilityLabel={isSaved ? 'Unsave' : 'Save'}
+              >
+                {isSaved ? (
+                  <BookmarkFillIcon width={19} height={19} fill="#111827" />
+                ) : (
+                  <BookmarkIcon width={19} height={19} fill="#475569" />
+                )}
+              </TouchableOpacity>
+            </View>
             {event.commentsEnabled ? (
-              <>
+              <View style={styles.engageActionGroup}>
                 <TouchableOpacity
                   onPress={userId ? () => setCommentsOpen(true) : showAuthHint}
                   style={styles.engagePillBtn}
@@ -218,7 +222,7 @@ function InshortsEventPage({
                   <ChatIcon width={19} height={19} fill="#475569" />
                 </TouchableOpacity>
                 <Text style={styles.engagePillCount}>{commentCount}</Text>
-              </>
+              </View>
             ) : null}
             {authHintVisible ? <Text style={styles.authHintBubble}>Login required</Text> : null}
           </View>
@@ -248,7 +252,7 @@ function InshortsEventPage({
           </View>
           {event.description ? (
             <Text style={styles.summary} numberOfLines={8}>
-              {truncateWords(event.description, 25)}
+              {truncateWords(event.description, 50)}
             </Text>
           ) : null}
           <Text style={styles.timeAgo}>{formatRelativeTime(event.updatedAt || event.createdAt)}</Text>
@@ -398,7 +402,7 @@ function InshortsSponsoredPage({ ad, pageHeight }: { ad: SponsoredAdPublic; page
           {ad.title?.trim() ? <Text style={styles.headline}>{ad.title}</Text> : null}
           {ad.description?.trim() ? (
             <Text style={styles.summary} numberOfLines={6}>
-              {truncateWords(ad.description, 25)}
+              {truncateWords(ad.description, 40)}
             </Text>
           ) : null}
           <Text style={styles.timeAgo}>{formatRelativeTime(ad.createdAt || ad.startAt)}</Text>
@@ -447,6 +451,33 @@ export function InshortsPagedFeed({
 
   /** One banner per event slide; extras flow to the next event card — see `assignBannersToEventSlides`. */
   const bannerBySlideIndex = useMemo(() => assignBannersToEventSlides(feedItems, slides), [feedItems, slides]);
+
+  // Prefetch first few slide images/logos to reduce visible loading delays.
+  const prefetchUrls = useMemo(() => {
+    const urls: string[] = [];
+    slides.slice(0, 8).forEach((item, index) => {
+      if (item.type === 'event') {
+        const first = parseImageUrlsJson(item.event.imageUrls ?? '')[0];
+        if (first) urls.push(imageSrc(first));
+        if (item.event.school?.image) urls.push(imageSrc(item.event.school.image));
+        const banner = bannerBySlideIndex.get(index);
+        if (banner?.imageUrl) urls.push(imageSrc(banner.imageUrl));
+      } else {
+        const first = parseImageUrlsJson(item.ad.imageUrls ?? '')[0];
+        if (first) urls.push(imageSrc(first));
+        if (item.ad.school?.image) urls.push(imageSrc(item.ad.school.image));
+      }
+    });
+    return Array.from(new Set(urls));
+  }, [slides, bannerBySlideIndex]);
+
+  React.useEffect(() => {
+    prefetchUrls.forEach((url) => {
+      void Image.prefetch(url).catch(() => {
+        // Some remote URLs can be missing/deleted; ignore prefetch failures.
+      });
+    });
+  }, [prefetchUrls]);
 
   const renderItem: ListRenderItem<Exclude<PublicFeedItem, { type: 'banner' }>> = useCallback(
     ({ item, index }) => (
@@ -516,7 +547,7 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#fff',
+    backgroundColor: '#eef2f7',
     borderWidth: 1,
     borderColor: '#e5e9f0',
     maxHeight: '100%',
@@ -566,12 +597,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  engageActionGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
   engagePillCount: {
     fontSize: 12,
     fontWeight: '700',
     color: '#1a1f2e',
+    lineHeight: 12,
     marginRight: 4,
     minWidth: 14,
+    textAlignVertical: 'center',
+    includeFontPadding: false,
+    marginTop: 0,
   },
   authHintBubble: {
     marginLeft: 6,

@@ -13,6 +13,12 @@ import {
   Pressable,
   Alert,
   DeviceEventEmitter,
+  InteractionManager,
+  Animated,
+  Easing,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -60,10 +66,16 @@ export default function EventsScreen() {
   const [homeFilterMenuOpen, setHomeFilterMenuOpen] = useState(false);
   const [showFirstLoginCategories, setShowFirstLoginCategories] = useState(false);
   const [categoryModalSelectedIds, setCategoryModalSelectedIds] = useState<string[]>([]);
+  const [categoryModalSaving, setCategoryModalSaving] = useState(false);
   /** Subcategory ids saved at first-login / Settings — used only to decide which category pills appear (matches web). */
   const [persistedPrefSubIds, setPersistedPrefSubIds] = useState<string[]>([]);
   const [expandedCategoryId, setExpandedCategoryId] = useState<string | null>(null);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const tabSlideAnim = useRef(new Animated.Value(0)).current;
+
+  if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  }
 
   const schoolId = user?.schoolId ?? null;
   const showCategories = !!user && !showAllSchools;
@@ -92,11 +104,48 @@ export default function EventsScreen() {
     try {
       const list = await getApprovedEvents(school, subIds);
       setEvents(list);
+      const ids = list.map((e) => e.id);
+      if (ids.length === 0) {
+        setInshortsEngagement({ likes: {}, commentCounts: {}, likedByMe: [], savedByMe: [] });
+      } else {
+        void (async () => {
+          try {
+            const rPublic = await getEngagementCounts(ids);
+            if (!user) {
+              setInshortsEngagement({
+                likes: rPublic.likes,
+                commentCounts: rPublic.commentCounts,
+                likedByMe: [],
+                savedByMe: [],
+              });
+              return;
+            }
+            try {
+              const rUser = await userEventsService.getEngagement(ids);
+              setInshortsEngagement({
+                likes: { ...rPublic.likes, ...rUser.likes },
+                commentCounts: { ...rPublic.commentCounts, ...rUser.commentCounts },
+                likedByMe: rUser.likedByMe,
+                savedByMe: rUser.savedByMe,
+              });
+            } catch {
+              setInshortsEngagement({
+                likes: rPublic.likes,
+                commentCounts: rPublic.commentCounts,
+                likedByMe: [],
+                savedByMe: [],
+              });
+            }
+          } catch {
+            /* keep previous */
+          }
+        })();
+      }
       setError(null);
     } catch {
       setError('Unable to load events right now. Pull to refresh and try again.');
     }
-  }, [showAllSchools, schoolId, showCategories, selectedSubCategoryIds]);
+  }, [showAllSchools, schoolId, showCategories, selectedSubCategoryIds, user]);
 
   useEffect(() => {
     if (showCategories && schoolId) {
@@ -131,8 +180,9 @@ export default function EventsScreen() {
           /* offline */
         }
         if (!cancelled) {
-          setSelectedSubCategoryIds(ids);
+          // Persisted prefs drive which category pills show (homeContentCategories), not the session filter UI.
           setPersistedPrefSubIds(ids);
+          setSelectedSubCategoryIds([]);
         }
         setShowFirstLoginCategories(false);
       } else if (done === null && user.schoolId) {
@@ -157,7 +207,7 @@ export default function EventsScreen() {
       if (done === 'true' || done === 'skip') {
         const ids = await getUserSubCategoryIds(user.id);
         setPersistedPrefSubIds(ids);
-        setSelectedSubCategoryIds(ids);
+        setSelectedSubCategoryIds([]);
       }
     });
     return () => sub.remove();
@@ -171,32 +221,35 @@ export default function EventsScreen() {
 
   const saveCategorySelectionMobile = useCallback(
     async (skip: boolean) => {
-      if (!user?.id) return;
-      if (skip) {
-        await setUserCategoryDone(user.id, 'skip');
-        await setUserSubCategoryIds(user.id, []);
-        try {
-          await userNotificationsService.setSubcategories([]);
-        } catch {
-          /* ignore */
-        }
-        setSelectedSubCategoryIds([]);
-        setPersistedPrefSubIds([]);
-      } else {
-        await setUserCategoryDone(user.id, 'true');
-        await setUserSubCategoryIds(user.id, categoryModalSelectedIds);
-        try {
-          await userNotificationsService.setSubcategories(categoryModalSelectedIds);
-        } catch {
-          /* ignore */
-        }
-        setSelectedSubCategoryIds(categoryModalSelectedIds);
-        setPersistedPrefSubIds(categoryModalSelectedIds);
-      }
+      if (!user?.id || categoryModalSaving) return;
+      setCategoryModalSaving(true);
+
+      // Close immediately so the UI feels instant; do the persistence work in background.
       setShowFirstLoginCategories(false);
+      const idsToPersist = skip ? [] : categoryModalSelectedIds.slice();
       setCategoryModalSelectedIds([]);
+      setSelectedSubCategoryIds([]);
+      setPersistedPrefSubIds(idsToPersist);
+
+      InteractionManager.runAfterInteractions(() => {
+        (async () => {
+          try {
+            await setUserCategoryDone(user.id, skip ? 'skip' : 'true');
+            await setUserSubCategoryIds(user.id, idsToPersist);
+            try {
+              await userNotificationsService.setSubcategories(idsToPersist);
+            } catch {
+              /* push sync optional */
+            }
+          } finally {
+            setCategoryModalSaving(false);
+          }
+        })().catch(() => {
+          setCategoryModalSaving(false);
+        });
+      });
     },
-    [user?.id, categoryModalSelectedIds],
+    [user?.id, categoryModalSelectedIds, categoryModalSaving],
   );
 
   /** Same as web `homeContentCategories`: filter category pills by first-login prefs, not live filter toggles. */
@@ -214,13 +267,25 @@ export default function EventsScreen() {
   );
 
   useEffect(() => {
+    // Avoid double load on app reopen:
+    // wait for user preference hydration before first fetch for logged-in users.
+    if (user?.id && !prefsLoaded) return;
     setLoading(true);
     fetchEvents().finally(() => setLoading(false));
-  }, [fetchEvents]);
+  }, [fetchEvents, user?.id, prefsLoaded]);
 
   useEffect(() => {
     if (!showCategories) setExpandedCategoryId(null);
   }, [showCategories]);
+
+  useEffect(() => {
+    Animated.timing(tabSlideAnim, {
+      toValue: showAllSchools ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [showAllSchools, tabSlideAnim]);
 
   useEffect(() => {
     if (user && showAllSchools) setHomeFilterMenuOpen(false);
@@ -242,46 +307,6 @@ export default function EventsScreen() {
     savedByMe: string[];
   }>({ likes: {}, commentCounts: {}, likedByMe: [], savedByMe: [] });
 
-  const refetchInshortsEngagement = useCallback(async () => {
-    if (eventIds.length === 0) {
-      setInshortsEngagement({ likes: {}, commentCounts: {}, likedByMe: [], savedByMe: [] });
-      return;
-    }
-    try {
-      const rPublic = await getEngagementCounts(eventIds);
-      if (!user) {
-        setInshortsEngagement({
-          likes: rPublic.likes,
-          commentCounts: rPublic.commentCounts,
-          likedByMe: [],
-          savedByMe: [],
-        });
-        return;
-      }
-      try {
-        const rUser = await userEventsService.getEngagement(eventIds);
-        setInshortsEngagement({
-          likes: { ...rPublic.likes, ...rUser.likes },
-          commentCounts: { ...rPublic.commentCounts, ...rUser.commentCounts },
-          likedByMe: rUser.likedByMe,
-          savedByMe: rUser.savedByMe,
-        });
-      } catch {
-        setInshortsEngagement({
-          likes: rPublic.likes,
-          commentCounts: rPublic.commentCounts,
-          likedByMe: [],
-          savedByMe: [],
-        });
-      }
-    } catch {
-      /* keep previous */
-    }
-  }, [eventIds, user]);
-
-  useEffect(() => {
-    refetchInshortsEngagement();
-  }, [refetchInshortsEngagement]);
 
   const getEventEngagement = useCallback(
     (eventId: string) => ({
@@ -446,10 +471,8 @@ export default function EventsScreen() {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    Promise.all([fetchEvents(), loadAds(), refetchInshortsEngagement()]).finally(() =>
-      setRefreshing(false),
-    );
-  }, [fetchEvents, loadAds, refetchInshortsEngagement]);
+    Promise.all([fetchEvents(), loadAds()]).finally(() => setRefreshing(false));
+  }, [fetchEvents, loadAds]);
 
   const toggleSubCategory = (subId: string) => {
     setSelectedSubCategoryIds((prev) =>
@@ -471,6 +494,17 @@ export default function EventsScreen() {
     return hit?.school?.image ? imageSrc(hit.school.image) : '';
   }, [events, schoolId]);
 
+  const selectedSubCategoryMeta = useMemo(() => {
+    if (!selectedSubCategoryIds.length || !categories.length) return [];
+    const byId = new Map<string, { id: string; name: string }>();
+    categories.forEach((cat) => {
+      (cat.subcategories ?? []).forEach((sub) => byId.set(sub.id, { id: sub.id, name: sub.name }));
+    });
+    return selectedSubCategoryIds
+      .map((id) => byId.get(id))
+      .filter((v): v is { id: string; name: string } => !!v);
+  }, [selectedSubCategoryIds, categories]);
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* My school / All schools tabs — same order as web (above category + filter row) */}
@@ -478,7 +512,10 @@ export default function EventsScreen() {
         <View style={styles.tabBar}>
           <TouchableOpacity
             style={[styles.tab, showAllSchools ? null : styles.tabActive]}
-            onPress={() => setShowAllSchools(false)}
+            onPress={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              setShowAllSchools(false);
+            }}
           >
             <View style={styles.tabContent}>
               {mySchoolLogo ? (
@@ -498,7 +535,10 @@ export default function EventsScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, showAllSchools ? styles.tabActive : null]}
-            onPress={() => setShowAllSchools(true)}
+            onPress={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              setShowAllSchools(true);
+            }}
           >
             <View style={styles.tabContent}>
               <View style={styles.tabSchoolLogoFallback}>
@@ -510,6 +550,20 @@ export default function EventsScreen() {
             </View>
             {showAllSchools && <View style={styles.tabUnderline} />}
           </TouchableOpacity>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.tabSlideTrack,
+              {
+                left: tabSlideAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0%', '50%'],
+                }),
+              },
+            ]}
+          >
+            <View style={styles.tabUnderlineSlide} />
+          </Animated.View>
         </View>
       ) : null}
 
@@ -526,7 +580,7 @@ export default function EventsScreen() {
               <TouchableOpacity
                 style={[
                   styles.categoryMainPill,
-                  feedSort === 'latest' && styles.categoryMainPillEmphasis,
+                  feedSort === 'latest' && styles.inlineSortPillActive,
                 ]}
                 onPress={() => setFeedSort('latest')}
                 accessibilityLabel="Sort by latest"
@@ -534,7 +588,7 @@ export default function EventsScreen() {
                 <Text
                   style={[
                     styles.categoryMainPillText,
-                    feedSort === 'latest' && styles.categoryMainPillTextEmphasis,
+                    feedSort === 'latest' && styles.inlineSortPillTextActive,
                   ]}
                 >
                   Latest
@@ -543,7 +597,7 @@ export default function EventsScreen() {
               <TouchableOpacity
                 style={[
                   styles.categoryMainPill,
-                  feedSort === 'popular' && styles.categoryMainPillEmphasis,
+                  feedSort === 'popular' && styles.inlineSortPillActive,
                 ]}
                 onPress={() => setFeedSort('popular')}
                 accessibilityLabel="Sort by popular"
@@ -551,7 +605,7 @@ export default function EventsScreen() {
                 <Text
                   style={[
                     styles.categoryMainPillText,
-                    feedSort === 'popular' && styles.categoryMainPillTextEmphasis,
+                    feedSort === 'popular' && styles.inlineSortPillTextActive,
                   ]}
                 >
                   Popular
@@ -562,7 +616,7 @@ export default function EventsScreen() {
             <>
               {showCategories && homeContentCategories.length > 0 && selectedSubCategoryIds.length > 0 ? (
                 <TouchableOpacity onPress={clearSubCategoryFilter} style={styles.clearCatsBtn}>
-                  <Text style={styles.clearCatsText}>All</Text>
+                  <Text style={styles.clearCatsText}>Reset All</Text>
                 </TouchableOpacity>
               ) : null}
               {showCategories && homeContentCategories.length > 0
@@ -657,6 +711,25 @@ export default function EventsScreen() {
           </View>
         ) : null}
       </View>
+
+      {isMySchoolFeed && selectedSubCategoryMeta.length > 0 ? (
+        <View style={styles.selectedSubCatRow}>
+          {selectedSubCategoryMeta.map((sub) => (
+            <TouchableOpacity
+              key={sub.id}
+              style={styles.selectedSubCatPill}
+              onPress={() => toggleSubCategory(sub.id)}
+              activeOpacity={0.85}
+              accessibilityLabel={`Remove ${sub.name}`}
+            >
+              <Text style={styles.selectedSubCatPillText}>{sub.name}</Text>
+              <View style={styles.selectedSubCatCloseBadge}>
+                <Text style={styles.selectedSubCatCloseText}>×</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : null}
 
       {error ? (
         <View style={styles.errorBox}>
@@ -787,63 +860,74 @@ export default function EventsScreen() {
         transparent
         onRequestClose={() => {}}
       >
-        <View style={styles.categorySelectOverlay}>
-          <ScrollView
-            style={styles.categorySelectScroll}
-            contentContainerStyle={styles.categorySelectScrollContent}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
+        <Pressable style={styles.categorySelectOverlay} onPress={() => {}}>
+          <Pressable style={styles.categorySelectCard} onPress={(e) => e.stopPropagation()}>
             <Text style={styles.categorySelectTitle} accessibilityRole="header">
               Select your categories
             </Text>
             <Text style={styles.categorySelectDesc}>
               Choose the categories and subcategories for your school. Your home feed will show news from your selections. You can skip and see all school news, or change this later in Settings.
             </Text>
-            {categories.length === 0 ? (
-              <ActivityIndicator color="#1a1f2e" style={{ marginVertical: 24 }} />
-            ) : (
-              categories.map((cat) => (
-                <View key={cat.id} style={styles.categorySelectBlock}>
-                  <Text style={styles.categorySelectCatTitle}>{cat.name}</Text>
-                  <View style={styles.categorySelectSubRow}>
-                    {(cat.subcategories ?? []).map((sub) => {
-                      const isSelected = categoryModalSelectedIds.includes(sub.id);
-                      return (
-                        <TouchableOpacity
-                          key={sub.id}
-                          style={[styles.subCatBtn, isSelected ? styles.subCatBtnDark : styles.subCatBtnOutline]}
-                          onPress={() => toggleCategoryModalSub(sub.id)}
-                          activeOpacity={0.85}
-                        >
-                          <Text style={[styles.subCatBtnText, isSelected && styles.subCatBtnTextOnDark]}>
-                            {sub.name}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
+
+            <ScrollView
+              style={styles.categorySelectList}
+              contentContainerStyle={styles.categorySelectListContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {categories.length === 0 ? (
+                <ActivityIndicator color="#1a1f2e" style={{ marginVertical: 18 }} />
+              ) : (
+                categories.map((cat) => (
+                  <View key={cat.id} style={styles.categorySelectBlock}>
+                    <Text style={styles.categorySelectCatTitle}>{cat.name}</Text>
+                    <View style={styles.categorySelectSubRow}>
+                      {(cat.subcategories ?? []).map((sub) => {
+                        const isSelected = categoryModalSelectedIds.includes(sub.id);
+                        return (
+                          <TouchableOpacity
+                            key={sub.id}
+                            style={[styles.subCatBtn, isSelected ? styles.subCatBtnDark : styles.subCatBtnOutline]}
+                            onPress={() => !categoryModalSaving && toggleCategoryModalSub(sub.id)}
+                            activeOpacity={0.85}
+                            disabled={categoryModalSaving}
+                          >
+                            <Text style={[styles.subCatBtnText, isSelected && styles.subCatBtnTextOnDark]}>
+                              {sub.name}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
                   </View>
-                </View>
-              ))
-            )}
+                ))
+              )}
+            </ScrollView>
+
             <View style={styles.categorySelectActions}>
               <TouchableOpacity
-                style={styles.catModalBtnOutline}
+                style={[styles.catModalBtnOutline, categoryModalSaving && styles.catModalBtnDisabled]}
                 onPress={() => saveCategorySelectionMobile(true)}
                 activeOpacity={0.85}
+                disabled={categoryModalSaving}
               >
-                <Text style={styles.catModalBtnOutlineText}>Skip</Text>
+                <Text style={styles.catModalBtnOutlineText}>
+                  {categoryModalSaving ? 'Please wait…' : 'Skip'}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.catModalBtnDark}
+                style={[styles.catModalBtnDark, categoryModalSaving && styles.catModalBtnDisabled]}
                 onPress={() => saveCategorySelectionMobile(false)}
                 activeOpacity={0.85}
+                disabled={categoryModalSaving}
               >
-                <Text style={styles.catModalBtnDarkText}>Next</Text>
+                <Text style={styles.catModalBtnDarkText}>
+                  {categoryModalSaving ? 'Saving…' : 'Next'}
+                </Text>
               </TouchableOpacity>
             </View>
-          </ScrollView>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
 
     </SafeAreaView>
@@ -952,14 +1036,18 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   clearCatsBtn: {
-    marginRight: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 6,
+    marginRight: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#212529',
+    backgroundColor: '#fff',
   },
   clearCatsText: {
-    fontSize: 12,
-    color: '#6c757d',
-    fontWeight: '500',
+    fontSize: 13,
+    color: '#212529',
+    fontWeight: '600',
   },
   /** Web `btn-sm rounded-pill btn-outline-dark` category chip */
   categoryMainPill: {
@@ -983,60 +1071,71 @@ const styles = StyleSheet.create({
   categoryMainPillTextEmphasis: {
     fontWeight: '600',
   },
+  inlineSortPillActive: {
+    borderColor: '#212529',
+    backgroundColor: '#212529',
+  },
+  inlineSortPillTextActive: {
+    color: '#fff',
+    fontWeight: '600',
+  },
   subCatDropdownBox: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.82)',
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#dee2e6',
+    borderColor: 'rgba(208,220,243,0.9)',
     width: '100%',
-    maxWidth: 320,
-    maxHeight: '70%',
-    paddingVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 12,
+    maxWidth: 340,
+    maxHeight: '78%',
+    paddingVertical: 12,
+    shadowColor: '#1f4da8',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 30,
+    elevation: 14,
   },
   subCatDropdownHeader: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6c757d',
-    paddingHorizontal: 14,
-    paddingBottom: 8,
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#0b1f3f',
+    paddingHorizontal: 18,
+    paddingBottom: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#dee2e6',
+    borderBottomColor: 'rgba(176,190,215,0.5)',
   },
   subCatDropdownScroll: {
     maxHeight: 360,
   },
   subCatDropdownEmpty: {
     fontSize: 13,
-    color: '#6c757d',
-    paddingHorizontal: 14,
+    color: '#0f2b52',
+    paddingHorizontal: 18,
     paddingVertical: 12,
   },
   subCatDropdownRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    gap: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 18,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(176,190,215,0.42)',
   },
   subCatDropdownRowText: {
-    fontSize: 14,
-    color: '#212529',
+    fontSize: 15,
+    color: '#0b1f3f',
     flex: 1,
+    fontWeight: '600',
   },
   checkbox: {
     width: 18,
     height: 18,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#6c757d',
+    borderColor: 'rgba(11,31,63,0.48)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.92)',
   },
   checkboxOn: {
     backgroundColor: '#212529',
@@ -1047,6 +1146,44 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     lineHeight: 13,
+  },
+  selectedSubCatRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 6,
+    backgroundColor: '#fff',
+  },
+  selectedSubCatPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 7,
+    paddingLeft: 12,
+    paddingRight: 8,
+    borderRadius: 999,
+    backgroundColor: '#212529',
+  },
+  selectedSubCatPillText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  selectedSubCatCloseBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.24)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedSubCatCloseText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 14,
   },
   emptyFeedScroll: {
     flexGrow: 1,
@@ -1116,6 +1253,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
+    position: 'relative',
   },
   tab: {
     flex: 1,
@@ -1160,10 +1298,16 @@ const styles = StyleSheet.create({
     color: '#8e8e8e',
   },
   tabUnderline: {
+    display: 'none',
+  },
+  tabSlideTrack: {
     position: 'absolute',
     bottom: 0,
-    left: '15%',
-    right: '15%',
+    width: '50%',
+    alignItems: 'center',
+  },
+  tabUnderlineSlide: {
+    width: '70%',
     height: 3,
     backgroundColor: '#fff',
     borderRadius: 2,
@@ -1229,7 +1373,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.35)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -1623,13 +1767,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.72)',
     justifyContent: 'center',
+    alignItems: 'center',
     padding: 16,
-    paddingBottom: 88,
   },
-  categorySelectScroll: {
-    maxHeight: '100%',
-  },
-  categorySelectScrollContent: {
+  categorySelectCard: {
+    width: '100%',
+    maxWidth: 520,
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 24,
@@ -1641,6 +1784,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 24,
     elevation: 8,
+  },
+  categorySelectList: {
+    marginTop: 4,
+    flexGrow: 0,
+    maxHeight: 420,
+  },
+  categorySelectListContent: {
+    paddingBottom: 6,
   },
   categorySelectTitle: {
     fontSize: 20,
@@ -1720,5 +1871,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#fff',
+  },
+  catModalBtnDisabled: {
+    opacity: 0.7,
   },
 });

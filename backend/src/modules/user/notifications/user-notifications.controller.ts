@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Post, Put, Query, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, Request, UseGuards } from '@nestjs/common';
 import { UserGuard } from '../guards/user.guard';
 import { UserNotificationsService } from './user-notifications.service';
 import { RegisterPushTokenDto } from './dto/register-push-token.dto';
@@ -40,5 +40,34 @@ export class UserNotificationsController {
     @Body() dto: UpdateNotificationSubcategoriesDto,
   ) {
     return this.notifications.setNotificationSubcategories(req.user.sub, dto.subCategoryIds ?? []);
+  }
+
+  @Get('inbox')
+  @UseGuards(UserGuard)
+  async getInbox(@Request() req: { user: { sub: string } }) {
+    return this.notifications.getInbox(req.user.sub);
+  }
+
+  @Get('unread-count')
+  @UseGuards(UserGuard)
+  async getUnreadCount(@Request() req: { user: { sub: string } }) {
+    return this.notifications.getUnreadCount(req.user.sub);
+  }
+
+  @Put('read-all')
+  @UseGuards(UserGuard)
+  async markAllRead(@Request() req: { user: { sub: string } }) {
+    return this.notifications.markAllRead(req.user.sub);
+  }
+
+  @Put(':id/read')
+  @UseGuards(UserGuard)
+  async markRead(
+    @Request() req: { user: { sub: string } },
+    @Param('id') idFromParam: string | undefined,
+  ) {
+    const id = idFromParam?.trim();
+    if (!id) return { ok: false };
+    return this.notifications.markRead(req.user.sub, id);
   }
 }

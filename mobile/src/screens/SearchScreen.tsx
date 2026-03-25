@@ -333,7 +333,9 @@ export default function SearchScreen() {
           onPress={openFilterPopup}
           accessibilityLabel="Filter options"
         >
-          <FunnelIcon width={FILTER_ICON_SIZE} height={FILTER_ICON_SIZE} fill="#1a1f2e" />
+          <View style={styles.headerFilterIconWrap}>
+            <FunnelIcon width={FILTER_ICON_SIZE} height={FILTER_ICON_SIZE} fill="#1a1f2e" />
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -589,15 +591,16 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   headerFilterBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 999,
-    backgroundColor: '#f5f5f5',
-    borderWidth: 1,
-    borderColor: '#eceef2',
+    minWidth: 44,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    padding: 0,
+  },
+  headerFilterIconWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   filterPopupOverlay: {
     flex: 1,

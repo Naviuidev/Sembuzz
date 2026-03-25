@@ -13,7 +13,7 @@ export default function ViewProfileScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>View profile</Text>
+        
 
         <View style={styles.heroCard}>
           {avatarUrl ? (

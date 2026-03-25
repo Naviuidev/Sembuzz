@@ -440,6 +440,11 @@ export default function SignUpModal({ visible, onClose, onCompleteGoToLogin }: P
                   placeholderTextColor="#8e8e8e"
                   secureTextEntry
                   autoComplete="new-password"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  textContentType="newPassword"
+                  cursorColor="#1a1f2e"
+                  selectionColor="rgba(26, 31, 46, 0.25)"
                 />
                 <Text style={styles.label}>Confirm password</Text>
                 <TextInput
@@ -450,6 +455,11 @@ export default function SignUpModal({ visible, onClose, onCompleteGoToLogin }: P
                   placeholderTextColor="#8e8e8e"
                   secureTextEntry
                   autoComplete="new-password"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  textContentType="newPassword"
+                  cursorColor="#1a1f2e"
+                  selectionColor="rgba(26, 31, 46, 0.25)"
                 />
 
                 <TouchableOpacity

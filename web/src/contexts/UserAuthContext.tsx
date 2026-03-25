@@ -12,6 +12,7 @@ interface UserAuthContextType {
   register: (dto: RegisterDto) => Promise<RegisterResponse>;
   completeRegistration: (accessToken: string, user: UserAuthUser) => void;
   logout: () => void;
+  refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
   loading: boolean;
 }
@@ -71,6 +72,13 @@ export const UserAuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
   };
 
+  const refreshUser = async () => {
+    const storedToken = localStorage.getItem(USER_TOKEN_KEY);
+    if (!storedToken) return;
+    const userData = await userAuthService.getMe();
+    setUser(userData);
+  };
+
   return (
     <UserAuthContext.Provider
       value={{
@@ -80,6 +88,7 @@ export const UserAuthProvider = ({ children }: { children: ReactNode }) => {
         register,
         completeRegistration,
         logout,
+        refreshUser,
         isAuthenticated: !!user && !!token,
         loading,
       }}
