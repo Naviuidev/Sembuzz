@@ -49,8 +49,7 @@ export class UpcomingPostsController {
   uploadImage(@UploadedFile() file: Express.Multer.File): { url: string } {
     if (!file) throw new BadRequestException('File is required');
     if (!ALLOWED_MIMES.includes(file.mimetype)) throw new BadRequestException('Allowed: JPEG, PNG, GIF, WebP');
-    const baseUrl = process.env.API_URL || 'http://localhost:3000';
-    return { url: `${baseUrl}/uploads/school-admin-upcoming-images/${file.filename}` };
+    return { url: `/uploads/school-admin-upcoming-images/${file.filename}` };
   }
 
   @Post()

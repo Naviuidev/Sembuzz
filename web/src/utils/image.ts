@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from '../config/apiBase';
+import { getAssetBaseUrl } from '../config/apiBase';
 
 /** Strip accidental JSON quotes from stored URLs */
 function stripQuotes(raw: string): string {
@@ -11,8 +11,7 @@ function stripQuotes(raw: string): string {
 
 /**
  * Resolve image URL for display.
- * - Paths under /uploads (relative or absolute) always use the current API base. Banner/event
- *   uploads are stored on the API; DB may still have wrong host (site URL, localhost, old env).
+ * - Paths under /uploads use `getAssetBaseUrl()` (see `VITE_ASSET_BASE_URL` when API is local).
  * - Other https URLs (e.g. external CDNs) are left unchanged.
  */
 export function imageSrc(url: string | null | undefined): string {
@@ -20,7 +19,7 @@ export function imageSrc(url: string | null | undefined): string {
   if (!u) return '';
   if (u.startsWith('data:')) return u;
 
-  const base = getApiBaseUrl().replace(/\/$/, '');
+  const base = getAssetBaseUrl().replace(/\/$/, '');
 
   if (u.startsWith('http://') || u.startsWith('https://')) {
     try {

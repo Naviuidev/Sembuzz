@@ -6,11 +6,10 @@ function trimTrailingSlash(value: string): string {
 export const PRODUCTION_API_BASE_URL = 'https://api.sembuzz.com';
 
 /**
- * API origin for axios and `imageSrc` (`/uploads/*`).
+ * API origin for axios (JSON, auth, etc.).
  * - **Production / release:** omit `EXPO_PUBLIC_API_URL` → `https://api.sembuzz.com`.
- * - **Local dev (match web `VITE_API_URL`):** set e.g. `EXPO_PUBLIC_API_URL=http://localhost:3000`
- *   so the simulator uses the same backend as `localhost:5173`. iOS Simulator can reach host
- *   `localhost`; Android emulator usually needs `http://10.0.2.2:3000` instead of `localhost`.
+ * - **Local dev:** e.g. `EXPO_PUBLIC_API_URL=http://localhost:3000` (iOS Simulator) or
+ *   `http://10.0.2.2:3000` (Android emulator).
  */
 export function getApiBaseUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL?.trim();
@@ -18,6 +17,20 @@ export function getApiBaseUrl(): string {
     return trimTrailingSlash(fromEnv);
   }
   return PRODUCTION_API_BASE_URL;
+}
+
+/**
+ * Base URL for static files under `/uploads/*` (see `imageSrc`).
+ * When unset, matches `getApiBaseUrl()`. Set to production when your API points at localhost
+ * but posts/images were uploaded to production — otherwise every image URL becomes
+ * `http://localhost:3000/uploads/...` and files are missing locally.
+ */
+export function getAssetBaseUrl(): string {
+  const fromEnv = process.env.EXPO_PUBLIC_ASSET_BASE_URL?.trim();
+  if (fromEnv) {
+    return trimTrailingSlash(fromEnv);
+  }
+  return getApiBaseUrl();
 }
 
 export function getFrontendBaseUrl(): string {

@@ -94,7 +94,6 @@ export class SubCategoryAdminQueriesController {
         'No file was uploaded. Attachment is optional — you can send your request without an attachment.',
       );
     }
-    const baseUrl = process.env.API_URL || 'http://localhost:3000';
-    return { url: `${baseUrl}/uploads/subcategory-admin-query-attachments/${file.filename}` };
+    return { url: `/uploads/subcategory-admin-query-attachments/${file.filename}` };
   }
 }

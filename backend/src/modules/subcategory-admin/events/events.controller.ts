@@ -92,10 +92,10 @@ export class EventsController {
     const forBlog =
       String(req.query?.for || '') === 'blog' ||
       String(req.query?.dest || '') === 'blog';
-    const baseUrl = process.env.API_URL || 'http://localhost:3000';
     const sub = forBlog ? 'subcategory-admin-blog-images' : 'subcategory-admin-event-images';
+    /** Path only — clients resolve with their API base (avoids localhost vs production mismatch in DB). */
     return {
-      url: `${baseUrl}/uploads/${sub}/${file.filename}`,
+      url: `/uploads/${sub}/${file.filename}`,
     };
   }
 

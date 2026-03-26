@@ -58,8 +58,7 @@ export class QueriesController {
     if (!file) {
       throw new BadRequestException('File is required');
     }
-    const baseUrl = process.env.API_URL || 'http://localhost:3000';
-    const url = `${baseUrl}/uploads/query-attachments/${file.filename}`;
+    const url = `/uploads/query-attachments/${file.filename}`;
     return { url };
   }
 

@@ -69,9 +69,8 @@ export class SchoolAdminSocialAccountsController {
         'Allowed types: JPEG, PNG, GIF, WebP, SVG. Your file may have an unexpected MIME type—try renaming to .svg or use a PNG.',
       );
     }
-    const baseUrl = process.env.API_URL || 'http://localhost:3000';
     return {
-      url: `${baseUrl}/uploads/school-admin-club-icons/${file.filename}`,
+      url: `/uploads/school-admin-club-icons/${file.filename}`,
     };
   }
 

@@ -1,5 +1,5 @@
 /**
- * Single source of truth for backend API origin (axios + image URLs for /uploads).
+ * Single source of truth for backend API origin (axios JSON, auth, etc.).
  */
 export function getApiBaseUrl(): string {
   const raw = import.meta.env.VITE_API_URL?.trim() ?? '';
@@ -33,4 +33,17 @@ export function getApiBaseUrl(): string {
     }
   }
   return 'http://localhost:3000';
+}
+
+/**
+ * Base URL for `/uploads/*` (see `utils/image.ts` → `imageSrc`).
+ * Defaults to `getApiBaseUrl()`. Set `VITE_ASSET_BASE_URL` when the API points at localhost
+ * but files were uploaded to production (same as mobile `EXPO_PUBLIC_ASSET_BASE_URL`).
+ */
+export function getAssetBaseUrl(): string {
+  const raw = import.meta.env.VITE_ASSET_BASE_URL?.trim() ?? '';
+  if (raw && raw !== '/') {
+    return raw.replace(/\/$/, '');
+  }
+  return getApiBaseUrl();
 }

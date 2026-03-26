@@ -1,10 +1,15 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getApiBaseUrl } from './env';
+import { getApiBaseUrl, getAssetBaseUrl } from './env';
 
 const TOKEN_KEY = 'user-token';
 
 const API_BASE_URL = getApiBaseUrl();
+
+if (typeof __DEV__ !== 'undefined' && __DEV__) {
+  const asset = getAssetBaseUrl();
+  console.log('[SemBuzz API] base URL:', API_BASE_URL, asset !== API_BASE_URL ? `(uploads/images: ${asset})` : '');
+}
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

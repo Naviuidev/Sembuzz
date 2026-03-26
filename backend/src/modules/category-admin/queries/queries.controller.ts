@@ -50,8 +50,7 @@ export class CategoryAdminQueriesController {
   )
   async uploadFile(@UploadedFile() file: Express.Multer.File): Promise<{ url: string }> {
     if (!file) throw new BadRequestException('File is required');
-    const baseUrl = process.env.API_URL || 'http://localhost:3000';
-    return { url: `${baseUrl}/uploads/category-admin-query-attachments/${file.filename}` };
+    return { url: `/uploads/category-admin-query-attachments/${file.filename}` };
   }
 
   @Get()

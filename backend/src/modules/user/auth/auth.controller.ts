@@ -76,8 +76,7 @@ export class UserAuthController {
     if (!file) {
       throw new BadRequestException('Please select a file to upload.');
     }
-    const baseUrl = process.env.API_URL || 'http://localhost:3000';
-    const docUrl = `${baseUrl}/uploads/registration-docs/${file.filename}`;
+    const docUrl = `/uploads/registration-docs/${file.filename}`;
     return this.authService.submitUpdateDoc(token, docUrl);
   }
 
@@ -106,8 +105,7 @@ export class UserAuthController {
     if (!file) {
       throw new BadRequestException('Please select a file to upload.');
     }
-    const baseUrl = process.env.API_URL || 'http://localhost:3000';
-    const url = `${baseUrl}/uploads/registration-docs/${file.filename}`;
+    const url = `/uploads/registration-docs/${file.filename}`;
     return { url };
   }
 
@@ -136,8 +134,7 @@ export class UserAuthController {
     if (!file) {
       throw new BadRequestException('Please select a file to upload.');
     }
-    const baseUrl = process.env.API_URL || 'http://localhost:3000';
-    const url = `${baseUrl}/uploads/profile-pics/${file.filename}`;
+    const url = `/uploads/profile-pics/${file.filename}`;
     return { url };
   }
 

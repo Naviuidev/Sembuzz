@@ -54,8 +54,7 @@ export class CategoryAdminSponsoredAdsController {
     if (!ALLOWED_MIMES.includes(file.mimetype)) {
       throw new BadRequestException('Allowed types: JPEG, PNG, GIF, WebP');
     }
-    const baseUrl = process.env.API_URL || 'http://localhost:3000';
-    return { url: `${baseUrl}/uploads/category-admin-sponsored-ads/${file.filename}` };
+    return { url: `/uploads/category-admin-sponsored-ads/${file.filename}` };
   }
 
   @Post()

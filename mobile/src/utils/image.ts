@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from '../config/env';
+import { getAssetBaseUrl } from '../config/env';
 
 function stripQuotes(raw: string): string {
   let v = raw.trim();
@@ -17,7 +17,7 @@ export function imageSrc(url: string | null | undefined): string {
   if (!u) return '';
   if (u.startsWith('data:')) return u;
 
-  const base = getApiBaseUrl().replace(/\/$/, '');
+  const base = getAssetBaseUrl().replace(/\/$/, '');
 
   if (u.startsWith('http://') || u.startsWith('https://')) {
     try {

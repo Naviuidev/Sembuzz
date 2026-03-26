@@ -24,18 +24,23 @@ Cross-platform mobile app (Android & iOS) for SemBuzz, with the same UI and flow
    cp .env.example .env
    ```
 
-   **API + images**: the app **always** uses **`https://api.sembuzz.com`** (`src/config/env.ts`). There is no env override — this avoids broken images on devices/emulators.
+   **API URL** (`src/config/env.ts`):
 
-   Example `.env` (frontend URL only):
+   - **Default (no `EXPO_PUBLIC_API_URL`):** `https://api.sembuzz.com` — same as production; use this in Expo Go if you only want to test UI against the live API.
+   - **Local Nest backend:** set `EXPO_PUBLIC_API_URL=http://localhost:3000` (iOS Simulator) or `http://10.0.2.2:3000` (Android emulator). On a **physical phone**, use your computer’s LAN IP, not `localhost`.
+
+   If you set a local URL, you **must** run the backend or every request will fail with **Axios “Network Error”**.
+
+   **Images from production** (`/uploads/*` on the VPS): if `EXPO_PUBLIC_API_URL` is localhost, `imageSrc` used to point every image at your Mac — files are not there. Set **`EXPO_PUBLIC_ASSET_BASE_URL=https://api.sembuzz.com`** so images load from production while JSON/auth still hit your local API (optional).
 
    ```env
    EXPO_PUBLIC_FRONTEND_URL=https://sembuzz.com
    ```
 
-3. Start the backend from the repo root (only if you develop the backend locally):
+3. Start the backend (required only when `EXPO_PUBLIC_API_URL` points at localhost):
 
    ```bash
-   cd backend && npm run start:dev
+   cd ../backend && npm run start:dev
    ```
 
 4. Start Expo:
@@ -45,6 +50,12 @@ Cross-platform mobile app (Android & iOS) for SemBuzz, with the same UI and flow
    ```
 
    Then press `a` for Android or `i` for iOS in the terminal, or scan the QR code with Expo Go.
+
+### Images not loading (remote `/uploads/*`)
+
+- **Android + `http://` (localhost or LAN)** blocks cleartext by default. This project sets `expo-build-properties` → `usesCleartextTraffic: true` so **dev / EAS builds** can load HTTP images. **Expo Go** uses Expo’s prebuilt app — if HTTP images still fail there, point the app at HTTPS by **commenting out** `EXPO_PUBLIC_API_URL` in `.env` (uses `https://api.sembuzz.com`), or run a **development build** (`npx expo run:android` / EAS) after pulling this config.
+- **iOS Simulator** to `http://localhost:3000` is allowed via `NSAllowsLocalNetworking` in the same plugin.
+- Confirm the Metro log line `[SemBuzz API] base URL:` matches where your API (and static `/uploads`) is actually served.
 
 ## Features (Phase 1)
 
