@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AppState, View, StyleSheet, TouchableOpacity, Image, Text } from 'react-native';
@@ -38,15 +38,20 @@ function BottomNavBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
   const { user, token } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
-  /** If school logo URL is wrong/404, fall back to profile pic instead of initials. */
+  /** Same as web `EventsBottomNav`: profile photo → school logo → initials. */
+  const profileImageValue = useMemo(
+    () => user?.profilePicUrl?.trim() || user?.image?.trim() || '',
+    [user?.profilePicUrl, user?.image],
+  );
+  /** If school logo URL is wrong/404, fall back to initials (after profile failed). */
   const [settingsSchoolImgFailed, setSettingsSchoolImgFailed] = useState(false);
-  /** If profile pic URL fails (wrong host, 404), show initials. */
+  /** If profile pic URL fails (wrong host, 404), try school logo then initials. */
   const [settingsProfileImgFailed, setSettingsProfileImgFailed] = useState(false);
 
   useEffect(() => {
     setSettingsSchoolImgFailed(false);
     setSettingsProfileImgFailed(false);
-  }, [user?.id, user?.schoolImage, user?.profilePicUrl, user?.image]);
+  }, [user?.id, user?.schoolImage, profileImageValue]);
 
   const refreshUnread = useCallback(async () => {
     if (!user?.id || !token) {
@@ -101,8 +106,6 @@ function BottomNavBar({ state, descriptors, navigation }: any) {
           { label: route.name, inactiveIconName: 'ellipse-outline', activeIconName: 'ellipse' };
         const { label, inactiveIconName, activeIconName } = config;
 
-        const profilePicRaw = user?.profilePicUrl || user?.image || '';
-
         const onPress = () => {
           const event = navigation.emit({
             type: 'tabPress',
@@ -126,17 +129,18 @@ function BottomNavBar({ state, descriptors, navigation }: any) {
           >
             {route.name === 'Settings' ? (
               <View style={styles.profileAvatarWrap}>
-                {user?.schoolImage && !settingsSchoolImgFailed ? (
+                {/* Prefer user profile photo when set; school logo is fallback (matches Settings header). */}
+                {profileImageValue && !settingsProfileImgFailed ? (
+                  <Image
+                    source={{ uri: imageSrc(profileImageValue) }}
+                    style={styles.profileAvatar}
+                    onError={() => setSettingsProfileImgFailed(true)}
+                  />
+                ) : user?.schoolImage && !settingsSchoolImgFailed ? (
                   <Image
                     source={{ uri: imageSrc(user.schoolImage) }}
                     style={styles.profileAvatar}
                     onError={() => setSettingsSchoolImgFailed(true)}
-                  />
-                ) : profilePicRaw && !settingsProfileImgFailed ? (
-                  <Image
-                    source={{ uri: imageSrc(profilePicRaw) }}
-                    style={styles.profileAvatar}
-                    onError={() => setSettingsProfileImgFailed(true)}
                   />
                 ) : (
                   <View style={styles.profileAvatarPlaceholder}>

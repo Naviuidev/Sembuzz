@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useUserAuth } from '../contexts/UserAuthContext';
 import { imageSrc } from '../utils/image';
 
-/** Matches mobile `AppNavigator` bottom tabs: Search, Home, Settings (school logo → profile → initial), Apps, Blogs. */
+/** Matches mobile `AppNavigator` bottom tabs: Search, Home, Settings (profile → school logo → initial), Apps, Blogs. */
 export type EventsBottomNavTab = 'search' | 'home' | 'settings' | 'apps' | 'blogs';
 
 type EventsBottomNavProps = {
@@ -31,7 +31,7 @@ export function EventsBottomNav({
   useEffect(() => {
     setSettingsSchoolImgFailed(false);
     setSettingsProfileImgFailed(false);
-  }, [user?.id, user?.schoolImage, user?.profilePicUrl]);
+  }, [user?.id, user?.schoolImage, profileImageValue]);
 
   const iconColor = (tab: EventsBottomNavTab) => (activeTab === tab ? '#1a1f2e' : '#6c757d');
 
@@ -94,19 +94,19 @@ export function EventsBottomNav({
               onClick={() => onSelectTab('settings')}
             >
               <span className="position-relative d-inline-flex align-items-center justify-content-center">
-                {user?.schoolImage && !settingsSchoolImgFailed ? (
-                  <img
-                    src={imageSrc(user.schoolImage)}
-                    alt=""
-                    style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }}
-                    onError={() => setSettingsSchoolImgFailed(true)}
-                  />
-                ) : profileImageValue && !settingsProfileImgFailed ? (
+                {profileImageValue && !settingsProfileImgFailed ? (
                   <img
                     src={imageSrc(profileImageValue)}
                     alt=""
                     style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }}
                     onError={() => setSettingsProfileImgFailed(true)}
+                  />
+                ) : user?.schoolImage && !settingsSchoolImgFailed ? (
+                  <img
+                    src={imageSrc(user.schoolImage)}
+                    alt=""
+                    style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }}
+                    onError={() => setSettingsSchoolImgFailed(true)}
                   />
                 ) : user ? (
                   <span

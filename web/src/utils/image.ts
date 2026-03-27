@@ -6,6 +6,7 @@ function stripQuotes(raw: string): string {
   if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
     v = v.slice(1, -1).trim();
   }
+  if (v === 'null' || v === 'undefined') return '';
   return v;
 }
 
