@@ -3,6 +3,7 @@ import { SchoolAdminNavbar } from '../components/SchoolAdminNavbar';
 import { SchoolAdminSidebar } from '../components/SchoolAdminSidebar';
 import { useSchoolAdminAuth } from '../contexts/SchoolAdminAuthContext';
 import { schoolAdminSocialAccountsService } from '../services/school-admin-social-accounts.service';
+import { imageSrc } from '../utils/image';
 
 export interface SocialPlatform {
   id: string;
@@ -477,7 +478,7 @@ export const SchoolAdminSocialShare = () => {
                                     style={{ width: 44, height: 44, backgroundColor: '#fff' }}
                                   >
                                     {isIconUrl(group.icon) ? (
-                                      <img src={group.icon} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                      <img src={imageSrc(group.icon)} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                                     ) : group.icon.startsWith('fa-') ? (
                                       <i className={group.icon} style={{ fontSize: '1.25rem', color: '#1a1f2e' }} />
                                     ) : (
@@ -740,7 +741,7 @@ export const SchoolAdminSocialShare = () => {
                             style={{ width: 40, height: 40, backgroundColor: '#fff', color: '#1a1f2e' }}
                           >
                             {isIconUrl(clubIconUrl) ? (
-                              <img src={clubIconUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                              <img src={imageSrc(clubIconUrl)} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                             ) : clubIconUrl?.startsWith('fa-') ? (
                               <i className={clubIconUrl} style={{ fontSize: '1.25rem' }} />
                             ) : clubIconUrl ? (
@@ -806,7 +807,7 @@ export const SchoolAdminSocialShare = () => {
                             style={{ width: 40, height: 40, backgroundColor: '#fff', color: '#1a1f2e' }}
                           >
                             {isIconUrl(clubIconUrl) ? (
-                              <img src={clubIconUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                              <img src={imageSrc(clubIconUrl)} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                             ) : clubIconUrl?.startsWith('fa-') ? (
                               <i className={clubIconUrl} style={{ fontSize: '1.25rem' }} />
                             ) : clubIconUrl ? (
@@ -1018,7 +1019,7 @@ export const SchoolAdminSocialShare = () => {
                     <span className="text-muted small">Preview:</span>
                     {isIconUrl(editingClubIcon) ? (
                       <img
-                        src={editingClubIcon}
+                        src={imageSrc(editingClubIcon)}
                         alt=""
                         style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: '8px', border: '1px solid #dee2e6' }}
                       />

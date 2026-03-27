@@ -54,7 +54,9 @@ export default function EditProfileScreen() {
   const [lastName, setLastName] = useState(
     user?.lastName?.trim() || user?.name?.split(' ').slice(1).join(' ') || '',
   );
-  const [profilePicUrl, setProfilePicUrl] = useState(user?.profilePicUrl || '');
+  const [profilePicUrl, setProfilePicUrl] = useState(
+    user?.profilePicUrl || (user as { image?: string | null } | null)?.image || '',
+  );
   const [showEmailTooltip, setShowEmailTooltip] = useState(false);
   const [changePassword, setChangePassword] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);

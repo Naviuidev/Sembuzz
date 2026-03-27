@@ -3292,7 +3292,7 @@ export const PublicEvents = () => {
                           style={{ width: 44, height: 44, backgroundColor: '#fff', border: '1px solid #eee' }}
                         >
                           {isClubIconUrl(group.icon) ? (
-                            <img src={group.icon} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                            <img src={imageSrc(group.icon)} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                           ) : group.icon.startsWith('fa-') ? (
                             <i className={group.icon} style={{ fontSize: '1.25rem', color: '#1a1f2e' }} />
                           ) : (

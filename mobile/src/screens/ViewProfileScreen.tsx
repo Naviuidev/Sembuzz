@@ -8,7 +8,11 @@ import { imageSrc } from '../utils/image';
 
 export default function ViewProfileScreen() {
   const { user } = useAuth();
-  const avatarUrl = useMemo(() => imageSrc(user?.profilePicUrl || ''), [user?.profilePicUrl]);
+  const avatarUrl = useMemo(() => {
+    const u = user as { profilePicUrl?: string | null; image?: string | null } | null;
+    const raw = u?.profilePicUrl?.trim() || u?.image?.trim() || '';
+    return raw ? imageSrc(raw) : '';
+  }, [user]);
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>

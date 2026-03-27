@@ -21,6 +21,10 @@ export function EventsBottomNav({
   zIndex = 1030,
 }: EventsBottomNavProps) {
   const { user } = useUserAuth();
+  const profileImageValue =
+    (user as { profilePicUrl?: string | null; image?: string | null } | null)?.profilePicUrl ||
+    (user as { profilePicUrl?: string | null; image?: string | null } | null)?.image ||
+    '';
   const [settingsSchoolImgFailed, setSettingsSchoolImgFailed] = useState(false);
   const [settingsProfileImgFailed, setSettingsProfileImgFailed] = useState(false);
 
@@ -97,9 +101,9 @@ export function EventsBottomNav({
                     style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }}
                     onError={() => setSettingsSchoolImgFailed(true)}
                   />
-                ) : user?.profilePicUrl && !settingsProfileImgFailed ? (
+                ) : profileImageValue && !settingsProfileImgFailed ? (
                   <img
-                    src={imageSrc(user.profilePicUrl)}
+                    src={imageSrc(profileImageValue)}
                     alt=""
                     style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }}
                     onError={() => setSettingsProfileImgFailed(true)}
