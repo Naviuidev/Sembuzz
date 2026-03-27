@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { AppState, Platform } from 'react-native';
+import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { useAuth } from '../contexts/AuthContext';
@@ -16,8 +17,9 @@ Notifications.setNotificationHandler({
 });
 
 /**
- * Registers FCM/APNs device token with SemBuzz API when user is logged in.
- * Requires a dev/production build with Firebase (Android google-services.json, iOS APNs in Firebase).
+ * Registers an **Expo push token** (`ExponentPushToken[...]`) with the API so the backend can send
+ * via Expo Push (works on iOS TestFlight and Android). Native `getDevicePushTokenAsync()` on iOS is
+ * an APNs token, not an FCM token — Firebase `sendEachForMulticast` cannot use it.
  */
 export function useRegisterPushToken() {
   const { user, token } = useAuth();
@@ -51,8 +53,22 @@ export function useRegisterPushToken() {
         return;
       }
 
-      const devicePush = await Notifications.getDevicePushTokenAsync();
-      const pushToken = devicePush.data;
+      const projectId =
+        Constants.expoConfig?.extra?.eas?.projectId ??
+        (Constants.expoConfig as { extra?: { eas?: { projectId?: string } } } | null)?.extra?.eas
+          ?.projectId;
+
+      let pushToken: string | null = null;
+      if (projectId) {
+        const expoPush = await Notifications.getExpoPushTokenAsync({ projectId });
+        pushToken = expoPush.data;
+      } else {
+        if (__DEV__) {
+          console.warn('[Push] No EAS projectId in app config; falling back to native token (Android FCM only).');
+        }
+        const devicePush = await Notifications.getDevicePushTokenAsync();
+        pushToken = devicePush.data ?? null;
+      }
       if (!pushToken) return;
 
       const platform: 'android' | 'ios' | 'web' =

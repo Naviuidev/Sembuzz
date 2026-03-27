@@ -1,16 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as admin from 'firebase-admin';
+import Expo from 'expo-server-sdk';
 import { PrismaService } from '../../prisma/prisma.service';
 import { randomUUID } from 'crypto';
 
 /**
- * Sends FCM notifications when Firebase Admin is configured via **backend `.env`**
- * (`FIREBASE_SERVICE_ACCOUNT_JSON` or `GOOGLE_APPLICATION_CREDENTIALS`).
+ * Sends push when:
+ * - **Expo** (`ExponentPushToken[...]`) — Expo Push API (iOS TestFlight + Android from EAS builds).
+ * - **FCM** — Firebase Admin (`FIREBASE_SERVICE_ACCOUNT_JSON` / `GOOGLE_APPLICATION_CREDENTIALS`), Android native tokens.
  */
 @Injectable()
 export class PushNotificationService {
   private readonly log = new Logger(PushNotificationService.name);
   private messaging: admin.messaging.Messaging | null = null;
+  /** Expo Push; optional `EXPO_ACCESS_TOKEN` for higher rate limits / CI. */
+  private readonly expoSdk = new Expo({
+    accessToken: process.env.EXPO_ACCESS_TOKEN?.trim() || undefined,
+  });
 
   constructor(private readonly prisma: PrismaService) {
     try {
@@ -101,8 +107,10 @@ export class PushNotificationService {
 
     const matchedUserIds = [...new Set(users.map((u) => u.id))];
     const tokens = [...new Set(users.flatMap((u) => u.pushDevices.map((d) => d.token)))];
+    const expoTokens = tokens.filter((t) => Expo.isExpoPushToken(t));
+    const fcmTokens = tokens.filter((t) => !Expo.isExpoPushToken(t));
     this.log.log(
-      `[Push] event=${event.id} school=${event.schoolId} subCategory=${event.subCategoryId} matchedUsers=${users.length} tokens=${tokens.length} fcm=${this.messaging ? 'on' : 'off'}`,
+      `[Push] event=${event.id} school=${event.schoolId} subCategory=${event.subCategoryId} matchedUsers=${users.length} tokens=${tokens.length} (expo=${expoTokens.length} fcm=${fcmTokens.length}) firebase=${this.messaging ? 'on' : 'off'}`,
     );
     const schoolName = event.schoolName?.trim() || 'School';
     const apiBase = (process.env.API_URL || 'http://localhost:3000').replace(/\/+$/, '');
@@ -148,62 +156,104 @@ export class PushNotificationService {
       }
     }
 
+    const dataStrings = Object.fromEntries(Object.entries(data).map(([k, v]) => [k, String(v)]));
+
+    if (expoTokens.length > 0) {
+      const messages = expoTokens.map((to) => ({
+        to,
+        sound: 'default' as const,
+        title,
+        body,
+        data: dataStrings,
+        priority: 'high' as const,
+      }));
+      const chunks = this.expoSdk.chunkPushNotifications(messages);
+      for (let c = 0; c < chunks.length; c++) {
+        const chunk = chunks[c];
+        try {
+          const tickets = await this.expoSdk.sendPushNotificationsAsync(chunk);
+          const toRemove: string[] = [];
+          tickets.forEach((ticket, idx) => {
+            if (ticket.status === 'error') {
+              this.log.warn(
+                `[Push] Expo ticket: ${ticket.message} code=${ticket.details?.error ?? '?'}`,
+              );
+              if (ticket.details?.error === 'DeviceNotRegistered' && chunk[idx]?.to) {
+                const t = chunk[idx].to;
+                if (typeof t === 'string') toRemove.push(t);
+              }
+            }
+          });
+          if (toRemove.length > 0) {
+            await this.prisma.userPushDevice.deleteMany({ where: { token: { in: toRemove } } });
+            this.log.warn(`[Push] removed ${toRemove.length} unregistered Expo token(s)`);
+          }
+        } catch (e) {
+          this.log.error(`sendPushNotificationsAsync: ${e instanceof Error ? e.message : e}`);
+        }
+      }
+    }
+
+    if (fcmTokens.length === 0) {
+      return;
+    }
+
     if (!this.messaging) {
-      this.log.warn(`[Push] FCM skipped event=${event.id} — Firebase messaging not initialized`);
+      this.log.warn(
+        `[Push] FCM tokens=${fcmTokens.length} skipped event=${event.id} — Firebase messaging not initialized`,
+      );
       return;
     }
 
     const chunkSize = 500;
-    if (tokens.length > 0) {
-      for (let i = 0; i < tokens.length; i += chunkSize) {
-        const batch = tokens.slice(i, i + chunkSize);
-        try {
-          const res = await this.messaging.sendEachForMulticast({
-            tokens: batch,
-            notification: { title, body },
-            data: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, String(v)])),
-            android: {
-              priority: 'high',
-              notification: {
-                color: '#FFFFFF',
-              },
+    for (let i = 0; i < fcmTokens.length; i += chunkSize) {
+      const batch = fcmTokens.slice(i, i + chunkSize);
+      try {
+        const res = await this.messaging.sendEachForMulticast({
+          tokens: batch,
+          notification: { title, body },
+          data: dataStrings,
+          android: {
+            priority: 'high',
+            notification: {
+              color: '#FFFFFF',
             },
-            apns: {
-              payload: { aps: { sound: 'default' } },
-            },
-          });
-          this.log.log(
-            `[Push] batch ${i / chunkSize + 1}: success=${res.successCount} failure=${res.failureCount}`,
-          );
-          const invalidTokens: string[] = [];
-          if (res.failureCount > 0) {
-            res.responses.forEach((r, idx) => {
-              if (!r.success && r.error) {
-                this.log.debug(`FCM fail token[${i + idx}]: ${r.error.message}`);
-                const code = r.error.code ?? '';
-                const msg = (r.error.message ?? '').toLowerCase();
-                const isInvalidToken =
-                  code === 'messaging/registration-token-not-registered' ||
-                  code === 'messaging/invalid-registration-token' ||
-                  code === 'messaging/invalid-argument' ||
-                  msg.includes('requested entity was not found') ||
-                  msg.includes('not a valid fcm registration token');
-                if (isInvalidToken) {
-                  invalidTokens.push(batch[idx]);
-                }
+          },
+          apns: {
+            payload: { aps: { sound: 'default' } },
+          },
+        });
+        this.log.log(
+          `[Push] FCM batch ${i / chunkSize + 1}: success=${res.successCount} failure=${res.failureCount}`,
+        );
+        const invalidTokens: string[] = [];
+        if (res.failureCount > 0) {
+          res.responses.forEach((r, idx) => {
+            if (!r.success && r.error) {
+              this.log.debug(`FCM fail token[${i + idx}]: ${r.error.message}`);
+              const code = r.error.code ?? '';
+              const msg = (r.error.message ?? '').toLowerCase();
+              const isInvalidToken =
+                code === 'messaging/registration-token-not-registered' ||
+                code === 'messaging/invalid-registration-token' ||
+                code === 'messaging/invalid-argument' ||
+                msg.includes('requested entity was not found') ||
+                msg.includes('not a valid fcm registration token');
+              if (isInvalidToken) {
+                invalidTokens.push(batch[idx]);
               }
-            });
-          }
-          if (invalidTokens.length > 0) {
-            const uniqueInvalid = [...new Set(invalidTokens)];
-            await this.prisma.userPushDevice.deleteMany({
-              where: { token: { in: uniqueInvalid } },
-            });
-            this.log.warn(`[Push] removed ${uniqueInvalid.length} invalid token(s) from database`);
-          }
-        } catch (e) {
-          this.log.error(`sendEachForMulticast: ${e instanceof Error ? e.message : e}`);
+            }
+          });
         }
+        if (invalidTokens.length > 0) {
+          const uniqueInvalid = [...new Set(invalidTokens)];
+          await this.prisma.userPushDevice.deleteMany({
+            where: { token: { in: uniqueInvalid } },
+          });
+          this.log.warn(`[Push] removed ${uniqueInvalid.length} invalid FCM token(s) from database`);
+        }
+      } catch (e) {
+        this.log.error(`sendEachForMulticast: ${e instanceof Error ? e.message : e}`);
       }
     }
   }

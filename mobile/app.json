@@ -16,7 +16,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.sembuzz.mobile",
       "googleServicesFile": "./GoogleService-Info.plist",
-      "buildNumber": "13",
+      "buildNumber": "14",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }

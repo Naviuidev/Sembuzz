@@ -13,16 +13,17 @@
 ## Backend
 
 1. Run migration: `cd backend && npx prisma migrate deploy` (or `migrate dev` in dev).
-2. Add Firebase credentials to **`backend/.env`** (the same file your API already uses for `DATABASE_URL`, `JWT_SECRET`, etc.—loaded at startup, not committed to git). Use **one** of:
+2. **Expo Push (required for iOS TestFlight / EAS builds):** No extra env is required for basic sending. Optional: `EXPO_ACCESS_TOKEN` from [expo.dev](https://expo.dev) for higher limits / automation.
+3. **FCM (Android native tokens):** Add Firebase credentials to **`backend/.env`**. Use **one** of:
    - `GOOGLE_APPLICATION_CREDENTIALS` — absolute path to the Firebase service account JSON file.
    - `FIREBASE_SERVICE_ACCOUNT_JSON` — single-line JSON string of that service account (common on PaaS).
-3. Restart the API. If these are unset, approval still works; push is skipped (warning in logs).
+4. Restart the API. Tokens starting with `ExponentPushToken[` are sent via **Expo**; other tokens are sent via **FCM** if Firebase is configured.
 
 ## Mobile (Expo)
 
-1. Add **Firebase** to your project: Android `google-services.json`, iOS APNs key uploaded to Firebase (for FCM on iOS).
-2. Use a **development/production build** (Expo Go has limits for push).
-3. The app registers the device token after login when notification permission is granted (`useRegisterPushToken`).
+1. The app registers an **Expo push token** (`getExpoPushTokenAsync` + EAS `projectId` from `app.json`) after login when notification permission is granted (`useRegisterPushToken`). **iOS does not use a raw APNs token with Firebase FCM** — that path fails; Expo Push is the supported pipeline for EAS iOS builds.
+2. Add **Firebase** to the project for Android (`google-services.json`); iOS uses `GoogleService-Info.plist` for other features as needed.
+3. Use a **development/production build** (Expo Go has limits for push). After changing push registration, ship a **new TestFlight build** and open the app once so the new token is stored.
 
 ## API (Bearer user JWT)
 
