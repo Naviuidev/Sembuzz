@@ -24,7 +24,7 @@ import {
 } from '../services/user-events.service';
 import { userAuthService } from '../services/user-auth.service';
 import { api } from '../config/api';
-import { imageSrc } from '../utils/image';
+import { imageSrc, isImageIconValue } from '../utils/image';
 import { userHelpService } from '../services/user-help.service';
 import { userSchoolSocialService, type SchoolSocialAccountPublic } from '../services/user-school-social.service';
 import { getUserCategoryDone, getUserSubCategoryIds, setUserCategoryDone, setUserSubCategoryIds } from '../utils/user-category-prefs';
@@ -61,10 +61,6 @@ const PLATFORM_ICONS: Record<string, string> = {
   reddit: 'bi-reddit',
   snapchat: 'bi-snapchat',
 };
-
-function isClubIconUrl(icon: string): boolean {
-  return !!icon && (icon.startsWith('http://') || icon.startsWith('https://'));
-}
 
 function formatDate(iso: string) {
   try {
@@ -3291,7 +3287,7 @@ export const PublicEvents = () => {
                           className="d-flex align-items-center justify-content-center rounded-2 flex-shrink-0 overflow-hidden"
                           style={{ width: 44, height: 44, backgroundColor: '#fff', border: '1px solid #eee' }}
                         >
-                          {isClubIconUrl(group.icon) ? (
+                          {isImageIconValue(group.icon) ? (
                             <img src={imageSrc(group.icon)} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                           ) : group.icon.startsWith('fa-') ? (
                             <i className={group.icon} style={{ fontSize: '1.25rem', color: '#1a1f2e' }} />

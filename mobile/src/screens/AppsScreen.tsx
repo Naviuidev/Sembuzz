@@ -16,7 +16,7 @@ import { FontAwesome5 } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { getSchoolSocialAccounts, SchoolSocialAccountPublic } from '../services/userSchoolSocial';
 import Link45degIcon from 'react-native-bootstrap-icons/icons/link-45deg';
-import { imageSrc } from '../utils/image';
+import { imageSrc, isImageIconValue } from '../utils/image';
 
 const PLATFORM_COLORS: Record<string, string> = {
   facebook: '#1877F2',
@@ -84,10 +84,6 @@ function groupAccountsByPage(accounts: SchoolSocialAccountPublic[]) {
     const first = list[0];
     return { key, pageName: first.pageName, icon: first.icon, accounts: list };
   });
-}
-
-function isClubIconUrl(icon: string): boolean {
-  return !!icon && (icon.startsWith('http://') || icon.startsWith('https://'));
 }
 
 function PlatformIconButton({
@@ -229,7 +225,7 @@ export default function AppsScreen() {
             <View key={g.key} style={styles.section}>
               <View style={styles.sectionHeader}>
                 <View style={styles.clubIconWrap}>
-                  {isClubIconUrl(g.icon) ? (
+                  {isImageIconValue(g.icon) ? (
                     <Image source={{ uri: imageSrc(g.icon) }} style={styles.clubIconImg} resizeMode="contain" />
                   ) : (
                     <Link45degIcon width={22} height={22} fill="#1a1f2e" />

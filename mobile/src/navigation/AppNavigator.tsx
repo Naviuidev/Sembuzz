@@ -38,6 +38,12 @@ function BottomNavBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
   const { user, token } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
+  /** If school logo URL is wrong/404, fall back to profile pic instead of initials. */
+  const [settingsSchoolImgFailed, setSettingsSchoolImgFailed] = useState(false);
+
+  useEffect(() => {
+    setSettingsSchoolImgFailed(false);
+  }, [user?.id, user?.schoolImage, user?.profilePicUrl]);
 
   const refreshUnread = useCallback(async () => {
     if (!user?.id || !token) {
@@ -92,6 +98,9 @@ function BottomNavBar({ state, descriptors, navigation }: any) {
           { label: route.name, inactiveIconName: 'ellipse-outline', activeIconName: 'ellipse' };
         const { label, inactiveIconName, activeIconName } = config;
 
+        const profilePicRaw =
+          user?.profilePicUrl || (user as { image?: string | null } | null)?.image || '';
+
         const onPress = () => {
           const event = navigation.emit({
             type: 'tabPress',
@@ -115,13 +124,14 @@ function BottomNavBar({ state, descriptors, navigation }: any) {
           >
             {route.name === 'Settings' ? (
               <View style={styles.profileAvatarWrap}>
-                {user?.schoolImage ? (
-                  <Image source={{ uri: imageSrc(user.schoolImage) }} style={styles.profileAvatar} />
-                ) : user?.profilePicUrl || (user as { image?: string | null } | null)?.image ? (
+                {user?.schoolImage && !settingsSchoolImgFailed ? (
                   <Image
-                    source={{ uri: imageSrc(user?.profilePicUrl || (user as { image?: string | null }).image || '') }}
+                    source={{ uri: imageSrc(user.schoolImage) }}
                     style={styles.profileAvatar}
+                    onError={() => setSettingsSchoolImgFailed(true)}
                   />
+                ) : profilePicRaw ? (
+                  <Image source={{ uri: imageSrc(profilePicRaw) }} style={styles.profileAvatar} />
                 ) : (
                   <View style={styles.profileAvatarPlaceholder}>
                     <Text style={styles.profileAvatarLetter}>

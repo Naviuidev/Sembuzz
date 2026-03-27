@@ -39,3 +39,16 @@ export function imageSrc(url: string | null | undefined): string {
   }
   return `${base}${path}`;
 }
+
+/**
+ * Club/social icon field: uploads are stored as `/uploads/...` paths; only `http(s)` was
+ * treated as images before, which hid relative upload paths.
+ */
+export function isImageIconValue(icon: string | null | undefined): boolean {
+  const u = stripQuotes(typeof icon === 'string' ? icon : '');
+  if (!u) return false;
+  if (/^bi-/i.test(u) || /^fa-/.test(u) || /^fa\s/i.test(u)) return false;
+  if (u.startsWith('http://') || u.startsWith('https://')) return true;
+  if (u.startsWith('/uploads') || u.startsWith('uploads/')) return true;
+  return /\.(jpe?g|png|gif|webp|svg)(\?.*)?$/i.test(u);
+}

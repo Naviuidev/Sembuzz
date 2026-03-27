@@ -37,3 +37,16 @@ export function imageSrc(url: string | null | undefined): string {
   }
   return `${base}${path}`;
 }
+
+/**
+ * Club/social icon field: uploaded files are stored as `/uploads/...` (or `http(s)`).
+ * Bootstrap (`bi-*`) / Font Awesome (`fa-*`) are not image URLs.
+ */
+export function isImageIconValue(icon: string | null | undefined): boolean {
+  const t = stripQuotes(typeof icon === 'string' ? icon : '');
+  if (!t) return false;
+  if (/^bi-/i.test(t) || /^fa-/.test(t) || /^fa\s/i.test(t)) return false;
+  if (t.startsWith('http://') || t.startsWith('https://')) return true;
+  if (t.startsWith('/uploads') || t.startsWith('uploads/')) return true;
+  return /\.(jpe?g|png|gif|webp|svg)(\?.*)?$/i.test(t);
+}

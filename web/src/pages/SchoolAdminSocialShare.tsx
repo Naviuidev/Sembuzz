@@ -3,7 +3,7 @@ import { SchoolAdminNavbar } from '../components/SchoolAdminNavbar';
 import { SchoolAdminSidebar } from '../components/SchoolAdminSidebar';
 import { useSchoolAdminAuth } from '../contexts/SchoolAdminAuthContext';
 import { schoolAdminSocialAccountsService } from '../services/school-admin-social-accounts.service';
-import { imageSrc } from '../utils/image';
+import { imageSrc, isImageIconValue } from '../utils/image';
 
 export interface SocialPlatform {
   id: string;
@@ -44,11 +44,6 @@ const PLATFORM_COLORS: Record<string, string> = {
 type View = 'main' | 'link-form' | 'saved-list';
 type Step = 'club-info' | 'select' | 'animating' | 'form' | 'animating-save' | 'list';
 type PopupMode = 'add' | 'edit';
-
-/** Whether the stored icon is a URL (uploaded image) */
-function isIconUrl(icon: string): boolean {
-  return !!icon && (icon.startsWith('http://') || icon.startsWith('https://'));
-}
 
 export interface SavedSocialAccount {
   id: string;
@@ -477,7 +472,7 @@ export const SchoolAdminSocialShare = () => {
                                     className="d-flex align-items-center justify-content-center rounded-2 flex-shrink-0 overflow-hidden"
                                     style={{ width: 44, height: 44, backgroundColor: '#fff' }}
                                   >
-                                    {isIconUrl(group.icon) ? (
+                                    {isImageIconValue(group.icon) ? (
                                       <img src={imageSrc(group.icon)} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                                     ) : group.icon.startsWith('fa-') ? (
                                       <i className={group.icon} style={{ fontSize: '1.25rem', color: '#1a1f2e' }} />
@@ -740,7 +735,7 @@ export const SchoolAdminSocialShare = () => {
                             className="d-flex align-items-center justify-content-center rounded-2 flex-shrink-0 overflow-hidden"
                             style={{ width: 40, height: 40, backgroundColor: '#fff', color: '#1a1f2e' }}
                           >
-                            {isIconUrl(clubIconUrl) ? (
+                            {isImageIconValue(clubIconUrl) ? (
                               <img src={imageSrc(clubIconUrl)} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                             ) : clubIconUrl?.startsWith('fa-') ? (
                               <i className={clubIconUrl} style={{ fontSize: '1.25rem' }} />
@@ -806,7 +801,7 @@ export const SchoolAdminSocialShare = () => {
                             className="d-flex align-items-center justify-content-center rounded-2 flex-shrink-0 overflow-hidden"
                             style={{ width: 40, height: 40, backgroundColor: '#fff', color: '#1a1f2e' }}
                           >
-                            {isIconUrl(clubIconUrl) ? (
+                            {isImageIconValue(clubIconUrl) ? (
                               <img src={imageSrc(clubIconUrl)} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                             ) : clubIconUrl?.startsWith('fa-') ? (
                               <i className={clubIconUrl} style={{ fontSize: '1.25rem' }} />
@@ -1017,7 +1012,7 @@ export const SchoolAdminSocialShare = () => {
                 {editingClubIcon.trim() && (
                   <div className="mt-2 d-flex align-items-center gap-2 flex-wrap">
                     <span className="text-muted small">Preview:</span>
-                    {isIconUrl(editingClubIcon) ? (
+                    {isImageIconValue(editingClubIcon) ? (
                       <img
                         src={imageSrc(editingClubIcon)}
                         alt=""
