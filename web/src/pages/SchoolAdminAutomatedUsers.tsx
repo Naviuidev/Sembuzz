@@ -5,6 +5,7 @@ import {
   schoolAdminStudentsService,
   type SchoolStudent,
 } from '../services/school-admin-students.service';
+import { imageSrc } from '../utils/image';
 
 function formatDate(iso: string) {
   try {
@@ -18,6 +19,13 @@ function getDocExt(url: string): string {
   const clean = url.split('?')[0].split('#')[0];
   const idx = clean.lastIndexOf('.');
   return idx >= 0 ? clean.slice(idx + 1).toLowerCase() : '';
+}
+
+/** Filename for download attribute (path segment only). */
+function getDocFilename(url: string): string {
+  const clean = url.split('?')[0].split('#')[0];
+  const seg = clean.split('/').pop();
+  return seg && seg.includes('.') ? seg : 'document';
 }
 
 export const SchoolAdminAutomatedUsers = () => {
@@ -133,7 +141,7 @@ export const SchoolAdminAutomatedUsers = () => {
                           <td className="align-middle">
                             {s.profilePicUrl ? (
                               <img
-                                src={s.profilePicUrl}
+                                src={imageSrc(s.profilePicUrl)}
                                 alt=""
                                 style={{
                                   width: 40,
@@ -282,10 +290,13 @@ export const SchoolAdminAutomatedUsers = () => {
                 </div>
                 <div className="card-body p-0" style={{ minHeight: 400 }}>
                   {(() => {
+                    /** Absolute URL on API host — relative /uploads/... on sembuzz.com was loading SPA index instead. */
+                    const resolvedUrl = imageSrc(viewDocUrl);
                     const ext = getDocExt(viewDocUrl);
                     const isPdf = ext === 'pdf';
                     const isBrowserImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext);
                     const needsFallback = docPreviewFailed || (!isPdf && !isBrowserImage);
+                    const downloadName = getDocFilename(viewDocUrl);
 
                     if (needsFallback) {
                       return (
@@ -295,10 +306,10 @@ export const SchoolAdminAutomatedUsers = () => {
                             {ext ? ` (.${ext})` : ''}. Open or download the file instead.
                           </p>
                           <div className="d-flex gap-2">
-                            <a href={viewDocUrl} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm">
+                            <a href={resolvedUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm">
                               Open document
                             </a>
-                            <a href={viewDocUrl} download className="btn btn-outline-secondary btn-sm">
+                            <a href={resolvedUrl} download={downloadName} className="btn btn-outline-secondary btn-sm">
                               Download
                             </a>
                           </div>
@@ -309,7 +320,7 @@ export const SchoolAdminAutomatedUsers = () => {
                     if (isPdf) {
                       return (
                         <iframe
-                          src={viewDocUrl}
+                          src={resolvedUrl}
                           title="Document"
                           style={{ width: '100%', height: 450, border: 'none' }}
                         />
@@ -318,7 +329,7 @@ export const SchoolAdminAutomatedUsers = () => {
 
                     return (
                       <img
-                        src={viewDocUrl}
+                        src={resolvedUrl}
                         alt="Uploaded document"
                         style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain' }}
                         onError={() => setDocPreviewFailed(true)}
