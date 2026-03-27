@@ -77,8 +77,7 @@ export default function SettingsScreen() {
 
   /** Settings header = user photo only (school logo stays on bottom tab). */
   const profileImageUrl = useMemo(() => {
-    const u = user as { profilePicUrl?: string | null; image?: string | null } | null;
-    const raw = u?.profilePicUrl?.trim() || u?.image?.trim() || '';
+    const raw = user?.profilePicUrl?.trim() || user?.image?.trim() || '';
     return raw ? imageSrc(raw) : '';
   }, [user]);
 

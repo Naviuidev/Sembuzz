@@ -45,6 +45,8 @@ const PLATFORM_COLORS: Record<string, string> = {
   telegram: '#26A5E4',
   reddit: '#FF4500',
   snapchat: '#FFFC00',
+  linktree: '#43E660',
+  weebly: '#1cb0a1',
 };
 
 const PLATFORM_ICONS: Record<string, string> = {
@@ -60,6 +62,8 @@ const PLATFORM_ICONS: Record<string, string> = {
   telegram: 'bi-telegram',
   reddit: 'bi-reddit',
   snapchat: 'bi-snapchat',
+  linktree: 'bi-link-45deg',
+  weebly: 'bi-columns-gap',
 };
 
 function formatDate(iso: string) {

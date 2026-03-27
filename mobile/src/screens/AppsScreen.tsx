@@ -31,6 +31,8 @@ const PLATFORM_COLORS: Record<string, string> = {
   telegram: '#26A5E4',
   reddit: '#FF4500',
   snapchat: '#FFFC00',
+  linktree: '#43E660',
+  weebly: '#1cb0a1',
 };
 
 /** FontAwesome5 brand icon names (subset aligned with web platform ids). */
@@ -47,6 +49,9 @@ const PLATFORM_FA5_BRANDS: Record<string, string> = {
   telegram: 'telegram',
   reddit: 'reddit',
   snapchat: 'snapchat',
+  /** FA5 solid “link” — Linktree has no stable FA5 brand glyph in all builds */
+  linktree: 'link',
+  weebly: 'weebly',
 };
 
 const DEFAULT_SOCIAL = [

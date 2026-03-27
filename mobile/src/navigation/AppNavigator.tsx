@@ -40,10 +40,13 @@ function BottomNavBar({ state, descriptors, navigation }: any) {
   const [unreadCount, setUnreadCount] = useState(0);
   /** If school logo URL is wrong/404, fall back to profile pic instead of initials. */
   const [settingsSchoolImgFailed, setSettingsSchoolImgFailed] = useState(false);
+  /** If profile pic URL fails (wrong host, 404), show initials. */
+  const [settingsProfileImgFailed, setSettingsProfileImgFailed] = useState(false);
 
   useEffect(() => {
     setSettingsSchoolImgFailed(false);
-  }, [user?.id, user?.schoolImage, user?.profilePicUrl]);
+    setSettingsProfileImgFailed(false);
+  }, [user?.id, user?.schoolImage, user?.profilePicUrl, user?.image]);
 
   const refreshUnread = useCallback(async () => {
     if (!user?.id || !token) {
@@ -98,8 +101,7 @@ function BottomNavBar({ state, descriptors, navigation }: any) {
           { label: route.name, inactiveIconName: 'ellipse-outline', activeIconName: 'ellipse' };
         const { label, inactiveIconName, activeIconName } = config;
 
-        const profilePicRaw =
-          user?.profilePicUrl || (user as { image?: string | null } | null)?.image || '';
+        const profilePicRaw = user?.profilePicUrl || user?.image || '';
 
         const onPress = () => {
           const event = navigation.emit({
@@ -130,8 +132,12 @@ function BottomNavBar({ state, descriptors, navigation }: any) {
                     style={styles.profileAvatar}
                     onError={() => setSettingsSchoolImgFailed(true)}
                   />
-                ) : profilePicRaw ? (
-                  <Image source={{ uri: imageSrc(profilePicRaw) }} style={styles.profileAvatar} />
+                ) : profilePicRaw && !settingsProfileImgFailed ? (
+                  <Image
+                    source={{ uri: imageSrc(profilePicRaw) }}
+                    style={styles.profileAvatar}
+                    onError={() => setSettingsProfileImgFailed(true)}
+                  />
                 ) : (
                   <View style={styles.profileAvatarPlaceholder}>
                     <Text style={styles.profileAvatarLetter}>

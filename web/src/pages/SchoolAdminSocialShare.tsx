@@ -24,6 +24,8 @@ const ALL_PLATFORMS: SocialPlatform[] = [
   { id: 'telegram', name: 'Telegram', icon: 'bi-telegram' },
   { id: 'reddit', name: 'Reddit', icon: 'bi-reddit' },
   { id: 'snapchat', name: 'Snapchat', icon: 'bi-snapchat' },
+  { id: 'linktree', name: 'Linktree', icon: 'bi-link-45deg' },
+  { id: 'weebly', name: 'Weebly', icon: 'bi-columns-gap' },
 ];
 
 const PLATFORM_COLORS: Record<string, string> = {
@@ -39,6 +41,8 @@ const PLATFORM_COLORS: Record<string, string> = {
   telegram: '#26A5E4',
   reddit: '#FF4500',
   snapchat: '#FFFC00',
+  linktree: '#43E660',
+  weebly: '#1cb0a1',
 };
 
 type View = 'main' | 'link-form' | 'saved-list';

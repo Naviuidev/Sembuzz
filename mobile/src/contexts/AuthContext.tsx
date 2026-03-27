@@ -12,6 +12,8 @@ type User = {
   firstName?: string;
   lastName?: string;
   profilePicUrl?: string;
+  /** Legacy/alternate field some responses may use for the same photo URL */
+  image?: string | null;
   schoolId: string | null;
   schoolName?: string | null;
   schoolImage?: string;

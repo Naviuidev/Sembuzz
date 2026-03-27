@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,10 +9,14 @@ import { imageSrc } from '../utils/image';
 export default function ViewProfileScreen() {
   const { user } = useAuth();
   const avatarUrl = useMemo(() => {
-    const u = user as { profilePicUrl?: string | null; image?: string | null } | null;
-    const raw = u?.profilePicUrl?.trim() || u?.image?.trim() || '';
+    const raw = user?.profilePicUrl?.trim() || user?.image?.trim() || '';
     return raw ? imageSrc(raw) : '';
   }, [user]);
+  const [avatarFailed, setAvatarFailed] = useState(false);
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [avatarUrl, user?.id]);
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -20,8 +24,8 @@ export default function ViewProfileScreen() {
         
 
         <View style={styles.heroCard}>
-          {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+          {avatarUrl && !avatarFailed ? (
+            <Image source={{ uri: avatarUrl }} style={styles.avatar} onError={() => setAvatarFailed(true)} />
           ) : (
             <View style={styles.avatarPlaceholder}>
               <Ionicons name="person" size={52} color="#7d8590" />
