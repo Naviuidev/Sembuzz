@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { AppState, Platform } from 'react-native';
+import { AppState, InteractionManager, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
@@ -99,13 +99,17 @@ export function useRegisterPushToken() {
       clearRetry();
       return;
     }
-    void registerNow();
+    // Defer until after navigation/modals settle so the UI thread isn't contending right after login.
+    const task = InteractionManager.runAfterInteractions(() => {
+      void registerNow();
+    });
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         void registerNow();
       }
     });
     return () => {
+      task.cancel();
       sub.remove();
       clearRetry();
     };

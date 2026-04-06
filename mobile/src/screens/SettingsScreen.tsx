@@ -136,6 +136,9 @@ export default function SettingsScreen() {
     setLoading(true);
     try {
       await login(email.trim(), password);
+      setShowLoginModal(false);
+      setLoginInfoMessage(null);
+      setPassword('');
     } catch (e: unknown) {
       const msg =
         e && typeof e === 'object' && 'response' in e
@@ -149,6 +152,8 @@ export default function SettingsScreen() {
 
   const confirmLogout = useCallback(async () => {
     setShowLogoutConfirmModal(false);
+    setShowLoginModal(false);
+    setLoginInfoMessage(null);
     await logout();
     const tabNav = navigation.getParent();
     if (tabNav && typeof (tabNav as { navigate?: unknown }).navigate === 'function') {

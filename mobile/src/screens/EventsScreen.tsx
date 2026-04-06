@@ -142,7 +142,10 @@ export default function EventsScreen() {
         })();
       }
       setError(null);
-    } catch {
+    } catch (e) {
+      if (__DEV__) {
+        console.warn('[EventsScreen] fetchEvents failed', e);
+      }
       setError('Unable to load events right now. Pull to refresh and try again.');
     }
   }, [showAllSchools, schoolId, showCategories, selectedSubCategoryIds, user]);
@@ -858,9 +861,17 @@ export default function EventsScreen() {
         visible={showFirstLoginCategories && !!user?.schoolId && prefsLoaded}
         animationType="fade"
         transparent
-        onRequestClose={() => {}}
+        presentationStyle="fullScreen"
+        onRequestClose={() => {
+          if (!categoryModalSaving) saveCategorySelectionMobile(true);
+        }}
       >
-        <Pressable style={styles.categorySelectOverlay} onPress={() => {}}>
+        <Pressable
+          style={styles.categorySelectOverlay}
+          onPress={() => {
+            if (!categoryModalSaving) saveCategorySelectionMobile(true);
+          }}
+        >
           <Pressable style={styles.categorySelectCard} onPress={(e) => e.stopPropagation()}>
             <Text style={styles.categorySelectTitle} accessibilityRole="header">
               Select your categories
