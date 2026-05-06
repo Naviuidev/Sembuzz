@@ -271,7 +271,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.08,
     shadowRadius: 16,
-    elevation: 8,
+    /** Keep bar above feed scroll layers on large screens (e.g. iPad). */
+    zIndex: 1000,
+    elevation: 24,
     paddingVertical: 10,
     paddingHorizontal: 8,
     paddingBottom: 10,

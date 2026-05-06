@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, DeviceEventEmitter, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, CommonActions } from '@react-navigation/native';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import * as Notifications from 'expo-notifications';
 import { AuthProvider } from './src/contexts/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import { useRegisterPushToken } from './src/hooks/useRegisterPushToken';
+import { NATIVE_UI_TOUCH_RECOVERY } from './src/constants/appEvents';
 
 /**
  * Background illustration ONLY (no phone chrome, no mockup UI).
@@ -21,6 +22,17 @@ const ONBOARDING_CONTENT_BG = '#f9bf8540';
 const ONBOARDING_SAFE_STRIP_BG = '#f9bf8540';
 
 function PushNotificationBootstrap() {
+  /** Force a subtree re-render after the system notification sheet dismisses (mitigates iPad stuck touches). */
+  const [, setRecoveryTick] = useState(0);
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(NATIVE_UI_TOUCH_RECOVERY, () => {
+      setRecoveryTick((n) => n + 1);
+      if (__DEV__) {
+        console.log('[App] NATIVE_UI_TOUCH_RECOVERY applied');
+      }
+    });
+    return () => sub.remove();
+  }, []);
   useRegisterPushToken();
   return null;
 }

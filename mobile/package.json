@@ -5,7 +5,9 @@
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
-    "ios": "expo run:ios",
+    "ios": "PATH=\"/usr/bin:/bin:/usr/sbin:/sbin:$PATH\" expo run:ios",
+    "ios:ipad": "PATH=\"/usr/bin:/bin:/usr/sbin:/sbin:$PATH\" expo run:ios --device \"iPad (A16)\"",
+    "pod-install": "PATH=\"/usr/bin:/bin:/usr/sbin:/sbin:$PATH\" bash -lc 'cd ios && pod install'",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "doctor": "expo doctor",

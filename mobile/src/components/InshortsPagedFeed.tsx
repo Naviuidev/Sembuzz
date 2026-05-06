@@ -520,6 +520,7 @@ export function InshortsPagedFeed({
 
   return (
     <FlatList
+      style={styles.feedList}
       data={slides}
       renderItem={renderItem}
       keyExtractor={keyExtractor}
@@ -537,6 +538,9 @@ export function InshortsPagedFeed({
 }
 
 const styles = StyleSheet.create({
+  feedList: {
+    flex: 1,
+  },
   pageRoot: {
     width: '100%',
     justifyContent: 'center',

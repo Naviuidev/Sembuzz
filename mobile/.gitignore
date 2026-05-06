@@ -34,6 +34,10 @@ yarn-error.*
 .env
 .env*.local
 
+# EAS `eas credentials` download (secrets)
+credentials.json
+credentials/
+
 # typescript
 *.tsbuildinfo
 

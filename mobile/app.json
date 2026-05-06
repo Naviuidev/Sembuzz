@@ -22,7 +22,7 @@
       }
     },
     "android": {
-      "package": "com.sembuzz.mobile",
+      "package": "com.naveenui.studentnewsapp",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
@@ -30,7 +30,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "versionCode": 4,
+      "versionCode": 15,
       "permissions": [
         "android.permission.RECORD_AUDIO"
       ]

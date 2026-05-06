@@ -49,7 +49,7 @@ import {
   setUserSubCategoryIds,
 } from '../utils/userCategoryPrefs';
 import { userNotificationsService } from '../services/userNotifications';
-import { CATEGORY_PREFS_CHANGED } from '../constants/appEvents';
+import { CATEGORY_PREFS_CHANGED, READY_FOR_PUSH_PERMISSION } from '../constants/appEvents';
 
 export default function EventsScreen() {
   const navigation = useNavigation();
@@ -72,6 +72,8 @@ export default function EventsScreen() {
   const [expandedCategoryId, setExpandedCategoryId] = useState<string | null>(null);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
   const tabSlideAnim = useRef(new Animated.Value(0)).current;
+  /** Emit push-permission readiness once per login so the OS dialog does not stack on first-login Modals (iPad). */
+  const pushPermissionReadyEmittedForUser = useRef<string | null>(null);
 
   if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -201,6 +203,21 @@ export default function EventsScreen() {
       cancelled = true;
     };
   }, [user?.id, user?.schoolId]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      pushPermissionReadyEmittedForUser.current = null;
+      return;
+    }
+    if (!prefsLoaded || showFirstLoginCategories) return;
+    if (pushPermissionReadyEmittedForUser.current === user.id) return;
+    pushPermissionReadyEmittedForUser.current = user.id;
+    const t = setTimeout(() => {
+      DeviceEventEmitter.emit(READY_FOR_PUSH_PERMISSION, { userId: user.id });
+      if (__DEV__) console.log('[Events] READY_FOR_PUSH_PERMISSION', user.id);
+    }, 0);
+    return () => clearTimeout(t);
+  }, [user?.id, prefsLoaded, showFirstLoginCategories]);
 
   /** When Settings saves category prefs, refresh strip + filter without resetting first-login flow. */
   useEffect(() => {
@@ -816,130 +833,130 @@ export default function EventsScreen() {
         </View>
       )}
 
-      {/* Subcategory dropdown (same behavior as web portal under category pill) */}
-      <Modal
-        visible={!!expandedCategory && showCategories}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setExpandedCategoryId(null)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setExpandedCategoryId(null)}>
-          <Pressable style={styles.subCatDropdownBox} onPress={(e) => e.stopPropagation()}>
-            {expandedCategory ? (
-              <>
-                <Text style={styles.subCatDropdownHeader}>{expandedCategory.name}</Text>
-                {(expandedCategory.subcategories ?? []).length === 0 ? (
-                  <Text style={styles.subCatDropdownEmpty}>No subcategories</Text>
-                ) : (
-                  <ScrollView style={styles.subCatDropdownScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                    {(expandedCategory.subcategories ?? []).map((sub) => {
-                      const checked = selectedSubCategoryIds.includes(sub.id);
-                      return (
-                        <TouchableOpacity
-                          key={sub.id}
-                          style={styles.subCatDropdownRow}
-                          onPress={() => toggleSubCategory(sub.id)}
-                          activeOpacity={0.7}
-                        >
-                          <View style={[styles.checkbox, checked && styles.checkboxOn]}>
-                            {checked ? <Text style={styles.checkboxTick}>✓</Text> : null}
-                          </View>
-                          <Text style={styles.subCatDropdownRowText}>{sub.name}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                )}
-              </>
-            ) : null}
+      {/* Subcategory dropdown — unmount when closed so iOS does not keep a stale touch layer (iPad). */}
+      {!!expandedCategory && showCategories ? (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => setExpandedCategoryId(null)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setExpandedCategoryId(null)}>
+            <Pressable style={styles.subCatDropdownBox} onPress={(e) => e.stopPropagation()}>
+              <Text style={styles.subCatDropdownHeader}>{expandedCategory.name}</Text>
+              {(expandedCategory.subcategories ?? []).length === 0 ? (
+                <Text style={styles.subCatDropdownEmpty}>No subcategories</Text>
+              ) : (
+                <ScrollView style={styles.subCatDropdownScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                  {(expandedCategory.subcategories ?? []).map((sub) => {
+                    const checked = selectedSubCategoryIds.includes(sub.id);
+                    return (
+                      <TouchableOpacity
+                        key={sub.id}
+                        style={styles.subCatDropdownRow}
+                        onPress={() => toggleSubCategory(sub.id)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.checkbox, checked && styles.checkboxOn]}>
+                          {checked ? <Text style={styles.checkboxTick}>✓</Text> : null}
+                        </View>
+                        <Text style={styles.subCatDropdownRowText}>{sub.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
+      ) : null}
 
-      {/* First login — same structure as web PublicEvents (glass overlay + white card) */}
-      <Modal
-        visible={showFirstLoginCategories && !!user?.schoolId && prefsLoaded}
-        animationType="fade"
-        transparent
-        presentationStyle="fullScreen"
-        onRequestClose={() => {
-          if (!categoryModalSaving) saveCategorySelectionMobile(true);
-        }}
-      >
-        <Pressable
-          style={styles.categorySelectOverlay}
-          onPress={() => {
+      {/* First login — unmount Modal when dismissed (visible={false} alone can leave a ghost window on iPad that blocks the tab bar until cold start). */}
+      {showFirstLoginCategories && !!user?.schoolId && prefsLoaded ? (
+        <Modal
+          visible
+          animationType="fade"
+          transparent
+          presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
+          onRequestClose={() => {
             if (!categoryModalSaving) saveCategorySelectionMobile(true);
           }}
         >
-          <Pressable style={styles.categorySelectCard} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.categorySelectTitle} accessibilityRole="header">
-              Select your categories
-            </Text>
-            <Text style={styles.categorySelectDesc}>
-              Choose the categories and subcategories for your school. Your home feed will show news from your selections. You can skip and see all school news, or change this later in Settings.
-            </Text>
+          <Pressable
+            style={styles.categorySelectOverlay}
+            onPress={() => {
+              if (!categoryModalSaving) saveCategorySelectionMobile(true);
+            }}
+          >
+            <Pressable style={styles.categorySelectCard} onPress={(e) => e.stopPropagation()}>
+              <Text style={styles.categorySelectTitle} accessibilityRole="header">
+                Select your categories
+              </Text>
+              <Text style={styles.categorySelectDesc}>
+                Choose the categories and subcategories for your school. Your home feed will show news from your selections. You can skip and see all school news, or change this later in Settings.
+              </Text>
 
-            <ScrollView
-              style={styles.categorySelectList}
-              contentContainerStyle={styles.categorySelectListContent}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              {categories.length === 0 ? (
-                <ActivityIndicator color="#1a1f2e" style={{ marginVertical: 18 }} />
-              ) : (
-                categories.map((cat) => (
-                  <View key={cat.id} style={styles.categorySelectBlock}>
-                    <Text style={styles.categorySelectCatTitle}>{cat.name}</Text>
-                    <View style={styles.categorySelectSubRow}>
-                      {(cat.subcategories ?? []).map((sub) => {
-                        const isSelected = categoryModalSelectedIds.includes(sub.id);
-                        return (
-                          <TouchableOpacity
-                            key={sub.id}
-                            style={[styles.subCatBtn, isSelected ? styles.subCatBtnDark : styles.subCatBtnOutline]}
-                            onPress={() => !categoryModalSaving && toggleCategoryModalSub(sub.id)}
-                            activeOpacity={0.85}
-                            disabled={categoryModalSaving}
-                          >
-                            <Text style={[styles.subCatBtnText, isSelected && styles.subCatBtnTextOnDark]}>
-                              {sub.name}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
+              <ScrollView
+                style={styles.categorySelectList}
+                contentContainerStyle={styles.categorySelectListContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                {categories.length === 0 ? (
+                  <ActivityIndicator color="#1a1f2e" style={{ marginVertical: 18 }} />
+                ) : (
+                  categories.map((cat) => (
+                    <View key={cat.id} style={styles.categorySelectBlock}>
+                      <Text style={styles.categorySelectCatTitle}>{cat.name}</Text>
+                      <View style={styles.categorySelectSubRow}>
+                        {(cat.subcategories ?? []).map((sub) => {
+                          const isSelected = categoryModalSelectedIds.includes(sub.id);
+                          return (
+                            <TouchableOpacity
+                              key={sub.id}
+                              style={[styles.subCatBtn, isSelected ? styles.subCatBtnDark : styles.subCatBtnOutline]}
+                              onPress={() => !categoryModalSaving && toggleCategoryModalSub(sub.id)}
+                              activeOpacity={0.85}
+                              disabled={categoryModalSaving}
+                            >
+                              <Text style={[styles.subCatBtnText, isSelected && styles.subCatBtnTextOnDark]}>
+                                {sub.name}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
                     </View>
-                  </View>
-                ))
-              )}
-            </ScrollView>
+                  ))
+                )}
+              </ScrollView>
 
-            <View style={styles.categorySelectActions}>
-              <TouchableOpacity
-                style={[styles.catModalBtnOutline, categoryModalSaving && styles.catModalBtnDisabled]}
-                onPress={() => saveCategorySelectionMobile(true)}
-                activeOpacity={0.85}
-                disabled={categoryModalSaving}
-              >
-                <Text style={styles.catModalBtnOutlineText}>
-                  {categoryModalSaving ? 'Please wait…' : 'Skip'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.catModalBtnDark, categoryModalSaving && styles.catModalBtnDisabled]}
-                onPress={() => saveCategorySelectionMobile(false)}
-                activeOpacity={0.85}
-                disabled={categoryModalSaving}
-              >
-                <Text style={styles.catModalBtnDarkText}>
-                  {categoryModalSaving ? 'Saving…' : 'Next'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+              <View style={styles.categorySelectActions}>
+                <TouchableOpacity
+                  style={[styles.catModalBtnOutline, categoryModalSaving && styles.catModalBtnDisabled]}
+                  onPress={() => saveCategorySelectionMobile(true)}
+                  activeOpacity={0.85}
+                  disabled={categoryModalSaving}
+                >
+                  <Text style={styles.catModalBtnOutlineText}>
+                    {categoryModalSaving ? 'Please wait…' : 'Skip'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.catModalBtnDark, categoryModalSaving && styles.catModalBtnDisabled]}
+                  onPress={() => saveCategorySelectionMobile(false)}
+                  activeOpacity={0.85}
+                  disabled={categoryModalSaving}
+                >
+                  <Text style={styles.catModalBtnDarkText}>
+                    {categoryModalSaving ? 'Saving…' : 'Next'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
+      ) : null}
 
     </SafeAreaView>
   );

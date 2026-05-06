@@ -597,97 +597,99 @@ export default function SettingsScreen() {
         onCompleteGoToLogin={handleSignUpCompleteGoToLogin}
       />
 
-      <Modal visible={showLoginModal} transparent animationType="fade">
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => {
-            setLoginInfoMessage(null);
-            setShowLoginModal(false);
-          }}
-        >
-          <Pressable style={styles.modalBox} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.modalHeader}>
-              <View style={{ flex: 1 }} />
+      {showLoginModal ? (
+        <Modal visible transparent animationType="fade">
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => {
+              setLoginInfoMessage(null);
+              setShowLoginModal(false);
+            }}
+          >
+            <Pressable style={styles.modalBox} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.modalHeader}>
+                <View style={{ flex: 1 }} />
+                <TouchableOpacity
+                  onPress={() => {
+                    setLoginInfoMessage(null);
+                    setShowLoginModal(false);
+                  }}
+                  hitSlop={12}
+                >
+                  <Text style={styles.modalClose}>×</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.modalBrand}>Sembuzz</Text>
+              <Text style={styles.modalTitle}>Login to your Account</Text>
+              {loginInfoMessage ? <Text style={styles.modalInfoBanner}>{loginInfoMessage}</Text> : null}
+              <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="Email"
+                  placeholderTextColor="#8e8e8e"
+                  value={email}
+                  onChangeText={(t) => {
+                    setEmail(t);
+                    setError(null);
+                    setLoginInfoMessage(null);
+                  }}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  autoComplete="email"
+                />
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="Password"
+                  placeholderTextColor="#8e8e8e"
+                  value={password}
+                  onChangeText={(t) => {
+                    setPassword(t);
+                    setError(null);
+                    setLoginInfoMessage(null);
+                  }}
+                  secureTextEntry
+                  autoComplete="password"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  textContentType="password"
+                  cursorColor="#1a1f2e"
+                  selectionColor="rgba(26, 31, 46, 0.25)"
+                />
+                {error ? <Text style={styles.modalError}>{error}</Text> : null}
+                <TouchableOpacity
+                  style={[styles.modalSignInBtn, loading && styles.buttonDisabled]}
+                  onPress={handleLogin}
+                  disabled={loading}
+                >
+                  {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalSignInText}>Sign in</Text>}
+                </TouchableOpacity>
+              </KeyboardAvoidingView>
+              <Text style={styles.modalSignUpPrompt}>
+                Create new account?{' '}
+                <Text style={styles.modalSignUpLink} onPress={openRegister}>Sign up</Text>
+              </Text>
+              <View style={styles.modalLegalRow}>
+                <TouchableOpacity onPress={() => Linking.openURL(`${BASE_URL}/#privacy`).catch(() => {})}>
+                  <Text style={styles.modalLegalLink}>Privacy policy</Text>
+                </TouchableOpacity>
+                <Text style={styles.footerDot}> </Text>
+                <TouchableOpacity onPress={() => Linking.openURL(`${BASE_URL}/#terms-of-service`).catch(() => {})}>
+                  <Text style={styles.modalLegalLink}>Terms and conditions</Text>
+                </TouchableOpacity>
+              </View>
               <TouchableOpacity
                 onPress={() => {
                   setLoginInfoMessage(null);
                   setShowLoginModal(false);
                 }}
-                hitSlop={12}
+                style={styles.modalCancel}
               >
-                <Text style={styles.modalClose}>×</Text>
+                <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
-            </View>
-            <Text style={styles.modalBrand}>Sembuzz</Text>
-            <Text style={styles.modalTitle}>Login to your Account</Text>
-            {loginInfoMessage ? <Text style={styles.modalInfoBanner}>{loginInfoMessage}</Text> : null}
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-              <TextInput
-                style={styles.modalInput}
-                placeholder="Email"
-                placeholderTextColor="#8e8e8e"
-                value={email}
-                onChangeText={(t) => {
-                  setEmail(t);
-                  setError(null);
-                  setLoginInfoMessage(null);
-                }}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                autoComplete="email"
-              />
-              <TextInput
-                style={styles.modalInput}
-                placeholder="Password"
-                placeholderTextColor="#8e8e8e"
-                value={password}
-                onChangeText={(t) => {
-                  setPassword(t);
-                  setError(null);
-                  setLoginInfoMessage(null);
-                }}
-                secureTextEntry
-                autoComplete="password"
-                autoCapitalize="none"
-                autoCorrect={false}
-                textContentType="password"
-                cursorColor="#1a1f2e"
-                selectionColor="rgba(26, 31, 46, 0.25)"
-              />
-              {error ? <Text style={styles.modalError}>{error}</Text> : null}
-              <TouchableOpacity
-                style={[styles.modalSignInBtn, loading && styles.buttonDisabled]}
-                onPress={handleLogin}
-                disabled={loading}
-              >
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalSignInText}>Sign in</Text>}
-              </TouchableOpacity>
-            </KeyboardAvoidingView>
-            <Text style={styles.modalSignUpPrompt}>
-              Create new account?{' '}
-              <Text style={styles.modalSignUpLink} onPress={openRegister}>Sign up</Text>
-            </Text>
-            <View style={styles.modalLegalRow}>
-              <TouchableOpacity onPress={() => Linking.openURL(`${BASE_URL}/#privacy`).catch(() => {})}>
-                <Text style={styles.modalLegalLink}>Privacy policy</Text>
-              </TouchableOpacity>
-              <Text style={styles.footerDot}> </Text>
-              <TouchableOpacity onPress={() => Linking.openURL(`${BASE_URL}/#terms-of-service`).catch(() => {})}>
-                <Text style={styles.modalLegalLink}>Terms and conditions</Text>
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity
-              onPress={() => {
-                setLoginInfoMessage(null);
-                setShowLoginModal(false);
-              }}
-              style={styles.modalCancel}
-            >
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </TouchableOpacity>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
+      ) : null}
     </SafeAreaView>
   );
 }

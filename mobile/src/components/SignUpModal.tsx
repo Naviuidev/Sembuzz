@@ -293,8 +293,13 @@ export default function SignUpModal({ visible, onClose, onCompleteGoToLogin }: P
     });
   };
 
+  /** Unmount when closed: iOS (esp. iPad) can keep a stale touch layer if Modal stays mounted with visible={false}. */
+  if (!visible) {
+    return null;
+  }
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView
         style={styles.overlay}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -532,35 +537,37 @@ export default function SignUpModal({ visible, onClose, onCompleteGoToLogin }: P
         </Pressable>
       </KeyboardAvoidingView>
 
-      <Modal visible={showSchoolPicker} transparent animationType="fade">
-        <Pressable style={styles.pickerOverlay} onPress={() => setShowSchoolPicker(false)}>
-          <Pressable style={styles.pickerBox} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.pickerTitle}>Select school</Text>
-            <FlatList
-              data={schools}
-              keyExtractor={(item) => item.id}
-              style={{ maxHeight: 320 }}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.pickerRow}
-                  onPress={() => {
-                    setFormData((f) => ({ ...f, schoolId: item.id }));
-                    setShowSchoolPicker(false);
-                  }}
-                >
-                  <Text style={styles.pickerRowText}>
-                    {item.name}
-                    {item.domain ? ` (${item.domain})` : ''}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            />
-            <TouchableOpacity style={styles.pickerCancel} onPress={() => setShowSchoolPicker(false)}>
-              <Text style={styles.pickerCancelText}>Cancel</Text>
-            </TouchableOpacity>
+      {showSchoolPicker ? (
+        <Modal visible transparent animationType="fade">
+          <Pressable style={styles.pickerOverlay} onPress={() => setShowSchoolPicker(false)}>
+            <Pressable style={styles.pickerBox} onPress={(e) => e.stopPropagation()}>
+              <Text style={styles.pickerTitle}>Select school</Text>
+              <FlatList
+                data={schools}
+                keyExtractor={(item) => item.id}
+                style={{ maxHeight: 320 }}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.pickerRow}
+                    onPress={() => {
+                      setFormData((f) => ({ ...f, schoolId: item.id }));
+                      setShowSchoolPicker(false);
+                    }}
+                  >
+                    <Text style={styles.pickerRowText}>
+                      {item.name}
+                      {item.domain ? ` (${item.domain})` : ''}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              />
+              <TouchableOpacity style={styles.pickerCancel} onPress={() => setShowSchoolPicker(false)}>
+                <Text style={styles.pickerCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
+      ) : null}
     </Modal>
   );
 }

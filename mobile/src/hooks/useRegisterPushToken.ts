@@ -1,10 +1,17 @@
-import { useCallback, useEffect, useRef } from 'react';
-import { AppState, InteractionManager, Platform } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  AppState,
+  DeviceEventEmitter,
+  Dimensions,
+  InteractionManager,
+  Platform,
+} from 'react-native';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { useAuth } from '../contexts/AuthContext';
 import { userNotificationsService } from '../services/userNotifications';
+import { NATIVE_UI_TOUCH_RECOVERY, READY_FOR_PUSH_PERMISSION } from '../constants/appEvents';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -16,6 +23,15 @@ Notifications.setNotificationHandler({
   }),
 });
 
+/** Extra wait after interactions so the system notification alert does not stack on RN Modals (iPad ghost touches). */
+function tabletAwareDelayMs(): number {
+  const tablet =
+    Device.deviceType === Device.DeviceType.TABLET ||
+    (Platform.OS === 'ios' && Platform.isPad === true);
+  if (tablet) return 2200;
+  return Platform.OS === 'ios' ? 650 : 350;
+}
+
 /**
  * Registers an **Expo push token** (`ExponentPushToken[...]`) with the API so the backend can send
  * via Expo Push (works on iOS TestFlight and Android). Native `getDevicePushTokenAsync()` on iOS is
@@ -26,6 +42,7 @@ export function useRegisterPushToken() {
   const lastRegistered = useRef<string | null>(null);
   const inflight = useRef(false);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [mainUiReady, setMainUiReady] = useState(false);
 
   const clearRetry = useCallback(() => {
     if (retryTimer.current) {
@@ -34,16 +51,37 @@ export function useRegisterPushToken() {
     }
   }, []);
 
+  const recoverNativeUiAfterSystemPrompt = useCallback(() => {
+    InteractionManager.runAfterInteractions(() => {
+      InteractionManager.runAfterInteractions(() => {
+        try {
+          Dimensions.get('window');
+        } catch {
+          /* ignore */
+        }
+        DeviceEventEmitter.emit(NATIVE_UI_TOUCH_RECOVERY, { source: 'post-push-permission' });
+        if (__DEV__) {
+          console.log('[Push] post-permission UI recovery (tablet-safe)');
+        }
+      });
+    });
+  }, []);
+
   const registerNow = useCallback(async () => {
     if (!user?.id || !token || inflight.current) return;
     // Real devices only in production. In __DEV__, allow simulator/emulator.
     if (!Device.isDevice && !__DEV__) return;
     inflight.current = true;
+    let didRequestPermissions = false;
     try {
       const { status: existing } = await Notifications.getPermissionsAsync();
       if (__DEV__) console.log('[Push] existing permission:', existing);
       let final = existing;
       if (final !== 'granted') {
+        didRequestPermissions = true;
+        if (__DEV__) {
+          console.log('[Push] requesting permission (after UI settle + delay)');
+        }
         const req = await Notifications.requestPermissionsAsync();
         final = req.status;
         if (__DEV__) console.log('[Push] requested permission:', final);
@@ -89,9 +127,45 @@ export function useRegisterPushToken() {
         void registerNow();
       }, 5000);
     } finally {
+      if (didRequestPermissions) {
+        recoverNativeUiAfterSystemPrompt();
+      }
       inflight.current = false;
     }
-  }, [clearRetry, token, user?.id]);
+  }, [clearRetry, recoverNativeUiAfterSystemPrompt, token, user?.id]);
+
+  /** Wait until Home finished first-login modals / prefs (or fallback timeout) before showing iOS alert. */
+  useEffect(() => {
+    if (!user?.id || !token) {
+      setMainUiReady(false);
+      return;
+    }
+    setMainUiReady(false);
+    let cancelled = false;
+    const markReady = () => {
+      if (!cancelled) {
+        setMainUiReady(true);
+        if (__DEV__) console.log('[Push] main UI ready for permission flow');
+      }
+    };
+
+    const sub = DeviceEventEmitter.addListener(
+      READY_FOR_PUSH_PERMISSION,
+      (p: { userId?: string } | undefined) => {
+        if (p?.userId === user?.id) markReady();
+      },
+    );
+
+    /** Only if Home never emits (should be rare); keep long so first-login modal is never under the OS alert. */
+    const fallbackMs = 300_000;
+    const fallback = setTimeout(markReady, fallbackMs);
+
+    return () => {
+      cancelled = true;
+      sub.remove();
+      clearTimeout(fallback);
+    };
+  }, [token, user?.id]);
 
   useEffect(() => {
     if (!user?.id || !token) {
@@ -99,19 +173,26 @@ export function useRegisterPushToken() {
       clearRetry();
       return;
     }
-    // Defer until after navigation/modals settle so the UI thread isn't contending right after login.
+    if (!mainUiReady) return;
+
+    const delayMs = tabletAwareDelayMs();
     const task = InteractionManager.runAfterInteractions(() => {
-      void registerNow();
+      setTimeout(() => {
+        void registerNow();
+      }, delayMs);
     });
+
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
+        if (__DEV__) console.log('[Push] AppState active — refresh registration');
         void registerNow();
       }
     });
+
     return () => {
       task.cancel();
       sub.remove();
       clearRetry();
     };
-  }, [clearRetry, registerNow, token, user?.id]);
+  }, [clearRetry, mainUiReady, registerNow, token, user?.id]);
 }
