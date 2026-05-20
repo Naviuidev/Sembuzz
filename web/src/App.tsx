@@ -21,6 +21,7 @@ import { SchoolInfo } from './pages/SchoolInfo';
 import { RaiseRequest } from './pages/RaiseRequest';
 import { Queries } from './pages/Queries';
 import { Features } from './pages/Features';
+import { SuperAdminEventSync } from './pages/SuperAdminEventSync';
 import { SchoolAdminLogin } from './pages/SchoolAdminLogin';
 import { SchoolAdminDashboard } from './pages/SchoolAdminDashboard';
 import { SchoolAdminCategories } from './pages/SchoolAdminCategories';
@@ -88,6 +89,9 @@ import { VerifyApproval } from './pages/VerifyApproval';
 import { Home } from './pages/Home';
 import { PublicEvents } from './pages/PublicEvents';
 import { PublicBlogs } from './pages/PublicBlogs';
+import { PublicUniversities } from './pages/PublicUniversities';
+import { PublicUniversityEvents } from './pages/PublicUniversityEvents';
+import { PublicAllUniversityEvents } from './pages/PublicAllUniversityEvents';
 import { PublicBlogDetail } from './pages/PublicBlogDetail';
 import { SavedItems } from './pages/SavedItems';
 import { Notifications } from './pages/Notifications';
@@ -178,6 +182,14 @@ const SuperAdminRoutes = () => {
         element={
           <ProtectedRoute>
             <Features />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="event-sync"
+        element={
+          <ProtectedRoute>
+            <SuperAdminEventSync />
           </ProtectedRoute>
         }
       />
@@ -627,6 +639,9 @@ const AppRoutes = () => {
       <Route path="/events" element={<PublicEvents />} />
       <Route path="/blogs" element={<PublicBlogs />} />
       <Route path="/blogs/:id" element={<PublicBlogDetail />} />
+      <Route path="/universities" element={<PublicUniversities />} />
+      <Route path="/university-events" element={<PublicAllUniversityEvents />} />
+      <Route path="/universities/:id" element={<PublicUniversityEvents />} />
       <Route path="/about" element={<About />} />
       <Route path="/contact" element={<Contact />} />
       <Route path="/faqs" element={<FAQs />} />

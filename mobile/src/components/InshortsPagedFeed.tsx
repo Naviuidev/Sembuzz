@@ -69,6 +69,7 @@ export function formatRelativeTime(iso: string): string {
 function InshortsEventPage({
   event,
   pageHeight,
+  alignTop,
   userId,
   likeCount,
   commentCount,
@@ -82,6 +83,7 @@ function InshortsEventPage({
 }: {
   event: ApprovedEventPublic;
   pageHeight: number;
+  alignTop: boolean;
   userId: string | null;
   likeCount: number;
   commentCount: number;
@@ -171,7 +173,7 @@ function InshortsEventPage({
   };
 
   return (
-    <View style={[styles.pageRoot, { minHeight: pageHeight }]}>
+    <View style={[styles.pageRoot, alignTop && styles.pageRootTopAligned, { minHeight: pageHeight }]}>
       <View style={styles.card}>
         <View style={styles.heroWrap}>
           {firstImage ? (
@@ -346,7 +348,7 @@ function InshortsEventPage({
   );
 }
 
-function InshortsSponsoredPage({ ad, pageHeight }: { ad: SponsoredAdPublic; pageHeight: number }) {
+function InshortsSponsoredPage({ ad, pageHeight, alignTop }: { ad: SponsoredAdPublic; pageHeight: number; alignTop: boolean }) {
   const images = parseImageUrlsJson(ad.imageUrls);
   const firstImage = images[0];
   const imgH = Math.max(160, Math.round(pageHeight * 0.42));
@@ -369,7 +371,7 @@ function InshortsSponsoredPage({ ad, pageHeight }: { ad: SponsoredAdPublic; page
   };
 
   return (
-    <View style={[styles.pageRoot, { minHeight: pageHeight }]}>
+    <View style={[styles.pageRoot, alignTop && styles.pageRootTopAligned, { minHeight: pageHeight }]}>
       <View style={[styles.card, { backgroundColor: SPONSORED_AD_BG }]}>
         <View style={styles.adRow}>
           <View style={styles.adBadge}>
@@ -415,6 +417,7 @@ function InshortsSponsoredPage({ ad, pageHeight }: { ad: SponsoredAdPublic; page
 type Props = {
   feedItems: PublicFeedItem[];
   pageHeight: number;
+  alignTop?: boolean;
   onRefresh: () => void;
   refreshing: boolean;
   userId: string | null;
@@ -434,6 +437,7 @@ type Props = {
 export function InshortsPagedFeed({
   feedItems,
   pageHeight,
+  alignTop = false,
   onRefresh,
   refreshing,
   userId,
@@ -443,6 +447,7 @@ export function InshortsPagedFeed({
   onCommentAdded,
   onBannerClick,
 }: Props) {
+  const listRef = React.useRef<FlatList<Exclude<PublicFeedItem, { type: 'banner' }>> | null>(null);
   /** Match web: do not render standalone banner slides — map banners onto news cards. */
   const slides = useMemo(
     () => feedItems.filter((item) => item.type !== 'banner') as Exclude<PublicFeedItem, { type: 'banner' }>[],
@@ -479,13 +484,19 @@ export function InshortsPagedFeed({
     });
   }, [prefetchUrls]);
 
+  React.useEffect(() => {
+    // When category/subcategory filters change, ensure the pager starts from top item.
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [slides, alignTop]);
+
   const renderItem: ListRenderItem<Exclude<PublicFeedItem, { type: 'banner' }>> = useCallback(
     ({ item, index }) => (
-      <View style={{ height: pageHeight, justifyContent: 'center' }}>
+      <View style={{ height: pageHeight, justifyContent: alignTop ? 'flex-start' : 'center' }}>
         {item.type === 'event' ? (
           <InshortsEventPage
             event={item.event}
             pageHeight={pageHeight}
+            alignTop={alignTop}
             userId={userId}
             {...getEventEngagement(item.event.id)}
             onLike={() => onLike(item.event.id)}
@@ -495,11 +506,11 @@ export function InshortsPagedFeed({
             onBannerClick={onBannerClick}
           />
         ) : (
-          <InshortsSponsoredPage ad={item.ad} pageHeight={pageHeight} />
+          <InshortsSponsoredPage ad={item.ad} pageHeight={pageHeight} alignTop={alignTop} />
         )}
       </View>
     ),
-    [pageHeight, userId, getEventEngagement, onLike, onSave, onCommentAdded, bannerBySlideIndex, onBannerClick],
+    [pageHeight, alignTop, userId, getEventEngagement, onLike, onSave, onCommentAdded, bannerBySlideIndex, onBannerClick],
   );
 
   const keyExtractor = useCallback((item: Exclude<PublicFeedItem, { type: 'banner' }>, index: number) => {
@@ -520,6 +531,7 @@ export function InshortsPagedFeed({
 
   return (
     <FlatList
+      ref={listRef}
       style={styles.feedList}
       data={slides}
       renderItem={renderItem}
@@ -530,6 +542,9 @@ export function InshortsPagedFeed({
       decelerationRate="fast"
       disableIntervalMomentum
       showsVerticalScrollIndicator={false}
+      contentInsetAdjustmentBehavior="never"
+      automaticallyAdjustContentInsets={false}
+      automaticallyAdjustKeyboardInsets={false}
       bounces
       overScrollMode="never"
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1a1f2e" />}
@@ -546,6 +561,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 10,
     paddingVertical: 8,
+  },
+  pageRootTopAligned: {
+    justifyContent: 'flex-start',
   },
   card: {
     flex: 1,

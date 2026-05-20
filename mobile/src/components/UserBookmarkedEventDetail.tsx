@@ -14,8 +14,9 @@ import {
 import { parseImageUrls } from '../services/publicBlogs';
 import { imageSrc } from '../utils/image';
 import type { LikedEventItem, SavedEventItem } from '../services/userEvents';
+import type { ApprovedEventPublic } from '../services/events';
 
-type BookmarkedEvent = LikedEventItem | SavedEventItem;
+type BookmarkedEvent = LikedEventItem | SavedEventItem | ApprovedEventPublic;
 
 type Props = {
   visible: boolean;
@@ -44,8 +45,9 @@ export function UserBookmarkedEventDetailModal({ visible, event, onClose }: Prop
         <Pressable style={styles.modalBackdrop} onPress={onClose} />
         <View style={[styles.sheet, { maxHeight: '92%' }]}>
           <View style={styles.sheetHeader}>
-            <TouchableOpacity onPress={onClose} hitSlop={12} accessibilityLabel="Close">
-              <Text style={styles.backText}>← Back</Text>
+            <TouchableOpacity style={styles.backBtn} onPress={onClose} hitSlop={12} accessibilityLabel="Close">
+              <Text style={styles.backArrow}>←</Text>
+              <Text style={styles.backText}>Back</Text>
             </TouchableOpacity>
           </View>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollInner}>
@@ -104,7 +106,7 @@ export function UserBookmarkedEventDetailModal({ visible, event, onClose }: Prop
                 style={styles.linkBtn}
                 onPress={() => Linking.openURL(event.externalLink!).catch(() => {})}
               >
-                <Text style={styles.linkBtnText}>View link</Text>
+                <Text style={styles.linkBtnText}>Know more</Text>
               </TouchableOpacity>
             ) : null}
           </ScrollView>
@@ -135,10 +137,25 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#eee',
   },
-  backText: {
+  backBtn: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#1a1f2e',
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  backArrow: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#1a1f2e',
+    fontWeight: '600',
+    color: '#fff',
+  },
+  backText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
   },
   scrollInner: {
     paddingBottom: 32,

@@ -883,6 +883,202 @@ model BlogPost {
   @@map("blog_posts")
 }
 
+// ============================================
+// UNIVERSITY EVENT AGGREGATOR (Super Admin)
+// Pulls events from external university websites via GPT API.
+// Independent of internal `Event` model.
+// ============================================
+
+model UniversitySource {
+  id             String    @id @default(uuid())
+  universityName String    @db.VarChar(500)
+  url            String    @unique @db.VarChar(2048)
+  status         String    @default("pending") // pending | syncing | completed | failed
+  lastSyncedAt   DateTime?
+  lastError      String?   @db.Text
+  totalEvents    Int       @default(0)
+  isActive       Boolean   @default(true)
+  // CSV batch grouping — same triple set when a row comes from the same upload.
+  // NULL for sources added manually via the URL field.
+  csvBatchId     String?   @db.VarChar(36)
+  csvFileName    String?   @db.VarChar(500)
+  csvUploadedAt  DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  events     UniversityEvent[]
+  syncRuns   UniversityEventSyncRun[]
+  crawlPages UniversityCrawlPageHash[]
+
+  @@index([status])
+  @@index([isActive])
+  @@index([csvBatchId])
+  @@map("university_sources")
+}
+
+model UniversityCrawlPageHash {
+  id          String   @id @default(uuid())
+  sourceId    String
+  urlHash     String   @db.VarChar(64)
+  pageUrl     String   @db.VarChar(2048)
+  contentHash String   @db.VarChar(64)
+  updatedAt   DateTime @updatedAt
+
+  source UniversitySource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, urlHash])
+  @@index([sourceId])
+  @@map("university_crawl_page_hashes")
+}
+
+model UniversityEvent {
+  id               String    @id @default(uuid())
+  sourceId         String
+  externalKey      String    @db.VarChar(255) // stable dedupe key (hash of title+date+venue)
+  title            String    @db.VarChar(500)
+  description      String?   @db.Text
+  summary          String?   @db.Text  // short AI-generated summary
+  startDate        DateTime?
+  endDate          DateTime?
+  rawDateText      String?   @db.VarChar(255)
+  rawTimeText      String?   @db.VarChar(255)
+  venue            String?   @db.VarChar(500)
+  organizer        String?   @db.VarChar(500)
+  category         String?   @db.VarChar(100)
+  tags             String?   @db.Text // JSON string array
+  registrationLink String?   @db.VarChar(2048)
+  imageUrl         String?   @db.VarChar(2048)
+  detailUrl        String?   @db.VarChar(2048)
+  contactInfo      String?   @db.VarChar(500) // phone / email / contact line from source page
+  // 0–100 heuristic + model-assisted QA score for extraction quality
+  extractionConfidence Int?
+  status           String    @default("active") // active | expired | archived
+  firstSeenAt      DateTime  @default(now())
+  lastSeenAt       DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  source UniversitySource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, externalKey])
+  @@index([sourceId])
+  @@index([startDate])
+  @@index([category])
+  @@index([status])
+  @@index([extractionConfidence])
+  @@map("university_events")
+}
+
+// Background queue for CSV batch / bulk sync (avoids blocking HTTP handlers).
+model UniversitySyncJob {
+  id              String    @id @default(uuid())
+  kind            String    @db.VarChar(32) // csv_batch | all_active | single_source
+  batchId         String?   @db.VarChar(36)
+  sourceIds       Json // string[]
+  status          String    @default("pending") // pending | running | completed | failed
+  progressDone    Int       @default(0)
+  progressTotal   Int       @default(0)
+  currentSourceId String?   @db.VarChar(36)
+  message         String?   @db.Text
+  error           String?   @db.Text
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  startedAt       DateTime?
+  completedAt     DateTime?
+
+  @@index([status, createdAt])
+  @@map("university_sync_jobs")
+}
+
+model UniversityEventSyncRun {
+  id            String    @id @default(uuid())
+  sourceId      String
+  status        String    @default("running") // running | completed | failed
+  eventsAdded   Int       @default(0)
+  eventsUpdated Int       @default(0)
+  eventsSkipped Int       @default(0)
+  error         String?   @db.Text
+  startedAt     DateTime  @default(now())
+  completedAt   DateTime?
+
+  source UniversitySource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId])
+  @@index([startedAt])
+  @@map("university_event_sync_runs")
+}
+
+// ============================================
+// SCRAPED EVENT AGGREGATION (scalable sync platform)
+// Roadmap: EventSource / Event / SyncLog — names kept distinct from internal `Event` model.
+// ============================================
+
+model ScrapedEventSource {
+  id            String    @id @default(uuid())
+  name          String    @db.VarChar(255)
+  websiteUrl    String    @db.VarChar(2048)
+  scraperType   String    @default("generic") @db.VarChar(64)
+  selectorsJson Json?
+  active        Boolean   @default(true)
+  lastSyncedAt  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  events   ScrapedEventRecord[]
+  syncLogs ScrapedSyncLog[]
+
+  @@index([active])
+  @@map("scraped_event_sources")
+}
+
+model ScrapedEventRecord {
+  id            String    @id @default(uuid())
+  sourceId      String
+  title         String    @db.VarChar(500)
+  slug          String    @db.VarChar(320)
+  description   String?   @db.Text
+  image         String?   @db.VarChar(2048)
+  startDate     DateTime?
+  endDate       DateTime?
+  venue         String?   @db.VarChar(500)
+  city          String?   @db.VarChar(200)
+  country       String?   @db.VarChar(200)
+  sourceUrl     String?   @db.VarChar(2048)
+  sourceWebsite String?   @db.VarChar(2048)
+  category      String?   @db.VarChar(120)
+  organizer     String?   @db.VarChar(500)
+  tags          String?   @db.Text
+  dedupeKey     String    @db.VarChar(64)
+  syncedAt      DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  source ScrapedEventSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, dedupeKey])
+  @@index([sourceId])
+  @@index([slug])
+  @@index([startDate])
+  @@map("scraped_event_records")
+}
+
+model ScrapedSyncLog {
+  id          String    @id @default(uuid())
+  sourceId    String
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  status      String    @default("running") @db.VarChar(32)
+  totalEvents Int       @default(0)
+  errors      String?   @db.Text
+  /// Structured QA/debug: date ranges, months, samples, fetch mode, etc.
+  detailsJson Json?
+
+  source ScrapedEventSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId])
+  @@index([startedAt])
+  @@map("scraped_sync_logs")
+}
+
 model SchoolSocialAccount {
   id            String   @id @default(uuid())
   schoolId      String

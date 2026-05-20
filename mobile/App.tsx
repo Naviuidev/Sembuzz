@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, DeviceEventEmitter, View } from 'react-native';
+import { ActivityIndicator, DeviceEventEmitter, Platform, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, CommonActions } from '@react-navigation/native';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Image, Pressable, StyleSheet, Text, useWindowDimensions } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, TextInput, useWindowDimensions } from 'react-native';
 import { useFonts, Poppins_400Regular, Poppins_600SemiBold } from '@expo-google-fonts/poppins';
 import * as Notifications from 'expo-notifications';
 import { AuthProvider } from './src/contexts/AuthContext';
@@ -40,8 +40,9 @@ function PushNotificationBootstrap() {
 function StartScreen({ onStart }: { onStart: () => void }) {
   const insets = useSafeAreaInsets();
   const { height: screenH } = useWindowDimensions();
+  const isAndroid = Platform.OS === 'android';
   /** Hero band below status bar (white bar stays for clock / battery). */
-  const heroHeight = Math.round(screenH * 0.48);
+  const heroHeight = Math.round(screenH * (isAndroid ? 0.46 : 0.48));
 
   return (
     <View style={[styles.startScreenWrap, { backgroundColor: ONBOARDING_CONTENT_BG }]}>
@@ -65,7 +66,7 @@ function StartScreen({ onStart }: { onStart: () => void }) {
         </View>
       </View>
 
-      <View style={[styles.startCard, { flex: 1 }]}>
+      <View style={[styles.startCard, { flex: 1, marginTop: isAndroid ? -20 : -28 }]}>
         <View
           style={[
             styles.startCardInner,
@@ -108,6 +109,21 @@ export default function App() {
     Poppins_400Regular,
     Poppins_600SemiBold,
   });
+
+  useEffect(() => {
+    const TextAny = Text as typeof Text & { defaultProps?: Record<string, unknown> };
+    const TextInputAny = TextInput as typeof TextInput & { defaultProps?: Record<string, unknown> };
+    const textDefaults = TextAny.defaultProps ?? {};
+    const inputDefaults = TextInputAny.defaultProps ?? {};
+    TextAny.defaultProps = {
+      ...textDefaults,
+      style: [{ fontFamily: 'Poppins_400Regular' }, textDefaults.style],
+    };
+    TextInputAny.defaultProps = {
+      ...inputDefaults,
+      style: [{ fontFamily: 'Poppins_400Regular' }, inputDefaults.style],
+    };
+  }, []);
 
   const handleNavigate = (name: 'Search' | 'Events' | 'Settings' | 'Apps' | 'Blogs') => {
     navRef.current?.dispatch(
@@ -218,7 +234,6 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   startCard: {
-    marginTop: -28,
     backgroundColor: ONBOARDING_CONTENT_BG,
     paddingHorizontal: 22,
     paddingTop: 12,
@@ -242,6 +257,7 @@ const styles = StyleSheet.create({
     lineHeight: 44,
     marginBottom: 14,
     paddingHorizontal: 8,
+    includeFontPadding: false,
   },
   startPara: {
     fontSize: 22,
@@ -251,6 +267,7 @@ const styles = StyleSheet.create({
     lineHeight: 35,
     maxWidth: 350,
     marginBottom: 0,
+    includeFontPadding: false,
   },
   startButtonWrap: {
     alignItems: 'center',
@@ -274,5 +291,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontFamily: 'Poppins_600SemiBold',
     letterSpacing: 0.5,
+    includeFontPadding: false,
   },
 });

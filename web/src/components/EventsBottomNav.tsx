@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { useUserAuth } from '../contexts/UserAuthContext';
 import { imageSrc } from '../utils/image';
 
-/** Matches mobile `AppNavigator` bottom tabs: Search, Home, Settings (profile → school logo → initial), Apps, Blogs. */
-export type EventsBottomNavTab = 'search' | 'home' | 'settings' | 'apps' | 'blogs';
+/** Matches mobile `AppNavigator` bottom tabs: Search, Home, Settings (profile → school logo → initial), Apps, Blogs, Universities. */
+export type EventsBottomNavTab = 'search' | 'home' | 'settings' | 'apps' | 'blogs' | 'universities';
 
 type EventsBottomNavProps = {
   activeTab: EventsBottomNavTab;
@@ -165,6 +165,15 @@ export function EventsBottomNav({
               onClick={() => onSelectTab('blogs')}
             >
               <i className="bi bi-newspaper" style={{ fontSize: '1.375rem', color: iconColor('blogs') }} />
+            </button>
+            <button
+              type="button"
+              className={`events-bottom-nav-btn ${activeTab === 'universities' ? 'events-bottom-nav-btn-active' : ''}`}
+              aria-label="Universities"
+              aria-current={activeTab === 'universities' ? 'page' : undefined}
+              onClick={() => onSelectTab('universities')}
+            >
+              <i className="bi bi-calendar-event" style={{ fontSize: '1.375rem', color: iconColor('universities') }} />
             </button>
           </div>
         </div>

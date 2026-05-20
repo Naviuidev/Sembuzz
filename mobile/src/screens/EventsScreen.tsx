@@ -733,7 +733,12 @@ export default function EventsScreen() {
       </View>
 
       {isMySchoolFeed && selectedSubCategoryMeta.length > 0 ? (
-        <View style={styles.selectedSubCatRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.selectedSubCatScroll}
+          contentContainerStyle={styles.selectedSubCatRow}
+        >
           {selectedSubCategoryMeta.map((sub) => (
             <TouchableOpacity
               key={sub.id}
@@ -748,7 +753,7 @@ export default function EventsScreen() {
               </View>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
       ) : null}
 
       {error ? (
@@ -816,6 +821,7 @@ export default function EventsScreen() {
             <InshortsPagedFeed
               feedItems={feedItems}
               pageHeight={feedListHeight}
+              alignTop={isMySchoolFeed && selectedSubCategoryMeta.length > 0}
               onRefresh={onRefresh}
               refreshing={refreshing}
               userId={user?.id ?? null}
@@ -1177,16 +1183,22 @@ const styles = StyleSheet.create({
   },
   selectedSubCatRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 12,
+    paddingLeft: 12,
+    paddingRight: 16,
     paddingTop: 8,
     paddingBottom: 6,
+  },
+  selectedSubCatScroll: {
     backgroundColor: '#fff',
+    flexGrow: 0,
+    flexShrink: 0,
   },
   selectedSubCatPill: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
     gap: 8,
     paddingVertical: 7,
     paddingLeft: 12,

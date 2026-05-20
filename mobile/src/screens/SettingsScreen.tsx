@@ -28,6 +28,7 @@ import { userHelpService, type UserHelpQueryItem } from '../services/userHelp';
 import { userNotificationsService } from '../services/userNotifications';
 import SignUpModal from '../components/SignUpModal';
 import Svg, { Circle } from 'react-native-svg';
+import { UserBookmarkedEventDetailModal } from '../components/UserBookmarkedEventDetail';
 
 const BASE_URL = getFrontendBaseUrl();
 
@@ -37,6 +38,22 @@ const PROFILE_AVATAR_STROKE = 3;
 const PROFILE_AVATAR_INNER = 52;
 /** Circle radius (stroke is centered on this path). */
 const PROFILE_AVATAR_R = PROFILE_AVATAR_RING / 2 - PROFILE_AVATAR_STROKE / 2;
+
+function getEventThumbUrl(ev: ApprovedEventPublic): string {
+  const rawImageUrls = typeof ev.imageUrls === 'string' ? ev.imageUrls : '';
+  if (rawImageUrls) {
+    try {
+      const parsed = JSON.parse(rawImageUrls);
+      if (Array.isArray(parsed)) {
+        const first = parsed.find((u): u is string => typeof u === 'string' && u.trim().length > 0);
+        if (first) return imageSrc(first);
+      }
+    } catch {
+      // Ignore malformed JSON and fallback.
+    }
+  }
+  return ev.school?.image ? imageSrc(ev.school.image) : '';
+}
 
 export default function SettingsScreen() {
   const navigation = useNavigation();
@@ -71,9 +88,10 @@ export default function SettingsScreen() {
   const [helpError, setHelpError] = useState<string | null>(null);
   const [helpQueries, setHelpQueries] = useState<UserHelpQueryItem[]>([]);
   const [helpQueriesLoading, setHelpQueriesLoading] = useState(false);
-  const [selectedAction, setSelectedAction] = useState<'categories' | 'liked' | 'notifications' | 'saved' | 'help'>('categories');
   const [unreadCount, setUnreadCount] = useState(0);
   const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState(false);
+  const [selectedRecentEvent, setSelectedRecentEvent] = useState<ApprovedEventPublic | null>(null);
+  const [showRecentNewsList, setShowRecentNewsList] = useState(false);
 
   /** Settings header = user photo only (school logo stays on bottom tab). */
   const profileImageUrl = useMemo(() => {
@@ -139,6 +157,10 @@ export default function SettingsScreen() {
       setShowLoginModal(false);
       setLoginInfoMessage(null);
       setPassword('');
+      const tabNav = navigation.getParent();
+      if (tabNav && typeof (tabNav as { navigate?: unknown }).navigate === 'function') {
+        (tabNav as { navigate: (name: string) => void }).navigate('Events');
+      }
     } catch (e: unknown) {
       const msg =
         e && typeof e === 'object' && 'response' in e
@@ -202,8 +224,8 @@ export default function SettingsScreen() {
     }
   }, [helpMessage, loadHelpQueries]);
 
-  const runSelectedAction = useCallback(() => {
-    if (selectedAction === 'categories') {
+  const handleActionPress = useCallback((action: 'categories' | 'liked' | 'notifications' | 'saved' | 'help') => {
+    if (action === 'categories') {
       if (!user?.schoolId) {
         Alert.alert('School required', 'Your account must be linked to a school to change categories.');
         return;
@@ -211,46 +233,67 @@ export default function SettingsScreen() {
       navigation.navigate('ChangeCategories' as never);
       return;
     }
-    if (selectedAction === 'liked') {
+    if (action === 'liked') {
       navigateRoot('LikedNews');
       return;
     }
-    if (selectedAction === 'saved') {
+    if (action === 'saved') {
       navigateRoot('SavedNews');
       return;
     }
-    if (selectedAction === 'notifications') {
+    if (action === 'notifications') {
       navigateRoot('Notifications');
       return;
     }
-    if (selectedAction === 'help') {
+    if (action === 'help') {
       openHelpModal();
       return;
     }
-  }, [selectedAction, user?.schoolId, navigation, navigateRoot, openHelpModal]);
+  }, [user?.schoolId, navigation, navigateRoot, openHelpModal]);
 
-  const selectedActionMeta = useMemo(() => {
-    switch (selectedAction) {
-      case 'categories':
-        return {
-          title: 'Change categories',
-          subtitle: 'Update your preferred categories and subcategories.',
-          cta: 'Open categories',
-        };
-      case 'liked':
-        return { title: 'Liked news', subtitle: 'Review news posts you have liked.', cta: 'Open liked news' };
-      case 'saved':
-        return { title: 'Saved news', subtitle: 'Open your saved news collection.', cta: 'Open saved news' };
-      case 'notifications':
-        return {
-          title: 'Notifications',
-          subtitle: 'Review notifications triggered for your selected categories.',
-          cta: 'Open notifications',
-        };
-      case 'help':
-        return { title: 'Help', subtitle: 'Raise a query to your school admin.', cta: 'Raise query' };
-    }
-  }, [selectedAction]);
+  const openRecentNews = useCallback(
+    (ev: ApprovedEventPublic) => {
+      setSelectedRecentEvent(ev);
+    },
+    [],
+  );
+
+  const settingsActions = useMemo(
+    () => [
+      {
+        key: 'categories' as const,
+        title: 'Change categories',
+        subtitle: 'Update your preferred categories and subcategories.',
+        icon: 'folder-outline' as const,
+      },
+      {
+        key: 'liked' as const,
+        title: 'Liked posts',
+        subtitle: 'Review news posts you have liked.',
+        icon: 'heart-outline' as const,
+      },
+      {
+        key: 'notifications' as const,
+        title: 'Notifications',
+        subtitle: 'Review updates for your selected categories.',
+        icon: 'notifications-outline' as const,
+        badge: unreadCount,
+      },
+      {
+        key: 'saved' as const,
+        title: 'Bookmarks',
+        subtitle: 'Open your saved news collection.',
+        icon: 'bookmark-outline' as const,
+      },
+      {
+        key: 'help' as const,
+        title: 'Feedback/Query/Ask your School Admin',
+        subtitle: 'Send feedback or ask questions directly to your school admin.',
+        icon: 'help-circle-outline' as const,
+      },
+    ],
+    [unreadCount],
+  );
 
   if (authLoading) {
     return (
@@ -328,81 +371,81 @@ export default function SettingsScreen() {
             </View>
           </View>
 
-          <View style={styles.actionsIconRow}>
-            <TouchableOpacity
-              style={[styles.actionIconBtn, selectedAction === 'categories' && styles.actionIconBtnActive]}
-              onPress={() => setSelectedAction('categories')}
-            >
-              <Ionicons name={selectedAction === 'categories' ? 'folder' : 'folder-outline'} size={20} color="#1a1f2e" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionIconBtn, selectedAction === 'liked' && styles.actionIconBtnActive]}
-              onPress={() => setSelectedAction('liked')}
-            >
-              <Ionicons name={selectedAction === 'liked' ? 'heart' : 'heart-outline'} size={20} color="#1a1f2e" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionIconBtn, selectedAction === 'notifications' && styles.actionIconBtnActive]}
-              onPress={() => setSelectedAction('notifications')}
-            >
-              <Ionicons
-                name={selectedAction === 'notifications' ? 'notifications' : 'notifications-outline'}
-                size={20}
-                color="#1a1f2e"
-              />
-              {unreadCount > 0 ? (
-                <View style={styles.actionNotifBadgeBlack}>
-                  <Text style={styles.actionNotifBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+          <View style={styles.actionListCard}>
+            {settingsActions.map((item, index) => (
+              <TouchableOpacity
+                key={item.key}
+                style={[styles.actionListItem, index < settingsActions.length - 1 && styles.actionListItemDivider]}
+                onPress={() => handleActionPress(item.key)}
+                activeOpacity={0.85}
+              >
+                <View style={styles.actionListLeft}>
+                  <View style={styles.actionListIconWrap}>
+                    <Ionicons name={item.icon} size={18} color="#1a1f2e" />
+                    {item.key === 'notifications' && (item.badge ?? 0) > 0 ? (
+                      <View style={styles.actionNotifBadgeBlack}>
+                        <Text style={styles.actionNotifBadgeText}>{(item.badge ?? 0) > 99 ? '99+' : item.badge}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <View style={styles.actionListTextWrap}>
+                    <Text style={styles.actionListTitle}>{item.title}</Text>
+                    <Text style={styles.actionListSubtitle}>{item.subtitle}</Text>
+                  </View>
                 </View>
-              ) : null}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionIconBtn, selectedAction === 'saved' && styles.actionIconBtnActive]}
-              onPress={() => setSelectedAction('saved')}
-            >
-              <Ionicons name={selectedAction === 'saved' ? 'bookmark' : 'bookmark-outline'} size={20} color="#1a1f2e" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionIconBtn, selectedAction === 'help' && styles.actionIconBtnActive]}
-              onPress={() => setSelectedAction('help')}
-            >
-              <Ionicons name={selectedAction === 'help' ? 'help-circle' : 'help-circle-outline'} size={20} color="#1a1f2e" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.selectedActionPanel}>
-            <Text style={styles.selectedActionTitle}>{selectedActionMeta.title}</Text>
-            <Text style={styles.selectedActionSubtitle}>{selectedActionMeta.subtitle}</Text>
-            <TouchableOpacity style={styles.selectedActionCta} onPress={runSelectedAction}>
-              <Text style={styles.selectedActionCtaText}>{selectedActionMeta.cta}</Text>
-            </TouchableOpacity>
+                <Ionicons name="chevron-forward" size={18} color="#8e8e8e" />
+              </TouchableOpacity>
+            ))}
           </View>
 
           <View style={styles.sectionDivider} />
-          <Text style={styles.sectionTitle}>Recently added schools / news</Text>
-          {recentLoading ? (
-            <ActivityIndicator size="small" color="#1a1f2e" style={{ marginVertical: 16 }} />
-          ) : recentError ? (
-            <Text style={styles.errorText}>{recentError}</Text>
-          ) : recentEvents.length === 0 ? (
-            <Text style={styles.emptyRecentText}>No news yet.</Text>
-          ) : (
-            recentEvents.map((ev) => (
-              <View key={ev.id} style={styles.recentItem}>
-                {ev.school?.image ? (
-                  <Image source={{ uri: imageSrc(ev.school.image) }} style={styles.recentLogo} />
-                ) : (
-                  <View style={styles.recentLogoPlaceholder}>
-                    <Text style={styles.recentLogoLetter}>{ev.school?.name?.charAt(0) ?? '?'}</Text>
-                  </View>
-                )}
-                <View style={styles.recentText}>
-                  <Text style={styles.recentTitle}>{ev.title}</Text>
-                  <Text style={styles.recentSub}>{ev.school?.name ?? ev.subCategory?.name ?? ''}</Text>
+          <View style={styles.actionListCard}>
+            <TouchableOpacity
+              style={styles.actionListItem}
+              onPress={() => setShowRecentNewsList((v) => !v)}
+              activeOpacity={0.85}
+            >
+              <View style={styles.actionListLeft}>
+                <View style={styles.actionListIconWrap}>
+                  <Ionicons name="newspaper-outline" size={18} color="#1a1f2e" />
+                </View>
+                <View style={styles.actionListTextWrap}>
+                  <Text style={styles.actionListTitle}>Recently added schools / news</Text>
+                  <Text style={styles.actionListSubtitle}>Tap to view latest posted news</Text>
                 </View>
               </View>
-            ))
-          )}
+              <Ionicons name={showRecentNewsList ? 'chevron-up' : 'chevron-forward'} size={18} color="#8e8e8e" />
+            </TouchableOpacity>
+          </View>
+
+          {showRecentNewsList ? (
+            recentLoading ? (
+              <ActivityIndicator size="small" color="#1a1f2e" style={{ marginVertical: 16 }} />
+            ) : recentError ? (
+              <Text style={styles.errorText}>{recentError}</Text>
+            ) : recentEvents.length === 0 ? (
+              <Text style={styles.emptyRecentText}>No news yet.</Text>
+            ) : (
+              recentEvents.map((ev) => {
+                const thumbUrl = getEventThumbUrl(ev);
+                return (
+                <TouchableOpacity key={ev.id} style={styles.recentItem} activeOpacity={0.85} onPress={() => openRecentNews(ev)}>
+                  {thumbUrl ? (
+                    <Image source={{ uri: thumbUrl }} style={styles.recentLogo} />
+                  ) : (
+                    <View style={styles.recentLogoPlaceholder}>
+                      <Text style={styles.recentLogoLetter}>{ev.school?.name?.charAt(0) ?? '?'}</Text>
+                    </View>
+                  )}
+                  <View style={styles.recentText}>
+                    <Text style={styles.recentTitle}>{ev.title}</Text>
+                    <Text style={styles.recentSub}>{ev.school?.name ?? ev.subCategory?.name ?? ''}</Text>
+                  </View>
+                </TouchableOpacity>
+                );
+              })
+            )
+          ) : null}
 
           <View style={styles.sectionDivider} />
           <View style={styles.footerLinks}>
@@ -501,6 +544,11 @@ export default function SettingsScreen() {
             </Pressable>
           </Pressable>
         </Modal>
+        <UserBookmarkedEventDetailModal
+          visible={!!selectedRecentEvent}
+          event={selectedRecentEvent}
+          onClose={() => setSelectedRecentEvent(null)}
+        />
       </SafeAreaView>
     );
   }
@@ -562,10 +610,12 @@ export default function SettingsScreen() {
         ) : recentEvents.length === 0 ? (
           <Text style={styles.emptyRecentText}>No news yet.</Text>
         ) : (
-          recentEvents.map((ev) => (
-            <View key={ev.id} style={styles.recentItem}>
-              {ev.school?.image ? (
-                <Image source={{ uri: imageSrc(ev.school.image) }} style={styles.recentLogo} />
+          recentEvents.map((ev) => {
+            const thumbUrl = getEventThumbUrl(ev);
+            return (
+            <TouchableOpacity key={ev.id} style={styles.recentItem} activeOpacity={0.85} onPress={() => openRecentNews(ev)}>
+              {thumbUrl ? (
+                <Image source={{ uri: thumbUrl }} style={styles.recentLogo} />
               ) : (
                 <View style={styles.recentLogoPlaceholder}>
                   <Text style={styles.recentLogoLetter}>{ev.school?.name?.charAt(0) ?? '?'}</Text>
@@ -575,8 +625,9 @@ export default function SettingsScreen() {
                 <Text style={styles.recentTitle}>{ev.title}</Text>
                 <Text style={styles.recentSub}>{ev.school?.name ?? ev.subCategory?.name ?? ''}</Text>
               </View>
-            </View>
-          ))
+            </TouchableOpacity>
+            );
+          })
         )}
 
         <View style={styles.sectionDivider} />
@@ -595,6 +646,11 @@ export default function SettingsScreen() {
         visible={showSignUpModal}
         onClose={() => setShowSignUpModal(false)}
         onCompleteGoToLogin={handleSignUpCompleteGoToLogin}
+      />
+      <UserBookmarkedEventDetailModal
+        visible={!!selectedRecentEvent}
+        event={selectedRecentEvent}
+        onClose={() => setSelectedRecentEvent(null)}
       />
 
       {showLoginModal ? (
@@ -926,6 +982,55 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '700',
   },
+  actionListCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#e4e7ee',
+    backgroundColor: '#fff',
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  actionListItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+  },
+  actionListItemDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f2f6',
+  },
+  actionListLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+  },
+  actionListIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 999,
+    backgroundColor: '#eef1f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    position: 'relative',
+  },
+  actionListTextWrap: {
+    flex: 1,
+  },
+  actionListTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1a1f2e',
+  },
+  actionListSubtitle: {
+    fontSize: 12,
+    color: '#6c757d',
+    marginTop: 2,
+  },
   selectedActionPanel: {
     borderRadius: 14,
     borderWidth: 1,
@@ -1003,8 +1108,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingHorizontal: 12,
+    marginBottom: 10,
+    borderRadius: 20,
+    backgroundColor: '#fff',
   },
   recentLogo: {
     width: 44,

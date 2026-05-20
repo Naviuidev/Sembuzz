@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
 
 import {
   getSchools,
@@ -381,7 +382,7 @@ export default function SignUpModal({ visible, onClose, onCompleteGoToLogin }: P
 
                 <Text style={styles.label}>School</Text>
                 <TouchableOpacity
-                  style={styles.input}
+                  style={[styles.input, styles.schoolPickerInput]}
                   onPress={() => setShowSchoolPicker(true)}
                   disabled={schoolsLoading}
                 >
@@ -392,6 +393,7 @@ export default function SignUpModal({ visible, onClose, onCompleteGoToLogin }: P
                         ? `${selectedSchool.name}${selectedSchool.domain ? ` (${selectedSchool.domain})` : ''}`
                         : 'Select your school'}
                   </Text>
+                  <Ionicons name="chevron-down" size={18} color="#6c757d" />
                 </TouchableOpacity>
                 {schoolsError ? <Text style={styles.warn}>{schoolsError}</Text> : null}
                 {!schoolsLoading && !schoolsError && schools.length === 0 ? (
@@ -714,6 +716,11 @@ const styles = StyleSheet.create({
     color: '#1a1f2e',
     backgroundColor: '#fff',
     justifyContent: 'center',
+  },
+  schoolPickerInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   schoolSelected: { color: '#1a1f2e', fontSize: 16 },
   schoolPlaceholder: { color: '#8e8e8e', fontSize: 16 },

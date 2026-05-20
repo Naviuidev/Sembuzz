@@ -578,6 +578,10 @@ export const PublicBlogs = () => {
         activeTab="blogs"
         onSelectTab={(tab) => {
           if (tab === 'blogs') return;
+          if (tab === 'universities') {
+            navigate('/universities');
+            return;
+          }
           navigate('/events', { state: { bottomNav: tab } });
         }}
         notifUnreadCount={notifUnreadCount}

@@ -48,6 +48,7 @@ api.interceptors.request.use((config) => {
 
   // Match by path segment so /category-admin/subcategory-admins uses category-admin token, not subcategory-admin
   const isUserRoute = pathname.startsWith('/user/');
+  const isPublicApiRoute = pathname.startsWith('/public/');
   const isSuperAdminRoute = pathname === '/super-admin' || pathname.startsWith('/super-admin/');
   const isSchoolAdminRoute = pathname === '/school-admin' || pathname.startsWith('/school-admin/');
   const isSubCategoryAdminRoute = pathname === '/subcategory-admin' || pathname.startsWith('/subcategory-admin/');
@@ -55,7 +56,11 @@ api.interceptors.request.use((config) => {
   const isAdsAdminRoute = pathname === '/ads-admin' || pathname.startsWith('/ads-admin/');
 
   let token: string | null = null;
-  if (isUserRoute) {
+  if (isPublicApiRoute) {
+    // Never attach `user-token` (or any JWT) to public aggregator routes — avoids 401s after reload
+    // when a stale student token is still in localStorage, and matches unauthenticated browser behavior.
+    token = null;
+  } else if (isUserRoute) {
     token = localStorage.getItem(TOKEN_KEYS.USER);
   } else if (isSuperAdminRoute) {
     token = localStorage.getItem(TOKEN_KEYS.SUPER_ADMIN);

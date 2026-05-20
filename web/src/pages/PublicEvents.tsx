@@ -1449,6 +1449,10 @@ export const PublicEvents = () => {
       navigate('/blogs');
       return;
     }
+    if (tab === 'universities') {
+      navigate('/universities');
+      return;
+    }
     setSelectedSettingsEvent(null);
     if (tab === 'search') setBottomNavActive('search');
     else if (tab === 'home') setBottomNavActive('home');

@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  TextInput,
   TouchableOpacity,
   Linking,
   ActivityIndicator,
@@ -13,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontAwesome5 } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { getSchoolSocialAccounts, SchoolSocialAccountPublic } from '../services/userSchoolSocial';
 import Link45degIcon from 'react-native-bootstrap-icons/icons/link-45deg';
@@ -170,11 +172,13 @@ function AnimatedTitle({ text }: { text: string }) {
 }
 
 export default function AppsScreen() {
+  const navigation = useNavigation();
   const { user } = useAuth();
   const [accounts, setAccounts] = useState<SchoolSocialAccountPublic[]>([]);
   const [loading, setLoading] = useState(!!user);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchAccounts = useCallback(async () => {
     if (!user) {
@@ -201,6 +205,19 @@ export default function AppsScreen() {
 
   const groups = groupAccountsByPage(accounts);
   const showSchoolAccounts = !!(user && groups.length > 0);
+  const filteredGroups = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return groups;
+    return groups.filter((g) => {
+      const inName = (g.pageName || '').toLowerCase().includes(q);
+      const inPlatforms = g.accounts.some(
+        (acc) =>
+          (acc.platformName || '').toLowerCase().includes(q) ||
+          (acc.platformId || '').toLowerCase().includes(q),
+      );
+      return inName || inPlatforms;
+    });
+  }, [groups, searchQuery]);
   const displayTitle = user?.schoolName?.trim() || 'Sembuzz';
 
   const onRefresh = useCallback(async () => {
@@ -209,67 +226,122 @@ export default function AppsScreen() {
     setRefreshing(false);
   }, [fetchAccounts]);
 
+  useEffect(() => {
+    if (!user) setSearchQuery('');
+  }, [user?.id]);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <AnimatedTitle text={displayTitle} />
-
-        <Text style={styles.followTitle}>Follow us</Text>
-
-        {user && loading ? (
-          <ActivityIndicator size="small" color="#1a1f2e" style={styles.loader} />
-        ) : error ? (
-          <Text style={styles.errorText}>{error}</Text>
-        ) : null}
-
-        {showSchoolAccounts ? (
-          groups.map((g) => (
-            <View key={g.key} style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <View style={styles.clubIconWrap}>
-                  {isImageIconValue(g.icon) ? (
-                    <Image source={{ uri: imageSrc(g.icon) }} style={styles.clubIconImg} resizeMode="contain" />
-                  ) : (
-                    <Link45degIcon width={22} height={22} fill="#1a1f2e" />
-                  )}
-                </View>
-                <Text style={styles.sectionName}>{g.pageName || 'Club'}</Text>
+        {!user ? (
+          <View style={styles.authPromptCard}>
+            <View style={styles.authPromptTopRow}>
+              <View style={styles.authPromptIconWrap}>
+                <FontAwesome5 name="user" size={14} color="#6c757d" />
               </View>
-              <View style={styles.linksRow}>
-                {g.accounts.map((acc) => (
-                  <PlatformIconButton
-                    key={acc.id}
-                    platformId={acc.platformId}
-                    platformName={acc.platformName}
-                    link={acc.link}
-                  />
-                ))}
-              </View>
+              <Text style={styles.authPromptDesc}>Sign up to filter by your school and get personalized social links.</Text>
             </View>
-          ))
-        ) : !loading || !user ? (
-          <View style={styles.defaultSocialRow}>
-            {DEFAULT_SOCIAL.map((s) => (
+            <View style={styles.authPromptActions}>
               <TouchableOpacity
-                key={s.key}
-                style={styles.defaultSocialBtn}
-                onPress={() => Linking.openURL(s.url)}
+                style={styles.authLoginBtn}
+                onPress={() => (navigation as { navigate: (name: string) => void }).navigate('Settings')}
                 activeOpacity={0.85}
-                accessibilityRole="link"
-                accessibilityLabel={s.label}
               >
-                <FontAwesome5 name={s.icon} size={32} color={s.color} brand />
+                <FontAwesome5 name="sign-in-alt" size={13} color="#fff" />
+                <Text style={styles.authLoginBtnText}>Login</Text>
               </TouchableOpacity>
-            ))}
+              <TouchableOpacity
+                style={styles.authSignupBtn}
+                onPress={() => (navigation as { navigate: (name: string) => void }).navigate('Settings')}
+                activeOpacity={0.85}
+              >
+                <FontAwesome5 name="user-plus" size={13} color="#1a1f2e" />
+                <Text style={styles.authSignupBtnText}>Sign up</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         ) : null}
 
-        <Text style={styles.footerHint}>
-          {showSchoolAccounts ? "Your school's social accounts." : 'Connect with us on social media.'}
-        </Text>
+        {user && !loading ? (
+          <View style={styles.searchWrap}>
+            <FontAwesome5 name="search" size={14} color="#6c757d" />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search clubs"
+              placeholderTextColor="#8e8e8e"
+              style={styles.searchInput}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+        ) : null}
+
+        <View style={[styles.mainContentWrap, !showSchoolAccounts && !loading ? styles.mainContentCentered : null]}>
+          <AnimatedTitle text={displayTitle} />
+
+          <Text style={styles.followTitle}>Follow us</Text>
+
+          {user && loading ? (
+            <ActivityIndicator size="small" color="#1a1f2e" style={styles.loader} />
+          ) : error ? (
+            <Text style={styles.errorText}>{error}</Text>
+          ) : null}
+
+          {showSchoolAccounts ? (
+            <>
+              {filteredGroups.length === 0 ? (
+                <Text style={styles.emptySearchText}>No matching groups found.</Text>
+              ) : null}
+              {filteredGroups.map((g) => (
+              <View key={g.key} style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <View style={styles.clubIconWrap}>
+                    {isImageIconValue(g.icon) ? (
+                      <Image source={{ uri: imageSrc(g.icon) }} style={styles.clubIconImg} resizeMode="contain" />
+                    ) : (
+                      <Link45degIcon width={22} height={22} fill="#1a1f2e" />
+                    )}
+                  </View>
+                  <Text style={styles.sectionName}>{g.pageName || 'Club'}</Text>
+                </View>
+                <View style={styles.linksRow}>
+                  {g.accounts.map((acc) => (
+                    <PlatformIconButton
+                      key={acc.id}
+                      platformId={acc.platformId}
+                      platformName={acc.platformName}
+                      link={acc.link}
+                    />
+                  ))}
+                </View>
+              </View>
+              ))}
+            </>
+          ) : !loading || !user ? (
+            <View style={styles.defaultSocialRow}>
+              {DEFAULT_SOCIAL.map((s) => (
+                <TouchableOpacity
+                  key={s.key}
+                  style={styles.defaultSocialBtn}
+                  onPress={() => Linking.openURL(s.url)}
+                  activeOpacity={0.85}
+                  accessibilityRole="link"
+                  accessibilityLabel={s.label}
+                >
+                  <FontAwesome5 name={s.icon} size={32} color={s.color} brand />
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : null}
+
+          <Text style={styles.footerHint}>
+            {showSchoolAccounts ? "Your school's social accounts." : 'Connect with us on social media.'}
+          </Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -281,16 +353,99 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 16,
     paddingBottom: 120,
     alignItems: 'center',
     width: '100%',
   },
+  mainContentWrap: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  mainContentCentered: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingTop: 24,
+    paddingBottom: 24,
+  },
+  authPromptCard: {
+    width: '100%',
+    maxWidth: 600,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e8edf5',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 14,
+  },
+  authPromptTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+    marginBottom: 14,
+  },
+  authPromptIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 999,
+    backgroundColor: '#f1f4f8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  authPromptDesc: {
+    fontSize: 13,
+    color: '#1a1f2e',
+    lineHeight: 17,
+    flex: 1,
+  },
+  authPromptActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginLeft: 44,
+  },
+  authLoginBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1a1f2e',
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    minWidth: 118,
+    gap: 8,
+  },
+  authLoginBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  authSignupBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#1a1f2e',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    minWidth: 118,
+    gap: 8,
+  },
+  authSignupBtnText: {
+    color: '#1a1f2e',
+    fontSize: 15,
+    fontWeight: '600',
+  },
   titleRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
+    alignSelf: 'center',
+    width: '100%',
     marginBottom: 24,
     maxWidth: 600,
   },
@@ -304,11 +459,38 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1a1f2e',
     textAlign: 'center',
+    alignSelf: 'center',
     marginBottom: 20,
     width: '100%',
   },
   loader: {
     marginVertical: 16,
+  },
+  searchWrap: {
+    width: '100%',
+    maxWidth: 420,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    minHeight: 50,
+    paddingVertical: 12,
+    marginBottom: 14,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1a1f2e',
+    paddingVertical: 0,
+  },
+  emptySearchText: {
+    fontSize: 13,
+    color: '#6c757d',
+    marginBottom: 12,
   },
   section: {
     marginBottom: 24,
@@ -361,6 +543,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
+    alignSelf: 'center',
+    width: '100%',
     gap: 20,
     marginTop: 4,
     maxWidth: 600,
@@ -376,7 +560,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#8e8e8e',
     textAlign: 'center',
+    alignSelf: 'center',
     marginTop: 16,
+    width: '100%',
     paddingHorizontal: 16,
   },
   errorText: {

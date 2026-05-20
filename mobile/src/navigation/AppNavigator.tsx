@@ -144,9 +144,13 @@ function BottomNavBar({ state, descriptors, navigation }: any) {
                   />
                 ) : (
                   <View style={styles.profileAvatarPlaceholder}>
-                    <Text style={styles.profileAvatarLetter}>
-                      {(user?.schoolName?.trim()?.charAt(0) || user?.name?.trim()?.charAt(0) || '?').toUpperCase()}
-                    </Text>
+                    {user ? (
+                      <Text style={styles.profileAvatarLetter}>
+                        {(user?.schoolName?.trim()?.charAt(0) || user?.name?.trim()?.charAt(0) || 'U').toUpperCase()}
+                      </Text>
+                    ) : (
+                      <Ionicons name="person-outline" size={14} color="#1a1f2e" />
+                    )}
                   </View>
                 )}
                 {unreadCount > 0 ? (
