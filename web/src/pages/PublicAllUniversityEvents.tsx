@@ -127,7 +127,15 @@ function EventCard({ event }: { event: PublicUniversityEvent }) {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', fontSize: '0.8rem', color: TEXT_MUTED }}>
           {(event.startDate || event.rawDateText) && (
             <span>
-              <i className="bi bi-calendar3 me-1" />
+              {event.multiMonthSpan ? (
+                <i
+                  className="bi bi-arrow-repeat me-1"
+                  aria-label="Multi-month event"
+                  title="Multi-month event"
+                />
+              ) : (
+                <i className="bi bi-calendar3 me-1" aria-hidden />
+              )}
               {formatUniversityEventCardDateLine(event, DEFAULT_UNIVERSITY_EVENT_DISPLAY_TZ)}
             </span>
           )}

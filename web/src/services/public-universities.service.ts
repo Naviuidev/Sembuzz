@@ -43,6 +43,14 @@ export interface PublicUniversityEvent {
   detailUrl: string | null;
   contactInfo: string | null;
   firstSeenAt: string;
+  /** Runs before/after the listing month (long-running or cross-month program). */
+  multiMonthSpan?: boolean;
+  /** Extra instance dates in the listing month (YYYY-MM-DD, ingestion TZ). */
+  occurrenceDates?: string[];
+  /** Primary instance date for "+ N dates" label (YYYY-MM-DD). */
+  occurrenceDisplayYmd?: string | null;
+  /** More than one occurrence in the current month. */
+  multipleOccurrencesInMonth?: boolean;
   source: { id: string; universityName: string; url: string };
 }
 

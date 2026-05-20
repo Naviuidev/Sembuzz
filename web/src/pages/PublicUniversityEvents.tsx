@@ -19,7 +19,11 @@ import {
   DEFAULT_UNIVERSITY_EVENT_DISPLAY_TZ,
   shortUniversityTimeZoneLabel,
   universityEventTitleTooltip,
+  formatIngestionMonthWindowLabel,
+  formatOccurrenceDatesTooltip,
   formatUniversityEventCardDateLine,
+  formatUniversityEventCardDateWithOccurrences,
+  universityEventSpansOutsideMonth,
 } from '../utils/universityEventDisplay';
 
 const TEXT_DARK = '#1a1f2e';
@@ -417,13 +421,92 @@ const iconLinkBase: CSSProperties = {
   transition: 'background 0.15s ease',
 };
 
-function EventCard({ event, displayTimeZone }: { event: PublicUniversityEvent; displayTimeZone: string }) {
+function OccurrenceDatesLoopIcon({
+  dates,
+  timeZone,
+}: {
+  dates: string[];
+  timeZone: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const tip = formatOccurrenceDatesTooltip(dates, timeZone);
+  if (!tip) return null;
+
+  return (
+    <span
+      className="uni-occurrence-loop-wrap"
+      style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+    >
+      <i
+        className="bi bi-arrow-repeat"
+        style={{ fontSize: '0.85rem', color: '#B91C1C', cursor: 'help' }}
+        tabIndex={0}
+        aria-label={`${dates.length} dates this month`}
+      />
+      {open && tip && (
+        <span
+          role="tooltip"
+          style={{
+            position: 'absolute',
+            left: '50%',
+            bottom: 'calc(100% + 8px)',
+            transform: 'translateX(-50%)',
+            zIndex: 40,
+            minWidth: 200,
+            maxWidth: 280,
+            padding: '0.55rem 0.7rem',
+            background: '#1a1f2e',
+            color: '#fff',
+            fontSize: '0.72rem',
+            lineHeight: 1.45,
+            borderRadius: 8,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+            whiteSpace: 'pre-line',
+            pointerEvents: 'none',
+          }}
+        >
+          {tip}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function EventCard({
+  event,
+  displayTimeZone,
+  ingestionWindow,
+}: {
+  event: PublicUniversityEvent;
+  displayTimeZone: string;
+  ingestionWindow?: PublicUniversityIngestionWindowUtc;
+}) {
   const goHref = event.registrationLink || event.detailUrl;
+  const multiMonth =
+    Boolean(event.multiMonthSpan) || universityEventSpansOutsideMonth(event, ingestionWindow);
+  const occurrenceDates = event.occurrenceDates ?? [];
+  const tooltipDates =
+    occurrenceDates.length > 1 && event.occurrenceDisplayYmd
+      ? occurrenceDates.filter((d) => d !== event.occurrenceDisplayYmd)
+      : occurrenceDates;
+  const hasMultipleOccurrences = Boolean(event.multipleOccurrencesInMonth) || occurrenceDates.length > 1;
   const dateLine =
-    event.startDate || event.rawDateText
-      ? formatUniversityEventCardDateLine(event, displayTimeZone)
+    event.startDate || event.rawDateText || occurrenceDates.length
+      ? hasMultipleOccurrences
+        ? formatUniversityEventCardDateWithOccurrences(event, displayTimeZone)
+        : formatUniversityEventCardDateLine(event, displayTimeZone)
       : null;
-  const titleTooltip = universityEventTitleTooltip(event.title, event, displayTimeZone);
+  const titleTooltip = [
+    universityEventTitleTooltip(event.title, event, displayTimeZone),
+    multiMonth ? 'Runs across multiple months (includes this month).' : '',
+    hasMultipleOccurrences ? formatOccurrenceDatesTooltip(tooltipDates, displayTimeZone) : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 
   return (
     <div
@@ -436,7 +519,9 @@ function EventCard({ event, displayTimeZone }: { event: PublicUniversityEvent; d
         display: 'flex',
         flexDirection: 'column',
         gap: '0.75rem',
-        boxShadow: '0 4px 14px rgba(15, 23, 42, 0.06)',
+        boxShadow: multiMonth
+          ? '0 0 0 2px #DC2626, 0 4px 14px rgba(220, 38, 38, 0.12)'
+          : '0 4px 14px rgba(15, 23, 42, 0.06)',
         height: '100%',
         transition: 'transform 0.18s ease, box-shadow 0.18s ease',
       }}
@@ -468,11 +553,18 @@ function EventCard({ event, displayTimeZone }: { event: PublicUniversityEvent; d
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
               }}
               title={dateLine}
             >
-              <i className="bi bi-calendar3 me-1" aria-hidden />
-              {dateLine}
+              {hasMultipleOccurrences ? (
+                <OccurrenceDatesLoopIcon dates={tooltipDates.length ? tooltipDates : occurrenceDates} timeZone={displayTimeZone} />
+              ) : (
+                <i className="bi bi-calendar3 flex-shrink-0" aria-hidden />
+              )}
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{dateLine}</span>
             </div>
           )}
           {event.venue && (
@@ -752,7 +844,7 @@ export const PublicUniversityEvents = () => {
                       ...pillSurface(view === v),
                     }}
                   >
-                    {v === 'all' ? 'All' : v === 'upcoming' ? 'Upcoming' : v === 'latest' ? 'Latest' : 'Trending'}
+                    {v === 'all' ? 'This month' : v === 'upcoming' ? 'Upcoming' : v === 'latest' ? 'Latest' : 'Trending'}
                   </button>
                 ))}
                 <input
@@ -852,6 +944,19 @@ export const PublicUniversityEvents = () => {
               </div>
             </div>
 
+            {view === 'all' && university.ingestionWindowUtc && !calendarDayLocal && (
+              <p style={{ fontSize: '0.8rem', color: TEXT_MUTED, margin: '0 0 0.75rem' }}>
+                Showing events in{' '}
+                <strong style={{ color: TEXT_DARK }}>
+                  {formatIngestionMonthWindowLabel(university.ingestionWindowUtc)}
+                </strong>{' '}
+                ({shortUniversityTimeZoneLabel(displayTz)}), including programs that run before or after this month.{' '}
+                <span style={{ color: '#DC2626', fontWeight: 600 }}>Red border</span> = spans outside this month.{' '}
+                <i className="bi bi-arrow-repeat" style={{ color: '#B91C1C' }} aria-hidden /> = more dates this month
+                (hover for list).
+              </p>
+            )}
+
             {eventsLoading ? (
               <div style={{ padding: '2rem', textAlign: 'center', color: TEXT_MUTED }}>Loading events...</div>
             ) : (data?.items.length ?? 0) === 0 ? (
@@ -867,13 +972,20 @@ export const PublicUniversityEvents = () => {
               >
                 <i className="bi bi-calendar-x" style={{ fontSize: '2rem', display: 'block', marginBottom: '0.5rem' }} />
                 {calendarDayLocal
-                  ? `No events for ${shortUniversityTimeZoneLabel(displayTz)} ${calendarDayLocal} with the current filters. Try All or another day.`
-                  : 'No events yet for this university.'}
+                  ? `No events for ${shortUniversityTimeZoneLabel(displayTz)} ${calendarDayLocal} with the current filters. Try This month or another day.`
+                  : view === 'all' && university.ingestionWindowUtc
+                    ? `No events for ${formatIngestionMonthWindowLabel(university.ingestionWindowUtc)} yet. Run sync in admin or try Upcoming.`
+                    : 'No events yet for this university.'}
               </div>
             ) : (
               <div className="uni-events-grid">
                 {data!.items.map((e) => (
-                  <EventCard key={e.id} event={e} displayTimeZone={displayTz} />
+                  <EventCard
+                    key={e.id}
+                    event={e}
+                    displayTimeZone={displayTz}
+                    ingestionWindow={university.ingestionWindowUtc}
+                  />
                 ))}
               </div>
             )}

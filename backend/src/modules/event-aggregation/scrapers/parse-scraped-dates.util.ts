@@ -68,10 +68,13 @@ function tryLuxonParse(text: string, zone: string): DateTime | null {
   const formats = [
     'EEE, LLL d, yyyy h:mma',
     'EEE, LLL d, yyyy',
+    'ccc, LLL d, yyyy h:mma',
+    'ccc, LLL d, yyyy',
     'EEEE, LLLL d, yyyy h:mma',
     'EEEE, LLLL d, yyyy',
     'LLLL d, yyyy h:mma',
     'LLLL d, yyyy',
+    'LLL. d, yyyy',
     'LLL d, yyyy',
     'LLL d yyyy',
   ];
@@ -81,6 +84,26 @@ function tryLuxonParse(text: string, zone: string): DateTime | null {
   }
   const iso = DateTime.fromISO(t, { zone });
   return iso.isValid ? iso : null;
+}
+
+/** Find prose ranges like "Jan. 27 - June. 13, 2026" in Localist descriptions. */
+export function parseDateRangeFromFreeText(
+  text: string,
+  zone: string,
+): { start: Date | null; end: Date | null } {
+  if (!text?.trim()) return { start: null, end: null };
+  const z = zone || 'America/New_York';
+  const m = text.match(
+    /([A-Za-z]+\.?\s+\d{1,2})\s*[-–]\s*([A-Za-z]+\.?\s+\d{1,2}),?\s*(\d{4})/i,
+  );
+  if (!m) return { start: null, end: null };
+  const normMonth = (part: string) => part.replace(/\./g, '').replace(/\s+/g, ' ').trim();
+  const startText = `${normMonth(m[1])}, ${m[3]}`;
+  const endText = `${normMonth(m[2])}, ${m[3]}`;
+  const startDt = tryLuxonParse(startText, z);
+  const endDt = tryLuxonParse(endText, z);
+  if (!startDt) return { start: null, end: null };
+  return { start: startDt.toJSDate(), end: endDt ? endDt.toJSDate() : null };
 }
 
 /** @deprecated use parseScrapedDateLine */

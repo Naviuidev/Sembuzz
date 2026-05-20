@@ -1,7 +1,9 @@
 import * as cheerio from 'cheerio';
+import type { AnyNode } from 'domhandler';
 import { createHash } from 'crypto';
+import { DateTime } from 'luxon';
 import { BaseScraper, type RawNormalizedEventDraft } from '../base-scraper.abstract';
-import { parseScrapedDateLine } from '../parse-scraped-dates.util';
+import { parseDateRangeFromFreeText, parseScrapedDateLine } from '../parse-scraped-dates.util';
 import type { GenericSelectorConfig } from '../selector-config.types';
 
 export class GenericSelectorScraper extends BaseScraper {
@@ -132,8 +134,7 @@ export class GenericSelectorScraper extends BaseScraper {
 
   /** Localist Community Event Platform – e.g. https://events.miamioh.edu/ */
   private extractLocalist($: cheerio.CheerioAPI): RawNormalizedEventDraft[] {
-    const out: RawNormalizedEventDraft[] = [];
-    const seen = new Set<string>();
+    const byKey = new Map<string, RawNormalizedEventDraft>();
 
     $('.em-card_text').each((_, el) => {
       const root = $(el);
@@ -142,16 +143,7 @@ export class GenericSelectorScraper extends BaseScraper {
       if (!title) return;
 
       const href = titleA.attr('href')?.trim() || null;
-      let dateStr = '';
-      let venue: string | null = null;
-
-      root.find('p.em-text_icon').each((__, p) => {
-        const pe = $(p);
-        const hasMap = pe.find('.fa-map-marker-alt, .fa-map-marker, .fa-location-dot').length > 0;
-        const t = this.normalizeWhitespace(pe.text());
-        if (hasMap && t) venue = t;
-        else if (!hasMap && t && !dateStr) dateStr = t;
-      });
+      const { dateStr, venue } = this.extractLocalistDateAndVenue($, root);
 
       const cardRoot = root.closest('.em-list_item, .em-card, li, article').first();
       const img =
@@ -160,22 +152,124 @@ export class GenericSelectorScraper extends BaseScraper {
         null;
 
       const { start, end } = parseScrapedDateLine(dateStr, this.dateZone);
+      const listingOccurrenceYmd = start
+        ? DateTime.fromJSDate(new Date(start), { zone: this.dateZone }).toISODate()
+        : null;
+      const hasRecurringInstances =
+        root.find('.recurringmessage').length > 0 || cardRoot.find('.recurringmessage').length > 0;
+      const ld = this.findAdjacentLocalistJsonLd($, cardRoot.length ? cardRoot : root, href);
+      const descRange = ld.description
+        ? parseDateRangeFromFreeText(ld.description, this.dateZone)
+        : { start: null as Date | null, end: null as Date | null };
+      const programStart = descRange.start ?? (start ? new Date(start) : null);
+      const programEnd = descRange.end ?? (end ? new Date(end) : null) ?? programStart;
 
-      const key = `${title}|${href ?? ''}|${dateStr}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-
-      out.push({
+      const draft: RawNormalizedEventDraft = {
         title,
+        description: ld.description ? ld.description.slice(0, 8000) : undefined,
         image: img,
-        startDate: start ? new Date(start) : null,
-        endDate: end ? new Date(end) : null,
-        venue,
+        startDate: programStart,
+        endDate: programEnd,
+        venue: ld.venue ?? venue,
         sourceUrl: href,
-      });
+        hasRecurringInstances,
+        listingOccurrenceYmd,
+      };
+
+      const key = `${title}|${href ?? ''}`;
+      const prev = byKey.get(key);
+      if (!prev) {
+        byKey.set(key, draft);
+        return;
+      }
+      byKey.set(key, this.mergeLocalistDrafts(prev, draft));
     });
 
-    return out;
+    return [...byKey.values()];
+  }
+
+  /**
+   * Localist uses `p.em-text_icon` on featured cards and `p.em-card_event-text` on list rows
+   * (e.g. https://events.miamioh.edu/).
+   */
+  private extractLocalistDateAndVenue(
+    $: cheerio.CheerioAPI,
+    root: cheerio.Cheerio<AnyNode>,
+  ): { dateStr: string; venue: string | null } {
+    let dateStr = '';
+    let venue: string | null = null;
+
+    const consumeParagraph = (pe: cheerio.Cheerio<AnyNode>) => {
+      const hasMap =
+        pe.find('.fa-map-marker-alt, .fa-map-marker, .fa-location-dot').length > 0;
+      const hasCalendar = pe.find('.fa-calendar, .fa-calendar-alt, .fa-calendar-days').length > 0;
+      const t = this.normalizeWhitespace(pe.text());
+      if (!t) return;
+      if (hasMap && !venue) venue = t;
+      else if ((hasCalendar || !hasMap) && !dateStr) dateStr = t;
+    };
+
+    root.find('p.em-text_icon, p.em-card_event-text').each((__, p) => {
+      consumeParagraph($(p));
+    });
+
+    return { dateStr, venue };
+  }
+
+  /** JSON-LD `<script>` often sits immediately before the `.em-card` on Localist listing pages. */
+  private findAdjacentLocalistJsonLd(
+    $: cheerio.CheerioAPI,
+    cardRoot: cheerio.Cheerio<AnyNode>,
+    href: string | null,
+  ): { description: string | null; venue: string | null } {
+    if (!href) return { description: null, venue: null };
+    const normHref = href.split('?')[0];
+    const scripts = cardRoot.prevAll('script[type="application/ld+json"]').toArray();
+    for (const el of scripts.slice(0, 3)) {
+      const raw = $(el).html()?.trim();
+      if (!raw) continue;
+      try {
+        const parsed = JSON.parse(raw) as unknown;
+        const nodes = Array.isArray(parsed) ? parsed : [parsed];
+        for (const node of nodes) {
+          if (!node || typeof node !== 'object') continue;
+          const ev = node as Record<string, unknown>;
+          if (ev['@type'] !== 'Event') continue;
+          const url = typeof ev.url === 'string' ? ev.url.split('?')[0] : '';
+          if (url && url !== normHref) continue;
+          const loc = ev.location as { name?: string } | undefined;
+          return {
+            description: typeof ev.description === 'string' ? ev.description : null,
+            venue: loc?.name ?? null,
+          };
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    return { description: null, venue: null };
+  }
+
+  /** Prefer dated rows; fill image/venue from duplicates (carousel vs list markup). */
+  private mergeLocalistDrafts(
+    a: RawNormalizedEventDraft,
+    b: RawNormalizedEventDraft,
+  ): RawNormalizedEventDraft {
+    const pick =
+      a.startDate && !b.startDate ? a : !a.startDate && b.startDate ? b : b.startDate ? b : a;
+    const other = pick === a ? b : a;
+    return {
+      ...pick,
+      image: pick.image || other.image,
+      venue: pick.venue || other.venue,
+      description: pick.description || other.description,
+      endDate: pick.endDate || other.endDate,
+      hasRecurringInstances: pick.hasRecurringInstances || other.hasRecurringInstances,
+      occurrenceDatesInMonth:
+        pick.occurrenceDatesInMonth?.length || other.occurrenceDatesInMonth?.length
+          ? [...new Set([...(pick.occurrenceDatesInMonth ?? []), ...(other.occurrenceDatesInMonth ?? [])])].sort()
+          : undefined,
+    };
   }
 
   /** UWM / WordPress calendar – e.g. https://uwm.edu/events/ */

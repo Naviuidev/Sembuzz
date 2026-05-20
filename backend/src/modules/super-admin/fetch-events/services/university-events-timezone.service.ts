@@ -26,6 +26,54 @@ export interface UniversityIngestionWindow {
  * and the sync window [firstDayInclusive … lastDayInclusive].
  * If `endDate` is missing, the event is treated as a single local day at `startDate`.
  */
+/**
+ * Prisma filter: event local date range overlaps [firstDayInclusive … lastDayInclusive].
+ * Use for public "All" listings (current calendar month + multi-month spans).
+ */
+/** Prisma `where` for events whose local date range overlaps the sync month (UTC bounds). */
+export function prismaMonthOverlapWhereInput(
+  win: Pick<UniversityIngestionWindow, 'startUtc' | 'endExclusiveUtc'>,
+) {
+  return {
+    startDate: { not: null },
+    AND: [
+      { startDate: { lt: win.endExclusiveUtc } },
+      {
+        OR: [
+          {
+            AND: [{ endDate: { not: null } }, { endDate: { gte: win.startUtc } }],
+          },
+          {
+            AND: [
+              { endDate: null },
+              { startDate: { gte: win.startUtc } },
+              { startDate: { lt: win.endExclusiveUtc } },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+/** True when the event runs before or after the sync/listing month (multi-month / long-running). */
+export function universityEventSpansOutsideIngestionMonth(
+  startDate: Date,
+  endDate: Date | null | undefined,
+  win: Pick<UniversityIngestionWindow, 'timeZone' | 'firstDayInclusive' | 'lastDayInclusive'>,
+): boolean {
+  if (!startDate || Number.isNaN(startDate.getTime())) return false;
+  const tz = win.timeZone;
+  const winStart = DateTime.fromISO(win.firstDayInclusive, { zone: tz }).startOf('day');
+  const winEnd = DateTime.fromISO(win.lastDayInclusive, { zone: tz }).endOf('day');
+  const evStart = DateTime.fromJSDate(startDate, { zone: 'utc' }).setZone(tz).startOf('day');
+  const evEnd =
+    endDate != null && !Number.isNaN(new Date(endDate).getTime())
+      ? DateTime.fromJSDate(new Date(endDate), { zone: 'utc' }).setZone(tz).endOf('day')
+      : evStart.endOf('day');
+  return evStart < winStart || evEnd > winEnd;
+}
+
 export function universityEventRangeOverlapsWindow(
   startDate: Date,
   endDate: Date | null | undefined,

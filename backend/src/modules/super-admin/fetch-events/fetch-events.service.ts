@@ -6,7 +6,11 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { parseUniversityCsv, parseUniversityMatrix, ParsedSourceRow } from './services/csv.parser';
 import { SyncService } from './services/sync.service';
 import { UniversitySyncJobService } from './services/university-sync-job.service';
-import { UniversityEventsTimezoneService } from './services/university-events-timezone.service';
+import {
+  prismaMonthOverlapWhereInput,
+  UniversityEventsTimezoneService,
+  universityEventSpansOutsideIngestionMonth,
+} from './services/university-events-timezone.service';
 import { parseXlsxToMatrix } from './services/xlsx.parser';
 
 interface ListEventsParams {
@@ -305,7 +309,10 @@ export class FetchEventsService {
       where: { id, active: true },
     });
     if (scraped) {
-      const totalEvents = await this.prisma.scrapedEventRecord.count({ where: { sourceId: id } });
+      const win = this.universityTz.getCurrentCalendarMonthWindow();
+      const totalEvents = await this.prisma.scrapedEventRecord.count({
+        where: { sourceId: id, ...prismaMonthOverlapWhereInput(win) },
+      });
       return {
         id: scraped.id,
         universityName: scraped.name,
@@ -336,6 +343,56 @@ export class FetchEventsService {
       currentMonthEndInclusive: win.currentMonthEndInclusive,
       computedAt: win.computedAtIso,
     };
+  }
+
+  /** Public "All" tab: current calendar month, including ranges that start before or end after the month. */
+  private usesCurrentMonthListScope(params: ListEventsParams): boolean {
+    return !params.upcoming && !params.latest && !params.trending && !params.onDateUtc?.trim();
+  }
+
+  private appendCurrentMonthOverlapFilter(
+    andParts: Array<Prisma.UniversityEventWhereInput | Prisma.ScrapedEventRecordWhereInput>,
+    params: ListEventsParams,
+  ) {
+    if (!this.usesCurrentMonthListScope(params)) return;
+    const win = this.universityTz.getCurrentCalendarMonthWindow();
+    andParts.push(prismaMonthOverlapWhereInput(win));
+  }
+
+  private mapMultiMonthSpan(
+    startDate: Date | null,
+    endDate: Date | null,
+    win: ReturnType<UniversityEventsTimezoneService['getCurrentCalendarMonthWindow']>,
+  ): boolean {
+    if (!startDate) return false;
+    return universityEventSpansOutsideIngestionMonth(startDate, endDate, win);
+  }
+
+  private scrapedOccurrenceDates(json: Prisma.JsonValue | null | undefined): {
+    dates: string[];
+    displayYmd: string | null;
+  } {
+    if (!json) return { dates: [], displayYmd: null };
+    if (Array.isArray(json)) {
+      const dates = json.filter(
+        (x): x is string => typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x),
+      );
+      return { dates, displayYmd: dates[0] ?? null };
+    }
+    if (typeof json === 'object' && json !== null && !Array.isArray(json)) {
+      const o = json as { dates?: unknown; displayYmd?: unknown };
+      const dates = Array.isArray(o.dates)
+        ? o.dates.filter(
+            (x): x is string => typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x),
+          )
+        : [];
+      const displayYmd =
+        typeof o.displayYmd === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.displayYmd)
+          ? o.displayYmd
+          : dates[0] ?? null;
+      return { dates, displayYmd };
+    }
+    return { dates: [], displayYmd: null };
   }
 
   async syncOne(sourceId: string) {
@@ -544,8 +601,12 @@ export class FetchEventsService {
       });
     }
 
+    this.appendCurrentMonthOverlapFilter(andParts, params);
+
     const where: Prisma.UniversityEventWhereInput =
       andParts.length === 1 ? andParts[0] : { AND: andParts };
+
+    const listWin = this.universityTz.getCurrentCalendarMonthWindow(now);
 
     const orderBy: Prisma.UniversityEventOrderByWithRelationInput | Prisma.UniversityEventOrderByWithRelationInput[] =
       (() => {
@@ -633,6 +694,10 @@ export class FetchEventsService {
         contactInfo: this.eventRowContactInfo(e),
         extractionConfidence: this.eventRowExtractionConfidence(e),
         firstSeenAt: e.firstSeenAt,
+        multiMonthSpan: this.mapMultiMonthSpan(e.startDate, e.endDate, listWin),
+        occurrenceDates: [],
+        occurrenceDisplayYmd: null,
+        multipleOccurrencesInMonth: false,
         source: e.source,
       })),
       categories: categoryAgg
@@ -729,8 +794,12 @@ export class FetchEventsService {
       });
     }
 
+    this.appendCurrentMonthOverlapFilter(andParts, params);
+
     const where: Prisma.ScrapedEventRecordWhereInput =
       andParts.length === 1 ? andParts[0] : { AND: andParts };
+
+    const listWin = this.universityTz.getCurrentCalendarMonthWindow(now);
 
     const orderBy:
       | Prisma.ScrapedEventRecordOrderByWithRelationInput
@@ -794,6 +863,11 @@ export class FetchEventsService {
         contactInfo: null,
         extractionConfidence: null,
         firstSeenAt: e.createdAt,
+        multiMonthSpan: this.mapMultiMonthSpan(e.startDate, e.endDate, listWin),
+        occurrenceDates: this.scrapedOccurrenceDates(e.occurrenceDatesJson).dates,
+        occurrenceDisplayYmd: this.scrapedOccurrenceDates(e.occurrenceDatesJson).displayYmd,
+        multipleOccurrencesInMonth:
+          this.scrapedOccurrenceDates(e.occurrenceDatesJson).dates.length > 1,
         source: sourcePayload,
       })),
       categories: categoryAgg

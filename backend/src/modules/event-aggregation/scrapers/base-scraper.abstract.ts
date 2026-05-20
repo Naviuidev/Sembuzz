@@ -14,6 +14,12 @@ export interface RawNormalizedEventDraft {
   category?: string | null;
   organizer?: string | null;
   tags?: string[];
+  /** Localist: more instance dates in the sync month (YYYY-MM-DD). */
+  occurrenceDatesInMonth?: string[];
+  /** Date shown on the listing card (YYYY-MM-DD), when it differs from program start. */
+  listingOccurrenceYmd?: string | null;
+  /** Localist: card has "More dates" / recurring instances. */
+  hasRecurringInstances?: boolean;
 }
 
 export type ExtractEventsResult = {

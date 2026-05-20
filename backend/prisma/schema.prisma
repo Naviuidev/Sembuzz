@@ -1039,6 +1039,8 @@ model ScrapedEventRecord {
   image         String?   @db.VarChar(2048)
   startDate     DateTime?
   endDate       DateTime?
+  /// Local YYYY-MM-DD strings for recurring instances in the sync month (tooltip).
+  occurrenceDatesJson Json?
   venue         String?   @db.VarChar(500)
   city          String?   @db.VarChar(200)
   country       String?   @db.VarChar(200)

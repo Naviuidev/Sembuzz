@@ -11,6 +11,7 @@ import type { RawNormalizedEventDraft } from '../scrapers/base-scraper.abstract'
 import type { GenericSelectorConfig } from '../scrapers/selector-config.types';
 import { ScrapedHtmlLoaderService } from '../scrapers/scraped-html-loader.service';
 import { discoverEventCalendarUrl } from '../scrapers/discover-calendar-url.util';
+import { enrichLocalistRecurringDrafts } from '../scrapers/localist-recurring-enrichment';
 import {
   buildDedupeKey,
   buildSlug,
@@ -218,6 +219,10 @@ export class ScrapedSyncService {
         }
       }
 
+      if (extractionMode === 'localist' && result.drafts.length > 0) {
+        await enrichLocalistRecurringDrafts(result.drafts, ingestionWindow, this.dateZone());
+      }
+
       const filtered = this.filterDraftsByIngestionMonth(result.drafts);
       inMonthCount = filtered.inMonth.length;
       skippedNoDate = filtered.skippedNoDate;
@@ -248,6 +253,17 @@ export class ScrapedSyncService {
             image: draft.image ? draft.image.slice(0, 2048) : null,
             startDate: draft.startDate,
             endDate: draft.endDate ?? null,
+            occurrenceDatesJson:
+              draft.occurrenceDatesInMonth?.length ?
+                ({
+                  dates: draft.occurrenceDatesInMonth,
+                  displayYmd:
+                    draft.listingOccurrenceYmd &&
+                    draft.occurrenceDatesInMonth.includes(draft.listingOccurrenceYmd)
+                      ? draft.listingOccurrenceYmd
+                      : draft.occurrenceDatesInMonth[0],
+                } as Prisma.InputJsonValue)
+              : undefined,
             venue: draft.venue ? draft.venue.slice(0, 500) : null,
             city: draft.city ? draft.city.slice(0, 200) : null,
             country: draft.country ? draft.country.slice(0, 200) : null,
@@ -265,6 +281,17 @@ export class ScrapedSyncService {
             image: draft.image ? draft.image.slice(0, 2048) : null,
             startDate: draft.startDate,
             endDate: draft.endDate ?? null,
+            occurrenceDatesJson:
+              draft.occurrenceDatesInMonth?.length ?
+                ({
+                  dates: draft.occurrenceDatesInMonth,
+                  displayYmd:
+                    draft.listingOccurrenceYmd &&
+                    draft.occurrenceDatesInMonth.includes(draft.listingOccurrenceYmd)
+                      ? draft.listingOccurrenceYmd
+                      : draft.occurrenceDatesInMonth[0],
+                } as Prisma.InputJsonValue)
+              : undefined,
             venue: draft.venue ? draft.venue.slice(0, 500) : null,
             city: draft.city ? draft.city.slice(0, 200) : null,
             country: draft.country ? draft.country.slice(0, 200) : null,
