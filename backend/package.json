@@ -7,7 +7,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "postinstall": "prisma generate",
-    "build": "NODE_OPTIONS='--max-old-space-size=4096' nest build",
+    "build": "rm -f tsconfig.build.tsbuildinfo && NODE_OPTIONS='--max-old-space-size=4096' nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "NODE_OPTIONS='--max-old-space-size=4096' nest start",
     "start:dev": "NODE_OPTIONS='--max-old-space-size=4096' nest start --watch",
