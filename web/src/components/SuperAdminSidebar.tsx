@@ -50,6 +50,12 @@ export const SuperAdminSidebar = () => {
       icon: 'bi-link-45deg',
       title: 'Add page URLs and CSS selectors, then sync scraped events'
     },
+    {
+      path: '/super-admin/json-upload',
+      label: 'JSON upload',
+      icon: 'bi-filetype-json',
+      title: 'Upload JSON file for event sources'
+    },
     { path: '/super-admin/raise-request', label: 'Raise a Request', icon: 'bi-question-circle' },
   ];
 

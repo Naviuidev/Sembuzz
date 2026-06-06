@@ -9,6 +9,8 @@ import { ScrapedEventSourcesService } from './event-sources/scraped-event-source
 import { ScrapedSyncAdminController } from './sync/scraped-sync-admin.controller';
 import { ScrapedSyncService } from './sync/scraped-sync.service';
 import { ScrapedHtmlLoaderService } from './scrapers/scraped-html-loader.service';
+import { JsonEventUploadAdminController } from './json-upload/json-event-upload-admin.controller';
+import { JsonEventUploadService } from './json-upload/json-event-upload.service';
 
 @Module({
   imports: [
@@ -23,13 +25,20 @@ import { ScrapedHtmlLoaderService } from './scrapers/scraped-html-loader.service
     ScrapedEventsAdminController,
     ScrapedEventSourcesAdminController,
     ScrapedSyncAdminController,
+    JsonEventUploadAdminController,
   ],
   providers: [
     ScrapedEventsService,
     ScrapedEventSourcesService,
     ScrapedHtmlLoaderService,
     ScrapedSyncService,
+    JsonEventUploadService,
   ],
-  exports: [ScrapedEventsService, ScrapedEventSourcesService, ScrapedSyncService],
+  exports: [
+    ScrapedEventsService,
+    ScrapedEventSourcesService,
+    ScrapedSyncService,
+    JsonEventUploadService,
+  ],
 })
 export class EventAggregationModule {}

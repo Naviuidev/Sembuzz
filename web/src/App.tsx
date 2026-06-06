@@ -22,6 +22,7 @@ import { RaiseRequest } from './pages/RaiseRequest';
 import { Queries } from './pages/Queries';
 import { Features } from './pages/Features';
 import { SuperAdminEventSync } from './pages/SuperAdminEventSync';
+import { SuperAdminJsonUpload } from './pages/SuperAdminJsonUpload';
 import { SchoolAdminLogin } from './pages/SchoolAdminLogin';
 import { SchoolAdminDashboard } from './pages/SchoolAdminDashboard';
 import { SchoolAdminCategories } from './pages/SchoolAdminCategories';
@@ -190,6 +191,14 @@ const SuperAdminRoutes = () => {
         element={
           <ProtectedRoute>
             <SuperAdminEventSync />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="json-upload"
+        element={
+          <ProtectedRoute>
+            <SuperAdminJsonUpload />
           </ProtectedRoute>
         }
       />

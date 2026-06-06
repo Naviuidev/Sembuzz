@@ -1018,6 +1018,8 @@ model ScrapedEventSource {
   websiteUrl    String    @db.VarChar(2048)
   scraperType   String    @default("generic") @db.VarChar(64)
   selectorsJson Json?
+  /// Custom logo from JSON import (falls back to favicon on public UI).
+  logoUrl       String?   @db.VarChar(2048)
   active        Boolean   @default(true)
   lastSyncedAt  DateTime?
   createdAt     DateTime  @default(now())
@@ -1027,7 +1029,63 @@ model ScrapedEventSource {
   syncLogs ScrapedSyncLog[]
 
   @@index([active])
+  @@index([scraperType])
   @@map("scraped_event_sources")
+}
+
+// Super Admin JSON file uploads (draft → publish to scraped_event_sources).
+model JsonEventUpload {
+  id        String   @id @default(uuid())
+  fileName  String   @db.VarChar(500)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  groups JsonEventUploadGroup[]
+
+  @@index([createdAt])
+  @@map("json_event_uploads")
+}
+
+model JsonEventUploadGroup {
+  id                String    @id @default(uuid())
+  uploadId          String
+  universityName    String    @db.VarChar(500)
+  calendarUrl       String    @db.VarChar(2048)
+  logoUrl           String?   @db.VarChar(2048)
+  status            String    @default("draft") @db.VarChar(32) // draft | published
+  publishedSourceId String?   @db.VarChar(36)
+  publishedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  upload JsonEventUpload       @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  events JsonEventUploadEvent[]
+
+  @@index([uploadId])
+  @@index([status])
+  @@map("json_event_upload_groups")
+}
+
+model JsonEventUploadEvent {
+  id          String    @id @default(uuid())
+  groupId     String
+  title       String    @db.VarChar(500)
+  description String?   @db.Text
+  startDate   DateTime?
+  endDate     DateTime?
+  startTime   String?   @db.VarChar(64)
+  endTime     String?   @db.VarChar(64)
+  allDay      Boolean   @default(false)
+  venue       String?   @db.VarChar(500)
+  detailUrl   String?   @db.VarChar(2048)
+  posterUrl   String?   @db.VarChar(2048)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  group JsonEventUploadGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+  @@map("json_event_upload_events")
 }
 
 model ScrapedEventRecord {
