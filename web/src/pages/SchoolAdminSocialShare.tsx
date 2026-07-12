@@ -3,6 +3,7 @@ import { SchoolAdminNavbar } from '../components/SchoolAdminNavbar';
 import { SchoolAdminSidebar } from '../components/SchoolAdminSidebar';
 import { useSchoolAdminAuth } from '../contexts/SchoolAdminAuthContext';
 import { schoolAdminSocialAccountsService } from '../services/school-admin-social-accounts.service';
+import { getApiErrorMessage } from '../utils/apiError';
 import { imageSrc, isImageIconValue } from '../utils/image';
 
 export interface SocialPlatform {
@@ -392,11 +393,11 @@ export const SchoolAdminSocialShare = () => {
   const selectedPlatforms = ALL_PLATFORMS.filter((p) => selectedIds.has(p.id));
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fafafa' }}>
+    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
       <SchoolAdminNavbar />
-      <div className="d-flex">
+      <div className="admin-shell-body">
         <SchoolAdminSidebar />
-        <div style={{ flex: 1, padding: '2rem' }}>
+        <div className="admin-main">
           <div className="mb-4">
             <h1 style={{ fontSize: '2rem', fontWeight: 'normal', color: '#1a1f2e', marginBottom: '0.5rem' }}>
               Social Share
@@ -689,11 +690,7 @@ export const SchoolAdminSocialShare = () => {
                               const { url } = await schoolAdminSocialAccountsService.uploadIcon(file);
                               setClubIconUrl(url);
                             } catch (err: unknown) {
-                              const msg =
-                                err && typeof err === 'object' && 'response' in err
-                                  ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-                                  : null;
-                              setApiError(typeof msg === 'string' ? msg : 'Failed to upload icon. Try again.');
+                              setApiError(getApiErrorMessage(err, 'Failed to upload icon. Try again.'));
                             } finally {
                               setClubIconUploading(false);
                               e.target.value = '';
@@ -706,7 +703,7 @@ export const SchoolAdminSocialShare = () => {
                           <div className="mt-2 d-flex align-items-center gap-2">
                             <span className="text-muted small">Preview:</span>
                             <img
-                              src={clubIconUrl}
+                              src={imageSrc(clubIconUrl)}
                               alt="Club icon"
                               style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: '8px', border: '1px solid #dee2e6' }}
                             />
@@ -1000,11 +997,7 @@ export const SchoolAdminSocialShare = () => {
                       const { url } = await schoolAdminSocialAccountsService.uploadIcon(file);
                       setEditingClubIcon(url);
                     } catch (err: unknown) {
-                      const msg =
-                        err && typeof err === 'object' && 'response' in err
-                          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-                          : null;
-                      setApiError(typeof msg === 'string' ? msg : 'Failed to upload icon.');
+                      setApiError(getApiErrorMessage(err, 'Failed to upload icon.'));
                     } finally {
                       setEditingClubIconUploading(false);
                       e.target.value = '';

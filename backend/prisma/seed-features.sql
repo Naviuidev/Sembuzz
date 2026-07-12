@@ -7,5 +7,7 @@ INSERT INTO `features` (`id`, `code`, `name`, `createdAt`) VALUES
 (UUID(), 'ADS', 'Advertisements', NOW()),
 (UUID(), 'INSTAGRAM', 'Instagram Feed', NOW()),
 (UUID(), 'ANALYTICS', 'Analytics', NOW()),
-(UUID(), 'EMERGENCY', 'Emergency Notifications', NOW())
+(UUID(), 'EMERGENCY', 'Emergency Notifications', NOW()),
+(UUID(), 'GROUP_MESSAGING', 'Group messages', NOW()),
+(UUID(), 'INDIVIDUAL_MESSAGING', 'Individual messages', NOW())
 ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);

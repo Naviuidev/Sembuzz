@@ -19,6 +19,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { getSchoolSocialAccounts, SchoolSocialAccountPublic } from '../services/userSchoolSocial';
 import Link45degIcon from 'react-native-bootstrap-icons/icons/link-45deg';
 import { imageSrc, isImageIconValue } from '../utils/image';
+import { ClubMessagingBadges } from '../components/ClubMessagingBadges';
+import { ClubGroupChatWidget } from '../components/ClubGroupChatWidget';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { MainTabParamList } from '../navigation/types';
 
 const PLATFORM_COLORS: Record<string, string> = {
   facebook: '#1877F2',
@@ -172,7 +176,7 @@ function AnimatedTitle({ text }: { text: string }) {
 }
 
 export default function AppsScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
   const { user } = useAuth();
   const [accounts, setAccounts] = useState<SchoolSocialAccountPublic[]>([]);
   const [loading, setLoading] = useState(!!user);
@@ -285,6 +289,17 @@ export default function AppsScreen() {
 
           <Text style={styles.followTitle}>Follow us</Text>
 
+          <ClubMessagingBadges
+            isAuthenticated={!!user}
+            currentUserId={user?.id}
+            onRequireLogin={() =>
+              navigation.navigate('Settings', {
+                screen: 'SettingsMain',
+                params: { openLogin: true },
+              })
+            }
+          />
+
           {user && loading ? (
             <ActivityIndicator size="small" color="#1a1f2e" style={styles.loader} />
           ) : error ? (
@@ -343,6 +358,17 @@ export default function AppsScreen() {
           </Text>
         </View>
       </ScrollView>
+      <ClubGroupChatWidget
+        visible={!!user}
+        isAuthenticated={!!user}
+        currentUserId={user?.id}
+        onRequireLogin={() =>
+          navigation.navigate('Settings', {
+            screen: 'SettingsMain',
+            params: { openLogin: true },
+          })
+        }
+      />
     </SafeAreaView>
   );
 }

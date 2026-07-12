@@ -152,11 +152,11 @@ export const SchoolDetails = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen" style={{ backgroundColor: '#fafafa' }}>
+      <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
         <SuperAdminNavbar />
-        <div className="d-flex">
+        <div className="admin-shell-body">
           <SuperAdminSidebar />
-          <div style={{ flex: 1, padding: '2rem' }}>
+          <div className="admin-main">
             <div className="text-center py-5">
               <p style={{ color: '#6c757d' }}>Loading...</p>
             </div>
@@ -168,11 +168,11 @@ export const SchoolDetails = () => {
 
   if (!school) {
     return (
-      <div className="min-h-screen" style={{ backgroundColor: '#fafafa' }}>
+      <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
         <SuperAdminNavbar />
-        <div className="d-flex">
+        <div className="admin-shell-body">
           <SuperAdminSidebar />
-          <div style={{ flex: 1, padding: '2rem' }}>
+          <div className="admin-main">
             <div className="text-center py-5">
               <p style={{ color: '#6c757d' }}>School not found</p>
             </div>
@@ -183,11 +183,11 @@ export const SchoolDetails = () => {
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fafafa' }}>
+    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
       <SuperAdminNavbar />
-      <div className="d-flex">
+      <div className="admin-shell-body">
         <SuperAdminSidebar />
-        <div style={{ flex: 1, padding: '2rem' }}>
+        <div className="admin-main">
           <button
             onClick={() => navigate('/super-admin/dashboard')}
             className="btn btn-link p-0 mb-3"

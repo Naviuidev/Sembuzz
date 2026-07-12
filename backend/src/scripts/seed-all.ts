@@ -24,7 +24,16 @@ async function main() {
 
   // 1. Features (required for super-admin features list and school features)
   console.log('1. Seeding features...');
-  const featureCodes = ['NEWS', 'EVENTS', 'ADS', 'INSTAGRAM', 'ANALYTICS', 'EMERGENCY'];
+  const featureCodes = [
+    'NEWS',
+    'EVENTS',
+    'ADS',
+    'INSTAGRAM',
+    'ANALYTICS',
+    'EMERGENCY',
+    'GROUP_MESSAGING',
+    'INDIVIDUAL_MESSAGING',
+  ];
   const featureNames: Record<string, string> = {
     NEWS: 'News',
     EVENTS: 'Events',
@@ -32,6 +41,8 @@ async function main() {
     INSTAGRAM: 'Instagram Feed',
     ANALYTICS: 'Analytics',
     EMERGENCY: 'Emergency Notifications',
+    GROUP_MESSAGING: 'Group messages',
+    INDIVIDUAL_MESSAGING: 'Individual messages',
   };
   const features: { id: string; code: string; name: string }[] = [];
   for (const code of featureCodes) {

@@ -139,11 +139,11 @@ export const CategoryAdminRaiseRequest = () => {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fafafa' }}>
+    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
       <CategoryAdminNavbar />
-      <div className="d-flex">
+      <div className="admin-shell-body">
         <CategoryAdminSidebar />
-        <div style={{ flex: 1, padding: '2rem', position: 'relative', overflow: 'hidden' }}>
+        <div className="admin-main">
           <div
             style={{
               display: 'flex',

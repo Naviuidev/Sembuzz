@@ -8,23 +8,11 @@ interface SubCategoryAdminLayoutProps {
 
 export const SubCategoryAdminLayout = ({ children }: SubCategoryAdminLayoutProps) => {
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fafafa' }}>
-      {/* Top Navbar */}
+    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
       <SubCategoryAdminNavbar />
-
-      {/* Main Layout */}
-      <div className="d-flex">
-        {/* Sidebar */}
+      <div className="admin-shell-body">
         <SubCategoryAdminSidebar />
-
-        {/* Main Content */}
-        <div style={{
-          flex: 1,
-          padding: '2rem',
-          minHeight: 'calc(100vh - 60px)'
-        }}>
-          {children}
-        </div>
+        <main className="admin-main">{children}</main>
       </div>
     </div>
   );

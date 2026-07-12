@@ -9,6 +9,8 @@ import { SchoolAdminPostsModule } from './posts/posts.module';
 import { SchoolAdminSubcategoryAdminsModule } from './subcategory-admins/subcategory-admins.module';
 import { SchoolAdminUserHelpModule } from './user-help/school-admin-user-help.module';
 import { SchoolAdminSocialAccountsModule } from './social-accounts/school-admin-social-accounts.module';
+import { SchoolAdminClubGroupChatsModule } from './club-group-chats/school-admin-club-group-chats.module';
+import { SchoolAdminClubGroupChatRequestsModule } from './club-group-chat-requests/school-admin-club-group-chat-requests.module';
 import { UpcomingPostsModule } from './upcoming-posts/upcoming-posts.module';
 
 @Module({
@@ -23,6 +25,8 @@ import { UpcomingPostsModule } from './upcoming-posts/upcoming-posts.module';
     SchoolAdminPostsModule,
     SchoolAdminUserHelpModule,
     SchoolAdminSocialAccountsModule,
+    SchoolAdminClubGroupChatsModule,
+    SchoolAdminClubGroupChatRequestsModule,
     UpcomingPostsModule,
   ],
   exports: [
@@ -36,6 +40,7 @@ import { UpcomingPostsModule } from './upcoming-posts/upcoming-posts.module';
     SchoolAdminPostsModule,
     SchoolAdminUserHelpModule,
     SchoolAdminSocialAccountsModule,
+    SchoolAdminClubGroupChatsModule,
     UpcomingPostsModule,
   ],
 })

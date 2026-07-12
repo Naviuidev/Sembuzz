@@ -547,11 +547,11 @@ export const SuperAdminJsonUpload = () => {
   const loading = uploadMut.isPending;
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fafafa' }}>
+    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
       <SuperAdminNavbar />
-      <div className="d-flex">
+      <div className="admin-shell-body">
         <SuperAdminSidebar />
-        <div style={{ flex: 1, padding: '2rem', minHeight: 'calc(100vh - 60px)', maxWidth: 1200 }}>
+        <div className="admin-main">
           <h1 style={{ fontSize: '1.75rem', fontWeight: 600, color: TEXT_DARK }}>JSON upload</h1>
           <p style={{ color: TEXT_MUTED, maxWidth: 720 }}>
             Upload JSON with an <code>events</code> array. Data is grouped by university and saved as

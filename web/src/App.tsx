@@ -71,6 +71,7 @@ import { SubcategoryAdminAnalytics } from './pages/SubcategoryAdminAnalytics.tsx
 import { SubCategoryAdminRaiseRequest } from './pages/SubCategoryAdminRaiseRequest';
 import { SubCategoryAdminQueries } from './pages/SubCategoryAdminQueries';
 import { SubCategoryAdminReceivedCorrections } from './pages/SubCategoryAdminReceivedCorrections';
+import { SubCategoryAdminPrivacy } from './pages/SubCategoryAdminPrivacy';
 import { SubCategoryAdminPostBlog } from './pages/SubCategoryAdminPostBlog';
 import { SubCategoryAdminBlogPending } from './pages/SubCategoryAdminBlogPending';
 import { SubCategoryAdminBlogApproved } from './pages/SubCategoryAdminBlogApproved';
@@ -238,6 +239,10 @@ const SchoolAdminRoutes = () => {
             <SchoolAdminDashboard />
           </SchoolAdminProtectedRoute>
         }
+      />
+      <Route
+        path="messages"
+        element={<Navigate to="/school-admin/privacy?tab=message-config" replace />}
       />
       <Route
         path="user-requests"
@@ -460,6 +465,10 @@ const CategoryAdminRoutes = () => {
         }
       />
       <Route
+        path="messages"
+        element={<Navigate to="/category-admin/privacy?tab=messages" replace />}
+      />
+      <Route
         path="privacy"
         element={
           <CategoryAdminProtectedRoute>
@@ -592,6 +601,14 @@ const SubCategoryAdminRoutes = () => {
         element={
           <SubCategoryAdminProtectedRoute>
             <SubCategoryAdminQueries />
+          </SubCategoryAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="privacy"
+        element={
+          <SubCategoryAdminProtectedRoute>
+            <SubCategoryAdminPrivacy />
           </SubCategoryAdminProtectedRoute>
         }
       />

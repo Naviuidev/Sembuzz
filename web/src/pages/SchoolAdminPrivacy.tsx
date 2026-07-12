@@ -1,7 +1,11 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { SchoolAdminNavbar } from '../components/SchoolAdminNavbar';
 import { SchoolAdminSidebar } from '../components/SchoolAdminSidebar';
+import { PrivacyPageTabs, type PrivacyPageTab } from '../components/PrivacyPageTabs';
+import { ClubGroupChatRequestReviewPanel } from '../components/ClubGroupChatRequestReviewPanel';
+import { schoolAdminClubGroupChatRequestsService } from '../services/school-admin-club-group-chat-requests.service';
 import { useSchoolAdminAuth } from '../contexts/SchoolAdminAuthContext';
 import { categoriesService, type Category } from '../services/categories.service';
 import {
@@ -11,9 +15,29 @@ import {
   type UpdateCategoryAdminCategoriesDto,
 } from '../services/category-admins.service';
 
+function schoolPrivacyTabFromParam(tab: string | null): PrivacyPageTab {
+  if (tab === 'message-config') return tab;
+  return 'admins';
+}
+
 export const SchoolAdminPrivacy = () => {
   const queryClient = useQueryClient();
   const { user } = useSchoolAdminAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [privacyTab, setPrivacyTab] = useState<PrivacyPageTab>(() =>
+    schoolPrivacyTabFromParam(searchParams.get('tab')),
+  );
+
+  const handlePrivacyTabChange = (tab: PrivacyPageTab) => {
+    setPrivacyTab(tab);
+    const next = new URLSearchParams(searchParams);
+    if (tab === 'admins') {
+      next.delete('tab');
+    } else {
+      next.set('tab', tab);
+    }
+    setSearchParams(next, { replace: true });
+  };
   const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState<CreateCategoryAdminDto>({
     name: '',
@@ -195,11 +219,20 @@ export const SchoolAdminPrivacy = () => {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fafafa' }}>
+    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
       <SchoolAdminNavbar />
-      <div className="d-flex">
+      <div className="admin-shell-body">
         <SchoolAdminSidebar />
-        <div style={{ flex: 1, padding: '2rem' }}>
+        <div className="admin-main">
+          <PrivacyPageTabs activeTab={privacyTab} onChange={handlePrivacyTabChange} />
+
+          {privacyTab === 'message-config' ? (
+            <ClubGroupChatRequestReviewPanel
+              service={schoolAdminClubGroupChatRequestsService}
+              queryKeyPrefix="school-admin"
+            />
+          ) : (
+          <>
           <div className="d-flex justify-content-between align-items-center mb-4">
             <div>
               <h1
@@ -1017,6 +1050,8 @@ export const SchoolAdminPrivacy = () => {
               )}
             </div>
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>

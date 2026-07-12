@@ -452,11 +452,11 @@ export const SuperAdminEventSync = () => {
   });
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fafafa' }}>
+    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
       <SuperAdminNavbar />
-      <div className="d-flex">
+      <div className="admin-shell-body">
         <SuperAdminSidebar />
-        <div style={{ flex: 1, padding: '2rem', minHeight: 'calc(100vh - 60px)', maxWidth: 1100 }}>
+        <div className="admin-main">
           <h1 style={{ fontSize: '1.75rem', fontWeight: 600, color: '#1a1f2e' }}>
             Fetch events from URLs
           </h1>

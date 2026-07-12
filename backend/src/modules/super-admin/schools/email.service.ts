@@ -2317,4 +2317,80 @@ export class EmailService {
       throw error;
     }
   }
+
+  async sendClubGroupJoinApprovedEmail(
+    toEmail: string,
+    userName: string,
+    schoolName: string,
+    groupName: string,
+    appsUrl: string,
+  ) {
+    const linkForHtml = appsUrl.replace(/&/g, '&amp;');
+    const textBody = `Hello ${userName || 'there'},\n\nYour request to join the club group "${groupName}" at ${schoolName} has been approved.\n\nOpen SemBuzz and go to the Apps tab to start chatting with your group.\n\n${appsUrl}\n\n— SemBuzz`;
+
+    const mailOptions = {
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: toEmail,
+      subject: `SemBuzz - Approved to join ${groupName} (${schoolName})`,
+      text: textBody,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: 'Poppins', Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #1a1f2e; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .content { background-color: #f8f9fa; padding: 30px; border-radius: 0 0 8px 8px; }
+            .box { background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1a1f2e; }
+            .button { display: inline-block; padding: 14px 28px; background-color: #1a1f2e; color: white !important; text-decoration: none; border-radius: 50px; font-weight: 600; }
+            .footer { text-align: center; margin-top: 30px; color: #6c757d; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Group chat approved</h1>
+            </div>
+            <div class="content">
+              <p>Hello ${userName || 'there'},</p>
+              <p>Your request to join the club group at <strong>${schoolName}</strong> has been approved.</p>
+              <div class="box">
+                <p style="margin: 0;"><strong>Group:</strong> ${groupName}</p>
+              </div>
+              <p>Open SemBuzz, go to the <strong>Apps</strong> tab, and tap the chat icon to message your group.</p>
+              <p style="margin-top: 24px; margin-bottom: 16px;"><a href="${linkForHtml}" class="button">Open Apps</a></p>
+              <p style="color: #6c757d; font-size: 13px;">Or copy and paste this link into your browser:</p>
+              <p style="word-break: break-all; font-size: 13px; background: #eee; padding: 12px; border-radius: 6px;">${linkForHtml}</p>
+            </div>
+            <div class="footer">
+              <p>This is an automated email from SemBuzz. Please do not reply.</p>
+              <p>&copy; ${new Date().getFullYear()} SemBuzz. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    const isDev = process.env.NODE_ENV !== 'production';
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      if (isDev) {
+        console.warn('[EmailService] ⚠️  SMTP not configured. Club group approval email not sent.');
+        console.warn(`[EmailService] 📧 Approval for ${toEmail} — group "${groupName}" at ${schoolName}`);
+        return;
+      }
+      console.error('[EmailService] SMTP not configured. Club group approval email not sent.');
+      return;
+    }
+
+    try {
+      console.log(`[EmailService] 📧 Sending club group approval email to ${toEmail}...`);
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log(`[EmailService] ✅ Club group approval email sent. Message ID: ${info.messageId}`);
+    } catch (error: any) {
+      console.error('[EmailService] ❌ Failed to send club group approval email:', error?.message || error);
+      if (!isDev) throw error;
+    }
+  }
 }

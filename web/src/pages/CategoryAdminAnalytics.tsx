@@ -137,9 +137,9 @@ export const CategoryAdminAnalytics = () => {
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#eef1f5' }}>
       <CategoryAdminNavbar />
-      <div className="d-flex">
+      <div className="admin-shell-body">
         <CategoryAdminSidebar />
-        <div style={{ flex: 1, padding: '1.5rem 2rem', minWidth: 0 }}>
+        <div className="admin-main">
           <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
             <div className="d-flex align-items-center gap-2">
               <div

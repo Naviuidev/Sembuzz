@@ -7,11 +7,11 @@ export const AdsAdminDashboard = () => {
   const { user } = useAdsAdminAuth();
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fafafa' }}>
+    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
       <AdsAdminNavbar />
-      <div className="d-flex">
+      <div className="admin-shell-body">
         <AdsAdminSidebar />
-        <div style={{ flex: 1, padding: '2rem', minHeight: 'calc(100vh - 60px)' }}>
+        <div className="admin-main">
           <h1 style={{ fontSize: '2rem', fontWeight: 'normal', color: '#1a1f2e', marginBottom: '0.5rem' }}>Dashboard</h1>
           <p style={{ color: '#6c757d', fontSize: '1rem', marginBottom: '2rem' }}>
             Manage banner and sponsored ads for {user?.schoolName ?? 'your school'}.

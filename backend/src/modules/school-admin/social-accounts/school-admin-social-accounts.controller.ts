@@ -11,7 +11,9 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  UseFilters,
 } from '@nestjs/common';
+import { MulterExceptionFilter } from '../../../common/filters/multer-exception.filter';
 import { FileInterceptor } from '@nestjs/platform-express';
 import * as multer from 'multer';
 import * as path from 'path';
@@ -45,6 +47,7 @@ export class SchoolAdminSocialAccountsController {
   constructor(private readonly service: SchoolAdminSocialAccountsService) {}
 
   @Post('upload-icon')
+  @UseFilters(MulterExceptionFilter)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: multer.diskStorage({

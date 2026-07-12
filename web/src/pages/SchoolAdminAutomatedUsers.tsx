@@ -83,11 +83,11 @@ export const SchoolAdminAutomatedUsers = () => {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fafafa' }}>
+    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
       <SchoolAdminNavbar />
-      <div className="d-flex">
+      <div className="admin-shell-body">
         <SchoolAdminSidebar />
-        <div style={{ flex: 1, padding: '2rem' }}>
+        <div className="admin-main">
           <div className="mb-4">
             <h1
               style={{

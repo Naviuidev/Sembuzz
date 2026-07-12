@@ -19,20 +19,20 @@ export const SubCategoryAdminSidebar = () => {
     { path: '/subcategory-admin/analytics', label: 'Analytics', icon: 'bi-graph-up-arrow' },
     { path: '/subcategory-admin/raise-query', label: 'Raise a query', icon: 'bi-question-circle' },
     { path: '/subcategory-admin/queries', label: 'Queries', icon: 'bi-chat-left-text' },
+    { path: '/subcategory-admin/privacy', label: 'Privacy', icon: 'bi-shield-lock' },
     { path: '/subcategory-admin/received-corrections', label: 'Received corrections', icon: 'bi-arrow-down-circle' },
   ];
 
   return (
     <div
+      className="admin-sidebar"
       style={{
         width: isExpanded ? '250px' : '80px',
-        minHeight: 'calc(100vh - 60px)',
         backgroundColor: 'white',
         borderRight: '1px solid #dee2e6',
         padding: '1.5rem 0',
         transition: 'width 0.3s ease',
         position: 'relative',
-        overflow: 'hidden'
       }}
       onMouseEnter={() => setIsExpanded(true)}
       onMouseLeave={() => setIsExpanded(false)}

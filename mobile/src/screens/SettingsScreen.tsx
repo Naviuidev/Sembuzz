@@ -19,8 +19,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import PersonPlusIcon from 'react-native-bootstrap-icons/icons/person-plus';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import type { RootStackParamList } from '../navigation/types';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList, SettingsStackParamList } from '../navigation/types';
 import { useAuth } from '../contexts/AuthContext';
 import { getApprovedEvents, imageSrc, ApprovedEventPublic } from '../services/events';
 import { getFrontendBaseUrl } from '../config/env';
@@ -56,7 +58,8 @@ function getEventThumbUrl(ev: ApprovedEventPublic): string {
 }
 
 export default function SettingsScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<SettingsStackParamList, 'SettingsMain'>>();
+  const route = useRoute<RouteProp<SettingsStackParamList, 'SettingsMain'>>();
   const { user, login, logout, loading: authLoading } = useAuth();
 
   /** Root stack screens (Liked/Saved/Profile) — Settings lives in a nested stack under the tab. */
@@ -81,6 +84,20 @@ export default function SettingsScreen() {
   const [showSignUpModal, setShowSignUpModal] = useState(false);
   const [loginInfoMessage, setLoginInfoMessage] = useState<string | null>(null);
   const [profileImageFailed, setProfileImageFailed] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (user) return;
+      if (route.params?.openLogin) {
+        setLoginInfoMessage(null);
+        setShowLoginModal(true);
+        navigation.setParams({});
+      } else if (route.params?.openSignUp) {
+        setShowSignUpModal(true);
+        navigation.setParams({});
+      }
+    }, [user, route.params?.openLogin, route.params?.openSignUp, navigation]),
+  );
 
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [helpMessage, setHelpMessage] = useState('');

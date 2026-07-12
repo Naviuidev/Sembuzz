@@ -6,6 +6,10 @@ import { CategoryAdminCategoriesModule } from './categories/categories.module';
 import { CategoryAdminEventsModule } from './events/events.module';
 import { CategoryAdminBlogsModule } from './blogs/category-admin-blogs.module';
 import { CategoryAdminQueriesModule } from './queries/queries.module';
+import { CategoryAdminClubGroupMembershipsModule } from './club-group-memberships/category-admin-club-group-memberships.module';
+import { CategoryAdminClubGroupChatsModule } from './club-group-chats/category-admin-club-group-chats.module';
+import { CategoryAdminDirectChatsModule } from './direct-chats/category-admin-direct-chats.module';
+import { CategoryAdminClubGroupChatRequestsModule } from './club-group-chat-requests/category-admin-club-group-chat-requests.module';
 import { SubCategoryAdminsModule } from './subcategory-admins/subcategory-admins.module';
 
 @Module({
@@ -17,6 +21,10 @@ import { SubCategoryAdminsModule } from './subcategory-admins/subcategory-admins
     CategoryAdminEventsModule,
     CategoryAdminBlogsModule,
     CategoryAdminQueriesModule,
+    CategoryAdminClubGroupMembershipsModule,
+    CategoryAdminClubGroupChatsModule,
+    CategoryAdminDirectChatsModule,
+    CategoryAdminClubGroupChatRequestsModule,
     SubCategoryAdminsModule,
   ],
   exports: [
@@ -27,6 +35,9 @@ import { SubCategoryAdminsModule } from './subcategory-admins/subcategory-admins
     CategoryAdminEventsModule,
     CategoryAdminBlogsModule,
     CategoryAdminQueriesModule,
+    CategoryAdminClubGroupMembershipsModule,
+    CategoryAdminClubGroupChatsModule,
+    CategoryAdminDirectChatsModule,
     SubCategoryAdminsModule,
   ],
 })

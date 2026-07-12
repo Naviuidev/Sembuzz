@@ -53,11 +53,11 @@ export const CategoryAdminDashboard = () => {
   const allSubcategories = categories.flatMap((cat) => (cat.subcategories ?? []).map((sc) => ({ ...sc, categoryName: cat.name })));
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fafafa' }}>
+    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
       <CategoryAdminNavbar />
-      <div className="d-flex">
+      <div className="admin-shell-body">
         <CategoryAdminSidebar />
-        <div style={{ flex: 1, padding: '2rem', minHeight: 'calc(100vh - 60px)' }}>
+        <div className="admin-main">
           <h1 style={{
             fontSize: '2rem',
             fontWeight: 'normal',

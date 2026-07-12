@@ -13,21 +13,17 @@ export const Dashboard = () => {
   });
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fafafa' }}>
+    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
       {/* Top Navbar */}
       <SuperAdminNavbar />
 
       {/* Main Layout */}
-      <div className="d-flex">
+      <div className="admin-shell-body">
         {/* Sidebar */}
         <SuperAdminSidebar />
 
         {/* Main Content */}
-        <div style={{
-          flex: 1,
-          padding: '2rem',
-          minHeight: 'calc(100vh - 60px)'
-        }}>
+        <div className="admin-main">
           {/* Welcome Section */}
           <div className="mb-4">
             <h1 style={{

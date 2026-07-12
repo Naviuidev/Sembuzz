@@ -4,6 +4,8 @@ import { UserEventsModule } from './events/user-events.module';
 import { UserHelpModule } from './help/user-help.module';
 import { UserSchoolSocialModule } from './school-social/user-school-social.module';
 import { UserNotificationsModule } from './notifications/user-notifications.module';
+import { UserClubGroupChatsModule } from './club-group-chats/user-club-group-chats.module';
+import { UserDirectChatsModule } from './direct-chats/user-direct-chats.module';
 
 @Module({
   imports: [
@@ -12,6 +14,8 @@ import { UserNotificationsModule } from './notifications/user-notifications.modu
     UserHelpModule,
     UserSchoolSocialModule,
     UserNotificationsModule,
+    UserClubGroupChatsModule,
+    UserDirectChatsModule,
   ],
 })
 export class UserModule {}

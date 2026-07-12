@@ -62,6 +62,11 @@ model School {
   subCategoryAdminToSchoolAdminQueries SubCategoryAdminToSchoolAdminQuery[]
   userHelpQueries                    UserHelpQuery[]
   schoolSocialAccounts               SchoolSocialAccount[]
+  clubGroupChats                     ClubGroupChat[]
+  clubGroupChatRequests              ClubGroupChatRequest[]
+  clubGroupMemberships               ClubGroupMembership[]
+  directConversations              DirectConversation[]
+  directMessagingSetting             SchoolDirectMessagingSetting?
   upcomingPosts                      UpcomingPost[]
   bannerAds                          BannerAd[]
   sponsoredAds                       SponsoredAd[]
@@ -132,7 +137,7 @@ model AdsAdminPasswordResetOtp {
 
 model Feature {
   id        String   @id @default(uuid())
-  code      String   @unique // NEWS, EVENTS, ADS, INSTAGRAM, ANALYTICS, EMERGENCY
+  code      String   @unique // NEWS, EVENTS, ADS, INSTAGRAM, ANALYTICS, EMERGENCY, GROUP_MESSAGING, INDIVIDUAL_MESSAGING
   name      String
   createdAt DateTime @default(now())
 
@@ -424,6 +429,8 @@ model CategoryAdmin {
   queriesToSuperAdmins CategoryAdminToSuperAdminQuery[]
   bannerAds                BannerAd[]
   sponsoredAds             SponsoredAd[]
+  reviewedClubGroupMemberships ClubGroupMembership[]
+  clubGroupMessages            ClubGroupMessage[]
 
   @@map("category_admins")
 }
@@ -485,6 +492,7 @@ model SubCategoryAdmin {
   queriesToSchoolAdmins SubCategoryAdminToSchoolAdminQuery[]
   queriesToSuperAdmins SubCategoryAdminToSuperAdminQuery[]
   blogPosts         BlogPost[]
+  clubGroupChatRequests ClubGroupChatRequest[]
 
   @@map("sub_category_admins")
 }
@@ -775,6 +783,13 @@ model User {
   pushDevices               UserPushDevice[]
   notificationSubCategories UserNotificationSubCategory[]
   notificationInbox         UserNotificationInbox[]
+  clubGroupMessages         ClubGroupMessage[]
+  clubGroupMemberships      ClubGroupMembership[]
+  directConversationsAsOne  DirectConversation[] @relation("DirectConversationUserOne")
+  directConversationsAsTwo  DirectConversation[] @relation("DirectConversationUserTwo")
+  directConversationsRequested DirectConversation[] @relation("DirectConversationRequestedBy")
+  directConversationsBlocked DirectConversation[] @relation("DirectConversationBlockedBy")
+  directMessagesSent        DirectMessage[]
 
   @@index([schoolId])
   @@index([email])
@@ -1154,4 +1169,160 @@ model SchoolSocialAccount {
 
   @@index([schoolId])
   @@map("school_social_accounts")
+}
+
+model ClubGroupChat {
+  id          String   @id @default(uuid())
+  schoolId    String
+  clubKey     String   // pageName|icon — matches Social Share club grouping
+  pageName    String
+  icon        String
+  isEnabled   Boolean  @default(true)
+  messageMode String   @default("members") // admin_only | members
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school   School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  messages ClubGroupMessage[]
+  memberships ClubGroupMembership[]
+  chatRequests ClubGroupChatRequest[]
+
+  @@unique([schoolId, clubKey])
+  @@index([schoolId])
+  @@map("club_group_chats")
+}
+
+model ClubGroupChatRequest {
+  id                 String    @id @default(uuid())
+  schoolId           String
+  subCategoryAdminId String
+  clubKey            String
+  pageName           String
+  icon               String
+  note               String?   @db.Text
+  status             String    @default("pending") // pending | approved | declined
+  reviewedByRole     String?   // category_admin | school_admin
+  reviewedByAdminId  String?
+  declineReason      String?   @db.Text
+  clubGroupChatId    String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  reviewedAt         DateTime?
+
+  school           School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subCategoryAdmin SubCategoryAdmin @relation(fields: [subCategoryAdminId], references: [id], onDelete: Cascade)
+  clubGroupChat    ClubGroupChat?   @relation(fields: [clubGroupChatId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, status, createdAt])
+  @@index([subCategoryAdminId, createdAt])
+  @@map("club_group_chat_requests")
+}
+
+model ClubGroupMessage {
+  id               String   @id @default(uuid())
+  groupChatId      String
+  userId           String?
+  categoryAdminId  String?
+  body             String   @default("") @db.Text
+  attachmentUrl    String?  @db.VarChar(1000)
+  attachmentType   String?  // image | pdf
+  attachmentName   String?  @db.VarChar(500)
+  replyToMessageId String?
+  createdAt        DateTime @default(now())
+
+  groupChat     ClubGroupChat      @relation(fields: [groupChatId], references: [id], onDelete: Cascade)
+  user          User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryAdmin CategoryAdmin?     @relation(fields: [categoryAdminId], references: [id], onDelete: SetNull)
+  replyTo       ClubGroupMessage?  @relation("ClubGroupMessageReplies", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replies       ClubGroupMessage[] @relation("ClubGroupMessageReplies")
+
+  @@index([groupChatId, createdAt])
+  @@index([replyToMessageId])
+  @@map("club_group_messages")
+}
+
+model ClubGroupMembership {
+  id                        String    @id @default(uuid())
+  groupChatId               String
+  userId                    String
+  schoolId                  String
+  status                    String    @default("pending") // pending | approved | banned
+  reviewedByCategoryAdminId String?
+  reviewedAt                DateTime?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  groupChat    ClubGroupChat  @relation(fields: [groupChatId], references: [id], onDelete: Cascade)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school       School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  reviewedBy   CategoryAdmin? @relation(fields: [reviewedByCategoryAdminId], references: [id], onDelete: SetNull)
+
+  @@unique([groupChatId, userId])
+  @@index([schoolId, status])
+  @@index([groupChatId])
+  @@map("club_group_memberships")
+}
+
+model SchoolDirectMessagingSetting {
+  schoolId  String   @id
+  isEnabled Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@map("school_direct_messaging_settings")
+}
+
+model DirectConversation {
+  id                String    @id @default(uuid())
+  schoolId          String
+  userOneId         String
+  userTwoId         String
+  status            String    @default("pending") // pending | accepted | declined
+  requestedByUserId String
+  respondedAt       DateTime?
+  lastMessageAt     DateTime?
+  userOneLastReadAt DateTime?
+  userTwoLastReadAt DateTime?
+  blockedByUserId   String?
+  blockedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  school      School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  userOne     User            @relation("DirectConversationUserOne", fields: [userOneId], references: [id], onDelete: Cascade)
+  userTwo     User            @relation("DirectConversationUserTwo", fields: [userTwoId], references: [id], onDelete: Cascade)
+  requestedBy User            @relation("DirectConversationRequestedBy", fields: [requestedByUserId], references: [id], onDelete: Cascade)
+  blockedBy   User?           @relation("DirectConversationBlockedBy", fields: [blockedByUserId], references: [id], onDelete: SetNull)
+  messages    DirectMessage[]
+
+  @@unique([schoolId, userOneId, userTwoId])
+  @@index([schoolId, lastMessageAt])
+  @@index([schoolId, status])
+  @@index([userOneId])
+  @@index([userTwoId])
+  @@index([blockedByUserId])
+  @@map("direct_conversations")
+}
+
+model DirectMessage {
+  id               String   @id @default(uuid())
+  conversationId   String
+  senderUserId     String
+  body             String   @default("") @db.Text
+  attachmentUrl    String?  @db.VarChar(1000)
+  attachmentType   String?  // image | pdf
+  attachmentName   String?  @db.VarChar(500)
+  replyToMessageId String?
+  createdAt        DateTime @default(now())
+
+  conversation DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User               @relation(fields: [senderUserId], references: [id], onDelete: Cascade)
+  replyTo      DirectMessage?     @relation("DirectMessageReplies", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replies      DirectMessage[]    @relation("DirectMessageReplies")
+
+  @@index([conversationId, createdAt])
+  @@index([replyToMessageId])
+  @@map("direct_messages")
 }

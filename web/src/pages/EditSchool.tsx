@@ -6,6 +6,12 @@ import type { UpdateSchoolDto } from '../services/schools.service';
 import { SuperAdminNavbar } from '../components/SuperAdminNavbar';
 import { SuperAdminSidebar } from '../components/SuperAdminSidebar';
 import { US_STATES, US_CITIES_BY_STATE } from '../data/countries-states';
+import {
+  GROUP_MESSAGING_CODE,
+  INDIVIDUAL_MESSAGING_CODE,
+  MESSAGING_FEATURE_CODES,
+} from '../constants/messagingFeatures';
+import type { Feature } from '../services/schools.service';
 import { StatusPopup } from '../components/StatusPopup';
 
 export const EditSchool = () => {
@@ -91,6 +97,51 @@ export const EditSchool = () => {
     }));
   };
 
+  const platformFeatures =
+    features?.filter(
+      (f) => !MESSAGING_FEATURE_CODES.includes(f.code as (typeof MESSAGING_FEATURE_CODES)[number]),
+    ) ?? [];
+  const messagingFeatures =
+    features?.filter((f) =>
+      MESSAGING_FEATURE_CODES.includes(f.code as (typeof MESSAGING_FEATURE_CODES)[number]),
+    ) ?? [];
+
+  const hasGroupMessaging = formData.selectedFeatures?.includes(GROUP_MESSAGING_CODE) ?? false;
+  const hasIndividualMessaging =
+    formData.selectedFeatures?.includes(INDIVIDUAL_MESSAGING_CODE) ?? false;
+  const hasAnyMessaging = hasGroupMessaging || hasIndividualMessaging;
+
+  const renderFeatureCard = (feature: Feature) => (
+    <div key={feature.id} className="col-md-4 col-sm-6">
+      <div
+        className="form-check p-3"
+        style={{
+          border: formData.selectedFeatures?.includes(feature.code)
+            ? '2px solid #1a1f2e'
+            : '1px solid #dee2e6',
+          borderRadius: '0px',
+          cursor: 'pointer',
+          transition: 'all 0.3s',
+          backgroundColor: formData.selectedFeatures?.includes(feature.code)
+            ? 'rgba(26, 31, 46, 0.05)'
+            : 'transparent',
+        }}
+        onClick={() => handleFeatureToggle(feature.code)}
+      >
+        <input
+          type="checkbox"
+          className="form-check-input"
+          checked={formData.selectedFeatures?.includes(feature.code)}
+          onChange={() => handleFeatureToggle(feature.code)}
+          style={{ marginTop: '0.5rem' }}
+        />
+        <label className="form-check-label ms-2" style={{ cursor: 'pointer' }}>
+          {feature.name}
+        </label>
+      </div>
+    </div>
+  );
+
   const updateMutation = useMutation({
     mutationFn: (data: UpdateSchoolDto) => schoolsService.update(selectedSchoolId, data),
     onSuccess: () => {
@@ -168,11 +219,11 @@ export const EditSchool = () => {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fafafa' }}>
+    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
       <SuperAdminNavbar />
-      <div className="d-flex">
+      <div className="admin-shell-body">
         <SuperAdminSidebar />
-        <div style={{ flex: 1, padding: '2rem' }}>
+        <div className="admin-main">
           <h1 style={{
             fontSize: '2rem',
             fontWeight: 'normal',
@@ -426,36 +477,50 @@ export const EditSchool = () => {
                         }}>
                           Select Features *
                         </h2>
-                        <div className="row g-3">
-                          {features?.map((feature) => (
-                            <div key={feature.id} className="col-md-4 col-sm-6">
-                              <div className="form-check p-3" style={{
-                                border: formData.selectedFeatures?.includes(feature.code) 
-                                  ? '2px solid #1a1f2e' 
-                                  : '1px solid #dee2e6',
-                                borderRadius: '0px',
-                                cursor: 'pointer',
-                                transition: 'all 0.3s',
-                                backgroundColor: formData.selectedFeatures?.includes(feature.code)
-                                  ? 'rgba(26, 31, 46, 0.05)'
-                                  : 'transparent'
-                              }}
-                              onClick={() => handleFeatureToggle(feature.code)}
-                              >
-                                <input
-                                  type="checkbox"
-                                  className="form-check-input"
-                                  checked={formData.selectedFeatures?.includes(feature.code)}
-                                  onChange={() => handleFeatureToggle(feature.code)}
-                                  style={{ marginTop: '0.5rem' }}
-                                />
-                                <label className="form-check-label ms-2" style={{ cursor: 'pointer' }}>
-                                  {feature.name}
-                                </label>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                        {platformFeatures.length > 0 ? (
+                          <>
+                            <p className="text-muted mb-2" style={{ fontSize: '0.875rem' }}>
+                              Platform features
+                            </p>
+                            <div className="row g-3 mb-4">{platformFeatures.map(renderFeatureCard)}</div>
+                          </>
+                        ) : null}
+                        {messagingFeatures.length > 0 ? (
+                          <>
+                            <p
+                              className="text-muted mb-2 d-flex align-items-center gap-2"
+                              style={{ fontSize: '0.875rem' }}
+                            >
+                              <i className="bi bi-chat-dots" aria-hidden />
+                              Messaging options
+                            </p>
+                            <div className="row g-3">{messagingFeatures.map(renderFeatureCard)}</div>
+                          </>
+                        ) : null}
+                        {hasAnyMessaging ? (
+                          <div
+                            className="alert alert-light border mt-3 mb-0 text-start"
+                            style={{ borderRadius: 0, fontSize: '0.875rem' }}
+                          >
+                            <strong className="d-block mb-2" style={{ color: '#1a1f2e' }}>
+                              Messaging pipeline for this school
+                            </strong>
+                            <ul className="mb-0 ps-3" style={{ color: '#6c757d' }}>
+                              {hasGroupMessaging ? (
+                                <li>
+                                  <strong>Group messages</strong> — School Admin can create club/group
+                                  chats.
+                                </li>
+                              ) : null}
+                              {hasIndividualMessaging ? (
+                                <li>
+                                  <strong>Individual messages</strong> — School Admin can allow personal
+                                  student chats.
+                                </li>
+                              ) : null}
+                            </ul>
+                          </div>
+                        ) : null}
                         {formData.selectedFeatures?.length === 0 && (
                           <p className="text-danger mt-2" style={{ fontSize: '0.875rem' }}>
                             Please select at least one feature

@@ -5,6 +5,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Navbar } from '../components/Navbar';
 import { SchoolNavbar } from '../components/SchoolNavbar';
 import { EventsBottomNav, type EventsBottomNavTab } from '../components/EventsBottomNav';
+import { ClubMessagingBadges } from '../components/ClubMessagingBadges';
+import { ClubGroupChatWidget } from '../components/ClubGroupChatWidget';
 import { useUserAuth } from '../contexts/UserAuthContext';
 import { useEventsFilter } from '../contexts/EventsFilterContext';
 import {
@@ -1521,13 +1523,20 @@ export const PublicEvents = () => {
     );
   }, [allEventsForSearch, searchScreenQuery]);
 
-  // When navigating with bottomNav in state, switch to that tab
+  // When navigating with bottomNav in state or ?tab=, switch to that tab
   useEffect(() => {
-    const tab = (location.state as { bottomNav?: string })?.bottomNav;
+    const fromState = (location.state as { bottomNav?: string })?.bottomNav;
+    const fromQuery = searchParams.get('tab');
+    const tab = fromState ?? fromQuery;
     if (tab && ['search', 'home', 'settings', 'apps', 'help', 'liked'].includes(tab)) {
       setBottomNavActive(tab as 'search' | 'home' | 'settings' | 'apps' | 'help' | 'liked');
+      if (fromQuery) {
+        const next = new URLSearchParams(searchParams);
+        next.delete('tab');
+        setSearchParams(next, { replace: true });
+      }
     }
-  }, [location.state]);
+  }, [location.state, searchParams, setSearchParams]);
 
   // Refetch liked list when user opens the Liked tab so it's always up to date
   useEffect(() => {
@@ -2922,239 +2931,6 @@ export const PublicEvents = () => {
                 </div>
               </>
             )}
-            {/* Login popup — glass finish; overlay does not cover bottom nav so nav stays visible */}
-            {showSettingsLoginPopup && (
-              <div
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="settings-login-title"
-                style={{
-                  position: 'fixed',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: '72px',
-                  zIndex: 1060,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '1rem',
-                  backgroundColor: 'rgba(255, 255, 255, 0.5)',
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                }}
-                onClick={() => !settingsLoginLoading && setShowSettingsLoginPopup(false)}
-              >
-                <div
-                  style={{
-                    width: '100%',
-                    maxWidth: '380px',
-                    background: 'rgba(255, 255, 255, 0.9)',
-                    backdropFilter: 'blur(20px)',
-                    WebkitBackdropFilter: 'blur(20px)',
-                    borderRadius: '16px',
-                    padding: '2rem',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)',
-                    border: '1px solid rgba(255,255,255,0.5)',
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="d-flex justify-content-between align-items-start mb-3">
-                    <div className="flex-grow-1" />
-                    <button
-                      type="button"
-                      className="btn btn-link p-0 text-secondary"
-                      style={{ fontSize: '1.25rem', lineHeight: 1 }}
-                      onClick={() => !settingsLoginLoading && setShowSettingsLoginPopup(false)}
-                      aria-label="Close"
-                    >
-                      ×
-                    </button>
-                  </div>
-                  <div className="text-center mb-3" style={{ fontFamily: "'Poppins', sans-serif", fontSize: '1.5rem', fontWeight: 700, color: '#1a1f2e' }}>
-                    Sembuzz
-                  </div>
-                  <h2 id="settings-login-title" className="text-center mb-4" style={{ fontSize: '1.15rem', fontWeight: 600, color: '#495057' }}>
-                    Login to your Account
-                  </h2>
-                  <form onSubmit={handleSettingsLoginSubmit}>
-                    <div className="mb-3">
-                      <input
-                        type="email"
-                        className="form-control"
-                        placeholder="Email"
-                        value={settingsLoginEmail}
-                        onChange={(e) => { setSettingsLoginEmail(e.target.value); setSettingsLoginError(null); }}
-                        autoComplete="email"
-                        style={{ borderRadius: '10px', border: '1px solid #dee2e6' }}
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <input
-                        type="password"
-                        className="form-control"
-                        placeholder="Password"
-                        value={settingsLoginPassword}
-                        onChange={(e) => { setSettingsLoginPassword(e.target.value); setSettingsLoginError(null); }}
-                        autoComplete="current-password"
-                        style={{ borderRadius: '10px', border: '1px solid #dee2e6' }}
-                      />
-                    </div>
-                    {settingsLoginError && (
-                      <div className="small text-danger mb-2">{settingsLoginError}</div>
-                    )}
-                    <button
-                      type="submit"
-                      className="btn btn-dark rounded-pill w-100"
-                      disabled={settingsLoginLoading}
-                      style={{
-                        borderRadius: '10px',
-                        
-                        fontWeight: 500,
-                        padding: '0.6rem 1rem',
-                      }}
-                    >
-                      {settingsLoginLoading ? 'Signing in…' : 'Sign in'}
-                    </button>
-                  </form>
-                  <p className="text-center mt-3 mb-0 small text-muted">
-                    Create new account?{' '}
-                    <button
-                      type="button"
-                      className="btn btn-link p-0 text-primary text-decoration-none"
-                      onClick={() => { setShowSettingsLoginPopup(false); setShowSignupPopup(true); }}
-                    >
-                      Sign up
-                    </button>
-                  </p>
-                  <hr className="my-3" />
-                  <div className="d-flex flex-wrap gap-3 small justify-content-center">
-                    <a href="https://sembuzz.com/#privacy" target="_blank" rel="noopener noreferrer" className="text-secondary">
-                      Privacy policy
-                    </a>
-                    <a href="https://sembuzz.com/#terms-of-service" target="_blank" rel="noopener noreferrer" className="text-secondary">
-                      Terms and conditions
-                    </a>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-link btn-sm w-100 mt-2 p-0 text-secondary text-decoration-none"
-                    onClick={() => !settingsLoginLoading && setShowSettingsLoginPopup(false)}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-            {/* Signup popup — same glass UI; step 1: method choice; privacy/terms; then navigate to /register */}
-            {showSignupPopup && (
-              <div
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="settings-signup-title"
-                style={{
-                  position: 'fixed',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: '72px',
-                  zIndex: 1060,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '1rem',
-                  backgroundColor: 'rgba(255, 255, 255, 0.5)',
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                }}
-                onClick={() => setShowSignupPopup(false)}
-              >
-                <div
-                  style={{
-                    width: '100%',
-                    maxWidth: '420px',
-                    maxHeight: '90vh',
-                    overflowY: 'auto',
-                    background: 'rgba(255, 255, 255, 0.9)',
-                    backdropFilter: 'blur(20px)',
-                    WebkitBackdropFilter: 'blur(20px)',
-                    borderRadius: '16px',
-                    padding: '2rem',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)',
-                    border: '1px solid rgba(255,255,255,0.5)',
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="d-flex justify-content-between align-items-start mb-2">
-                    <div className="flex-grow-1" />
-                    <button
-                      type="button"
-                      className="btn btn-link p-0 text-secondary"
-                      style={{ fontSize: '1.25rem', lineHeight: 1 }}
-                      onClick={() => setShowSignupPopup(false)}
-                      aria-label="Close"
-                    >
-                      ×
-                    </button>
-                  </div>
-                  <div className="text-center mb-3" style={{ fontFamily: "'Poppins', sans-serif", fontSize: '1.5rem', fontWeight: 700, color: '#1a1f2e' }}>
-                    Sembuzz
-                  </div>
-                  <h2 id="settings-signup-title" className="text-center mb-2" style={{ fontSize: '1.15rem', fontWeight: 600, color: '#1a1f2e' }}>
-                    How are you able to create an account?
-                  </h2>
-                  <p className="text-center text-muted small mb-4">
-                    Choose the option that applies to you. This helps us verify your identity.
-                  </p>
-                  <div className="d-flex flex-column gap-3 mb-4">
-                    <button
-                      type="button"
-                      className="btn w-100 py-3 d-flex flex-column align-items-center text-start"
-                      style={{
-                        borderRadius: '12px',
-                        border: '1px solidrgb(0, 0, 0)',
-                        backgroundColor: 'rgb(255, 255, 255)',
-                        color: '#0d6efd',
-                      }}
-                      onClick={() => {
-                        setShowSignupPopup(false);
-                        navigate('/register', { state: { registrationMethod: 'school_domain' } });
-                      }}
-                    >
-                      <i className="bi text-dark bi-building" style={{ fontSize: '2rem', marginBottom: '0.5rem' }} />
-                      <span className="fw-semibold text-dark">School domain</span>
-                      <small className="text-muted mt-1 text-center" style={{ color: '#6c757d' }}>
-                        I have an email with my school&apos;s domain (e.g. @sembuzz.com)
-                      </small>
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-outline-dark w-100 py-3 d-flex flex-column align-items-center text-start"
-                      style={{ borderRadius: '12px', borderWidth: '1px' }}
-                      onClick={() => {
-                        setShowSignupPopup(false);
-                        navigate('/register', { state: { registrationMethod: 'gmail' } });
-                      }}
-                    >
-                      <span className="fw-semibold" style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>G</span>
-                      <span className="fw-semibold">Gmail / Yahoo / other</span>
-                      <small className=" mt-1 text-center">
-                        I will use a personal email (Gmail, Yahoo, etc.); upload a school doc for admin approval
-                      </small>
-                    </button>
-                  </div>
-                  <hr className="my-3" />
-                  <div className="d-flex flex-wrap gap-3 small justify-content-center">
-                    <a href="https://sembuzz.com/#privacy" target="_blank" rel="noopener noreferrer" className="text-secondary">
-                      Privacy policy
-                    </a>
-                    <a href="https://sembuzz.com/#terms-of-service" target="_blank" rel="noopener noreferrer" className="text-secondary">
-                      Terms and conditions
-                    </a>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         ) : bottomNavActive === 'liked' ? (
           /* Liked news — same as Saved: list + full post detail when item selected */
@@ -3277,7 +3053,12 @@ export const PublicEvents = () => {
                 ))}
               </div>
             </div>
-            <h2 className="mb-4 text-center w-100" style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1a1f2e' }}>Follow us</h2>
+            <h2 className="mb-3 text-center w-100" style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1a1f2e' }}>Follow us</h2>
+            <ClubMessagingBadges
+              isAuthenticated={!!user}
+              currentUserId={user?.id}
+              onRequireLogin={() => setShowSettingsLoginPopup(true)}
+            />
             <div className="d-flex flex-column align-items-center w-100" style={{ gap: '1.5rem', maxWidth: '600px' }}>
               {user && schoolSocialAccounts.length > 0 ? (
                 (() => {
@@ -4314,6 +4095,246 @@ export const PublicEvents = () => {
           </div>
         )}
       </div>
+
+      {/* Login / sign-up — global so guests can auth from Events home (e.g. club group chat) */}
+      {showSettingsLoginPopup && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="settings-login-title"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: '72px',
+            zIndex: 1060,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+            backgroundColor: 'rgba(255, 255, 255, 0.5)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+          }}
+          onClick={() => !settingsLoginLoading && setShowSettingsLoginPopup(false)}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '380px',
+              background: 'rgba(255, 255, 255, 0.9)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              borderRadius: '16px',
+              padding: '2rem',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)',
+              border: '1px solid rgba(255,255,255,0.5)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="d-flex justify-content-between align-items-start mb-3">
+              <div className="flex-grow-1" />
+              <button
+                type="button"
+                className="btn btn-link p-0 text-secondary"
+                style={{ fontSize: '1.25rem', lineHeight: 1 }}
+                onClick={() => !settingsLoginLoading && setShowSettingsLoginPopup(false)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="text-center mb-3" style={{ fontFamily: "'Poppins', sans-serif", fontSize: '1.5rem', fontWeight: 700, color: '#1a1f2e' }}>
+              Sembuzz
+            </div>
+            <h2 id="settings-login-title" className="text-center mb-4" style={{ fontSize: '1.15rem', fontWeight: 600, color: '#495057' }}>
+              Login to your Account
+            </h2>
+            <form onSubmit={handleSettingsLoginSubmit}>
+              <div className="mb-3">
+                <input
+                  type="email"
+                  className="form-control"
+                  placeholder="Email"
+                  value={settingsLoginEmail}
+                  onChange={(e) => { setSettingsLoginEmail(e.target.value); setSettingsLoginError(null); }}
+                  autoComplete="email"
+                  style={{ borderRadius: '10px', border: '1px solid #dee2e6' }}
+                />
+              </div>
+              <div className="mb-3">
+                <input
+                  type="password"
+                  className="form-control"
+                  placeholder="Password"
+                  value={settingsLoginPassword}
+                  onChange={(e) => { setSettingsLoginPassword(e.target.value); setSettingsLoginError(null); }}
+                  autoComplete="current-password"
+                  style={{ borderRadius: '10px', border: '1px solid #dee2e6' }}
+                />
+              </div>
+              {settingsLoginError && (
+                <div className="small text-danger mb-2">{settingsLoginError}</div>
+              )}
+              <button
+                type="submit"
+                className="btn btn-dark rounded-pill w-100"
+                disabled={settingsLoginLoading}
+                style={{
+                  borderRadius: '10px',
+                  fontWeight: 500,
+                  padding: '0.6rem 1rem',
+                }}
+              >
+                {settingsLoginLoading ? 'Signing in…' : 'Sign in'}
+              </button>
+            </form>
+            <p className="text-center mt-3 mb-0 small text-muted">
+              Create new account?{' '}
+              <button
+                type="button"
+                className="btn btn-link p-0 text-primary text-decoration-none"
+                onClick={() => { setShowSettingsLoginPopup(false); setShowSignupPopup(true); }}
+              >
+                Sign up
+              </button>
+            </p>
+            <hr className="my-3" />
+            <div className="d-flex flex-wrap gap-3 small justify-content-center">
+              <a href="https://sembuzz.com/#privacy" target="_blank" rel="noopener noreferrer" className="text-secondary">
+                Privacy policy
+              </a>
+              <a href="https://sembuzz.com/#terms-of-service" target="_blank" rel="noopener noreferrer" className="text-secondary">
+                Terms and conditions
+              </a>
+            </div>
+            <button
+              type="button"
+              className="btn btn-link btn-sm w-100 mt-2 p-0 text-secondary text-decoration-none"
+              onClick={() => !settingsLoginLoading && setShowSettingsLoginPopup(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {showSignupPopup && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="settings-signup-title"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: '72px',
+            zIndex: 1060,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+            backgroundColor: 'rgba(255, 255, 255, 0.5)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+          }}
+          onClick={() => setShowSignupPopup(false)}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '420px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              background: 'rgba(255, 255, 255, 0.9)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              borderRadius: '16px',
+              padding: '2rem',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)',
+              border: '1px solid rgba(255,255,255,0.5)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="d-flex justify-content-between align-items-start mb-2">
+              <div className="flex-grow-1" />
+              <button
+                type="button"
+                className="btn btn-link p-0 text-secondary"
+                style={{ fontSize: '1.25rem', lineHeight: 1 }}
+                onClick={() => setShowSignupPopup(false)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="text-center mb-3" style={{ fontFamily: "'Poppins', sans-serif", fontSize: '1.5rem', fontWeight: 700, color: '#1a1f2e' }}>
+              Sembuzz
+            </div>
+            <h2 id="settings-signup-title" className="text-center mb-2" style={{ fontSize: '1.15rem', fontWeight: 600, color: '#1a1f2e' }}>
+              How are you able to create an account?
+            </h2>
+            <p className="text-center text-muted small mb-4">
+              Choose the option that applies to you. This helps us verify your identity.
+            </p>
+            <div className="d-flex flex-column gap-3 mb-4">
+              <button
+                type="button"
+                className="btn w-100 py-3 d-flex flex-column align-items-center text-start"
+                style={{
+                  borderRadius: '12px',
+                  border: '1px solidrgb(0, 0, 0)',
+                  backgroundColor: 'rgb(255, 255, 255)',
+                  color: '#0d6efd',
+                }}
+                onClick={() => {
+                  setShowSignupPopup(false);
+                  navigate('/register', { state: { registrationMethod: 'school_domain' } });
+                }}
+              >
+                <i className="bi text-dark bi-building" style={{ fontSize: '2rem', marginBottom: '0.5rem' }} />
+                <span className="fw-semibold text-dark">School domain</span>
+                <small className="text-muted mt-1 text-center" style={{ color: '#6c757d' }}>
+                  I have an email with my school&apos;s domain (e.g. @sembuzz.com)
+                </small>
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline-dark w-100 py-3 d-flex flex-column align-items-center text-start"
+                style={{ borderRadius: '12px', borderWidth: '1px' }}
+                onClick={() => {
+                  setShowSignupPopup(false);
+                  navigate('/register', { state: { registrationMethod: 'gmail' } });
+                }}
+              >
+                <span className="fw-semibold" style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>G</span>
+                <span className="fw-semibold">Gmail / Yahoo / other</span>
+                <small className=" mt-1 text-center">
+                  I will use a personal email (Gmail, Yahoo, etc.); upload a school doc for admin approval
+                </small>
+              </button>
+            </div>
+            <hr className="my-3" />
+            <div className="d-flex flex-wrap gap-3 small justify-content-center">
+              <a href="https://sembuzz.com/#privacy" target="_blank" rel="noopener noreferrer" className="text-secondary">
+                Privacy policy
+              </a>
+              <a href="https://sembuzz.com/#terms-of-service" target="_blank" rel="noopener noreferrer" className="text-secondary">
+                Terms and conditions
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Club group chat — approved members only (Apps screen handles join requests) */}
+      <ClubGroupChatWidget
+        visible={!!user && bottomNavActive === 'apps'}
+        isAuthenticated={!!user}
+        currentUserId={user?.id}
+        onRequireLogin={() => setShowSettingsLoginPopup(true)}
+      />
 
       {/* Bottom nav — matches mobile: 5 icons, no labels, profile + badge on account */}
       <EventsBottomNav

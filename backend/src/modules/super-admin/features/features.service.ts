@@ -91,6 +91,8 @@ export class FeaturesService {
       { code: 'INSTAGRAM', name: 'Instagram Feed' },
       { code: 'ANALYTICS', name: 'Analytics' },
       { code: 'EMERGENCY', name: 'Emergency Notifications' },
+      { code: 'GROUP_MESSAGING', name: 'Group messages' },
+      { code: 'INDIVIDUAL_MESSAGING', name: 'Individual messages' },
     ];
 
     for (const feature of features) {

@@ -1,7 +1,12 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CategoryAdminNavbar } from '../components/CategoryAdminNavbar';
 import { CategoryAdminSidebar } from '../components/CategoryAdminSidebar';
+import { PrivacyPageTabs, type PrivacyPageTab } from '../components/PrivacyPageTabs';
+import { ClubGroupChatRequestReviewPanel } from '../components/ClubGroupChatRequestReviewPanel';
+import { CategoryAdminMessagesPanel } from '../components/CategoryAdminMessagesPanel';
+import { categoryAdminClubGroupChatRequestsService } from '../services/category-admin-club-group-chat-requests.service';
 import { useCategoryAdminAuth } from '../contexts/CategoryAdminAuthContext';
 import { categoryAdminCategoriesService } from '../services/category-admin-categories.service';
 import {
@@ -11,9 +16,29 @@ import {
   type UpdateSubCategoryAdminSubCategoriesDto,
 } from '../services/subcategory-admins.service';
 
+function privacyTabFromParam(tab: string | null): PrivacyPageTab {
+  if (tab === 'message-config' || tab === 'messages') return tab;
+  return 'admins';
+}
+
 export const CategoryAdminPrivacy = () => {
   const queryClient = useQueryClient();
   const { user, token } = useCategoryAdminAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [privacyTab, setPrivacyTab] = useState<PrivacyPageTab>(() =>
+    privacyTabFromParam(searchParams.get('tab')),
+  );
+
+  const handlePrivacyTabChange = (tab: PrivacyPageTab) => {
+    setPrivacyTab(tab);
+    const next = new URLSearchParams(searchParams);
+    if (tab === 'admins') {
+      next.delete('tab');
+    } else {
+      next.set('tab', tab);
+    }
+    setSearchParams(next, { replace: true });
+  };
   const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState<CreateSubCategoryAdminDto>({
     name: '',
@@ -204,11 +229,26 @@ export const CategoryAdminPrivacy = () => {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fafafa' }}>
+    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
       <CategoryAdminNavbar />
-      <div className="d-flex">
+      <div className="admin-shell-body">
         <CategoryAdminSidebar />
-        <div style={{ flex: 1, padding: '2rem' }}>
+        <div className="admin-main">
+          <PrivacyPageTabs
+            activeTab={privacyTab}
+            onChange={handlePrivacyTabChange}
+            showMessagesTab
+          />
+
+          {privacyTab === 'message-config' ? (
+            <ClubGroupChatRequestReviewPanel
+              service={categoryAdminClubGroupChatRequestsService}
+              queryKeyPrefix="category-admin"
+            />
+          ) : privacyTab === 'messages' ? (
+            <CategoryAdminMessagesPanel />
+          ) : (
+          <>
           <div className="d-flex justify-content-between align-items-center mb-4">
             <div>
               <h1
@@ -995,6 +1035,8 @@ export const CategoryAdminPrivacy = () => {
               )}
             </div>
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>

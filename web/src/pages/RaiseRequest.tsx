@@ -96,9 +96,9 @@ export const RaiseRequest = () => {
   ];
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fafafa' }}>
+    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
       <SuperAdminNavbar />
-      <div className="d-flex">
+      <div className="admin-shell-body">
         <SuperAdminSidebar />
         <div 
           style={{ 

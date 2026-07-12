@@ -21,15 +21,14 @@ export const CategoryAdminSidebar = () => {
 
   return (
     <div
+      className="admin-sidebar"
       style={{
         width: isExpanded ? '250px' : '80px',
-        minHeight: 'calc(100vh - 60px)',
         backgroundColor: 'white',
         borderRight: '1px solid #dee2e6',
         padding: '1.5rem 0',
         transition: 'width 0.3s ease',
         position: 'relative',
-        overflow: 'hidden'
       }}
       onMouseEnter={() => setIsExpanded(true)}
       onMouseLeave={() => setIsExpanded(false)}

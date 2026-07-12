@@ -125,11 +125,11 @@ export const CategoryAdminBlogs = () => {
   } as const;
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fafafa' }}>
+    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
       <CategoryAdminNavbar />
-      <div className="d-flex">
+      <div className="admin-shell-body">
         <CategoryAdminSidebar />
-        <div style={{ flex: 1, padding: '2rem', minHeight: 'calc(100vh - 60px)' }}>
+        <div className="admin-main">
           <h1 style={{ fontSize: '2rem', fontWeight: 'normal', color: '#1a1f2e' }}>Blogs</h1>
           <p className="text-muted mb-4">
             Approve submissions to make them public (same as news). View approved blogs below.

@@ -208,9 +208,9 @@ export const AdsAdminAds = () => {
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#eef1f5' }}>
       <AdsAdminNavbar />
-      <div className="d-flex">
+      <div className="admin-shell-body">
         <AdsAdminSidebar />
-        <div style={{ flex: 1, padding: '1.5rem 2rem', minWidth: 0 }}>
+        <div className="admin-main">
           <div className="mb-4">
             <h1 className="h4 mb-1" style={{ color: '#1a1f2e', fontWeight: 600 }}>Ads</h1>
             <p className="small text-muted mb-0">Manage banner and sponsored ads for your school.</p>

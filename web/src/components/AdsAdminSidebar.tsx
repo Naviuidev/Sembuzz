@@ -14,9 +14,9 @@ export const AdsAdminSidebar = () => {
 
   return (
     <div
+      className="admin-sidebar"
       style={{
         width: isExpanded ? '250px' : '80px',
-        minHeight: 'calc(100vh - 60px)',
         backgroundColor: 'white',
         borderRight: '1px solid #dee2e6',
         padding: '1.5rem 0',

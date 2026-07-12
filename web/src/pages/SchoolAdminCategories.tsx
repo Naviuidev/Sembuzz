@@ -248,11 +248,11 @@ export const SchoolAdminCategories = () => {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fafafa' }}>
+    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
       <SchoolAdminNavbar />
-      <div className="d-flex">
+      <div className="admin-shell-body">
         <SchoolAdminSidebar />
-        <div style={{ flex: 1, padding: '2rem' }}>
+        <div className="admin-main">
           <div className="d-flex justify-content-between align-items-center mb-4">
             <div>
               <h1

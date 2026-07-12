@@ -131,11 +131,11 @@ export const SchoolInfo = () => {
   const emailPreview = getEmailPreview();
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fafafa' }}>
+    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
       <SuperAdminNavbar />
-      <div className="d-flex">
+      <div className="admin-shell-body">
         <SuperAdminSidebar />
-        <div style={{ flex: 1, padding: '2rem' }}>
+        <div className="admin-main">
           <h1 style={{
             fontSize: '2rem',
             fontWeight: 'normal',
