@@ -1410,47 +1410,52 @@ export const PublicEvents = () => {
     (groupUnreadData?.unreadCount ?? 0);
 
   const settingsActions = useMemo(
-    () =>
-      [
-        {
-          key: 'categories' as const,
-          title: 'Change categories',
-          subtitle: 'Update your preferred categories and subcategories.',
-          icon: 'bi-folder',
-        },
-        {
-          key: 'messages' as const,
-          title: 'Messages',
-          subtitle: 'Chat with classmates and join group conversations.',
-          icon: 'bi-chat-dots',
-          badge: messagesUnreadCount,
-        },
-        {
-          key: 'liked' as const,
-          title: 'Liked posts',
-          subtitle: 'Review news posts you have liked.',
-          icon: 'bi-heart',
-        },
-        {
-          key: 'notifications' as const,
-          title: 'Notifications',
-          subtitle: 'Review updates for your selected categories.',
-          icon: 'bi-bell',
-          badge: notifUnreadCount,
-        },
-        {
-          key: 'saved' as const,
-          title: 'Bookmarks',
-          subtitle: 'Open your saved news collection.',
-          icon: 'bi-bookmark',
-        },
-        {
-          key: 'help' as const,
-          title: 'Feedback/Query/Ask your School Admin',
-          subtitle: 'Send feedback or ask questions directly to your school admin.',
-          icon: 'bi-question-circle',
-        },
-      ] as const,
+    (): Array<{
+      key: 'categories' | 'messages' | 'liked' | 'notifications' | 'saved' | 'help';
+      title: string;
+      subtitle: string;
+      icon: string;
+      badge?: number;
+    }> => [
+      {
+        key: 'categories',
+        title: 'Change categories',
+        subtitle: 'Update your preferred categories and subcategories.',
+        icon: 'bi-folder',
+      },
+      {
+        key: 'messages',
+        title: 'Messages',
+        subtitle: 'Chat with classmates and join group conversations.',
+        icon: 'bi-chat-dots',
+        badge: messagesUnreadCount,
+      },
+      {
+        key: 'liked',
+        title: 'Liked posts',
+        subtitle: 'Review news posts you have liked.',
+        icon: 'bi-heart',
+      },
+      {
+        key: 'notifications',
+        title: 'Notifications',
+        subtitle: 'Review updates for your selected categories.',
+        icon: 'bi-bell',
+        badge: notifUnreadCount,
+      },
+      {
+        key: 'saved',
+        title: 'Bookmarks',
+        subtitle: 'Open your saved news collection.',
+        icon: 'bi-bookmark',
+      },
+      {
+        key: 'help',
+        title: 'Feedback/Query/Ask your School Admin',
+        subtitle: 'Send feedback or ask questions directly to your school admin.',
+        icon: 'bi-question-circle',
+      },
+    ],
     [notifUnreadCount, messagesUnreadCount],
   );
 

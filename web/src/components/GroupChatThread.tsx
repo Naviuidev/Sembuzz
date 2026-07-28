@@ -13,7 +13,6 @@ import {
 } from '../utils/chatMessage';
 
 const TEXT_DARK = '#1a1f2e';
-const TEXT_MUTED = '#6c757d';
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
 type UploadEndpoint =
@@ -230,9 +229,9 @@ export function GroupChatThread({
             sending={sending}
             uploading={uploading}
             replyTo={replyTo}
-            onClearReply={() => setReplyTo(null)}
+            onCancelReply={() => setReplyTo(null)}
             pendingAttachment={pendingAttachment}
-            onClearAttachment={() => setPendingAttachment(null)}
+            onRemoveAttachment={() => setPendingAttachment(null)}
             onPickImage={() => imageInputRef.current?.click()}
             onPickPdf={() => pdfInputRef.current?.click()}
           />
