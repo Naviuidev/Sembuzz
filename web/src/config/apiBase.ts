@@ -17,6 +17,11 @@ export function getApiBaseUrl(): string {
       } catch {
         /* use url */
       }
+      const host = window.location.hostname;
+      const onProdFrontend = host === 'sembuzz.com' || host === 'www.sembuzz.com';
+      if (onProdFrontend && /localhost|127\.0\.0\.1/.test(url)) {
+        return 'https://api.sembuzz.com';
+      }
       return url;
     }
     return url;

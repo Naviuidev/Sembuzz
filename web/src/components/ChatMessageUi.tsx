@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   type ChatMessageReplyTo,
   type ChatMessageShape,
@@ -52,15 +53,24 @@ export function MessageAttachment({
   attachmentName: string | null;
   isMine: boolean;
 }) {
+  const [failed, setFailed] = useState(false);
   const fullUrl = chatAttachmentFullUrl(attachmentUrl);
 
   if (attachmentType === 'image') {
+    if (failed) {
+      return (
+        <div className="small mb-1" style={{ color: isMine ? 'rgba(255,255,255,0.85)' : TEXT_MUTED }}>
+          Image unavailable
+        </div>
+      );
+    }
     return (
       <a href={fullUrl} target="_blank" rel="noopener noreferrer" className="d-block mb-1">
         <img
           src={fullUrl}
           alt={attachmentName || 'Image'}
           style={{ maxWidth: '100%', maxHeight: 220, borderRadius: 8, display: 'block' }}
+          onError={() => setFailed(true)}
         />
       </a>
     );

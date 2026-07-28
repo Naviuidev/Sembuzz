@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from '../config/apiBase';
+import { imageSrc } from './image';
 
 export type ChatAttachmentType = 'image' | 'pdf';
 
@@ -37,9 +37,7 @@ export interface PendingChatAttachment {
 }
 
 export function chatAttachmentFullUrl(path: string): string {
-  if (path.startsWith('http')) return path;
-  const base = getApiBaseUrl();
-  return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+  return imageSrc(path) || path;
 }
 
 export function replySenderName(reply: ChatMessageReplyTo): string {

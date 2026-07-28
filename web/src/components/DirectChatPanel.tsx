@@ -8,7 +8,7 @@ import {
   type DirectChatUser,
   type DirectMessageItem,
 } from '../services/user-direct-chats.service';
-import { imageSrc, isImageIconValue } from '../utils/image';
+import { imageSrc } from '../utils/image';
 import {
   ChatComposer,
   ChatMessageBubble,
@@ -976,27 +976,22 @@ function StudentRow({
 }
 
 export function StudentAvatar({ user, size = 40 }: { user: DirectChatUser; size?: number }) {
+  const [failed, setFailed] = useState(false);
   const pic = user.profilePicUrl;
-  if (pic && isImageIconValue(pic)) {
+  const url = pic && !failed ? imageSrc(pic) : '';
+
+  if (url) {
     return (
       <img
-        src={imageSrc(pic)}
+        src={url}
         alt={user.name}
         className="flex-shrink-0"
         style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover' }}
+        onError={() => setFailed(true)}
       />
     );
   }
-  if (pic && pic.startsWith('http')) {
-    return (
-      <img
-        src={pic}
-        alt={user.name}
-        className="flex-shrink-0"
-        style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover' }}
-      />
-    );
-  }
+
   return (
     <div
       className="d-flex align-items-center justify-content-center flex-shrink-0 fw-semibold"
