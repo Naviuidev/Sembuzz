@@ -19,6 +19,7 @@ export interface AdsAdminLoginResponse {
 
 export interface AdsAdminUser {
   id: string;
+  userId?: string;
   name: string;
   email: string;
   schoolId: string;
@@ -45,6 +46,11 @@ export const adsAdminAuthService = {
 
   getMe: async (): Promise<AdsAdminUser> => {
     const response = await api.get<AdsAdminUser>('/ads-admin/auth/me');
+    return response.data;
+  },
+
+  updateEmail: async (email: string): Promise<{ userId: string; email: string }> => {
+    const response = await api.patch<{ userId: string; email: string }>('/ads-admin/auth/email', { email });
     return response.data;
   },
 };

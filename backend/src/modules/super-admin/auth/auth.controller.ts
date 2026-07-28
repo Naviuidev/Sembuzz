@@ -1,7 +1,8 @@
-import { Controller, Post, Get, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, UseGuards, Request } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from '../dto/login.dto';
 import { SuperAdminGuard } from '../guards/super-admin.guard';
+import { UpdateEmailDto } from '../../platform-user/dto/update-email.dto';
 
 @Controller('super-admin/auth')
 export class AuthController {
@@ -23,5 +24,11 @@ export class AuthController {
   @UseGuards(SuperAdminGuard)
   async getMe(@Request() req) {
     return this.authService.validateUser(req.user.sub);
+  }
+
+  @Patch('email')
+  @UseGuards(SuperAdminGuard)
+  async updateEmail(@Request() req, @Body() dto: UpdateEmailDto) {
+    return this.authService.updateEmail(req.user.sub, dto);
   }
 }

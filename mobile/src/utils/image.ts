@@ -39,6 +39,19 @@ export function imageSrc(url: string | null | undefined): string {
   return `${base}${path}`;
 }
 
+/** School logos in lists — skip inline base64 blobs (iOS Image.prefetch / memory issues). */
+export function schoolLogoSrc(url: string | null | undefined): string {
+  const u = stripQuotes(typeof url === 'string' ? url : '');
+  if (!u || u.startsWith('data:')) return '';
+  return imageSrc(u);
+}
+
+export function canPrefetchImage(url: string): boolean {
+  const u = stripQuotes(url).trim();
+  if (!u || u.startsWith('data:')) return false;
+  return true;
+}
+
 /**
  * Club/social icon field: uploaded files are stored as `/uploads/...` (or `http(s)`).
  * Bootstrap (`bi-*`) / Font Awesome (`fa-*`) are not image URLs.

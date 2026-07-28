@@ -575,9 +575,12 @@ export const PublicBlogs = () => {
       `}</style>
 
       <EventsBottomNav
-        activeTab="blogs"
+        activeTab="home"
         onSelectTab={(tab) => {
-          if (tab === 'blogs') return;
+          if (tab === 'chat') {
+            navigate('/messages');
+            return;
+          }
           if (tab === 'universities') {
             navigate('/universities');
             return;

@@ -2,6 +2,7 @@ import { api } from '../config/api';
 
 export interface UserAuthUser {
   id: string;
+  userId?: string;
   name: string;
   firstName?: string;
   lastName?: string;
@@ -94,6 +95,35 @@ export const userAuthService = {
     return response.data;
   },
 
+  requestPasswordResetOtp: async (email: string): Promise<{ message: string; email?: string }> => {
+    const response = await api.post<{ message: string; email?: string }>(
+      '/user/auth/forgot-password/request-otp',
+      { email },
+    );
+    return response.data;
+  },
+
+  verifyPasswordResetOtp: async (email: string, otp: string): Promise<{ message: string; verified: boolean }> => {
+    const response = await api.post<{ message: string; verified: boolean }>(
+      '/user/auth/forgot-password/verify-otp',
+      { email, otp },
+    );
+    return response.data;
+  },
+
+  resetPassword: async (payload: {
+    email: string;
+    otp: string;
+    newPassword: string;
+    confirmPassword: string;
+  }): Promise<{ message: string; success: boolean }> => {
+    const response = await api.post<{ message: string; success: boolean }>(
+      '/user/auth/forgot-password/reset',
+      payload,
+    );
+    return response.data;
+  },
+
   getMe: async (): Promise<UserAuthUser> => {
     const response = await api.get<UserAuthUser>('/user/auth/me');
     return response.data;
@@ -101,6 +131,11 @@ export const userAuthService = {
 
   updateProfile: async (payload: UpdateProfilePayload): Promise<UserAuthUser> => {
     const response = await api.post<UserAuthUser>('/user/auth/update-profile', payload);
+    return response.data;
+  },
+
+  updateEmail: async (email: string): Promise<{ userId: string; email: string }> => {
+    const response = await api.patch<{ userId: string; email: string }>('/user/auth/email', { email });
     return response.data;
   },
 

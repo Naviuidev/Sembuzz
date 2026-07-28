@@ -125,8 +125,8 @@ export const PublicUniversities = () => {
 
   const handleTabSelect = (tab: EventsBottomNavTab) => {
     if (tab === 'universities') return;
-    if (tab === 'blogs') {
-      navigate('/blogs');
+    if (tab === 'chat') {
+      navigate('/messages');
       return;
     }
     navigate('/events', { state: { bottomNav: tab } });

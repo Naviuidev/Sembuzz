@@ -45,7 +45,10 @@ export function replyPreviewText(reply: ChatMessageReplyTo): string {
 }
 
 export async function uploadChatAttachmentMobile(
-  endpoint: '/user/direct-chats/upload-attachment' | '/user/club-group-chats/upload-attachment',
+  endpoint:
+    | '/user/direct-chats/upload-attachment'
+    | '/user/club-group-chats/upload-attachment'
+    | '/user/student-chat-groups/upload-attachment',
   file: { uri: string; name: string; mimeType: string; size?: number },
 ): Promise<PendingChatAttachment> {
   if (file.size && file.size > MAX_FILE_BYTES) {

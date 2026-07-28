@@ -72,6 +72,12 @@ export const ViewProfile = () => {
             </div>
           </div>
           <div className="py-2 border-bottom" style={{ borderColor: '#e7ebef' }}>
+            <div className="small text-secondary">User ID</div>
+            <div className="fw-semibold font-monospace small text-break" style={{ color: '#1a1f2e', wordBreak: 'break-all' }}>
+              {user.userId || '—'}
+            </div>
+          </div>
+          <div className="py-2 border-bottom" style={{ borderColor: '#e7ebef' }}>
             <div className="small text-secondary">Email</div>
             <div className="fw-semibold" style={{ color: '#1a1f2e' }}>
               {user.email}

@@ -57,7 +57,7 @@ export class UserClubGroupChatsService {
     });
     if (!membership || membership.status !== 'approved') {
       throw new ForbiddenException(
-        'You must be approved to access this group chat. Request to join and wait for category admin approval.',
+        'You must be approved to access this group chat. Request to join and wait for subcategory admin approval.',
       );
     }
   }
@@ -131,7 +131,7 @@ export class UserClubGroupChatsService {
         throw new BadRequestException('You are already a member of this group.');
       }
       if (existing.status === 'banned') {
-        throw new ForbiddenException('You are not allowed to join this group. Contact your category admin.');
+        throw new ForbiddenException('You are not allowed to join this group. Contact your subcategory admin.');
       }
     }
 
@@ -212,7 +212,7 @@ export class UserClubGroupChatsService {
       : 'members';
     if (messageMode === 'admin_only') {
       throw new ForbiddenException(
-        'Only category admins can send messages in this group. You can read messages from your admin.',
+        'Only subcategory admins can send messages in this group. You can read messages from your admin.',
       );
     }
 

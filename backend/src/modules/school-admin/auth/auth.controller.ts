@@ -1,9 +1,10 @@
-import { Controller, Post, Get, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, UseGuards, Request } from '@nestjs/common';
 import { SchoolAdminAuthService } from './auth.service';
 import { SchoolAdminLoginDto } from '../dto/login.dto';
 import { ChangePasswordDto } from '../dto/change-password.dto';
 import { RequestOtpDto, VerifyOtpDto, ResetPasswordDto } from '../dto/forgot-password.dto';
 import { SchoolAdminGuard } from '../guards/school-admin.guard';
+import { UpdateEmailDto } from '../../platform-user/dto/update-email.dto';
 
 @Controller('school-admin/auth')
 export class SchoolAdminAuthController {
@@ -39,5 +40,11 @@ export class SchoolAdminAuthController {
   @Post('forgot-password/reset')
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto);
+  }
+
+  @Patch('email')
+  @UseGuards(SchoolAdminGuard)
+  async updateEmail(@Request() req, @Body() dto: UpdateEmailDto) {
+    return this.authService.updateEmail(req.user.sub, dto);
   }
 }

@@ -3,7 +3,7 @@ export { default as AuthScreen } from './AuthScreen';
 export { default as SearchScreen } from './SearchScreen';
 export { default as SettingsScreen } from './SettingsScreen';
 export { default as AppsScreen } from './AppsScreen';
-export { default as BlogsScreen } from './BlogsScreen';
+export { default as ChatScreen } from './ChatScreen';
 export { default as LikedNewsScreen } from './LikedNewsScreen';
 export { default as SavedNewsScreen } from './SavedNewsScreen';
 export { default as NotificationsScreen } from './NotificationsScreen';

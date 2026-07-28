@@ -1,9 +1,10 @@
-import { Controller, Post, Get, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, UseGuards, Request } from '@nestjs/common';
 import { SubCategoryAdminAuthService } from './auth.service';
 import { SubCategoryAdminLoginDto } from '../dto/login.dto';
 import { ChangePasswordDto } from '../dto/change-password.dto';
 import { RequestOtpDto, VerifyOtpDto, ResetPasswordDto } from '../dto/forgot-password.dto';
 import { SubCategoryAdminGuard } from '../guards/subcategory-admin.guard';
+import { UpdateEmailDto } from '../../platform-user/dto/update-email.dto';
 
 @Controller('subcategory-admin/auth')
 export class SubCategoryAdminAuthController {
@@ -39,5 +40,11 @@ export class SubCategoryAdminAuthController {
   @Post('forgot-password/reset')
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
+  }
+
+  @Patch('email')
+  @UseGuards(SubCategoryAdminGuard)
+  async updateEmail(@Request() req, @Body() dto: UpdateEmailDto) {
+    return this.authService.updateEmail(req.user.sub, dto);
   }
 }

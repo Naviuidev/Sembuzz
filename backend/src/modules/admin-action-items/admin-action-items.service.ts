@@ -147,7 +147,7 @@ export class AdminActionItemsService {
         ? this.prisma.blogPost.count({ where: { ...categoryFilter!, status: 'pending' } })
         : 0,
       this.prisma.clubGroupChatRequest.count({ where: { schoolId, status: 'pending' } }),
-      this.prisma.clubGroupMembership.count({ where: { schoolId, status: 'pending' } }),
+      0,
       hasCategories
         ? this.prisma.subCategoryAdminQuery.count({
             where: { status: 'pending', subCategoryAdmin: { categoryId: { in: categoryIds } } },
@@ -161,7 +161,7 @@ export class AdminActionItemsService {
         ? this.latestCreatedAt(this.prisma.blogPost, { ...categoryFilter!, status: 'pending' })
         : undefined,
       this.latestCreatedAt(this.prisma.clubGroupChatRequest, { schoolId, status: 'pending' }),
-      this.latestCreatedAt(this.prisma.clubGroupMembership, { schoolId, status: 'pending' }),
+      undefined,
       hasCategories
         ? this.latestCreatedAt(this.prisma.subCategoryAdminQuery, {
             status: 'pending',
@@ -200,15 +200,6 @@ export class AdminActionItemsService {
         createdAt: latestChat,
       },
       {
-        id: 'club-group-memberships',
-        kind: 'club_group_memberships',
-        title: 'Club join requests',
-        summary: `${memberships} student${memberships === 1 ? '' : 's'} waiting to join a club chat`,
-        href: '/category-admin/privacy?tab=messages',
-        count: memberships,
-        createdAt: latestMember,
-      },
-      {
         id: 'subcategory-queries',
         kind: 'subcategory_queries',
         title: 'Queries from sub-category admins',
@@ -241,10 +232,12 @@ export class AdminActionItemsService {
       revertedBlogs,
       schoolQueries,
       categoryQueries,
+      memberships,
       latestEvent,
       latestBlog,
       latestSchoolQ,
       latestCatQ,
+      latestMember,
     ] = await Promise.all([
       this.prisma.event.count({
         where: { subCategoryAdminId, status: 'reverted', revertNotes: { not: null } },
@@ -255,6 +248,9 @@ export class AdminActionItemsService {
       }),
       this.prisma.categoryAdminToSubCategoryAdminQuery.count({
         where: { categoryId: admin.categoryId, status: 'pending' },
+      }),
+      this.prisma.clubGroupMembership.count({
+        where: { schoolId: admin.schoolId, status: 'pending' },
       }),
       this.latestCreatedAt(this.prisma.event, {
         subCategoryAdminId,
@@ -270,9 +266,22 @@ export class AdminActionItemsService {
         categoryId: admin.categoryId,
         status: 'pending',
       }),
+      this.latestCreatedAt(this.prisma.clubGroupMembership, {
+        schoolId: admin.schoolId,
+        status: 'pending',
+      }),
     ]);
 
     return this.buildResponse([
+      {
+        id: 'club-group-memberships',
+        kind: 'club_group_memberships',
+        title: 'Club join requests',
+        summary: `${memberships} student${memberships === 1 ? '' : 's'} waiting to join a club chat`,
+        href: '/subcategory-admin/privacy?tab=messages',
+        count: memberships,
+        createdAt: latestMember,
+      },
       {
         id: 'event-corrections',
         kind: 'event_corrections',

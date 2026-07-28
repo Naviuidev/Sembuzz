@@ -3,15 +3,25 @@ import {
   UnauthorizedException,
   BadRequestException,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
 import { VerifyOtpDto } from '../dto/verify-otp.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
+import {
+  RequestPasswordResetOtpDto,
+  VerifyPasswordResetOtpDto,
+  ResetPasswordDto,
+} from '../dto/forgot-password.dto';
 import { EmailService } from '../../super-admin/schools/email.service';
+import { PlatformUserService } from '../../platform-user/platform-user.service';
+import { UpdateEmailDto } from '../../platform-user/dto/update-email.dto';
 
 const OTP_EXPIRY_MINUTES = 10;
 
@@ -36,10 +46,36 @@ export class UserAuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private emailService: EmailService,
+    private platformUserService: PlatformUserService,
   ) {}
+
+  private async findUserByEmail(email: string) {
+    const platformUser = await this.platformUserService.findByEmail(email);
+    if (!platformUser) {
+      return null;
+    }
+    return this.prisma.user.findUnique({
+      where: { platformUserId: platformUser.id },
+    });
+  }
+
+  private async findUserByEmailWithSchool(
+    email: string,
+    schoolSelect: Prisma.SchoolSelect = { id: true, name: true, image: true },
+  ) {
+    const platformUser = await this.platformUserService.findByEmail(email);
+    if (!platformUser) {
+      return null;
+    }
+    return this.prisma.user.findUnique({
+      where: { platformUserId: platformUser.id },
+      include: { school: { select: schoolSelect } },
+    });
+  }
 
   private userResponse(user: {
     id: string;
+    platformUserId: string;
     name: string;
     firstName: string | null;
     lastName: string | null;
@@ -50,6 +86,7 @@ export class UserAuthService {
   }) {
     return {
       id: user.id,
+      userId: user.platformUserId,
       name: user.name,
       firstName: user.firstName ?? undefined,
       lastName: user.lastName ?? undefined,
@@ -64,9 +101,10 @@ export class UserAuthService {
   async register(dto: RegisterDto) {
     try {
       const email = dto.email.toLowerCase().trim();
-      const existing = await this.prisma.user.findUnique({
-        where: { email },
-        include: { school: { select: { id: true, name: true, domain: true } } },
+      const existing = await this.findUserByEmailWithSchool(email, {
+        id: true,
+        name: true,
+        domain: true,
       });
       if (existing) {
         if (existing.status === 'pending_otp') {
@@ -123,24 +161,28 @@ export class UserAuthService {
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
         const otpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
-        const user = await this.prisma.user.create({
-          data: {
-            name,
-            firstName: dto.firstName.trim(),
-            lastName: dto.lastName.trim(),
-            profilePicUrl: dto.profilePicUrl ?? null,
-            verificationDocUrl: dto.verificationDocUrl ?? null,
-            email,
-            password: hashedPassword,
-            schoolId: dto.schoolId,
-            registrationMethod: 'school_domain',
-            status: 'pending_otp',
-            otp,
-            otpExpiresAt,
-          },
-          include: {
-            school: { select: { id: true, name: true, image: true } },
-          },
+        const user = await this.prisma.$transaction(async (tx) => {
+          const platformUser = await this.platformUserService.findOrCreateByEmail(email, tx);
+          return tx.user.create({
+            data: {
+              platformUserId: platformUser.id,
+              name,
+              firstName: dto.firstName.trim(),
+              lastName: dto.lastName.trim(),
+              profilePicUrl: dto.profilePicUrl ?? null,
+              verificationDocUrl: dto.verificationDocUrl ?? null,
+              email: platformUser.email,
+              password: hashedPassword,
+              schoolId: dto.schoolId,
+              registrationMethod: 'school_domain',
+              status: 'pending_otp',
+              otp,
+              otpExpiresAt,
+            },
+            include: {
+              school: { select: { id: true, name: true, image: true } },
+            },
+          });
         });
 
         try {
@@ -169,22 +211,26 @@ export class UserAuthService {
           'Please upload a school-related document (e.g. ID card or fee receipt) to verify your enrollment.',
         );
       }
-      const user = await this.prisma.user.create({
-        data: {
-          name,
-          firstName: dto.firstName.trim(),
-          lastName: dto.lastName.trim(),
-          profilePicUrl: dto.profilePicUrl ?? null,
-          email,
-          password: hashedPassword,
-          schoolId: dto.schoolId,
-          registrationMethod: 'gmail',
-          status: 'pending_approval',
-          verificationDocUrl: dto.verificationDocUrl.trim(),
-        },
-        include: {
-          school: { select: { id: true, name: true, image: true } },
-        },
+      const user = await this.prisma.$transaction(async (tx) => {
+        const platformUser = await this.platformUserService.findOrCreateByEmail(email, tx);
+        return tx.user.create({
+          data: {
+            platformUserId: platformUser.id,
+            name,
+            firstName: dto.firstName.trim(),
+            lastName: dto.lastName.trim(),
+            profilePicUrl: dto.profilePicUrl ?? null,
+            email: platformUser.email,
+            password: hashedPassword,
+            schoolId: dto.schoolId,
+            registrationMethod: 'gmail',
+            status: 'pending_approval',
+            verificationDocUrl: dto.verificationDocUrl?.trim() ?? null,
+          },
+          include: {
+            school: { select: { id: true, name: true, image: true } },
+          },
+        });
       });
 
       const admins = await this.prisma.schoolAdmin.findMany({
@@ -214,10 +260,7 @@ export class UserAuthService {
 
   async resendOtp(email: string) {
     const normalized = email.toLowerCase().trim();
-    const user = await this.prisma.user.findUnique({
-      where: { email: normalized },
-      include: { school: { select: { name: true } } },
-    });
+    const user = await this.findUserByEmailWithSchool(normalized, { name: true });
     if (!user || user.status !== 'pending_otp') {
       throw new BadRequestException('No pending registration found for this email. Please register again.');
     }
@@ -246,12 +289,7 @@ export class UserAuthService {
 
   async verifyOtp(dto: VerifyOtpDto) {
     const email = dto.email.toLowerCase().trim();
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-      include: {
-        school: { select: { id: true, name: true, image: true } },
-      },
-    });
+    const user = await this.findUserByEmailWithSchool(email);
     if (!user || user.status !== 'pending_otp') {
       throw new BadRequestException('Invalid or expired OTP. Please register again.');
     }
@@ -272,12 +310,7 @@ export class UserAuthService {
   }
 
   async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email.toLowerCase().trim() },
-      include: {
-        school: { select: { id: true, name: true, image: true } },
-      },
-    });
+    const user = await this.findUserByEmailWithSchool(dto.email);
     if (!user) {
       throw new UnauthorizedException('Email not registered');
     }
@@ -308,7 +341,7 @@ export class UserAuthService {
       throw new UnauthorizedException('Incorrect password');
     }
 
-    const payload = { sub: user.id, email: user.email, role: 'user' };
+    const payload = { sub: user.id, userId: user.platformUserId, email: user.email, role: 'user' };
     const access_token = this.jwtService.sign(payload);
     return {
       access_token,
@@ -333,6 +366,7 @@ export class UserAuthService {
     }
     return {
       id: user.id,
+      userId: user.platformUserId,
       name: user.name,
       firstName: user.firstName ?? undefined,
       lastName: user.lastName ?? undefined,
@@ -516,5 +550,127 @@ export class UserAuthService {
       if (err instanceof BadRequestException) throw err;
       throw new BadRequestException('Invalid or expired link. Please use the latest link from your email.');
     }
+  }
+
+  async requestPasswordResetOtp(dto: RequestPasswordResetOtpDto) {
+    const email = dto.email.toLowerCase().trim();
+    const user = await this.findUserByEmailWithSchool(email, { name: true });
+
+    if (!user || user.status !== 'active') {
+      throw new NotFoundException('No active account found with this email address');
+    }
+
+    if (user.registrationMethod === 'gmail' && !user.approvalEmailVerifiedAt) {
+      throw new BadRequestException(
+        'Your account is not fully verified yet. Please use the approval link from your email before resetting your password.',
+      );
+    }
+
+    const otp = crypto.randomInt(100000, 999999).toString();
+    const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+
+    await this.prisma.userPasswordResetOtp.updateMany({
+      where: { userId: user.id, isUsed: false },
+      data: { isUsed: true },
+    });
+
+    await this.prisma.userPasswordResetOtp.create({
+      data: {
+        userId: user.id,
+        otp,
+        expiresAt,
+      },
+    });
+
+    const maskedEmail =
+      user.email.substring(0, 3) + '***' + user.email.substring(user.email.indexOf('@'));
+
+    try {
+      await this.emailService.sendUserPasswordResetOtp(user.email, user.name, otp, user.school.name);
+    } catch (emailErr) {
+      console.error('[UserAuthService] Password reset OTP email failed:', emailErr);
+      throw new BadRequestException(
+        'We could not send the password reset email. Please try again later or contact support.',
+      );
+    }
+
+    return {
+      message: 'OTP has been sent to your registered email address',
+      email: maskedEmail,
+    };
+  }
+
+  async verifyPasswordResetOtp(dto: VerifyPasswordResetOtpDto) {
+    const email = dto.email.toLowerCase().trim();
+    const user = await this.findUserByEmail(email);
+
+    if (!user || user.status !== 'active') {
+      throw new NotFoundException('No active account found with this email address');
+    }
+
+    const otpRecord = await this.prisma.userPasswordResetOtp.findFirst({
+      where: {
+        userId: user.id,
+        otp: dto.otp,
+        isUsed: false,
+        expiresAt: { gte: new Date() },
+      },
+    });
+
+    if (!otpRecord) {
+      throw new BadRequestException('Invalid or expired OTP');
+    }
+
+    return { message: 'OTP verified successfully', verified: true };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const email = dto.email.toLowerCase().trim();
+    if (dto.newPassword !== dto.confirmPassword) {
+      throw new BadRequestException('New password and confirm password do not match');
+    }
+
+    const user = await this.findUserByEmail(email);
+
+    if (!user || user.status !== 'active') {
+      throw new NotFoundException('No active account found with this email address');
+    }
+
+    const otpRecord = await this.prisma.userPasswordResetOtp.findFirst({
+      where: {
+        userId: user.id,
+        otp: dto.otp,
+        isUsed: false,
+        expiresAt: { gte: new Date() },
+      },
+    });
+
+    if (!otpRecord) {
+      throw new BadRequestException('Invalid or expired OTP');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: { password: hashedPassword },
+      }),
+      this.prisma.userPasswordResetOtp.update({
+        where: { id: otpRecord.id },
+        data: { isUsed: true },
+      }),
+    ]);
+
+    return { message: 'Password reset successfully', success: true };
+  }
+
+  async updateEmail(userId: string, dto: UpdateEmailDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    const updated = await this.platformUserService.updateEmail(user.platformUserId, dto.email);
+    return { userId: updated.id, email: updated.email };
   }
 }

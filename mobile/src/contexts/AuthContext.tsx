@@ -7,6 +7,7 @@ const TOKEN_KEY = 'user-token';
 
 type User = {
   id: string;
+  userId?: string;
   email: string;
   name: string;
   firstName?: string;

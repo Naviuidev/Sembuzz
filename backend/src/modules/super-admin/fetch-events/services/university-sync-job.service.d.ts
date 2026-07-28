@@ -1,0 +1,54 @@
+import { OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../../../../prisma/prisma.service';
+import { SyncService } from './sync.service';
+export declare class UniversitySyncJobService implements OnModuleInit, OnModuleDestroy {
+    private readonly prisma;
+    private readonly sync;
+    private readonly config;
+    private readonly logger;
+    private timer;
+    private tickInFlight;
+    constructor(prisma: PrismaService, sync: SyncService, config: ConfigService);
+    onModuleInit(): void;
+    onModuleDestroy(): void;
+    enqueueBatch(batchId: string, sourceIds: string[]): Promise<string>;
+    enqueueAllActive(): Promise<string>;
+    enqueueSingle(sourceId: string): Promise<string>;
+    listJobs(limit?: number): Promise<{
+        error: string | null;
+        id: string;
+        status: string;
+        createdAt: Date;
+        updatedAt: Date;
+        message: string | null;
+        startedAt: Date | null;
+        completedAt: Date | null;
+        kind: string;
+        batchId: string | null;
+        sourceIds: Prisma.JsonValue;
+        progressDone: number;
+        progressTotal: number;
+        currentSourceId: string | null;
+    }[]>;
+    getJob(id: string): Promise<{
+        error: string | null;
+        id: string;
+        status: string;
+        createdAt: Date;
+        updatedAt: Date;
+        message: string | null;
+        startedAt: Date | null;
+        completedAt: Date | null;
+        kind: string;
+        batchId: string | null;
+        sourceIds: Prisma.JsonValue;
+        progressDone: number;
+        progressTotal: number;
+        currentSourceId: string | null;
+    } | null>;
+    private safeTick;
+    private tick;
+    private failJob;
+}

@@ -25,31 +25,38 @@ async function main() {
   const email = await question('Enter Super Admin email: ');
   const password = await question('Enter Super Admin password: ');
 
-  // Check if email already exists
-  const existing = await prisma.superAdmin.findUnique({
-    where: { email },
+  const normalizedEmail = email.toLowerCase().trim();
+  const existingPlatformUser = await prisma.platformUser.findUnique({
+    where: { email: normalizedEmail },
   });
-
-  if (existing) {
-    console.error(`\n❌ Super Admin with email ${email} already exists!`);
-    rl.close();
-    process.exit(1);
+  if (existingPlatformUser) {
+    const existing = await prisma.superAdmin.findUnique({
+      where: { platformUserId: existingPlatformUser.id },
+    });
+    if (existing) {
+      console.error(`\n❌ Super Admin with email ${email} already exists!`);
+      rl.close();
+      process.exit(1);
+    }
   }
 
-  // Hash password
   const hashedPassword = await bcrypt.hash(password, 10);
+  const platformUser =
+    existingPlatformUser ??
+    (await prisma.platformUser.create({ data: { email: normalizedEmail } }));
 
-  // Create super admin
   const superAdmin = await prisma.superAdmin.create({
     data: {
+      platformUserId: platformUser.id,
       name,
-      email,
+      email: platformUser.email,
       password: hashedPassword,
     },
   });
 
   console.log(`\n✅ Super Admin created successfully!`);
-  console.log(`   ID: ${superAdmin.id}`);
+  console.log(`   User ID: ${platformUser.id}`);
+  console.log(`   Role ID: ${superAdmin.id}`);
   console.log(`   Name: ${superAdmin.name}`);
   console.log(`   Email: ${superAdmin.email}`);
   console.log(`   Created: ${superAdmin.createdAt}`);

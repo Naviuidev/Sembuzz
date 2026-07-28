@@ -1,6 +1,6 @@
 import { api, getApiBaseUrl } from '../config/api';
-import { imageSrc } from '../utils/image';
-export { imageSrc };
+import { imageSrc, schoolLogoSrc } from '../utils/image';
+export { imageSrc, schoolLogoSrc };
 
 export interface ApprovedEventPublic {
   id: string;

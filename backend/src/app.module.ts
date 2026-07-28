@@ -15,6 +15,7 @@ import { AdsAdminModule } from './modules/ads-admin/ads-admin.module';
 import { UserModule } from './modules/user/user.module';
 import { ContactModule } from './modules/contact/contact.module';
 import { AdminActionItemsModule } from './modules/admin-action-items/admin-action-items.module';
+import { PlatformUserModule } from './modules/platform-user/platform-user.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { AdminActionItemsModule } from './modules/admin-action-items/admin-actio
       isGlobal: true,
     }),
     PrismaModule,
+    PlatformUserModule,
     MeetingsModule,
     SuperAdminModule,
     SchoolAdminModule,

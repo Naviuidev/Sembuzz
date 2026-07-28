@@ -29,6 +29,12 @@ export const CLUB_GROUP_MESSAGE_SELECT = {
       name: true,
     },
   },
+  subCategoryAdmin: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
   replyTo: {
     select: CLUB_GROUP_MESSAGE_REPLY_SELECT,
   },
@@ -43,6 +49,7 @@ export function isClubGroupMessageMode(value: string): value is ClubGroupMessage
 export function clubGroupMessageSenderName(message: {
   user?: { name: string } | null;
   categoryAdmin?: { name: string } | null;
+  subCategoryAdmin?: { name: string } | null;
 }): string {
-  return message.user?.name ?? message.categoryAdmin?.name ?? 'Unknown';
+  return message.user?.name ?? message.categoryAdmin?.name ?? message.subCategoryAdmin?.name ?? 'Unknown';
 }

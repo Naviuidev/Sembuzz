@@ -63,3 +63,24 @@ export async function resendRegistrationOtp(email: string): Promise<{ success: b
   const response = await api.post<{ success: boolean; devOtp?: string }>('/user/auth/resend-otp', { email });
   return response.data;
 }
+
+export async function requestPasswordResetOtp(email: string): Promise<{ message: string; email?: string }> {
+  const response = await api.post<{ message: string; email?: string }>(
+    '/user/auth/forgot-password/request-otp',
+    { email },
+  );
+  return response.data;
+}
+
+export async function resetPassword(payload: {
+  email: string;
+  otp: string;
+  newPassword: string;
+  confirmPassword: string;
+}): Promise<{ message: string; success: boolean }> {
+  const response = await api.post<{ message: string; success: boolean }>(
+    '/user/auth/forgot-password/reset',
+    payload,
+  );
+  return response.data;
+}

@@ -12,20 +12,43 @@ datasource db {
 }
 
 // ============================================
+// PLATFORM IDENTITY (permanent User ID)
+// ============================================
+// Email is the login/contact field (changeable). All roles link here via platformUserId.
+
+model PlatformUser {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  superAdmins       SuperAdmin[]
+  schoolAdmins      SchoolAdmin[]
+  categoryAdmins    CategoryAdmin[]
+  subCategoryAdmins SubCategoryAdmin[]
+  adsAdmins         AdsAdmin[]
+  users             User[]
+
+  @@map("platform_users")
+}
+
+// ============================================
 // SUPER ADMIN MODULE
 // ============================================
 
 model SuperAdmin {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
-  password  String // hashed
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(uuid())
+  platformUserId String   @unique
+  name           String
+  email          String
+  password       String // hashed
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  // Relations
-  queries SuperAdminQuery[]
+  platformUser PlatformUser @relation(fields: [platformUserId], references: [id], onDelete: Cascade)
+  queries      SuperAdminQuery[]
 
+  @@index([email])
   @@map("super_admins")
 }
 
@@ -65,6 +88,8 @@ model School {
   clubGroupChats                     ClubGroupChat[]
   clubGroupChatRequests              ClubGroupChatRequest[]
   clubGroupMemberships               ClubGroupMembership[]
+  studentChatGroups                  StudentChatGroup[]
+  studentChatGroupMembers            StudentChatGroupMember[]
   directConversations              DirectConversation[]
   directMessagingSetting             SchoolDirectMessagingSetting?
   upcomingPosts                      UpcomingPost[]
@@ -76,43 +101,52 @@ model School {
 }
 
 model SchoolAdmin {
-  id           String   @id @default(uuid())
-  name         String
-  email        String   @unique
-  password     String // hashed (temporary initially)
-  schoolId     String
-  isActive     Boolean  @default(true)
-  isFirstLogin Boolean  @default(true) // Track if password has been changed
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String   @id @default(uuid())
+  platformUserId String
+  name           String
+  email          String
+  password       String // hashed (temporary initially)
+  schoolId       String
+  isActive       Boolean  @default(true)
+  isFirstLogin   Boolean  @default(true) // Track if password has been changed
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  // Relations
+  platformUser      PlatformUser @relation(fields: [platformUserId], references: [id], onDelete: Cascade)
   school            School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   queries           Query[]
   queriesToCategoryAdmins    SchoolAdminToCategoryAdminQuery[]
   queriesToSubCategoryAdmins SchoolAdminToSubCategoryAdminQuery[]
   passwordResetOtps PasswordResetOtp[]
 
+  @@unique([schoolId, platformUserId])
+  @@index([email])
+  @@index([platformUserId])
   @@map("school_admins")
 }
 
 // Ads Admin: manages banner and sponsored ads for a school (when school has Ads feature)
 model AdsAdmin {
-  id           String   @id @default(uuid())
-  name         String
-  email        String   @unique
-  password     String // hashed (temporary initially)
-  schoolId     String
-  isActive     Boolean  @default(true)
-  isFirstLogin Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String   @id @default(uuid())
+  platformUserId String
+  name           String
+  email          String
+  password       String // hashed (temporary initially)
+  schoolId       String
+  isActive       Boolean  @default(true)
+  isFirstLogin   Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
+  platformUser      PlatformUser @relation(fields: [platformUserId], references: [id], onDelete: Cascade)
   school             School                    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   passwordResetOtps  AdsAdminPasswordResetOtp[]
   bannerAds          BannerAd[]
   sponsoredAds       SponsoredAd[]
 
+  @@unique([schoolId, platformUserId])
+  @@index([email])
+  @@index([platformUserId])
   @@map("ads_admins")
 }
 
@@ -408,18 +442,19 @@ model SubCategory {
 // ============================================
 
 model CategoryAdmin {
-  id           String   @id @default(uuid())
-  name         String
-  email        String   @unique
-  password     String // hashed (temporary initially)
-  categoryId   String // Keep for backward compatibility
-  schoolId     String
-  isActive     Boolean  @default(true)
-  isFirstLogin Boolean  @default(true) // Track if password has been changed
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String   @id @default(uuid())
+  platformUserId String
+  name           String
+  email          String
+  password       String // hashed (temporary initially)
+  categoryId     String // Keep for backward compatibility
+  schoolId       String
+  isActive       Boolean  @default(true)
+  isFirstLogin   Boolean  @default(true) // Track if password has been changed
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  // Relations
+  platformUser      PlatformUser @relation(fields: [platformUserId], references: [id], onDelete: Cascade)
   category          Category                        @relation("CategoryAdminPrimaryCategory", fields: [categoryId], references: [id], onDelete: Cascade)
   school            School                          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   passwordResetOtps   CategoryAdminPasswordResetOtp[]
@@ -432,6 +467,9 @@ model CategoryAdmin {
   reviewedClubGroupMemberships ClubGroupMembership[]
   clubGroupMessages            ClubGroupMessage[]
 
+  @@unique([schoolId, platformUserId])
+  @@index([email])
+  @@index([platformUserId])
   @@map("category_admins")
 }
 
@@ -469,19 +507,20 @@ model CategoryAdminPasswordResetOtp {
 // ============================================
 
 model SubCategoryAdmin {
-  id            String   @id @default(uuid())
-  name          String
-  email         String   @unique
-  password      String // hashed (temporary initially)
-  subCategoryId String // Keep for backward compatibility
-  categoryId    String
-  schoolId      String
-  isActive      Boolean  @default(true)
-  isFirstLogin  Boolean  @default(true) // Track if password has been changed
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id             String   @id @default(uuid())
+  platformUserId String
+  name           String
+  email          String
+  password       String // hashed (temporary initially)
+  subCategoryId  String // Keep for backward compatibility
+  categoryId     String
+  schoolId       String
+  isActive       Boolean  @default(true)
+  isFirstLogin   Boolean  @default(true) // Track if password has been changed
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  // Relations
+  platformUser      PlatformUser @relation(fields: [platformUserId], references: [id], onDelete: Cascade)
   subCategory       SubCategory                        @relation("SubCategoryAdminPrimarySubCategory", fields: [subCategoryId], references: [id], onDelete: Cascade)
   category          Category                           @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   school            School                             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
@@ -493,7 +532,13 @@ model SubCategoryAdmin {
   queriesToSuperAdmins SubCategoryAdminToSuperAdminQuery[]
   blogPosts         BlogPost[]
   clubGroupChatRequests ClubGroupChatRequest[]
+  reviewedClubGroupMemberships ClubGroupMembership[] @relation("ClubGroupMembershipReviewedBySubCategoryAdmin")
+  clubGroupMessages            ClubGroupMessage[]
+  studentChatGroupsCreated     StudentChatGroup[] @relation("StudentChatGroupCreatedBySubCategoryAdmin")
 
+  @@unique([schoolId, platformUserId])
+  @@index([email])
+  @@index([platformUserId])
   @@map("sub_category_admins")
 }
 
@@ -758,11 +803,12 @@ model SponsoredAdEvent {
 
 model User {
   id                  String    @id @default(uuid())
+  platformUserId      String    @unique
   name                String    // full name (firstName + lastName) for display
   firstName           String?
   lastName            String?
   profilePicUrl       String?   // optional profile picture URL
-  email               String    @unique
+  email               String
   password            String    // hashed
   schoolId            String
   registrationMethod  String?   // 'school_domain' | 'gmail'
@@ -776,6 +822,7 @@ model User {
   updatedAt           DateTime  @updatedAt
 
   school         School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  platformUser   PlatformUser      @relation(fields: [platformUserId], references: [id], onDelete: Cascade)
   eventLikes     EventLike[]
   eventComments  EventComment[]
   savedEvents    UserSavedEvent[]
@@ -785,16 +832,35 @@ model User {
   notificationInbox         UserNotificationInbox[]
   clubGroupMessages         ClubGroupMessage[]
   clubGroupMemberships      ClubGroupMembership[]
+  studentChatGroupsCreated  StudentChatGroup[] @relation("StudentChatGroupCreatedBy")
+  studentChatGroupMembers   StudentChatGroupMember[]
+  studentChatGroupMessages  StudentChatGroupMessage[]
   directConversationsAsOne  DirectConversation[] @relation("DirectConversationUserOne")
   directConversationsAsTwo  DirectConversation[] @relation("DirectConversationUserTwo")
   directConversationsRequested DirectConversation[] @relation("DirectConversationRequestedBy")
   directConversationsBlocked DirectConversation[] @relation("DirectConversationBlockedBy")
   directMessagesSent        DirectMessage[]
+  passwordResetOtps         UserPasswordResetOtp[]
 
   @@index([schoolId])
   @@index([email])
   @@index([status])
   @@map("users")
+}
+
+model UserPasswordResetOtp {
+  id        String   @id @default(uuid())
+  userId    String
+  otp       String   @db.VarChar(6)
+  expiresAt DateTime @db.DateTime(3)
+  isUsed    Boolean  @default(false)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([otp, isUsed])
+  @@map("user_password_reset_otps")
 }
 
 model UserHelpQuery {
@@ -1219,22 +1285,24 @@ model ClubGroupChatRequest {
 }
 
 model ClubGroupMessage {
-  id               String   @id @default(uuid())
-  groupChatId      String
-  userId           String?
-  categoryAdminId  String?
-  body             String   @default("") @db.Text
-  attachmentUrl    String?  @db.VarChar(1000)
-  attachmentType   String?  // image | pdf
-  attachmentName   String?  @db.VarChar(500)
-  replyToMessageId String?
-  createdAt        DateTime @default(now())
+  id                    String   @id @default(uuid())
+  groupChatId           String
+  userId                String?
+  categoryAdminId       String?
+  subCategoryAdminId    String?
+  body                  String   @default("") @db.Text
+  attachmentUrl         String?  @db.VarChar(1000)
+  attachmentType        String?  // image | pdf
+  attachmentName        String?  @db.VarChar(500)
+  replyToMessageId      String?
+  createdAt             DateTime @default(now())
 
-  groupChat     ClubGroupChat      @relation(fields: [groupChatId], references: [id], onDelete: Cascade)
-  user          User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  categoryAdmin CategoryAdmin?     @relation(fields: [categoryAdminId], references: [id], onDelete: SetNull)
-  replyTo       ClubGroupMessage?  @relation("ClubGroupMessageReplies", fields: [replyToMessageId], references: [id], onDelete: SetNull)
-  replies       ClubGroupMessage[] @relation("ClubGroupMessageReplies")
+  groupChat          ClubGroupChat      @relation(fields: [groupChatId], references: [id], onDelete: Cascade)
+  user               User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryAdmin      CategoryAdmin?     @relation(fields: [categoryAdminId], references: [id], onDelete: SetNull)
+  subCategoryAdmin   SubCategoryAdmin?  @relation(fields: [subCategoryAdminId], references: [id], onDelete: SetNull)
+  replyTo            ClubGroupMessage?  @relation("ClubGroupMessageReplies", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replies            ClubGroupMessage[] @relation("ClubGroupMessageReplies")
 
   @@index([groupChatId, createdAt])
   @@index([replyToMessageId])
@@ -1242,20 +1310,22 @@ model ClubGroupMessage {
 }
 
 model ClubGroupMembership {
-  id                        String    @id @default(uuid())
-  groupChatId               String
-  userId                    String
-  schoolId                  String
-  status                    String    @default("pending") // pending | approved | banned
-  reviewedByCategoryAdminId String?
-  reviewedAt                DateTime?
-  createdAt                 DateTime  @default(now())
-  updatedAt                 DateTime  @updatedAt
+  id                           String    @id @default(uuid())
+  groupChatId                  String
+  userId                       String
+  schoolId                     String
+  status                       String    @default("pending") // pending | approved | banned
+  reviewedByCategoryAdminId    String?
+  reviewedBySubCategoryAdminId String?
+  reviewedAt                   DateTime?
+  createdAt                    DateTime  @default(now())
+  updatedAt                    DateTime  @updatedAt
 
-  groupChat    ClubGroupChat  @relation(fields: [groupChatId], references: [id], onDelete: Cascade)
-  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  school       School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  reviewedBy   CategoryAdmin? @relation(fields: [reviewedByCategoryAdminId], references: [id], onDelete: SetNull)
+  groupChat              ClubGroupChat   @relation(fields: [groupChatId], references: [id], onDelete: Cascade)
+  user                   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school                 School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  reviewedBy             CategoryAdmin?  @relation(fields: [reviewedByCategoryAdminId], references: [id], onDelete: SetNull)
+  reviewedBySubCategory  SubCategoryAdmin? @relation("ClubGroupMembershipReviewedBySubCategoryAdmin", fields: [reviewedBySubCategoryAdminId], references: [id], onDelete: SetNull)
 
   @@unique([groupChatId, userId])
   @@index([schoolId, status])
@@ -1325,4 +1395,73 @@ model DirectMessage {
   @@index([conversationId, createdAt])
   @@index([replyToMessageId])
   @@map("direct_messages")
+}
+
+model StudentChatGroup {
+  id                          String    @id @default(uuid())
+  schoolId                    String
+  name                        String    @db.VarChar(120)
+  description                 String?   @db.Text
+  avatarUrl                   String?   @db.VarChar(1000)
+  visibility                  String    @default("public") // public | private
+  createdByUserId             String?
+  createdBySubCategoryAdminId String?
+  lastMessageAt               DateTime?
+  isActive                    Boolean   @default(true)
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
+
+  school                    School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdBy                 User?             @relation("StudentChatGroupCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdBySubCategoryAdmin SubCategoryAdmin? @relation("StudentChatGroupCreatedBySubCategoryAdmin", fields: [createdBySubCategoryAdminId], references: [id], onDelete: SetNull)
+  members                   StudentChatGroupMember[]
+  messages                  StudentChatGroupMessage[]
+
+  @@index([schoolId, visibility, isActive])
+  @@index([schoolId, lastMessageAt])
+  @@map("student_chat_groups")
+}
+
+model StudentChatGroupMember {
+  id         String    @id @default(uuid())
+  groupId    String
+  userId     String
+  schoolId   String
+  role       String    @default("member") // owner | admin | member
+  status     String    @default("active") // active | left | banned
+  lastReadAt DateTime?
+  joinedAt   DateTime  @default(now())
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  group  StudentChatGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId, status])
+  @@index([schoolId, status])
+  @@index([groupId])
+  @@map("student_chat_group_members")
+}
+
+model StudentChatGroupMessage {
+  id               String   @id @default(uuid())
+  groupId          String
+  senderUserId     String
+  body             String   @default("") @db.Text
+  attachmentUrl    String?  @db.VarChar(1000)
+  attachmentType   String?  // image | pdf
+  attachmentName   String?  @db.VarChar(500)
+  replyToMessageId String?
+  createdAt        DateTime @default(now())
+
+  group    StudentChatGroup          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  sender   User                      @relation(fields: [senderUserId], references: [id], onDelete: Cascade)
+  replyTo  StudentChatGroupMessage?  @relation("StudentChatGroupMessageReplies", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replies  StudentChatGroupMessage[] @relation("StudentChatGroupMessageReplies")
+
+  @@index([groupId, createdAt])
+  @@index([replyToMessageId])
+  @@map("student_chat_group_messages")
 }

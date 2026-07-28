@@ -6,23 +6,41 @@ import {
   type ClubGroupMembershipStatus,
 } from '../services/category-admin-club-group-memberships.service';
 import {
+  subCategoryAdminClubGroupMembershipsService,
+  type SubCategoryAdminClubGroupMembershipRow,
+} from '../services/subcategory-admin-club-group-memberships.service';
+import {
   categoryAdminClubGroupChatsService,
   type CategoryAdminClubGroupChatRow,
   type CategoryAdminClubGroupMessageItem,
   type ClubGroupMessageMode,
 } from '../services/category-admin-club-group-chats.service';
 import {
+  subCategoryAdminClubGroupChatsService,
+  type SubCategoryAdminClubGroupChatRow,
+  type SubCategoryAdminClubGroupMessageItem,
+} from '../services/subcategory-admin-club-group-chats.service';
+import {
   categoryAdminDirectChatsService,
   type CategoryAdminDirectConversationRow,
 } from '../services/category-admin-direct-chats.service';
+import {
+  subCategoryAdminDirectChatsService,
+  type SubCategoryAdminDirectConversationRow,
+} from '../services/subcategory-admin-direct-chats.service';
 import type { DirectMessageItem } from '../services/user-direct-chats.service';
+import {
+  subCategoryAdminStudentChatGroupsService,
+  type SubCategoryAdminStudentChatGroupRow,
+  type SubCategoryAdminStudentRow,
+} from '../services/subcategory-admin-student-chat-groups.service';
 
 const TEXT_DARK = '#1a1f2e';
 const TEXT_MUTED = '#6c757d';
 
-type MessagesTab = 'config' | ClubGroupMembershipStatus | 'chat' | 'direct-chats';
+type MessagesTab = 'config' | ClubGroupMembershipStatus | 'chat' | 'direct-chats' | 'student-groups';
 
-const TABS: { id: MessagesTab; label: string }[] = [
+const BASE_TABS: { id: MessagesTab; label: string }[] = [
   { id: 'config', label: 'Chat config' },
   { id: 'pending', label: 'Pending approvals' },
   { id: 'approved', label: 'Approved' },
@@ -59,7 +77,32 @@ function formatDate(iso: string | null) {
   }
 }
 
-export function CategoryAdminMessagesPanel() {
+export function CategoryAdminMessagesPanel({
+  variant = 'category',
+}: {
+  /** Operational messaging is owned by subcategory admins; category view is deprecated. */
+  variant?: 'category' | 'subcategory';
+}) {
+  const queryPrefix = variant === 'subcategory' ? 'subcategory-admin' : 'category-admin';
+  const membershipsService =
+    variant === 'subcategory'
+      ? subCategoryAdminClubGroupMembershipsService
+      : categoryAdminClubGroupMembershipsService;
+  const clubChatsService =
+    variant === 'subcategory'
+      ? subCategoryAdminClubGroupChatsService
+      : categoryAdminClubGroupChatsService;
+  const directChatsService =
+    variant === 'subcategory' ? subCategoryAdminDirectChatsService : categoryAdminDirectChatsService;
+  const adminLabel = variant === 'subcategory' ? 'subcategory admin' : 'category admin';
+  const visibleTabs = useMemo(
+    () =>
+      variant === 'subcategory'
+        ? [...BASE_TABS, { id: 'student-groups' as const, label: 'Student groups' }]
+        : BASE_TABS,
+    [variant],
+  );
+
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<MessagesTab>('config');
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -77,20 +120,20 @@ export function CategoryAdminMessagesPanel() {
     : null;
 
   const { data: membershipRows = [], isLoading: membershipsLoading, error: membershipsError } = useQuery({
-    queryKey: ['category-admin', 'club-group-memberships', membershipTab],
-    queryFn: () => categoryAdminClubGroupMembershipsService.list(membershipTab!),
+    queryKey: [queryPrefix, 'club-group-memberships', membershipTab],
+    queryFn: () => membershipsService.list(membershipTab!),
     enabled: !!membershipTab,
   });
 
   const { data: configChats = [], isLoading: configLoading, error: configError } = useQuery({
-    queryKey: ['category-admin', 'club-group-chats'],
-    queryFn: categoryAdminClubGroupChatsService.list,
+    queryKey: [queryPrefix, 'club-group-chats'],
+    queryFn: clubChatsService.list,
     enabled: activeTab === 'config' || activeTab === 'chat',
   });
 
   const { data: approvedMembers = [], isLoading: membersLoading } = useQuery({
-    queryKey: ['category-admin', 'club-group-chats', selectedChatId, 'approved-members'],
-    queryFn: () => categoryAdminClubGroupChatsService.listApprovedMembers(selectedChatId!),
+    queryKey: [queryPrefix, 'club-group-chats', selectedChatId, 'approved-members'],
+    queryFn: () => clubChatsService.listApprovedMembers(selectedChatId!),
     enabled: activeTab === 'chat' && !!selectedChatId,
   });
 
@@ -99,21 +142,21 @@ export function CategoryAdminMessagesPanel() {
     isLoading: chatMessagesLoading,
     refetch: refetchChatMessages,
   } = useQuery({
-    queryKey: ['category-admin', 'club-group-chats', selectedChatId, 'messages'],
-    queryFn: () => categoryAdminClubGroupChatsService.listMessages(selectedChatId!),
+    queryKey: [queryPrefix, 'club-group-chats', selectedChatId, 'messages'],
+    queryFn: () => clubChatsService.listMessages(selectedChatId!),
     enabled: activeTab === 'chat' && !!selectedChatId,
     refetchInterval: activeTab === 'chat' && selectedChatId ? 4000 : false,
   });
 
   const { data: directSettings, isLoading: directSettingsLoading } = useQuery({
-    queryKey: ['category-admin', 'direct-chats', 'settings'],
-    queryFn: categoryAdminDirectChatsService.getSettings,
+    queryKey: [queryPrefix, 'direct-chats', 'settings'],
+    queryFn: directChatsService.getSettings,
     enabled: activeTab === 'config',
   });
 
   const { data: directConversations = [], isLoading: directListLoading, error: directListError } = useQuery({
-    queryKey: ['category-admin', 'direct-chats'],
-    queryFn: categoryAdminDirectChatsService.list,
+    queryKey: [queryPrefix, 'direct-chats'],
+    queryFn: directChatsService.list,
     enabled: activeTab === 'direct-chats',
     refetchInterval: activeTab === 'direct-chats' ? 8000 : false,
   });
@@ -122,8 +165,8 @@ export function CategoryAdminMessagesPanel() {
     data: directThread,
     isLoading: directThreadLoading,
   } = useQuery({
-    queryKey: ['category-admin', 'direct-chats', selectedDirectChatId, 'messages'],
-    queryFn: () => categoryAdminDirectChatsService.listMessages(selectedDirectChatId!),
+    queryKey: [queryPrefix, 'direct-chats', selectedDirectChatId, 'messages'],
+    queryFn: () => directChatsService.listMessages(selectedDirectChatId!),
     enabled: activeTab === 'direct-chats' && !!selectedDirectChatId,
     refetchInterval: activeTab === 'direct-chats' && selectedDirectChatId ? 4000 : false,
   });
@@ -153,18 +196,18 @@ export function CategoryAdminMessagesPanel() {
   }, [directThread?.messages, activeTab]);
 
   const invalidateMemberships = () => {
-    void queryClient.invalidateQueries({ queryKey: ['category-admin', 'club-group-memberships'] });
+    void queryClient.invalidateQueries({ queryKey: [queryPrefix, 'club-group-memberships'] });
   };
 
   const approveMutation = useMutation({
-    mutationFn: (id: string) => categoryAdminClubGroupMembershipsService.approve(id),
+    mutationFn: (id: string) => membershipsService.approve(id),
     onMutate: (id) => {
       setActingOnId(id);
       setActionMessage(null);
     },
     onSuccess: () => {
       invalidateMemberships();
-      void queryClient.invalidateQueries({ queryKey: ['category-admin', 'club-group-chats'] });
+      void queryClient.invalidateQueries({ queryKey: [queryPrefix, 'club-group-chats'] });
       setActionMessage({
         type: 'success',
         text: 'User approved. They will receive an email notification to join the group.',
@@ -180,14 +223,14 @@ export function CategoryAdminMessagesPanel() {
   });
 
   const banMutation = useMutation({
-    mutationFn: (id: string) => categoryAdminClubGroupMembershipsService.ban(id),
+    mutationFn: (id: string) => membershipsService.ban(id),
     onMutate: (id) => {
       setActingOnId(id);
       setActionMessage(null);
     },
     onSuccess: () => {
       invalidateMemberships();
-      void queryClient.invalidateQueries({ queryKey: ['category-admin', 'club-group-chats'] });
+      void queryClient.invalidateQueries({ queryKey: [queryPrefix, 'club-group-chats'] });
       setActionMessage({ type: 'success', text: 'User has been banned from the group.' });
     },
     onError: (err) => {
@@ -203,7 +246,7 @@ export function CategoryAdminMessagesPanel() {
     mutationFn: ({ id, messageMode }: { id: string; messageMode: ClubGroupMessageMode }) =>
       categoryAdminClubGroupChatsService.updateMessageMode(id, messageMode),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['category-admin', 'club-group-chats'] });
+      void queryClient.invalidateQueries({ queryKey: [queryPrefix, 'club-group-chats'] });
       setConfigModalChat(null);
       setActionMessage({ type: 'success', text: 'Chat settings saved.' });
     },
@@ -216,9 +259,9 @@ export function CategoryAdminMessagesPanel() {
   });
 
   const updateDirectSettingsMutation = useMutation({
-    mutationFn: (isEnabled: boolean) => categoryAdminDirectChatsService.updateSettings(isEnabled),
+    mutationFn: (isEnabled: boolean) => directChatsService.updateSettings(isEnabled),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['category-admin', 'direct-chats', 'settings'] });
+      void queryClient.invalidateQueries({ queryKey: [queryPrefix, 'direct-chats', 'settings'] });
       setActionMessage({ type: 'success', text: '1:1 chat settings saved.' });
     },
     onError: (err) => {
@@ -239,7 +282,7 @@ export function CategoryAdminMessagesPanel() {
     setChatSending(true);
     setActionMessage(null);
     try {
-      await categoryAdminClubGroupChatsService.sendMessage(selectedChatId, chatDraft.trim());
+      await clubChatsService.sendMessage(selectedChatId, chatDraft.trim());
       setChatDraft('');
       await refetchChatMessages();
     } catch (err) {
@@ -255,11 +298,12 @@ export function CategoryAdminMessagesPanel() {
   return (
     <>
       <p className="text-muted mb-4">
-        Configure club group chat, review join requests, and message approved students.
+        Configure club group chat, review student join requests, and message approved members. You are
+        the primary group moderator as {adminLabel}.
       </p>
 
       <ul className="nav nav-tabs mb-4" style={{ borderBottom: '1px solid #dee2e6' }}>
-            {TABS.map((tab) => (
+            {visibleTabs.map((tab) => (
               <li key={tab.id} className="nav-item">
                 <button
                   type="button"
@@ -336,6 +380,8 @@ export function CategoryAdminMessagesPanel() {
               error={directListError}
               messagesEndRef={directMessagesEndRef}
             />
+          ) : activeTab === 'student-groups' ? (
+            <StudentGroupsAdminPanel />
           ) : membershipTab ? (
             <MembershipTable
               rows={membershipRows}
@@ -372,7 +418,7 @@ function ChatConfigPanel({
   savingDirectSettings,
   onToggleDirectMessaging,
 }: {
-  chats: CategoryAdminClubGroupChatRow[];
+  chats: (CategoryAdminClubGroupChatRow | SubCategoryAdminClubGroupChatRow)[];
   isLoading: boolean;
   error: unknown;
   onConfigure: (chat: CategoryAdminClubGroupChatRow) => void;
@@ -576,13 +622,13 @@ function AdminChatPanel({
   isLoading,
   error,
 }: {
-  chats: CategoryAdminClubGroupChatRow[];
+  chats: (CategoryAdminClubGroupChatRow | SubCategoryAdminClubGroupChatRow)[];
   selectedChatId: string | null;
-  selectedChat: CategoryAdminClubGroupChatRow | null;
+  selectedChat: CategoryAdminClubGroupChatRow | SubCategoryAdminClubGroupChatRow | null;
   onSelectChat: (id: string) => void;
   approvedMembers: Array<{ id: string; user: { name: string; email: string } }>;
   membersLoading: boolean;
-  messages: CategoryAdminClubGroupMessageItem[];
+  messages: (CategoryAdminClubGroupMessageItem | SubCategoryAdminClubGroupMessageItem)[];
   messagesLoading: boolean;
   draft: string;
   sending: boolean;
@@ -720,9 +766,16 @@ function AdminChatPanel({
   );
 }
 
-function AdminMessageBubble({ message }: { message: CategoryAdminClubGroupMessageItem }) {
-  const isAdmin = !!message.categoryAdmin;
-  const senderName = message.categoryAdmin?.name ?? message.user?.name ?? 'Unknown';
+function AdminMessageBubble({
+  message,
+}: {
+  message: CategoryAdminClubGroupMessageItem | SubCategoryAdminClubGroupMessageItem;
+}) {
+  const subCategoryAdmin =
+    'subCategoryAdmin' in message ? message.subCategoryAdmin : null;
+  const isAdmin = !!(message.categoryAdmin || subCategoryAdmin);
+  const senderName =
+    message.categoryAdmin?.name ?? subCategoryAdmin?.name ?? message.user?.name ?? 'Unknown';
   const time = useMemo(() => {
     try {
       return new Date(message.createdAt).toLocaleTimeString([], {
@@ -769,7 +822,7 @@ function MembershipTable({
   onApprove,
   onBan,
 }: {
-  rows: CategoryAdminClubGroupMembershipRow[];
+  rows: (CategoryAdminClubGroupMembershipRow | SubCategoryAdminClubGroupMembershipRow)[];
   activeTab: ClubGroupMembershipStatus;
   isLoading: boolean;
   error: unknown;
@@ -827,7 +880,7 @@ function MembershipRow({
   onBan,
   actionLoading,
 }: {
-  row: CategoryAdminClubGroupMembershipRow;
+  row: CategoryAdminClubGroupMembershipRow | SubCategoryAdminClubGroupMembershipRow;
   activeTab: ClubGroupMembershipStatus;
   onApprove: () => void;
   onBan: () => void;
@@ -901,7 +954,7 @@ function DirectChatsAuditPanel({
   error,
   messagesEndRef,
 }: {
-  conversations: CategoryAdminDirectConversationRow[];
+  conversations: (CategoryAdminDirectConversationRow | SubCategoryAdminDirectConversationRow)[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   thread:
@@ -1025,6 +1078,236 @@ function DirectChatsAuditPanel({
               </div>
             </>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StudentGroupsAdminPanel() {
+  const queryClient = useQueryClient();
+  const [groupName, setGroupName] = useState('');
+  const [groupDescription, setGroupDescription] = useState('');
+  const [groupVisibility, setGroupVisibility] = useState<'public' | 'private'>('public');
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [studentQuery, setStudentQuery] = useState('');
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const { data: groups = [], isLoading } = useQuery({
+    queryKey: ['subcategory-admin', 'student-chat-groups'],
+    queryFn: subCategoryAdminStudentChatGroupsService.list,
+  });
+
+  const { data: members = [], isLoading: membersLoading } = useQuery({
+    queryKey: ['subcategory-admin', 'student-chat-groups', selectedGroupId, 'members'],
+    queryFn: () => subCategoryAdminStudentChatGroupsService.listMembers(selectedGroupId!),
+    enabled: !!selectedGroupId,
+  });
+
+  const { data: students = [] } = useQuery({
+    queryKey: ['subcategory-admin', 'student-chat-groups', 'students', studentQuery],
+    queryFn: () => subCategoryAdminStudentChatGroupsService.searchStudents(studentQuery),
+    enabled: !!selectedGroupId,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: () =>
+      subCategoryAdminStudentChatGroupsService.create({
+        name: groupName.trim(),
+        description: groupDescription.trim() || undefined,
+        visibility: groupVisibility,
+      }),
+    onSuccess: (group) => {
+      setGroupName('');
+      setGroupDescription('');
+      setGroupVisibility('public');
+      setSelectedGroupId(group.id);
+      setFeedback({ type: 'success', text: 'Group created. Add students below.' });
+      void queryClient.invalidateQueries({ queryKey: ['subcategory-admin', 'student-chat-groups'] });
+    },
+    onError: (err) => {
+      setFeedback({ type: 'error', text: getQueryErrorMessage(err, 'Could not create group.') });
+    },
+  });
+
+  const addMemberMutation = useMutation({
+    mutationFn: (userId: string) =>
+      subCategoryAdminStudentChatGroupsService.addMember(selectedGroupId!, userId),
+    onSuccess: () => {
+      setFeedback({ type: 'success', text: 'Student added to the group.' });
+      void queryClient.invalidateQueries({
+        queryKey: ['subcategory-admin', 'student-chat-groups', selectedGroupId, 'members'],
+      });
+      void queryClient.invalidateQueries({ queryKey: ['subcategory-admin', 'student-chat-groups'] });
+    },
+    onError: (err) => {
+      setFeedback({ type: 'error', text: getQueryErrorMessage(err, 'Could not add student.') });
+    },
+  });
+
+  const selectedGroup = groups.find((g) => g.id === selectedGroupId) ?? null;
+  const memberIds = new Set(members.map((m) => m.user.id));
+
+  return (
+    <div className="card border-0 shadow-sm" style={{ borderRadius: 0 }}>
+      <div className="px-4 py-3 border-bottom bg-white">
+        <div className="fw-semibold" style={{ color: TEXT_DARK }}>
+          Student chat groups
+        </div>
+        <div className="small text-muted">
+          Create public or private groups and add students. Students cannot create groups on their own.
+        </div>
+      </div>
+      <div className="p-4">
+        {feedback ? (
+          <div className={`alert alert-${feedback.type === 'success' ? 'success' : 'danger'} py-2`}>
+            {feedback.text}
+          </div>
+        ) : null}
+
+        <div className="row g-4">
+          <div className="col-lg-5">
+            <h6 className="fw-semibold mb-3">Create a group</h6>
+            <div className="mb-3">
+              <label className="form-label small fw-semibold">Group name</label>
+              <input
+                className="form-control"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                maxLength={120}
+                placeholder="e.g. CS Study Group"
+              />
+            </div>
+            <div className="mb-3">
+              <label className="form-label small fw-semibold">Description (optional)</label>
+              <textarea
+                className="form-control"
+                rows={2}
+                value={groupDescription}
+                onChange={(e) => setGroupDescription(e.target.value)}
+                maxLength={500}
+              />
+            </div>
+            <div className="mb-3">
+              <label className="form-label small fw-semibold">Type</label>
+              <div className="d-flex gap-2">
+                {(['public', 'private'] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    className={`btn btn-sm ${groupVisibility === v ? 'btn-dark' : 'btn-outline-secondary'}`}
+                    onClick={() => setGroupVisibility(v)}
+                  >
+                    {v === 'public' ? 'Public' : 'Private'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn btn-dark btn-sm"
+              disabled={createMutation.isPending || groupName.trim().length < 2}
+              onClick={() => createMutation.mutate()}
+            >
+              {createMutation.isPending ? 'Creating…' : 'Create group'}
+            </button>
+
+            <h6 className="fw-semibold mt-4 mb-3">Your groups</h6>
+            {isLoading ? (
+              <p className="small text-muted">Loading groups…</p>
+            ) : groups.length === 0 ? (
+              <p className="small text-muted">No student groups yet.</p>
+            ) : (
+              <ul className="list-group list-group-flush border rounded">
+                {groups.map((g: SubCategoryAdminStudentChatGroupRow) => (
+                  <li key={g.id} className="list-group-item">
+                    <button
+                      type="button"
+                      className={`btn btn-link text-start p-0 text-decoration-none w-100 ${selectedGroupId === g.id ? 'fw-semibold' : ''}`}
+                      onClick={() => {
+                        setSelectedGroupId(g.id);
+                        setFeedback(null);
+                      }}
+                    >
+                      <div className="d-flex justify-content-between align-items-center gap-2">
+                        <span style={{ color: TEXT_DARK }}>{g.name}</span>
+                        <span className="badge bg-light text-dark border text-uppercase" style={{ fontSize: 10 }}>
+                          {g.visibility}
+                        </span>
+                      </div>
+                      <div className="small text-muted">{g.memberCount} member{g.memberCount === 1 ? '' : 's'}</div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="col-lg-7">
+            {!selectedGroup ? (
+              <p className="small text-muted mb-0">Select a group to manage members.</p>
+            ) : (
+              <>
+                <h6 className="fw-semibold mb-2">{selectedGroup.name}</h6>
+                <p className="small text-muted">
+                  Add students from your school. They will see this group in their Messages inbox.
+                </p>
+
+                <div className="mb-3">
+                  <input
+                    className="form-control form-control-sm"
+                    placeholder="Search students by name or email"
+                    value={studentQuery}
+                    onChange={(e) => setStudentQuery(e.target.value)}
+                  />
+                </div>
+
+                <div className="mb-4" style={{ maxHeight: 200, overflowY: 'auto' }}>
+                  {students.length === 0 ? (
+                    <p className="small text-muted">No students match your search.</p>
+                  ) : (
+                    <ul className="list-group list-group-flush border rounded">
+                      {students.map((s: SubCategoryAdminStudentRow) => (
+                        <li
+                          key={s.id}
+                          className="list-group-item d-flex justify-content-between align-items-center py-2"
+                        >
+                          <div className="min-w-0">
+                            <div className="small fw-semibold text-truncate">{s.name}</div>
+                            <div className="small text-muted text-truncate">{s.email}</div>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-dark flex-shrink-0"
+                            disabled={memberIds.has(s.id) || addMemberMutation.isPending}
+                            onClick={() => addMemberMutation.mutate(s.id)}
+                          >
+                            {memberIds.has(s.id) ? 'Added' : 'Add'}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <h6 className="fw-semibold mb-2">Members ({members.length})</h6>
+                {membersLoading ? (
+                  <p className="small text-muted">Loading members…</p>
+                ) : members.length === 0 ? (
+                  <p className="small text-muted">No members yet.</p>
+                ) : (
+                  <ul className="list-group list-group-flush border rounded">
+                    {members.map((m) => (
+                      <li key={m.user.id} className="list-group-item py-2 small">
+                        <div className="fw-semibold">{m.user.name}</div>
+                        <div className="text-muted">{m.user.email}</div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

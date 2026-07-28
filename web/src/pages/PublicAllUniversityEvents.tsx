@@ -269,8 +269,8 @@ export const PublicAllUniversityEvents = () => {
       navigate('/universities');
       return;
     }
-    if (tab === 'blogs') {
-      navigate('/blogs');
+    if (tab === 'chat') {
+      navigate('/messages');
       return;
     }
     navigate('/events', { state: { bottomNav: tab } });

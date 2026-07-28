@@ -14,11 +14,7 @@ import {
   Alert,
   DeviceEventEmitter,
   InteractionManager,
-  Animated,
-  Easing,
-  LayoutAnimation,
   Platform,
-  UIManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -33,6 +29,7 @@ import {
   getActiveSponsoredAds,
   recordBannerAdClick,
   imageSrc,
+  schoolLogoSrc,
   ApprovedEventPublic,
   CategoryPublic,
   SponsoredAdPublic,
@@ -71,13 +68,8 @@ export default function EventsScreen() {
   const [persistedPrefSubIds, setPersistedPrefSubIds] = useState<string[]>([]);
   const [expandedCategoryId, setExpandedCategoryId] = useState<string | null>(null);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
-  const tabSlideAnim = useRef(new Animated.Value(0)).current;
   /** Emit push-permission readiness once per login so the OS dialog does not stack on first-login Modals (iPad). */
   const pushPermissionReadyEmittedForUser = useRef<string | null>(null);
-
-  if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
-  }
 
   const schoolId = user?.schoolId ?? null;
   const showCategories = !!user && !showAllSchools;
@@ -299,15 +291,6 @@ export default function EventsScreen() {
   }, [showCategories]);
 
   useEffect(() => {
-    Animated.timing(tabSlideAnim, {
-      toValue: showAllSchools ? 1 : 0,
-      duration: 220,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
-  }, [showAllSchools, tabSlideAnim]);
-
-  useEffect(() => {
     if (user && showAllSchools) setHomeFilterMenuOpen(false);
   }, [user, showAllSchools]);
 
@@ -508,10 +491,22 @@ export default function EventsScreen() {
     );
   };
 
+  const switchToMySchool = useCallback(() => {
+    setExpandedCategoryId(null);
+    setHomeFilterMenuOpen(false);
+    setShowAllSchools(false);
+  }, []);
+
+  const switchToAllSchools = useCallback(() => {
+    setExpandedCategoryId(null);
+    setHomeFilterMenuOpen(false);
+    setShowAllSchools(true);
+  }, []);
+
   const mySchoolLogo = useMemo(() => {
     if (!schoolId) return '';
     const hit = events.find((e) => e.schoolId === schoolId && e.school?.image);
-    return hit?.school?.image ? imageSrc(hit.school.image) : '';
+    return hit?.school?.image ? schoolLogoSrc(hit.school.image) : '';
   }, [events, schoolId]);
 
   const selectedSubCategoryMeta = useMemo(() => {
@@ -532,10 +527,7 @@ export default function EventsScreen() {
         <View style={styles.tabBar}>
           <TouchableOpacity
             style={[styles.tab, showAllSchools ? null : styles.tabActive]}
-            onPress={() => {
-              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-              setShowAllSchools(false);
-            }}
+            onPress={switchToMySchool}
           >
             <View style={styles.tabContent}>
               {mySchoolLogo ? (
@@ -555,10 +547,7 @@ export default function EventsScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, showAllSchools ? styles.tabActive : null]}
-            onPress={() => {
-              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-              setShowAllSchools(true);
-            }}
+            onPress={switchToAllSchools}
           >
             <View style={styles.tabContent}>
               <View style={styles.tabSchoolLogoFallback}>
@@ -570,20 +559,6 @@ export default function EventsScreen() {
             </View>
             {showAllSchools && <View style={styles.tabUnderline} />}
           </TouchableOpacity>
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.tabSlideTrack,
-              {
-                left: tabSlideAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['0%', '50%'],
-                }),
-              },
-            ]}
-          >
-            <View style={styles.tabUnderlineSlide} />
-          </Animated.View>
         </View>
       ) : null}
 
@@ -788,17 +763,7 @@ export default function EventsScreen() {
                 <Text style={styles.emptyFeedSecondary}>
                   <Text style={styles.emptyFeedStrong}>Approved</Text>
                   {' '}
-                  news from schools appears here after category admin approval. Use{' '}
-                  <Text
-                    style={styles.emptyFeedLink}
-                    onPress={() => {
-                      (navigation as { navigate: (name: string) => void }).navigate('Blogs');
-                    }}
-                  >
-                    Blogs
-                  </Text>
-                  {' '}
-                  in the nav for blog posts.
+                  news from schools appears here after category admin approval.
                 </Text>
                 {!user ? (
                   <Text style={styles.emptyFeedSecondary}>
@@ -811,6 +776,7 @@ export default function EventsScreen() {
         </ScrollView>
       ) : (
         <View
+          key={showAllSchools ? 'feed-all-schools' : 'feed-my-school'}
           style={styles.inshortsFeedHost}
           onLayout={(e) => {
             const h = e.nativeEvent.layout.height;
@@ -819,6 +785,7 @@ export default function EventsScreen() {
         >
           {feedListHeight > 0 ? (
             <InshortsPagedFeed
+              key={showAllSchools ? 'inshorts-all' : 'inshorts-my'}
               feedItems={feedItems}
               pageHeight={feedListHeight}
               alignTop={isMySchoolFeed && selectedSubCategoryMeta.length > 0}
@@ -1338,19 +1305,11 @@ const styles = StyleSheet.create({
     color: '#8e8e8e',
   },
   tabUnderline: {
-    display: 'none',
-  },
-  tabSlideTrack: {
-    position: 'absolute',
-    bottom: 0,
-    width: '50%',
-    alignItems: 'center',
-  },
-  tabUnderlineSlide: {
     width: '70%',
     height: 3,
     backgroundColor: '#fff',
     borderRadius: 2,
+    marginTop: 4,
   },
   categoriesStrip: {
     minHeight: 50,

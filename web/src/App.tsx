@@ -6,6 +6,8 @@ import { CategoryAdminAuthProvider, useCategoryAdminAuth } from './contexts/Cate
 import { SubCategoryAdminAuthProvider, useSubCategoryAdminAuth } from './contexts/SubCategoryAdminAuthContext';
 import { AdsAdminAuthProvider, useAdsAdminAuth } from './contexts/AdsAdminAuthContext';
 import { UserAuthProvider } from './contexts/UserAuthContext';
+import { ChatPopupProvider } from './contexts/ChatPopupContext';
+import { StudentChatGroupsWidget } from './components/StudentChatGroupsWidget';
 import { EventsFilterProvider } from './contexts/EventsFilterContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { SchoolAdminProtectedRoute } from './components/SchoolAdminProtectedRoute';
@@ -97,6 +99,7 @@ import { PublicAllUniversityEvents } from './pages/PublicAllUniversityEvents';
 import { PublicBlogDetail } from './pages/PublicBlogDetail';
 import { SavedItems } from './pages/SavedItems';
 import { Notifications } from './pages/Notifications';
+import Messages from './pages/Messages';
 import { AccountProfile } from './pages/AccountProfile';
 import { EditProfile } from './pages/EditProfile';
 import { ViewProfile } from './pages/ViewProfile';
@@ -466,7 +469,7 @@ const CategoryAdminRoutes = () => {
       />
       <Route
         path="messages"
-        element={<Navigate to="/category-admin/privacy?tab=messages" replace />}
+        element={<Navigate to="/category-admin/privacy?tab=message-config" replace />}
       />
       <Route
         path="privacy"
@@ -613,6 +616,10 @@ const SubCategoryAdminRoutes = () => {
         }
       />
       <Route
+        path="messages"
+        element={<Navigate to="/subcategory-admin/privacy?tab=messages" replace />}
+      />
+      <Route
         path="received-corrections"
         element={
           <SubCategoryAdminProtectedRoute>
@@ -677,6 +684,7 @@ const AppRoutes = () => {
       <Route path="/login" element={<Navigate to="/events" state={{ openAuth: 'login' }} replace />} />
       <Route path="/saved" element={<SavedItems />} />
       <Route path="/notifications" element={<Notifications />} />
+      <Route path="/messages" element={<Messages />} />
       <Route path="/profile" element={<AccountProfile />} />
       <Route path="/profile/edit" element={<EditProfile />} />
       <Route path="/profile/view" element={<ViewProfile />} />
@@ -712,9 +720,12 @@ function App() {
               <AdsAdminAuthProvider>
                 <UserAuthProvider>
                 <BrowserRouter>
+                  <ChatPopupProvider>
                   <EventsFilterProvider>
                     <AppRoutes />
+                    <StudentChatGroupsWidget />
                   </EventsFilterProvider>
+                  </ChatPopupProvider>
                 </BrowserRouter>
                 </UserAuthProvider>
               </AdsAdminAuthProvider>

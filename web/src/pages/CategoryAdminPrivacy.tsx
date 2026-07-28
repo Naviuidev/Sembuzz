@@ -5,9 +5,8 @@ import { CategoryAdminNavbar } from '../components/CategoryAdminNavbar';
 import { CategoryAdminSidebar } from '../components/CategoryAdminSidebar';
 import { PrivacyPageTabs, type PrivacyPageTab } from '../components/PrivacyPageTabs';
 import { ClubGroupChatRequestReviewPanel } from '../components/ClubGroupChatRequestReviewPanel';
-import { CategoryAdminMessagesPanel } from '../components/CategoryAdminMessagesPanel';
-import { categoryAdminClubGroupChatRequestsService } from '../services/category-admin-club-group-chat-requests.service';
 import { useCategoryAdminAuth } from '../contexts/CategoryAdminAuthContext';
+import { categoryAdminClubGroupChatRequestsService } from '../services/category-admin-club-group-chat-requests.service';
 import { categoryAdminCategoriesService } from '../services/category-admin-categories.service';
 import {
   subCategoryAdminsService,
@@ -17,7 +16,7 @@ import {
 } from '../services/subcategory-admins.service';
 
 function privacyTabFromParam(tab: string | null): PrivacyPageTab {
-  if (tab === 'message-config' || tab === 'messages') return tab;
+  if (tab === 'message-config') return tab;
   return 'admins';
 }
 
@@ -237,7 +236,6 @@ export const CategoryAdminPrivacy = () => {
           <PrivacyPageTabs
             activeTab={privacyTab}
             onChange={handlePrivacyTabChange}
-            showMessagesTab
           />
 
           {privacyTab === 'message-config' ? (
@@ -245,8 +243,6 @@ export const CategoryAdminPrivacy = () => {
               service={categoryAdminClubGroupChatRequestsService}
               queryKeyPrefix="category-admin"
             />
-          ) : privacyTab === 'messages' ? (
-            <CategoryAdminMessagesPanel />
           ) : (
           <>
           <div className="d-flex justify-content-between align-items-center mb-4">

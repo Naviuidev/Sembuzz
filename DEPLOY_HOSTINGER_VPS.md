@@ -55,10 +55,13 @@ API_URL="https://api.sembuzz.com"
 FRONTEND_URL="https://sembuzz.com"
 SMTP_HOST=smtp.hostinger.com
 SMTP_PORT=587
+SMTP_SECURE=false
 SMTP_USER=admin@sembuzz.com
 SMTP_PASS=your-smtp-password
 SMTP_FROM=admin@sembuzz.com
 ```
+
+`SMTP_FROM` must be a verified mailbox on your domain (use the same address as `SMTP_USER` or a valid alias). Wrong sender domains cause password-reset and registration emails to fail.
 
 Generate JWT secret: `openssl rand -base64 32` → paste into `JWT_SECRET`.  
 Save: **Ctrl+O**, Enter, **Ctrl+X**.

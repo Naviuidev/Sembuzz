@@ -6,6 +6,7 @@ import { UserSchoolSocialModule } from './school-social/user-school-social.modul
 import { UserNotificationsModule } from './notifications/user-notifications.module';
 import { UserClubGroupChatsModule } from './club-group-chats/user-club-group-chats.module';
 import { UserDirectChatsModule } from './direct-chats/user-direct-chats.module';
+import { UserStudentChatGroupsModule } from './student-chat-groups/user-student-chat-groups.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { UserDirectChatsModule } from './direct-chats/user-direct-chats.module';
     UserNotificationsModule,
     UserClubGroupChatsModule,
     UserDirectChatsModule,
+    UserStudentChatGroupsModule,
   ],
 })
 export class UserModule {}

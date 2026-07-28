@@ -31,9 +31,21 @@ const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
 interface DirectChatPanelProps {
   currentUserId?: string | null;
+  /** When set, only render the chat thread (parent supplies conversation list). */
+  embeddedConversation?: {
+    conversationId: string;
+    peer: DirectChatUser;
+  } | null;
+  onEmbeddedBack?: () => void;
+  headerExtra?: React.ReactNode;
 }
 
-export function DirectChatPanel({ currentUserId }: DirectChatPanelProps) {
+export function DirectChatPanel({
+  currentUserId,
+  embeddedConversation = null,
+  onEmbeddedBack,
+  headerExtra,
+}: DirectChatPanelProps) {
   const queryClient = useQueryClient();
   const [step, setStep] = useState<DirectStep>('inbox');
   const [searchQuery, setSearchQuery] = useState('');
@@ -58,6 +70,7 @@ export function DirectChatPanel({ currentUserId }: DirectChatPanelProps) {
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const pdfInputRef = useRef<HTMLInputElement | null>(null);
   const prevMessageCountRef = useRef(0);
+  const embeddedMode = onEmbeddedBack != null;
 
   const { data: availability, isLoading: availabilityLoading, isError: availabilityError } = useQuery({
     queryKey: ['user', 'direct-chats', 'availability'],
@@ -73,7 +86,7 @@ export function DirectChatPanel({ currentUserId }: DirectChatPanelProps) {
   } = useQuery({
     queryKey: ['user', 'direct-chats', 'inbox'],
     queryFn: userDirectChatsService.listInbox,
-    enabled: availability?.available === true && (step === 'inbox' || step === 'chat'),
+    enabled: availability?.available === true && !embeddedMode && (step === 'inbox' || step === 'chat'),
     refetchInterval: step === 'inbox' || step === 'chat' ? 3000 : false,
   });
 
@@ -114,6 +127,9 @@ export function DirectChatPanel({ currentUserId }: DirectChatPanelProps) {
         const result = await userDirectChatsService.listMessages(conversationId);
         setMessages(result.messages);
         applyBlockState(result);
+        if (!silent) {
+          await userDirectChatsService.markRead(conversationId);
+        }
         invalidateMessaging();
       } catch (err) {
         const msg =
@@ -178,6 +194,31 @@ export function DirectChatPanel({ currentUserId }: DirectChatPanelProps) {
     }
     prevMessageCountRef.current = 0;
   }, [applyBlockState]);
+
+  const handleChatBack = useCallback(() => {
+    if (embeddedMode && onEmbeddedBack) {
+      onEmbeddedBack();
+      setActivePeer(null);
+      setActiveConversationId(null);
+      setMessages([]);
+      setReplyTo(null);
+      setPendingAttachment(null);
+      setHeaderMenuOpen(false);
+      return;
+    }
+    setStep('inbox');
+    setActivePeer(null);
+    setActiveConversationId(null);
+    setMessages([]);
+    setReplyTo(null);
+    setPendingAttachment(null);
+    void refetchInbox();
+  }, [embeddedMode, onEmbeddedBack, refetchInbox]);
+
+  useEffect(() => {
+    if (!embeddedConversation) return;
+    openChat(embeddedConversation.peer, embeddedConversation.conversationId);
+  }, [embeddedConversation, openChat]);
 
   const handleOpenInboxItem = (item: DirectChatInboxItem) => {
     if (item.peerStatus === 'pending_incoming') return;
@@ -348,29 +389,31 @@ export function DirectChatPanel({ currentUserId }: DirectChatPanelProps) {
     }
   };
 
-  if (availabilityLoading) {
-    return <p className="small text-muted mb-0">Loading…</p>;
-  }
+  if (!embeddedConversation) {
+    if (availabilityLoading) {
+      return <p className="small text-muted mb-0">Loading…</p>;
+    }
 
-  if (availabilityError) {
-    return (
-      <p className="small text-danger mb-0">
-        Could not load direct messaging. Make sure the app is connected to an updated server and try again.
-      </p>
-    );
-  }
+    if (availabilityError) {
+      return (
+        <p className="small text-danger mb-0">
+          Could not load direct messaging. Make sure the app is connected to an updated server and try again.
+        </p>
+      );
+    }
 
-  if (availability && !availability.available) {
-    return (
-      <p className="small text-muted mb-0">
-        Direct messaging is not available for your school right now.
-      </p>
-    );
+    if (availability && !availability.available) {
+      return (
+        <p className="small text-muted mb-0">
+          Direct messaging is not available for your school right now.
+        </p>
+      );
+    }
   }
 
   return (
-    <div className="d-flex flex-column" style={{ minHeight: 420 }}>
-      {step === 'inbox' ? (
+    <div className="d-flex flex-column" style={{ minHeight: embeddedMode ? '100%' : 420, height: embeddedMode ? '100%' : undefined }}>
+      {!embeddedMode && step === 'inbox' ? (
         <>
           <div className="d-flex align-items-center justify-content-between mb-3">
             <p className="small text-muted mb-0">Your conversations</p>
@@ -434,7 +477,7 @@ export function DirectChatPanel({ currentUserId }: DirectChatPanelProps) {
         </>
       ) : null}
 
-      {step === 'new-chat' ? (
+      {!embeddedMode && step === 'new-chat' ? (
         <>
           <button
             type="button"
@@ -486,20 +529,149 @@ export function DirectChatPanel({ currentUserId }: DirectChatPanelProps) {
       ) : null}
 
       {step === 'chat' && activePeer && activeConversationId ? (
+        embeddedMode ? (
+          <div className="d-flex flex-column h-100" style={{ backgroundColor: '#efeae2' }}>
+            <div
+              ref={headerMenuRef}
+              className="d-flex align-items-center gap-2 px-3 py-2 flex-shrink-0 position-relative"
+              style={{ backgroundColor: TEXT_DARK, color: '#fff', minHeight: 60 }}
+            >
+              <button
+                type="button"
+                className="btn btn-link p-0 text-white"
+                onClick={handleChatBack}
+                aria-label="Back"
+              >
+                <i className="bi bi-arrow-left" style={{ fontSize: '1.25rem' }} />
+              </button>
+              <StudentAvatar user={activePeer} size={40} />
+              <div className="flex-grow-1 min-w-0">
+                <div className="fw-semibold text-truncate">{activePeer.name}</div>
+                <div className="small text-white-50 text-truncate">
+                  {blockedConversationSubtitle(isBlockedByMe, isBlockedByPeer) ?? 'Tap to chat'}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-link p-0 text-white flex-shrink-0"
+                onClick={() => setHeaderMenuOpen((open) => !open)}
+                aria-label="Chat options"
+                aria-haspopup="menu"
+                aria-expanded={headerMenuOpen}
+              >
+                <i className="bi bi-three-dots-vertical" style={{ fontSize: '1.15rem' }} />
+              </button>
+              {headerMenuOpen ? (
+                <div
+                  className="position-absolute bg-white border shadow-sm rounded overflow-hidden"
+                  style={{ zIndex: 20, minWidth: 200, top: '100%', right: 12 }}
+                  role="menu"
+                >
+                  {isBlockedByPeer ? (
+                    <div className="px-3 py-2 small text-muted">
+                      This student blocked you. You cannot send messages.
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="w-100 text-start px-3 py-2 border-0 bg-white"
+                      style={{ color: isBlockedByMe ? TEXT_DARK : '#dc3545' }}
+                      onClick={() => void handleBlockToggle()}
+                      disabled={blocking}
+                      role="menuitem"
+                    >
+                      {blocking ? '…' : isBlockedByMe ? 'Unblock conversation' : 'Block conversation'}
+                    </button>
+                  )}
+                </div>
+              ) : null}
+              {headerExtra}
+            </div>
+
+            {(() => {
+              const notice = blockedConversationNotice(isBlockedByMe, isBlockedByPeer);
+              return notice ? (
+                <div className="small text-muted text-center py-2 px-3 flex-shrink-0 bg-white border-bottom">
+                  {notice}
+                </div>
+              ) : null;
+            })()}
+
+            <div className="flex-grow-1 overflow-auto px-3 py-3" style={{ minHeight: 0 }}>
+              {messagesLoading && messages.length === 0 ? (
+                <p className="small text-muted mb-0 text-center">Loading messages…</p>
+              ) : messages.length === 0 ? (
+                <p className="small text-muted mb-0 text-center py-4">
+                  No messages yet. Say hello!
+                </p>
+              ) : (
+                messages.map((msg, index) => {
+                  const isMine = !!currentUserId && msg.senderUserId === currentUserId;
+                  const prev = messages[index - 1];
+                  const showDate =
+                    !prev ||
+                    new Date(prev.createdAt).toDateString() !== new Date(msg.createdAt).toDateString();
+                  return (
+                    <div key={msg.id}>
+                      {showDate ? (
+                        <div className="text-center small text-muted my-2">
+                          {formatMessageDate(msg.createdAt)}
+                        </div>
+                      ) : null}
+                      <ChatMessageBubble
+                        message={msg}
+                        isMine={isMine}
+                        onReply={() =>
+                          setReplyTo({
+                            id: msg.id,
+                            body: msg.body,
+                            attachmentType: msg.attachmentType,
+                            attachmentUrl: msg.attachmentUrl,
+                            attachmentName: msg.attachmentName,
+                            senderUserId: msg.senderUserId,
+                            sender: msg.sender,
+                          })
+                        }
+                      />
+                    </div>
+                  );
+                })
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {error ? <div className="small text-danger px-3 pb-1 flex-shrink-0">{error}</div> : null}
+
+            <div className="flex-shrink-0 bg-white border-top">
+              <HiddenChatFileInputs
+                imageInputRef={imageInputRef}
+                pdfInputRef={pdfInputRef}
+                onImageSelected={(file) => void handleFileSelected(file, 'image')}
+                onPdfSelected={(file) => void handleFileSelected(file, 'pdf')}
+              />
+              <ChatComposer
+                draft={draft}
+                onDraftChange={setDraft}
+                onSend={() => void handleSend()}
+                sending={sending}
+                uploading={uploading}
+                disabled={isBlockedByMe || isBlockedByPeer}
+                replyTo={replyTo}
+                onCancelReply={() => setReplyTo(null)}
+                pendingAttachment={pendingAttachment}
+                onRemoveAttachment={() => setPendingAttachment(null)}
+                onPickImage={() => imageInputRef.current?.click()}
+                onPickPdf={() => pdfInputRef.current?.click()}
+              />
+            </div>
+          </div>
+        ) : (
         <>
           <button
             type="button"
             className="btn btn-link btn-sm p-0 mb-2 text-decoration-none"
             style={{ color: TEXT_MUTED }}
-            onClick={() => {
-              setStep('inbox');
-              setActivePeer(null);
-              setActiveConversationId(null);
-              setMessages([]);
-              setReplyTo(null);
-              setPendingAttachment(null);
-              void refetchInbox();
-            }}
+            onClick={handleChatBack}
           >
             ← Messages
           </button>
@@ -630,6 +802,7 @@ export function DirectChatPanel({ currentUserId }: DirectChatPanelProps) {
             onPickPdf={() => pdfInputRef.current?.click()}
           />
         </>
+        )
       ) : null}
     </div>
   );

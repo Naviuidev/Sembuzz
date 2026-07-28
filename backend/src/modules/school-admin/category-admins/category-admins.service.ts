@@ -3,6 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateCategoryAdminDto } from '../dto/create-category-admin.dto';
 import { UpdateCategoryAdminCategoriesDto } from '../dto/update-category-admin-categories.dto';
 import { EmailService } from '../../super-admin/schools/email.service';
+import { PlatformUserService } from '../../platform-user/platform-user.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
@@ -11,6 +12,7 @@ export class CategoryAdminsService {
   constructor(
     private prisma: PrismaService,
     private emailService: EmailService,
+    private platformUserService: PlatformUserService,
   ) {}
 
   async generateTemporaryPassword(): Promise<string> {
@@ -124,13 +126,15 @@ export class CategoryAdminsService {
       throw new NotFoundException(`Category with id ${categoryId} not found or does not belong to this school`);
     }
 
-    // Check if email already exists
-    const existingAdmin = await this.prisma.categoryAdmin.findUnique({
-      where: { email },
-    });
-
-    if (existingAdmin) {
-      throw new BadRequestException('Category admin email already exists');
+    const normalizedEmail = this.platformUserService.normalizeEmail(email);
+    const platformUser = await this.platformUserService.findByEmail(normalizedEmail);
+    if (platformUser) {
+      const existingAdmin = await this.prisma.categoryAdmin.findFirst({
+        where: { schoolId, platformUserId: platformUser.id },
+      });
+      if (existingAdmin) {
+        throw new BadRequestException('This User ID already has a Category Admin role at this school.');
+      }
     }
 
     // Generate temporary password
@@ -141,10 +145,12 @@ export class CategoryAdminsService {
     let result;
     try {
       result = await this.prisma.$transaction(async (tx) => {
+        const linkedPlatformUser = await this.platformUserService.findOrCreateByEmail(normalizedEmail, tx);
         const categoryAdmin = await tx.categoryAdmin.create({
           data: {
+            platformUserId: linkedPlatformUser.id,
             name,
-            email,
+            email: linkedPlatformUser.email,
             password: hashedPassword,
             categoryId,
             schoolId,

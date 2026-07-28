@@ -338,7 +338,7 @@ export function ClubGroupChatWidget({
                 {sendError ? <Text style={styles.sendError}>{sendError}</Text> : null}
                 {activeChat.messageMode === 'admin_only' ? (
                   <Text style={styles.readOnlyHint}>
-                    Only your category admin can send messages here. You can read updates from them.
+                    Only your subcategory admin can send messages here. You can read updates from them.
                   </Text>
                 ) : (
                   <>

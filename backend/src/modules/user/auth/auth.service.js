@@ -1,0 +1,629 @@
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
+    function accept(f) { if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected"); return f; }
+    var kind = contextIn.kind, key = kind === "getter" ? "get" : kind === "setter" ? "set" : "value";
+    var target = !descriptorIn && ctor ? contextIn["static"] ? ctor : ctor.prototype : null;
+    var descriptor = descriptorIn || (target ? Object.getOwnPropertyDescriptor(target, contextIn.name) : {});
+    var _, done = false;
+    for (var i = decorators.length - 1; i >= 0; i--) {
+        var context = {};
+        for (var p in contextIn) context[p] = p === "access" ? {} : contextIn[p];
+        for (var p in contextIn.access) context.access[p] = contextIn.access[p];
+        context.addInitializer = function (f) { if (done) throw new TypeError("Cannot add initializers after decoration has completed"); extraInitializers.push(accept(f || null)); };
+        var result = (0, decorators[i])(kind === "accessor" ? { get: descriptor.get, set: descriptor.set } : descriptor[key], context);
+        if (kind === "accessor") {
+            if (result === void 0) continue;
+            if (result === null || typeof result !== "object") throw new TypeError("Object expected");
+            if (_ = accept(result.get)) descriptor.get = _;
+            if (_ = accept(result.set)) descriptor.set = _;
+            if (_ = accept(result.init)) initializers.unshift(_);
+        }
+        else if (_ = accept(result)) {
+            if (kind === "field") initializers.unshift(_);
+            else descriptor[key] = _;
+        }
+    }
+    if (target) Object.defineProperty(target, contextIn.name, descriptor);
+    done = true;
+};
+var __runInitializers = (this && this.__runInitializers) || function (thisArg, initializers, value) {
+    var useValue = arguments.length > 2;
+    for (var i = 0; i < initializers.length; i++) {
+        value = useValue ? initializers[i].call(thisArg, value) : initializers[i].call(thisArg);
+    }
+    return useValue ? value : void 0;
+};
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.UserAuthService = void 0;
+const common_1 = require("@nestjs/common");
+const bcrypt = __importStar(require("bcrypt"));
+const crypto = __importStar(require("crypto"));
+const OTP_EXPIRY_MINUTES = 10;
+function handlePrismaError(err, context) {
+    console.error(`[UserAuthService] ${context} error:`, err);
+    const e = err;
+    const msg = e?.message ?? '';
+    const schemaHint = e?.code?.startsWith('P2') ||
+        msg.includes('Unknown column') ||
+        msg.includes('doesn\'t exist')
+        ? ' Database schema may be out of date: apply migrations (see backend/prisma/migrations) or run the SQL for users/schools columns.'
+        : '';
+    throw new common_1.InternalServerErrorException((msg && msg.length < 200 ? msg : 'A database error occurred.') + schemaHint);
+}
+let UserAuthService = (() => {
+    let _classDecorators = [(0, common_1.Injectable)()];
+    let _classDescriptor;
+    let _classExtraInitializers = [];
+    let _classThis;
+    var UserAuthService = class {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            UserAuthService = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        prisma;
+        jwtService;
+        emailService;
+        constructor(prisma, jwtService, emailService) {
+            this.prisma = prisma;
+            this.jwtService = jwtService;
+            this.emailService = emailService;
+        }
+        userResponse(user) {
+            return {
+                id: user.id,
+                name: user.name,
+                firstName: user.firstName ?? undefined,
+                lastName: user.lastName ?? undefined,
+                email: user.email,
+                schoolId: user.schoolId,
+                schoolName: user.school.name,
+                schoolImage: user.school.image ?? undefined,
+                profilePicUrl: user.profilePicUrl ?? undefined,
+            };
+        }
+        async register(dto) {
+            try {
+                const email = dto.email.toLowerCase().trim();
+                const existing = await this.prisma.user.findUnique({
+                    where: { email },
+                    include: { school: { select: { id: true, name: true, domain: true } } },
+                });
+                if (existing) {
+                    if (existing.status === 'pending_otp') {
+                        const school = existing.school;
+                        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+                        const otpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+                        await this.prisma.user.update({
+                            where: { id: existing.id },
+                            data: { otp, otpExpiresAt },
+                        });
+                        try {
+                            await this.emailService.sendUserOtp(email, otp, school?.name ?? 'SemBuzz');
+                        }
+                        catch (emailErr) {
+                            const isDevelopment = process.env.NODE_ENV === 'development';
+                            if (isDevelopment) {
+                                console.warn('[UserAuthService] OTP email failed (dev). User kept for verification.');
+                                return { requiresOtp: true, email, devOtp: otp };
+                            }
+                            console.error('[UserAuthService] OTP email failed on resume:', emailErr);
+                            throw new common_1.BadRequestException('We couldn\'t send a new verification email. Please try again later or use Resend OTP on the verification step.');
+                        }
+                        const isDevelopment = process.env.NODE_ENV === 'development';
+                        return { requiresOtp: true, email, ...(isDevelopment ? { devOtp: otp } : {}) };
+                    }
+                    if (existing.status === 'pending_approval') {
+                        throw new common_1.BadRequestException('Your registration is pending school admin approval. Check your email or contact your school admin.');
+                    }
+                    throw new common_1.BadRequestException('An account with this email already exists');
+                }
+                const school = await this.prisma.school.findFirst({
+                    where: { id: dto.schoolId, isActive: true },
+                });
+                if (!school) {
+                    throw new common_1.BadRequestException('Invalid school');
+                }
+                const name = `${dto.firstName.trim()} ${dto.lastName.trim()}`.trim() || email;
+                const hashedPassword = await bcrypt.hash(dto.password, 10);
+                if (dto.registrationMethod === 'school_domain') {
+                    const schoolDomain = school.domain?.toLowerCase().replace(/^@?\.?/, '');
+                    const emailDomain = email.split('@')[1]?.toLowerCase();
+                    if (!schoolDomain || !emailDomain || emailDomain !== schoolDomain) {
+                        throw new common_1.BadRequestException(`Your email domain must match the school domain (${school.domain ?? 'not set'}). Use your school email address.`);
+                    }
+                    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+                    const otpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+                    const user = await this.prisma.user.create({
+                        data: {
+                            name,
+                            firstName: dto.firstName.trim(),
+                            lastName: dto.lastName.trim(),
+                            profilePicUrl: dto.profilePicUrl ?? null,
+                            verificationDocUrl: dto.verificationDocUrl ?? null,
+                            email,
+                            password: hashedPassword,
+                            schoolId: dto.schoolId,
+                            registrationMethod: 'school_domain',
+                            status: 'pending_otp',
+                            otp,
+                            otpExpiresAt,
+                        },
+                        include: {
+                            school: { select: { id: true, name: true, image: true } },
+                        },
+                    });
+                    try {
+                        await this.emailService.sendUserOtp(email, otp, school.name);
+                    }
+                    catch (emailErr) {
+                        const isDevelopment = process.env.NODE_ENV === 'development';
+                        if (isDevelopment) {
+                            console.warn('[UserAuthService] OTP email failed (dev fallback). OTP logged by EmailService. User kept for verification.');
+                            return { requiresOtp: true, email, devOtp: otp };
+                        }
+                        console.error('[UserAuthService] OTP email failed, removing pending user:', emailErr);
+                        await this.prisma.user.delete({ where: { id: user.id } }).catch(() => { });
+                        throw new common_1.BadRequestException('We couldn\'t send the verification email. Check that SMTP is configured (SMTP_USER, SMTP_PASS in backend .env) and your email is valid, or try again later.');
+                    }
+                    // Only expose OTP in response when NODE_ENV is explicitly 'development' (production and other envs never get devOtp).
+                    const isDevelopment = process.env.NODE_ENV === 'development';
+                    return { requiresOtp: true, email, ...(isDevelopment ? { devOtp: otp } : {}) };
+                }
+                // gmail/public domain: require verification doc and create user pending_approval
+                if (!dto.verificationDocUrl?.trim()) {
+                    throw new common_1.BadRequestException('Please upload a school-related document (e.g. ID card or fee receipt) to verify your enrollment.');
+                }
+                const user = await this.prisma.user.create({
+                    data: {
+                        name,
+                        firstName: dto.firstName.trim(),
+                        lastName: dto.lastName.trim(),
+                        profilePicUrl: dto.profilePicUrl ?? null,
+                        email,
+                        password: hashedPassword,
+                        schoolId: dto.schoolId,
+                        registrationMethod: 'gmail',
+                        status: 'pending_approval',
+                        verificationDocUrl: dto.verificationDocUrl.trim(),
+                    },
+                    include: {
+                        school: { select: { id: true, name: true, image: true } },
+                    },
+                });
+                const admins = await this.prisma.schoolAdmin.findMany({
+                    where: { schoolId: dto.schoolId, isActive: true },
+                    select: { email: true },
+                });
+                const userDetails = {
+                    firstName: dto.firstName,
+                    lastName: dto.lastName,
+                    email,
+                };
+                for (const admin of admins) {
+                    this.emailService.sendPendingUserToSchoolAdmin(admin.email, userDetails, school.name, user.id);
+                }
+                return { pendingApproval: true };
+            }
+            catch (err) {
+                if (err instanceof common_1.BadRequestException || err instanceof common_1.UnauthorizedException)
+                    throw err;
+                handlePrismaError(err, 'register');
+            }
+        }
+        async resendOtp(email) {
+            const normalized = email.toLowerCase().trim();
+            const user = await this.prisma.user.findUnique({
+                where: { email: normalized },
+                include: { school: { select: { name: true } } },
+            });
+            if (!user || user.status !== 'pending_otp') {
+                throw new common_1.BadRequestException('No pending registration found for this email. Please register again.');
+            }
+            const otp = Math.floor(100000 + Math.random() * 900000).toString();
+            const otpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+            await this.prisma.user.update({
+                where: { id: user.id },
+                data: { otp, otpExpiresAt },
+            });
+            const smtpConfigured = !!(process.env.SMTP_USER && process.env.SMTP_PASS);
+            try {
+                await this.emailService.sendUserOtp(normalized, otp, user.school.name);
+            }
+            catch (emailErr) {
+                if (process.env.NODE_ENV === 'development') {
+                    console.warn('[UserAuthService] Resend OTP email failed (dev). OTP logged by EmailService.');
+                    return { success: true, devOtp: otp };
+                }
+                console.error('[UserAuthService] Resend OTP email failed:', emailErr);
+                throw new common_1.BadRequestException('We couldn\'t send the verification email. Check SMTP configuration and try again.');
+            }
+            const isDevelopment = process.env.NODE_ENV === 'development';
+            return isDevelopment && !smtpConfigured ? { success: true, devOtp: otp } : { success: true };
+        }
+        async verifyOtp(dto) {
+            const email = dto.email.toLowerCase().trim();
+            const user = await this.prisma.user.findUnique({
+                where: { email },
+                include: {
+                    school: { select: { id: true, name: true, image: true } },
+                },
+            });
+            if (!user || user.status !== 'pending_otp') {
+                throw new common_1.BadRequestException('Invalid or expired OTP. Please register again.');
+            }
+            if (!user.otp || !user.otpExpiresAt || user.otpExpiresAt < new Date()) {
+                throw new common_1.BadRequestException('OTP has expired. Please request a new one by registering again.');
+            }
+            if (user.otp !== dto.otp) {
+                throw new common_1.BadRequestException('Invalid OTP.');
+            }
+            await this.prisma.user.update({
+                where: { id: user.id },
+                data: { status: 'active', otp: null, otpExpiresAt: null },
+            });
+            // Do not issue JWT here; user must log in with email and password.
+            return { success: true, email: user.email };
+        }
+        async login(dto) {
+            const user = await this.prisma.user.findUnique({
+                where: { email: dto.email.toLowerCase().trim() },
+                include: {
+                    school: { select: { id: true, name: true, image: true } },
+                },
+            });
+            if (!user) {
+                throw new common_1.UnauthorizedException('Email not registered');
+            }
+            if (user.status !== 'active') {
+                if (user.status === 'banned') {
+                    throw new common_1.UnauthorizedException('Your account has been suspended. Please contact your school admin to restore access.');
+                }
+                if (user.status === 'pending_otp') {
+                    throw new common_1.UnauthorizedException('Please verify your email with the OTP we sent.');
+                }
+                if (user.status === 'pending_approval') {
+                    throw new common_1.UnauthorizedException('Your account is pending approval by your school admin.');
+                }
+                throw new common_1.UnauthorizedException('Account is not active. Please contact support.');
+            }
+            // After admin approval (gmail flow), user must click verify link in email before they can login
+            if (user.registrationMethod === 'gmail' && !user.approvalEmailVerifiedAt) {
+                throw new common_1.UnauthorizedException('Admin has approved you. Please verify the link in the email we sent to log in.');
+            }
+            const isPasswordValid = await bcrypt.compare(dto.password, user.password);
+            if (!isPasswordValid) {
+                throw new common_1.UnauthorizedException('Incorrect password');
+            }
+            const payload = { sub: user.id, email: user.email, role: 'user' };
+            const access_token = this.jwtService.sign(payload);
+            return {
+                access_token,
+                user: this.userResponse(user),
+            };
+        }
+        async getMe(userId) {
+            const user = await this.prisma.user.findUnique({
+                where: { id: userId },
+                include: {
+                    school: { select: { id: true, name: true, image: true } },
+                },
+            });
+            if (!user) {
+                throw new common_1.UnauthorizedException('User not found');
+            }
+            if (user.status === 'banned') {
+                throw new common_1.UnauthorizedException('Your account has been suspended. Please contact your school admin to restore access.');
+            }
+            return {
+                id: user.id,
+                name: user.name,
+                firstName: user.firstName ?? undefined,
+                lastName: user.lastName ?? undefined,
+                email: user.email,
+                schoolId: user.schoolId,
+                schoolName: user.school.name,
+                schoolImage: user.school.image ?? undefined,
+                profilePicUrl: user.profilePicUrl ?? undefined,
+            };
+        }
+        async updateProfile(userId, dto) {
+            const user = await this.prisma.user.findUnique({
+                where: { id: userId },
+                include: {
+                    school: { select: { id: true, name: true, image: true } },
+                },
+            });
+            if (!user) {
+                throw new common_1.UnauthorizedException('User not found');
+            }
+            const firstName = dto.firstName?.trim();
+            const lastName = dto.lastName?.trim();
+            const profilePicUrl = dto.profilePicUrl?.trim();
+            const wantsPasswordChange = !!dto.currentPassword?.trim() || !!dto.newPassword?.trim() || !!dto.confirmPassword?.trim();
+            if (wantsPasswordChange) {
+                if (!dto.currentPassword?.trim() || !dto.newPassword?.trim() || !dto.confirmPassword?.trim()) {
+                    throw new common_1.BadRequestException('Current password, new password and confirm password are required to change password.');
+                }
+                const currentMatch = await bcrypt.compare(dto.currentPassword, user.password);
+                if (!currentMatch) {
+                    throw new common_1.BadRequestException('Current password is incorrect.');
+                }
+                if (dto.newPassword !== dto.confirmPassword) {
+                    throw new common_1.BadRequestException('New password and confirm password do not match.');
+                }
+                if (dto.newPassword === dto.currentPassword) {
+                    throw new common_1.BadRequestException('New password must be different from current password.');
+                }
+            }
+            const nextFirstName = firstName ?? user.firstName ?? user.name.split(' ')[0] ?? '';
+            const nextLastName = lastName ??
+                user.lastName ??
+                (user.name.split(' ').length > 1 ? user.name.split(' ').slice(1).join(' ') : '');
+            const nextName = `${nextFirstName} ${nextLastName}`.trim() || user.name;
+            const updated = await this.prisma.user.update({
+                where: { id: user.id },
+                data: {
+                    firstName: nextFirstName || null,
+                    lastName: nextLastName || null,
+                    name: nextName,
+                    profilePicUrl: profilePicUrl !== undefined ? (profilePicUrl || null) : user.profilePicUrl,
+                    ...(wantsPasswordChange ? { password: await bcrypt.hash(dto.newPassword, 10) } : {}),
+                },
+                include: {
+                    school: { select: { id: true, name: true, image: true } },
+                },
+            });
+            return this.userResponse(updated);
+        }
+        async getSchools() {
+            try {
+                const schools = await this.prisma.school.findMany({
+                    where: { isActive: true },
+                    select: { id: true, name: true, domain: true, image: true },
+                    orderBy: { name: 'asc' },
+                });
+                return schools;
+            }
+            catch (err) {
+                handlePrismaError(err, 'getSchools');
+            }
+        }
+        async deleteAccount(userId, password) {
+            const user = await this.prisma.user.findUnique({
+                where: { id: userId },
+            });
+            if (!user) {
+                throw new common_1.UnauthorizedException('User not found');
+            }
+            const match = await bcrypt.compare(password, user.password);
+            if (!match) {
+                throw new common_1.BadRequestException('Invalid password');
+            }
+            await this.prisma.user.delete({ where: { id: userId } });
+            return { success: true };
+        }
+        /** Verify token from update-verification-doc link (public). */
+        async verifyUpdateDocToken(token) {
+            if (!token || typeof token !== 'string') {
+                throw new common_1.BadRequestException('Invalid or expired link.');
+            }
+            try {
+                const payload = this.jwtService.verify(token);
+                if (payload.purpose !== 'update_verification_doc' || !payload.sub) {
+                    throw new common_1.BadRequestException('Invalid or expired link.');
+                }
+                const user = await this.prisma.user.findUnique({
+                    where: { id: payload.sub },
+                    select: { id: true, email: true, status: true },
+                });
+                if (!user || user.status !== 'pending_approval') {
+                    throw new common_1.BadRequestException('Invalid or expired link.');
+                }
+                const maskedEmail = user.email.replace(/(.{2})(.*)(@.*)/, '$1***$3');
+                return {
+                    valid: true,
+                    type: payload.type === 'additional' ? 'additional' : 'reupload',
+                    email: maskedEmail,
+                };
+            }
+            catch (err) {
+                if (err instanceof common_1.BadRequestException)
+                    throw err;
+                throw new common_1.BadRequestException('Invalid or expired link. Please use the latest link from your email.');
+            }
+        }
+        /** Submit updated doc from email link (public). */
+        async submitUpdateDoc(token, docUrl) {
+            if (!token || !docUrl) {
+                throw new common_1.BadRequestException('Token and document are required.');
+            }
+            try {
+                const payload = this.jwtService.verify(token);
+                if (payload.purpose !== 'update_verification_doc' || !payload.sub) {
+                    throw new common_1.BadRequestException('Invalid or expired link.');
+                }
+                const user = await this.prisma.user.findFirst({
+                    where: { id: payload.sub, status: 'pending_approval' },
+                });
+                if (!user) {
+                    throw new common_1.BadRequestException('Invalid or expired link.');
+                }
+                const isAdditional = payload.type === 'additional';
+                await this.prisma.user.update({
+                    where: { id: user.id },
+                    data: isAdditional
+                        ? { additionalVerificationDocUrl: docUrl }
+                        : { verificationDocUrl: docUrl },
+                });
+                return { success: true };
+            }
+            catch (err) {
+                if (err instanceof common_1.BadRequestException)
+                    throw err;
+                throw new common_1.BadRequestException('Invalid or expired link. Please use the latest link from your email.');
+            }
+        }
+        /** Verify approval-email link (user clicked link in "you're approved" email). Allows login after. */
+        async verifyApprovalToken(token) {
+            if (!token || typeof token !== 'string') {
+                throw new common_1.BadRequestException('Invalid or expired link.');
+            }
+            try {
+                const payload = this.jwtService.verify(token);
+                if (payload.purpose !== 'approval_email_verify' || !payload.sub) {
+                    throw new common_1.BadRequestException('Invalid or expired link.');
+                }
+                const user = await this.prisma.user.findFirst({
+                    where: { id: payload.sub, status: 'active' },
+                });
+                if (!user) {
+                    throw new common_1.BadRequestException('Invalid or expired link.');
+                }
+                await this.prisma.user.update({
+                    where: { id: user.id },
+                    data: { approvalEmailVerifiedAt: new Date() },
+                });
+                return { success: true };
+            }
+            catch (err) {
+                if (err instanceof common_1.BadRequestException)
+                    throw err;
+                throw new common_1.BadRequestException('Invalid or expired link. Please use the latest link from your email.');
+            }
+        }
+        async requestPasswordResetOtp(dto) {
+            const email = dto.email.toLowerCase().trim();
+            const user = await this.prisma.user.findUnique({
+                where: { email },
+                include: { school: { select: { name: true } } },
+            });
+            if (!user || user.status !== 'active') {
+                throw new common_1.NotFoundException('No active account found with this email address');
+            }
+            if (user.registrationMethod === 'gmail' && !user.approvalEmailVerifiedAt) {
+                throw new common_1.BadRequestException('Your account is not fully verified yet. Please use the approval link from your email before resetting your password.');
+            }
+            const otp = crypto.randomInt(100000, 999999).toString();
+            const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+            await this.prisma.userPasswordResetOtp.updateMany({
+                where: { userId: user.id, isUsed: false },
+                data: { isUsed: true },
+            });
+            await this.prisma.userPasswordResetOtp.create({
+                data: {
+                    userId: user.id,
+                    otp,
+                    expiresAt,
+                },
+            });
+            const maskedEmail = user.email.substring(0, 3) + '***' + user.email.substring(user.email.indexOf('@'));
+            try {
+                await this.emailService.sendUserPasswordResetOtp(user.email, user.name, otp, user.school.name);
+            }
+            catch (emailErr) {
+                console.error('[UserAuthService] Password reset OTP email failed:', emailErr);
+                throw new common_1.BadRequestException('We could not send the password reset email. Please try again later or contact support.');
+            }
+            return {
+                message: 'OTP has been sent to your registered email address',
+                email: maskedEmail,
+            };
+        }
+        async verifyPasswordResetOtp(dto) {
+            const email = dto.email.toLowerCase().trim();
+            const user = await this.prisma.user.findUnique({
+                where: { email, status: 'active' },
+            });
+            if (!user) {
+                throw new common_1.NotFoundException('No active account found with this email address');
+            }
+            const otpRecord = await this.prisma.userPasswordResetOtp.findFirst({
+                where: {
+                    userId: user.id,
+                    otp: dto.otp,
+                    isUsed: false,
+                    expiresAt: { gte: new Date() },
+                },
+            });
+            if (!otpRecord) {
+                throw new common_1.BadRequestException('Invalid or expired OTP');
+            }
+            return { message: 'OTP verified successfully', verified: true };
+        }
+        async resetPassword(dto) {
+            const email = dto.email.toLowerCase().trim();
+            if (dto.newPassword !== dto.confirmPassword) {
+                throw new common_1.BadRequestException('New password and confirm password do not match');
+            }
+            const user = await this.prisma.user.findUnique({
+                where: { email, status: 'active' },
+            });
+            if (!user) {
+                throw new common_1.NotFoundException('No active account found with this email address');
+            }
+            const otpRecord = await this.prisma.userPasswordResetOtp.findFirst({
+                where: {
+                    userId: user.id,
+                    otp: dto.otp,
+                    isUsed: false,
+                    expiresAt: { gte: new Date() },
+                },
+            });
+            if (!otpRecord) {
+                throw new common_1.BadRequestException('Invalid or expired OTP');
+            }
+            const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
+            await this.prisma.$transaction([
+                this.prisma.user.update({
+                    where: { id: user.id },
+                    data: { password: hashedPassword },
+                }),
+                this.prisma.userPasswordResetOtp.update({
+                    where: { id: otpRecord.id },
+                    data: { isUsed: true },
+                }),
+            ]);
+            return { message: 'Password reset successfully', success: true };
+        }
+    };
+    return UserAuthService = _classThis;
+})();
+exports.UserAuthService = UserAuthService;
+//# sourceMappingURL=auth.service.js.map

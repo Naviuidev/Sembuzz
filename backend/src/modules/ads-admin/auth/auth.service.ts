@@ -12,6 +12,8 @@ import { AdsAdminLoginDto } from '../dto/login.dto';
 import { ChangePasswordDto } from '../dto/change-password.dto';
 import { RequestOtpDto, VerifyOtpDto, ResetPasswordDto } from '../dto/forgot-password.dto';
 import { EmailService } from '../../super-admin/schools/email.service';
+import { PlatformUserService } from '../../platform-user/platform-user.service';
+import { UpdateEmailDto } from '../../platform-user/dto/update-email.dto';
 
 @Injectable()
 export class AdsAdminAuthService {
@@ -19,22 +21,24 @@ export class AdsAdminAuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private emailService: EmailService,
+    private platformUserService: PlatformUserService,
   ) {}
 
-  /** Cast so generated delegates (adsAdmin, adsAdminPasswordResetOtp) are accepted; run `npx prisma generate` so runtime client matches. */
-  private get client() {
-    return this.prisma as any;
+  private async findActiveAdminByEmail(email: string) {
+    const platformUser = await this.platformUserService.findByEmail(email);
+    if (!platformUser) {
+      return null;
+    }
+    return this.prisma.adsAdmin.findFirst({
+      where: { platformUserId: platformUser.id, isActive: true },
+      include: { school: { select: { id: true, name: true } } },
+    });
   }
 
   async login(loginDto: AdsAdminLoginDto) {
     const { email, password } = loginDto;
 
-    const admin = await this.client.adsAdmin.findUnique({
-      where: { email: email.trim() },
-      include: {
-        school: { select: { id: true, name: true } },
-      },
-    });
+    const admin = await this.findActiveAdminByEmail(email);
 
     if (!admin) {
       throw new UnauthorizedException('Invalid credentials');
@@ -52,6 +56,7 @@ export class AdsAdminAuthService {
 
     const payload = {
       sub: admin.id,
+      userId: admin.platformUserId,
       email: admin.email,
       schoolId: admin.schoolId,
       role: 'ads_admin',
@@ -62,6 +67,7 @@ export class AdsAdminAuthService {
       access_token: this.jwtService.sign(payload),
       user: {
         id: admin.id,
+        userId: admin.platformUserId,
         name: admin.name,
         email: admin.email,
         schoolId: admin.schoolId,
@@ -78,7 +84,7 @@ export class AdsAdminAuthService {
       throw new BadRequestException('New password and confirm password do not match');
     }
 
-    const admin = await this.client.adsAdmin.findUnique({
+    const admin = await this.prisma.adsAdmin.findUnique({
       where: { id: adminId },
     });
 
@@ -94,7 +100,7 @@ export class AdsAdminAuthService {
 
     const hashedNewPassword = await bcrypt.hash(newPassword, 10);
 
-    await this.client.adsAdmin.update({
+    await this.prisma.adsAdmin.update({
       where: { id: adminId },
       data: {
         password: hashedNewPassword,
@@ -106,7 +112,7 @@ export class AdsAdminAuthService {
   }
 
   async validateUser(userId: string) {
-    const admin = await this.client.adsAdmin.findUnique({
+    const admin = await this.prisma.adsAdmin.findUnique({
       where: { id: userId },
       include: {
         school: { select: { id: true, name: true } },
@@ -119,6 +125,7 @@ export class AdsAdminAuthService {
 
     return {
       id: admin.id,
+      userId: admin.platformUserId,
       name: admin.name,
       email: admin.email,
       schoolId: admin.schoolId,
@@ -130,9 +137,7 @@ export class AdsAdminAuthService {
   async requestOtp(requestOtpDto: RequestOtpDto) {
     const { email } = requestOtpDto;
 
-    const admin = await this.client.adsAdmin.findUnique({
-      where: { email: email.trim(), isActive: true },
-    });
+    const admin = await this.findActiveAdminByEmail(email);
 
     if (!admin) {
       throw new NotFoundException('No ads admin found with this email address');
@@ -141,12 +146,12 @@ export class AdsAdminAuthService {
     const otp = crypto.randomInt(100000, 999999).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    await this.client.adsAdminPasswordResetOtp.updateMany({
+    await this.prisma.adsAdminPasswordResetOtp.updateMany({
       where: { adsAdminId: admin.id, isUsed: false },
       data: { isUsed: true },
     });
 
-    await this.client.adsAdminPasswordResetOtp.create({
+    await this.prisma.adsAdminPasswordResetOtp.create({
       data: {
         adsAdminId: admin.id,
         otp,
@@ -176,15 +181,13 @@ export class AdsAdminAuthService {
   async verifyOtp(verifyOtpDto: VerifyOtpDto) {
     const { email, otp } = verifyOtpDto;
 
-    const admin = await this.client.adsAdmin.findUnique({
-      where: { email: email.trim(), isActive: true },
-    });
+    const admin = await this.findActiveAdminByEmail(email);
 
     if (!admin) {
       throw new NotFoundException('No ads admin found with this email address');
     }
 
-    const otpRecord = await this.client.adsAdminPasswordResetOtp.findFirst({
+    const otpRecord = await this.prisma.adsAdminPasswordResetOtp.findFirst({
       where: {
         adsAdminId: admin.id,
         otp,
@@ -207,15 +210,13 @@ export class AdsAdminAuthService {
       throw new BadRequestException('New password and confirm password do not match');
     }
 
-    const admin = await this.client.adsAdmin.findUnique({
-      where: { email: email.trim(), isActive: true },
-    });
+    const admin = await this.findActiveAdminByEmail(email);
 
     if (!admin) {
       throw new NotFoundException('No ads admin found with this email address');
     }
 
-    const otpRecord = await this.client.adsAdminPasswordResetOtp.findFirst({
+    const otpRecord = await this.prisma.adsAdminPasswordResetOtp.findFirst({
       where: {
         adsAdminId: admin.id,
         otp,
@@ -230,17 +231,26 @@ export class AdsAdminAuthService {
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    await this.client.$transaction([
-      this.client.adsAdmin.update({
+    await this.prisma.$transaction([
+      this.prisma.adsAdmin.update({
         where: { id: admin.id },
         data: { password: hashedPassword, isFirstLogin: false },
       }),
-      this.client.adsAdminPasswordResetOtp.update({
+      this.prisma.adsAdminPasswordResetOtp.update({
         where: { id: otpRecord.id },
         data: { isUsed: true },
       }),
     ]);
 
     return { message: 'Password reset successfully. Please login with your new password.' };
+  }
+
+  async updateEmail(adminId: string, dto: UpdateEmailDto) {
+    const admin = await this.prisma.adsAdmin.findUnique({ where: { id: adminId } });
+    if (!admin) {
+      throw new UnauthorizedException('User not found');
+    }
+    const updated = await this.platformUserService.updateEmail(admin.platformUserId, dto.email);
+    return { userId: updated.id, email: updated.email };
   }
 }

@@ -54,7 +54,7 @@ export function ClubMessagingBadges({
   const requestMutation = useMutation({
     mutationFn: (groupChatId: string) => userClubGroupChatsService.requestJoin(groupChatId),
     onSuccess: () => {
-      setRequestMessage('Join request sent. A category admin will review your request.');
+      setRequestMessage('Join request sent. A subcategory admin will review your request.');
       setRequestError(null);
       void queryClient.invalidateQueries({ queryKey: ['user', 'club-group-chats', 'joinable'] });
     },
@@ -158,7 +158,7 @@ export function ClubMessagingBadges({
           {groupStep === 'list' ? (
             <>
               <p className="small text-muted mb-3">
-                Select a club group chat to request access. Your category admin must approve before
+                Select a club group chat to request access. Your subcategory admin must approve before
                 you can message in the group.
               </p>
               {isLoading ? (
@@ -205,9 +205,9 @@ export function ClubMessagingBadges({
                 {selectedChat.membershipStatus === 'approved'
                   ? 'You are already approved for this group. Open the chat icon on this screen to message.'
                   : selectedChat.membershipStatus === 'pending'
-                    ? 'Your join request is waiting for category admin approval.'
+                    ? 'Your join request is waiting for subcategory admin approval.'
                     : selectedChat.membershipStatus === 'banned'
-                      ? 'You are not allowed to join this group. Contact your category admin.'
+                      ? 'You are not allowed to join this group. Contact your subcategory admin.'
                       : 'Send a join request. Once approved, you can read and send messages in this group.'}
               </p>
 

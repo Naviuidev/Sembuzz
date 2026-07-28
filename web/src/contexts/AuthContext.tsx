@@ -8,6 +8,7 @@ interface AuthContextType {
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
   loading: boolean;
 }
@@ -62,6 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Set user immediately from login response
       const userData = {
         id: response.user.id,
+        userId: response.user.userId,
         name: response.user.name,
         email: response.user.email,
         createdAt: new Date().toISOString(),
@@ -93,6 +95,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const refreshUser = async () => {
+    const userData = await authService.getMe();
+    setUser(userData);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -100,6 +107,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         token,
         login,
         logout,
+        refreshUser,
         isAuthenticated: !!token,
         loading,
       }}

@@ -118,7 +118,7 @@ export function ClubMessagingBadges({ isAuthenticated, currentUserId, onRequireL
     setError(null);
     try {
       await requestJoinClubGroup(selected.id);
-      setMessage('Join request sent. A category admin will review your request.');
+      setMessage('Join request sent. A subcategory admin will review your request.');
       await loadJoinable();
     } catch (e: unknown) {
       const msg =
@@ -170,7 +170,7 @@ export function ClubMessagingBadges({ isAuthenticated, currentUserId, onRequireL
             {step === 'list' ? (
               <>
                 <Text style={styles.body}>
-                  Select a club group chat to request access. Your category admin must approve before
+                  Select a club group chat to request access. Your subcategory admin must approve before
                   you can message in the group.
                 </Text>
                 {loading ? (
@@ -214,9 +214,9 @@ export function ClubMessagingBadges({ isAuthenticated, currentUserId, onRequireL
                   {selected.membershipStatus === 'approved'
                     ? 'You are already approved for this group. Open the chat icon on this screen to message.'
                     : selected.membershipStatus === 'pending'
-                      ? 'Your join request is waiting for category admin approval.'
+                      ? 'Your join request is waiting for subcategory admin approval.'
                       : selected.membershipStatus === 'banned'
-                        ? 'You are not allowed to join this group. Contact your category admin.'
+                        ? 'You are not allowed to join this group. Contact your subcategory admin.'
                         : 'Send a join request. Once approved, you can read and send messages in this group.'}
                 </Text>
 

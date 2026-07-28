@@ -61,7 +61,10 @@ export function replyPreviewText(reply: ChatMessageReplyTo): string {
 }
 
 export async function uploadChatAttachment(
-  endpoint: '/user/direct-chats/upload-attachment' | '/user/club-group-chats/upload-attachment',
+  endpoint:
+    | '/user/direct-chats/upload-attachment'
+    | '/user/club-group-chats/upload-attachment'
+    | '/user/student-chat-groups/upload-attachment',
   file: File,
 ): Promise<PendingChatAttachment> {
   const form = new FormData();

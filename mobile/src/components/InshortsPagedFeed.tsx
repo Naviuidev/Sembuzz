@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { assignBannersToEventSlides, type PublicFeedItem } from '../utils/publicFeed';
 import type { ApprovedEventPublic, SponsoredAdPublic, BannerAdPublic } from '../services/events';
-import { imageSrc } from '../utils/image';
+import { canPrefetchImage, imageSrc, schoolLogoSrc } from '../utils/image';
 import {
   recordBannerAdView,
   recordBannerAdClick,
@@ -98,6 +98,7 @@ function InshortsEventPage({
   const images = event.imageUrls ? parseImageUrlsJson(event.imageUrls) : [];
   const firstImage = images[0];
   const imgH = Math.max(160, Math.round(pageHeight * 0.42));
+  const schoolLogoUri = schoolLogoSrc(event.school?.image);
   const [commentsOpen, setCommentsOpen] = React.useState(false);
   const [comments, setComments] = React.useState<EventCommentResponse[]>([]);
   const [commentsLoading, setCommentsLoading] = React.useState(false);
@@ -230,8 +231,8 @@ function InshortsEventPage({
           </View>
         </View>
         <View style={styles.metaRow}>
-          {event.school?.image ? (
-            <Image source={{ uri: imageSrc(event.school.image) }} style={styles.smallLogo} />
+          {schoolLogoUri ? (
+            <Image source={{ uri: schoolLogoUri }} style={styles.smallLogo} />
           ) : (
             <View style={styles.smallLogoPh}>
               <Text style={styles.smallLogoLetter}>{event.school?.name?.charAt(0) ?? '?'}</Text>
@@ -353,6 +354,7 @@ function InshortsSponsoredPage({ ad, pageHeight, alignTop }: { ad: SponsoredAdPu
   const firstImage = images[0];
   const imgH = Math.max(160, Math.round(pageHeight * 0.42));
   const schoolName = ad.school?.name ?? 'School';
+  const schoolLogoUri = schoolLogoSrc(ad.school?.image);
 
   React.useEffect(() => {
     recordSponsoredAdView(ad.id).catch(() => {});
@@ -389,8 +391,8 @@ function InshortsSponsoredPage({ ad, pageHeight, alignTop }: { ad: SponsoredAdPu
           </View>
         )}
         <View style={styles.metaRow}>
-          {ad.school?.image ? (
-            <Image source={{ uri: imageSrc(ad.school.image) }} style={styles.smallLogo} />
+          {schoolLogoUri ? (
+            <Image source={{ uri: schoolLogoUri }} style={styles.smallLogo} />
           ) : (
             <View style={styles.smallLogoPh}>
               <Text style={styles.smallLogoLetter}>{schoolName.charAt(0)}</Text>
@@ -464,13 +466,15 @@ export function InshortsPagedFeed({
       if (item.type === 'event') {
         const first = parseImageUrlsJson(item.event.imageUrls ?? '')[0];
         if (first) urls.push(imageSrc(first));
-        if (item.event.school?.image) urls.push(imageSrc(item.event.school.image));
+        const schoolLogo = schoolLogoSrc(item.event.school?.image);
+        if (schoolLogo) urls.push(schoolLogo);
         const banner = bannerBySlideIndex.get(index);
         if (banner?.imageUrl) urls.push(imageSrc(banner.imageUrl));
       } else {
         const first = parseImageUrlsJson(item.ad.imageUrls ?? '')[0];
         if (first) urls.push(imageSrc(first));
-        if (item.ad.school?.image) urls.push(imageSrc(item.ad.school.image));
+        const adSchoolLogo = schoolLogoSrc(item.ad.school?.image);
+        if (adSchoolLogo) urls.push(adSchoolLogo);
       }
     });
     return Array.from(new Set(urls));
@@ -478,6 +482,7 @@ export function InshortsPagedFeed({
 
   React.useEffect(() => {
     prefetchUrls.forEach((url) => {
+      if (!canPrefetchImage(url)) return;
       void Image.prefetch(url).catch(() => {
         // Some remote URLs can be missing/deleted; ignore prefetch failures.
       });
@@ -485,8 +490,15 @@ export function InshortsPagedFeed({
   }, [prefetchUrls]);
 
   React.useEffect(() => {
-    // When category/subcategory filters change, ensure the pager starts from top item.
-    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    // When category/subcategory filters or school scope changes, reset pager to top.
+    const id = requestAnimationFrame(() => {
+      try {
+        listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      } catch {
+        /* FlatList may not be mounted yet */
+      }
+    });
+    return () => cancelAnimationFrame(id);
   }, [slides, alignTop]);
 
   const renderItem: ListRenderItem<Exclude<PublicFeedItem, { type: 'banner' }>> = useCallback(
@@ -548,6 +560,10 @@ export function InshortsPagedFeed({
       bounces
       overScrollMode="never"
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1a1f2e" />}
+      initialNumToRender={2}
+      maxToRenderPerBatch={2}
+      windowSize={3}
+      removeClippedSubviews
     />
   );
 }

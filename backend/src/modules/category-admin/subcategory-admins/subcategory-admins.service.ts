@@ -3,6 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateSubCategoryAdminDto } from '../dto/create-subcategory-admin.dto';
 import { UpdateSubCategoryAdminSubCategoriesDto } from '../dto/update-subcategory-admin-subcategories.dto';
 import { EmailService } from '../../super-admin/schools/email.service';
+import { PlatformUserService } from '../../platform-user/platform-user.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
@@ -11,6 +12,7 @@ export class SubCategoryAdminsService {
   constructor(
     private prisma: PrismaService,
     private emailService: EmailService,
+    private platformUserService: PlatformUserService,
   ) {}
 
   async generateTemporaryPassword(): Promise<string> {
@@ -163,13 +165,15 @@ export class SubCategoryAdminsService {
       );
     }
 
-    // Check if email already exists
-    const existingAdmin = await this.prisma.subCategoryAdmin.findUnique({
-      where: { email },
-    });
-
-    if (existingAdmin) {
-      throw new BadRequestException('Subcategory admin email already exists');
+    const normalizedEmail = this.platformUserService.normalizeEmail(email);
+    const platformUser = await this.platformUserService.findByEmail(normalizedEmail);
+    if (platformUser) {
+      const existingAdmin = await this.prisma.subCategoryAdmin.findFirst({
+        where: { schoolId: categoryAdmin.schoolId, platformUserId: platformUser.id },
+      });
+      if (existingAdmin) {
+        throw new BadRequestException('This User ID already has a Subcategory Admin role at this school.');
+      }
     }
 
     // Generate temporary password
@@ -180,10 +184,12 @@ export class SubCategoryAdminsService {
     let result;
     try {
       result = await this.prisma.$transaction(async (tx) => {
+        const linkedPlatformUser = await this.platformUserService.findOrCreateByEmail(normalizedEmail, tx);
         const subCategoryAdmin = await tx.subCategoryAdmin.create({
           data: {
+            platformUserId: linkedPlatformUser.id,
             name,
-            email,
+            email: linkedPlatformUser.email,
             password: hashedPassword,
             subCategoryId,
             categoryId: subCategory.categoryId,

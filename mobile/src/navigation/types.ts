@@ -11,7 +11,7 @@ export type MainTabParamList = {
   Events: undefined;
   Settings: NavigatorScreenParams<SettingsStackParamList> | undefined;
   Apps: undefined;
-  Blogs: undefined;
+  Chat: undefined;
 };
 
 export type RootStackParamList = {
@@ -22,4 +22,15 @@ export type RootStackParamList = {
   Profile: undefined;
   EditProfile: undefined;
   ViewProfile: undefined;
+  StudentGroupChat: {
+    groupId: string;
+    groupName: string;
+    visibility: 'public' | 'private';
+  };
+  ClubGroupChat: {
+    groupChatId: string;
+    pageName: string;
+    icon: string;
+    messageMode?: 'admin_only' | 'members';
+  };
 };

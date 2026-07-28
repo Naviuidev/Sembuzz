@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { getFrontendBaseUrl } from '../config/env';
+import { UserForgotPasswordPanel } from '../components/UserForgotPasswordPanel';
 
 const REGISTER_URL = getFrontendBaseUrl();
 
@@ -25,6 +26,7 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<'login' | 'forgot'>('login');
 
   useEffect(() => {
     if (user) {
@@ -86,6 +88,24 @@ export default function AuthScreen() {
       >
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.card}>
+            {view === 'forgot' ? (
+              <UserForgotPasswordPanel
+                initialEmail={email}
+                onBackToLogin={() => setView('login')}
+                onSuccess={() => setPassword('')}
+                styles={{
+                  modalTitle: styles.title,
+                  modalInput: styles.input,
+                  modalError: styles.errorText,
+                  modalSignInBtn: styles.loginButton,
+                  buttonDisabled: styles.buttonDisabled,
+                  modalSignInText: styles.loginButtonText,
+                  modalCancel: styles.registerLink,
+                  modalCancelText: styles.registerLinkText,
+                }}
+              />
+            ) : (
+              <>
             <Text style={styles.title}>Log in to SemBuzz</Text>
             <Text style={styles.subtitle}>Sign in to see your school’s events and filter by category.</Text>
 
@@ -114,6 +134,13 @@ export default function AuthScreen() {
               selectionColor="rgba(26, 31, 46, 0.25)"
             />
 
+            <TouchableOpacity
+              onPress={() => setView('forgot')}
+              style={{ alignSelf: 'flex-end', marginBottom: 8, marginTop: -4 }}
+            >
+              <Text style={{ fontSize: 14, color: '#6c757d' }}>Forgot password?</Text>
+            </TouchableOpacity>
+
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
             <TouchableOpacity
@@ -131,6 +158,8 @@ export default function AuthScreen() {
             <TouchableOpacity style={styles.registerLink} onPress={openRegister}>
               <Text style={styles.registerLinkText}>Don’t have an account? Register on the web</Text>
             </TouchableOpacity>
+              </>
+            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

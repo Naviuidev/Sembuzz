@@ -8,6 +8,7 @@ import { EventsBottomNav, type EventsBottomNavTab } from '../components/EventsBo
 import { ClubMessagingBadges } from '../components/ClubMessagingBadges';
 import { ClubGroupChatWidget } from '../components/ClubGroupChatWidget';
 import { useUserAuth } from '../contexts/UserAuthContext';
+import { useChatPopup } from '../contexts/ChatPopupContext';
 import { useEventsFilter } from '../contexts/EventsFilterContext';
 import {
   publicEventsService,
@@ -27,11 +28,18 @@ import {
 import { userAuthService } from '../services/user-auth.service';
 import { api } from '../config/api';
 import { imageSrc, isImageIconValue } from '../utils/image';
+import { getApiErrorMessage } from '../utils/apiError';
 import { userHelpService } from '../services/user-help.service';
 import { userSchoolSocialService, type SchoolSocialAccountPublic } from '../services/user-school-social.service';
 import { getUserCategoryDone, getUserSubCategoryIds, setUserCategoryDone, setUserSubCategoryIds } from '../utils/user-category-prefs';
 import { isMobileBrowser, openSembuzzAppWithToken } from '../utils/openSembuzzApp';
 import { userNotificationsService, USER_NOTIFICATIONS_UNREAD_QUERY_KEY } from '../services/user-notifications.service';
+import {
+  userDirectChatsService,
+  USER_DIRECT_CHATS_UNREAD_QUERY_KEY,
+} from '../services/user-direct-chats.service';
+import { USER_STUDENT_CHAT_GROUPS_UNREAD_QUERY_KEY, userStudentChatGroupsService } from '../services/user-student-chat-groups.service';
+import { UserForgotPasswordPanel } from '../components/UserForgotPasswordPanel';
 const DESCRIPTION_PREVIEW_LENGTH = 400;
 
 const PLATFORM_COLORS: Record<string, string> = {
@@ -1063,6 +1071,7 @@ type FilterMode = 'none' | 'search' | 'school' | 'category';
 
 export const PublicEvents = () => {
   const { user, logout, login } = useUserAuth();
+  const { openChat } = useChatPopup();
   const navigate = useNavigate();
   const eventsFilter = useEventsFilter();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1088,9 +1097,6 @@ export const PublicEvents = () => {
   const [helpSubmitError, setHelpSubmitError] = useState<string | null>(null);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState(false);
-  const [settingsSelectedAction, setSettingsSelectedAction] = useState<
-    'categories' | 'liked' | 'notifications' | 'saved' | 'help'
-  >('categories');
   const [settingsAvatarFailed, setSettingsAvatarFailed] = useState(false);
   const [deleteAccountPassword, setDeleteAccountPassword] = useState('');
   const [deleteAccountStatus, setDeleteAccountStatus] = useState<'idle' | 'loading' | 'success' | 'failure'>('idle');
@@ -1100,6 +1106,8 @@ export const PublicEvents = () => {
   const [searchScreenSchoolId, setSearchScreenSchoolId] = useState<string | null>(null);
   const [showSearchScreenNoNewsPopup, setShowSearchScreenNoNewsPopup] = useState(false);
   const [showSettingsLoginPopup, setShowSettingsLoginPopup] = useState(false);
+  const [settingsLoginView, setSettingsLoginView] = useState<'login' | 'forgot'>('login');
+  const [showSettingsRecentNewsList, setShowSettingsRecentNewsList] = useState(false);
   const [settingsLoginEmail, setSettingsLoginEmail] = useState('');
   const [settingsLoginPassword, setSettingsLoginPassword] = useState('');
   const [settingsLoginError, setSettingsLoginError] = useState<string | null>(null);
@@ -1347,56 +1355,6 @@ export const PublicEvents = () => {
     setSettingsAvatarFailed(false);
   }, [user?.id]);
 
-  const settingsActionMeta = useMemo(() => {
-    switch (settingsSelectedAction) {
-      case 'categories':
-        return {
-          title: 'Change categories',
-          subtitle: 'Update your preferred categories and subcategories.',
-          cta: 'Open categories',
-        };
-      case 'liked':
-        return { title: 'Liked news', subtitle: 'Review news posts you have liked.', cta: 'Open liked news' };
-      case 'saved':
-        return { title: 'Saved news', subtitle: 'Open your saved news collection.', cta: 'Open saved news' };
-      case 'notifications':
-        return {
-          title: 'Notifications',
-          subtitle: 'Review notifications triggered for your selected categories.',
-          cta: 'Open notifications',
-        };
-      case 'help':
-        return { title: 'Help', subtitle: 'Raise a query to your school admin.', cta: 'Raise query' };
-      default:
-        return { title: '', subtitle: '', cta: '' };
-    }
-  }, [settingsSelectedAction]);
-
-  const runSettingsSelectedAction = () => {
-    switch (settingsSelectedAction) {
-      case 'categories':
-        if (!user?.schoolId) {
-          window.alert('Your account must be linked to a school to change categories.');
-          return;
-        }
-        openChangeCategoryModal();
-        return;
-      case 'liked':
-        setBottomNavActive('liked');
-        return;
-      case 'saved':
-        navigate('/saved');
-        return;
-      case 'notifications':
-        navigate('/notifications');
-        return;
-      case 'help':
-        setShowHelpModal(true);
-        return;
-      default:
-    }
-  };
-
   const handleConfirmLogout = () => {
     setShowLogoutConfirmModal(false);
     logout();
@@ -1432,6 +1390,161 @@ export const PublicEvents = () => {
   });
   const notifUnreadCount = unreadNotifData?.unreadCount ?? 0;
 
+  const { data: directUnreadData } = useQuery({
+    queryKey: USER_DIRECT_CHATS_UNREAD_QUERY_KEY,
+    queryFn: userDirectChatsService.getUnreadCount,
+    enabled: !!user,
+    refetchInterval: 15_000,
+  });
+
+  const { data: groupUnreadData } = useQuery({
+    queryKey: USER_STUDENT_CHAT_GROUPS_UNREAD_QUERY_KEY,
+    queryFn: userStudentChatGroupsService.getUnreadCount,
+    enabled: !!user,
+    refetchInterval: 15_000,
+  });
+
+  const messagesUnreadCount =
+    (directUnreadData?.unreadCount ?? 0) +
+    (directUnreadData?.pendingIncomingCount ?? 0) +
+    (groupUnreadData?.unreadCount ?? 0);
+
+  const settingsActions = useMemo(
+    () =>
+      [
+        {
+          key: 'categories' as const,
+          title: 'Change categories',
+          subtitle: 'Update your preferred categories and subcategories.',
+          icon: 'bi-folder',
+        },
+        {
+          key: 'messages' as const,
+          title: 'Messages',
+          subtitle: 'Chat with classmates and join group conversations.',
+          icon: 'bi-chat-dots',
+          badge: messagesUnreadCount,
+        },
+        {
+          key: 'liked' as const,
+          title: 'Liked posts',
+          subtitle: 'Review news posts you have liked.',
+          icon: 'bi-heart',
+        },
+        {
+          key: 'notifications' as const,
+          title: 'Notifications',
+          subtitle: 'Review updates for your selected categories.',
+          icon: 'bi-bell',
+          badge: notifUnreadCount,
+        },
+        {
+          key: 'saved' as const,
+          title: 'Bookmarks',
+          subtitle: 'Open your saved news collection.',
+          icon: 'bi-bookmark',
+        },
+        {
+          key: 'help' as const,
+          title: 'Feedback/Query/Ask your School Admin',
+          subtitle: 'Send feedback or ask questions directly to your school admin.',
+          icon: 'bi-question-circle',
+        },
+      ] as const,
+    [notifUnreadCount, messagesUnreadCount],
+  );
+
+  const handleSettingsActionPress = (action: (typeof settingsActions)[number]['key']) => {
+    switch (action) {
+      case 'categories':
+        if (!user?.schoolId) {
+          window.alert('Your account must be linked to a school to change categories.');
+          return;
+        }
+        openChangeCategoryModal();
+        return;
+      case 'liked':
+        setBottomNavActive('liked');
+        return;
+      case 'saved':
+        navigate('/saved');
+        return;
+      case 'messages':
+        if (user) openChat();
+        else setShowSettingsLoginPopup(true);
+        return;
+      case 'notifications':
+        navigate('/notifications');
+        return;
+      case 'help':
+        setShowHelpModal(true);
+        return;
+      default:
+    }
+  };
+
+  const renderSettingsRecentNewsList = () => {
+    if (settingsRecentSorted.length === 0) {
+      return <p className="small text-muted mb-0">No news yet.</p>;
+    }
+    return (
+      <ul className="list-unstyled mb-0">
+        {settingsRecentSorted.slice(0, 10).map((e: ApprovedEventPublic) => {
+          const schoolLogo = e.school?.image ?? null;
+          const schoolLogoUrl = schoolLogo ? imageSrc(schoolLogo) : '';
+          return (
+            <li
+              key={e.id}
+              role="button"
+              tabIndex={0}
+              className="py-2 border-bottom d-flex align-items-center gap-3"
+              style={{ borderColor: '#eee', cursor: 'pointer' }}
+              onClick={() => {
+                setSelectedSettingsEvent(e);
+                setBottomNavActive('home');
+                navigate('/events', { replace: true });
+              }}
+              onKeyDown={(ev) => {
+                if (ev.key === 'Enter' || ev.key === ' ') {
+                  ev.preventDefault();
+                  setSelectedSettingsEvent(e);
+                  setBottomNavActive('home');
+                  navigate('/events', { replace: true });
+                }
+              }}
+            >
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: '8px',
+                  backgroundColor: 'rgb(26 31 46 / 8%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  overflow: 'hidden',
+                }}
+              >
+                {schoolLogoUrl ? (
+                  <img src={schoolLogoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <i className="bi bi-building" style={{ fontSize: '1rem', color: '#1a1f2e' }} />
+                )}
+              </div>
+              <div className="min-width-0 flex-grow-1">
+                <span className="fw-medium d-block text-truncate" style={{ fontSize: '0.95rem', color: '#1a1f2e' }}>
+                  {e.title}
+                </span>
+                <span className="text-muted small">{e.school?.name ?? 'School'}</span>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  };
+
   const eventsBottomNavActiveTab: EventsBottomNavTab = useMemo(() => {
     if (bottomNavActive === 'search') return 'search';
     if (bottomNavActive === 'home') return 'home';
@@ -1447,8 +1560,9 @@ export const PublicEvents = () => {
   }, [bottomNavActive]);
 
   const handleEventsBottomNavSelect = (tab: EventsBottomNavTab) => {
-    if (tab === 'blogs') {
-      navigate('/blogs');
+    if (tab === 'chat') {
+      if (user) openChat();
+      else setShowSettingsLoginPopup(true);
       return;
     }
     if (tab === 'universities') {
@@ -1559,6 +1673,7 @@ export const PublicEvents = () => {
     const openAuth = fromState ?? (fromQuery === 'login' || fromQuery === 'signup' ? fromQuery : null);
     if (openAuth === 'login') {
       setBottomNavActive('settings');
+      setSettingsLoginView('login');
       setShowSettingsLoginPopup(true);
       setShowSignupPopup(false);
       if (fromQuery) {
@@ -1888,7 +2003,7 @@ export const PublicEvents = () => {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#fafafa' }}>
-      {user ? <SchoolNavbar /> : <Navbar />}
+      {user ? <SchoolNavbar chatUnreadCount={messagesUnreadCount} /> : <Navbar />}
       {/* Refresh hint: only when user selected a school with no news; below nav, 3s auto-close, X to close — matches screenshot */}
       {showRefreshHint && (
         <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
@@ -2598,7 +2713,10 @@ export const PublicEvents = () => {
                     type="button"
                     className="btn btn-dark rounded-pill px-3"
                     
-                    onClick={() => setShowSettingsLoginPopup(true)}
+                    onClick={() => {
+                      setSettingsLoginView('login');
+                      setShowSettingsLoginPopup(true);
+                    }}
                   >
                     Login
                   </button>
@@ -2686,16 +2804,28 @@ export const PublicEvents = () => {
                 )}
                 <hr className="my-4" />
                 <div className="d-flex flex-wrap gap-3 small">
-                  <a href="https://sembuzz.com/#privacy" target="_blank" rel="noopener noreferrer" className="text-secondary">
+                  <a
+                    href="https://sembuzz.com/#privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-secondary"
+                    style={{ textDecoration: 'underline' }}
+                  >
                     Privacy policy
                   </a>
-                  <a href="https://sembuzz.com/#terms-of-service" target="_blank" rel="noopener noreferrer" className="text-secondary">
+                  <a
+                    href="https://sembuzz.com/#terms-of-service"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-secondary"
+                    style={{ textDecoration: 'underline' }}
+                  >
                     Terms and conditions
                   </a>
                 </div>
               </>
             ) : (
-              /* Logged in — matches mobile SettingsScreen: profile row, 5 icon actions, detail card, recent list */
+              /* Logged in — matches mobile SettingsScreen: profile row, action list cards, collapsible recent news */
               <>
                 <div className="d-flex align-items-center mb-4" style={{ gap: '1rem' }}>
                   <div className="position-relative flex-shrink-0" style={{ width: 64, height: 64 }}>
@@ -2775,147 +2905,133 @@ export const PublicEvents = () => {
                   </div>
                 </div>
 
-                <div className="d-flex justify-content-between align-items-center gap-2 mb-3" style={{ marginBottom: '0.75rem' }}>
-                  {(
-                    [
-                      { key: 'categories' as const, icon: 'bi-folder', iconFill: 'bi-folder-fill' },
-                      { key: 'liked' as const, icon: 'bi-heart', iconFill: 'bi-heart-fill' },
-                      { key: 'notifications' as const, icon: 'bi-bell', iconFill: 'bi-bell-fill' },
-                      { key: 'saved' as const, icon: 'bi-bookmark', iconFill: 'bi-bookmark-fill' },
-                      { key: 'help' as const, icon: 'bi-question-circle', iconFill: 'bi-question-circle-fill' },
-                    ] as const
-                  ).map(({ key, icon, iconFill }) => {
-                    const active = settingsSelectedAction === key;
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        className="border-0 d-flex align-items-center justify-content-center position-relative"
-                        style={{
-                          width: 46,
-                          height: 46,
-                          borderRadius: '50%',
-                          backgroundColor: active ? '#dbe7ff' : '#eef1f6',
-                          flexShrink: 0,
-                          transition: 'background 0.2s ease',
-                        }}
-                        onClick={() => setSettingsSelectedAction(key)}
-                        aria-label={key}
-                        aria-pressed={active}
-                      >
-                        <i className={`bi ${active ? iconFill : icon}`} style={{ fontSize: '1.15rem', color: '#1a1f2e' }} />
-                        {key === 'notifications' && notifUnreadCount > 0 ? (
-                          <span
-                            className="position-absolute rounded-pill text-white d-flex align-items-center justify-content-center"
-                            style={{
-                              top: -4,
-                              right: -4,
-                              minWidth: 17,
-                              height: 17,
-                              fontSize: 9,
-                              fontWeight: 700,
-                              backgroundColor: '#111315',
-                              border: '1.5px solid #fff',
-                              padding: '0 3px',
-                            }}
-                          >
-                            {notifUnreadCount > 99 ? '99+' : notifUnreadCount}
-                          </span>
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
-
                 <div
-                  className="mb-4"
+                  className="mb-2"
                   style={{
                     borderRadius: 14,
                     border: '1px solid #e4e7ee',
-                    backgroundColor: '#f9fbff',
-                    padding: 14,
+                    backgroundColor: '#fff',
+                    overflow: 'hidden',
                   }}
                 >
-                  <div className="fw-bold mb-1" style={{ fontSize: '1rem', color: '#1a1f2e' }}>
-                    {settingsActionMeta.title}
-                  </div>
-                  <div className="small mb-0" style={{ color: '#5f6b7a', lineHeight: 1.35 }}>
-                    {settingsActionMeta.subtitle}
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-dark mt-2"
-                    style={{ borderRadius: 10, fontWeight: 600 }}
-                    onClick={runSettingsSelectedAction}
-                  >
-                    {settingsActionMeta.cta}
-                  </button>
+                  {settingsActions.map((item, index) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      className="w-100 border-0 d-flex align-items-center justify-content-between text-start"
+                      style={{
+                        padding: '12px',
+                        backgroundColor: '#fff',
+                        borderBottom: index < settingsActions.length - 1 ? '1px solid #f0f2f6' : undefined,
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => handleSettingsActionPress(item.key)}
+                    >
+                      <div className="d-flex align-items-center flex-grow-1 min-width-0 me-2">
+                        <div
+                          className="position-relative d-flex align-items-center justify-content-center flex-shrink-0"
+                          style={{
+                            width: 34,
+                            height: 34,
+                            borderRadius: 999,
+                            backgroundColor: '#eef1f6',
+                            marginRight: 10,
+                          }}
+                        >
+                          <i className={`bi ${item.icon}`} style={{ fontSize: '1.1rem', color: '#1a1f2e' }} />
+                          {item.badge != null && (item.badge ?? 0) > 0 ? (
+                            <span
+                              className="position-absolute rounded-pill text-white d-flex align-items-center justify-content-center"
+                              style={{
+                                top: -4,
+                                right: -4,
+                                minWidth: 17,
+                                height: 17,
+                                fontSize: 9,
+                                fontWeight: 700,
+                                backgroundColor: '#111315',
+                                border: '1.5px solid #fff',
+                                padding: '0 3px',
+                              }}
+                            >
+                              {(item.badge ?? 0) > 99 ? '99+' : item.badge}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="min-width-0">
+                          <div style={{ fontSize: 15, fontWeight: 600, color: '#1a1f2e' }}>{item.title}</div>
+                          <div style={{ fontSize: 12, color: '#6c757d', marginTop: 2, lineHeight: 1.35 }}>{item.subtitle}</div>
+                        </div>
+                      </div>
+                      <i className="bi bi-chevron-right" style={{ fontSize: '1.1rem', color: '#8e8e8e', flexShrink: 0 }} />
+                    </button>
+                  ))}
                 </div>
 
                 <hr className="my-4" />
-                <h6 className="fw-semibold mb-3" style={{ color: '#1a1f2e' }}>Recently added schools / news</h6>
-                {settingsRecentSorted.length === 0 ? (
-                  <p className="small text-muted">No news yet.</p>
-                ) : (
-                  <ul className="list-unstyled mb-0">
-                    {settingsRecentSorted.map((e: ApprovedEventPublic) => {
-                      const schoolLogo = e.school?.image ?? null;
-                      const schoolLogoUrl = schoolLogo ? imageSrc(schoolLogo) : '';
-                      return (
-                        <li
-                          key={e.id}
-                          role="button"
-                          tabIndex={0}
-                          className="py-2 border-bottom d-flex align-items-center gap-3"
-                          style={{ borderColor: '#eee', cursor: 'pointer' }}
-                          onClick={() => {
-                            setSelectedSettingsEvent(e);
-                            setBottomNavActive('home');
-                            navigate('/events', { replace: true });
-                          }}
-                          onKeyDown={(ev) => {
-                            if (ev.key === 'Enter' || ev.key === ' ') {
-                              ev.preventDefault();
-                              setSelectedSettingsEvent(e);
-                              setBottomNavActive('home');
-                              navigate('/events', { replace: true });
-                            }
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: '8px',
-                              backgroundColor: 'rgb(26 31 46 / 8%)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              flexShrink: 0,
-                              overflow: 'hidden',
-                            }}
-                          >
-                            {schoolLogoUrl ? (
-                              <img src={schoolLogoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            ) : (
-                              <i className="bi bi-building" style={{ fontSize: '1rem', color: '#1a1f2e' }} />
-                            )}
-                          </div>
-                          <div className="min-width-0 flex-grow-1">
-                            <span className="fw-medium d-block text-truncate" style={{ fontSize: '0.95rem', color: '#1a1f2e' }}>{e.title}</span>
-                            <span className="text-muted small">{e.school?.name ?? 'School'}</span>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
+
+                <div
+                  className="mb-2"
+                  style={{
+                    borderRadius: 14,
+                    border: '1px solid #e4e7ee',
+                    backgroundColor: '#fff',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="w-100 border-0 d-flex align-items-center justify-content-between text-start"
+                    style={{ padding: '12px', backgroundColor: '#fff', cursor: 'pointer' }}
+                    onClick={() => setShowSettingsRecentNewsList((v) => !v)}
+                  >
+                    <div className="d-flex align-items-center flex-grow-1 min-width-0 me-2">
+                      <div
+                        className="d-flex align-items-center justify-content-center flex-shrink-0"
+                        style={{
+                          width: 34,
+                          height: 34,
+                          borderRadius: 999,
+                          backgroundColor: '#eef1f6',
+                          marginRight: 10,
+                        }}
+                      >
+                        <i className="bi bi-newspaper" style={{ fontSize: '1.1rem', color: '#1a1f2e' }} />
+                      </div>
+                      <div className="min-width-0">
+                        <div style={{ fontSize: 15, fontWeight: 600, color: '#1a1f2e' }}>Recently added schools / news</div>
+                        <div style={{ fontSize: 12, color: '#6c757d', marginTop: 2 }}>Tap to view latest posted news</div>
+                      </div>
+                    </div>
+                    <i
+                      className={`bi ${showSettingsRecentNewsList ? 'bi-chevron-up' : 'bi-chevron-right'}`}
+                      style={{ fontSize: '1.1rem', color: '#8e8e8e', flexShrink: 0 }}
+                    />
+                  </button>
+                </div>
+
+                {showSettingsRecentNewsList ? (
+                  <div className="mt-2">{renderSettingsRecentNewsList()}</div>
+                ) : null}
+
                 <hr className="my-4" />
                 <div className="d-flex flex-wrap gap-3 small">
-                  <a href="https://sembuzz.com/#privacy" target="_blank" rel="noopener noreferrer" className="text-secondary">
+                  <a
+                    href="https://sembuzz.com/#privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-secondary"
+                    style={{ textDecoration: 'underline' }}
+                  >
                     Privacy policy
                   </a>
-                  <a href="https://sembuzz.com/#terms-of-service" target="_blank" rel="noopener noreferrer" className="text-secondary">
+                  <a
+                    href="https://sembuzz.com/#terms-of-service"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-secondary"
+                    style={{ textDecoration: 'underline' }}
+                  >
                     Terms and conditions
                   </a>
                 </div>
@@ -2943,7 +3059,7 @@ export const PublicEvents = () => {
                   <button type="button" className="btn btn-link p-0 text-decoration-none d-flex align-items-center" onClick={() => setBottomNavActive('settings')} aria-label="Back to Settings">
                     <i className="bi bi-arrow-left" style={{ fontSize: '1.25rem', color: '#1a1f2e' }} />
                   </button>
-                  <h2 className="mb-0" style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1a1f2e' }}>Liked news</h2>
+                  <h2 className="mb-0" style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1a1f2e' }}>Liked posts</h2>
                 </div>
                 {likedEventsLoading ? (
                   <div className="text-center py-4"><div className="spinner-border text-primary" role="status" /><p className="mt-2 mb-0 small text-muted">Loading…</p></div>
@@ -3888,7 +4004,7 @@ export const PublicEvents = () => {
           </div>
         ) : error ? (
           <div className="alert alert-danger d-flex align-items-center justify-content-between flex-wrap gap-2" style={{ borderRadius: '8px' }}>
-            <span>Failed to load events. Check that the API is reachable and CORS allows this site.</span>
+            <span>{getApiErrorMessage(error, 'Failed to load events. Check that the API is reachable and CORS allows this site.')}</span>
             <button
               type="button"
               className="btn btn-outline-danger btn-sm"
@@ -4148,74 +4264,97 @@ export const PublicEvents = () => {
             <div className="text-center mb-3" style={{ fontFamily: "'Poppins', sans-serif", fontSize: '1.5rem', fontWeight: 700, color: '#1a1f2e' }}>
               Sembuzz
             </div>
-            <h2 id="settings-login-title" className="text-center mb-4" style={{ fontSize: '1.15rem', fontWeight: 600, color: '#495057' }}>
-              Login to your Account
-            </h2>
-            <form onSubmit={handleSettingsLoginSubmit}>
-              <div className="mb-3">
-                <input
-                  type="email"
-                  className="form-control"
-                  placeholder="Email"
-                  value={settingsLoginEmail}
-                  onChange={(e) => { setSettingsLoginEmail(e.target.value); setSettingsLoginError(null); }}
-                  autoComplete="email"
-                  style={{ borderRadius: '10px', border: '1px solid #dee2e6' }}
-                />
-              </div>
-              <div className="mb-3">
-                <input
-                  type="password"
-                  className="form-control"
-                  placeholder="Password"
-                  value={settingsLoginPassword}
-                  onChange={(e) => { setSettingsLoginPassword(e.target.value); setSettingsLoginError(null); }}
-                  autoComplete="current-password"
-                  style={{ borderRadius: '10px', border: '1px solid #dee2e6' }}
-                />
-              </div>
-              {settingsLoginError && (
-                <div className="small text-danger mb-2">{settingsLoginError}</div>
-              )}
-              <button
-                type="submit"
-                className="btn btn-dark rounded-pill w-100"
-                disabled={settingsLoginLoading}
-                style={{
-                  borderRadius: '10px',
-                  fontWeight: 500,
-                  padding: '0.6rem 1rem',
+            {settingsLoginView === 'forgot' ? (
+              <UserForgotPasswordPanel
+                compact
+                initialEmail={settingsLoginEmail}
+                onBackToLogin={() => setSettingsLoginView('login')}
+                onSuccess={() => {
+                  setSettingsLoginPassword('');
+                  setSettingsLoginError(null);
                 }}
-              >
-                {settingsLoginLoading ? 'Signing in…' : 'Sign in'}
-              </button>
-            </form>
-            <p className="text-center mt-3 mb-0 small text-muted">
-              Create new account?{' '}
-              <button
-                type="button"
-                className="btn btn-link p-0 text-primary text-decoration-none"
-                onClick={() => { setShowSettingsLoginPopup(false); setShowSignupPopup(true); }}
-              >
-                Sign up
-              </button>
-            </p>
-            <hr className="my-3" />
-            <div className="d-flex flex-wrap gap-3 small justify-content-center">
-              <a href="https://sembuzz.com/#privacy" target="_blank" rel="noopener noreferrer" className="text-secondary">
-                Privacy policy
-              </a>
-              <a href="https://sembuzz.com/#terms-of-service" target="_blank" rel="noopener noreferrer" className="text-secondary">
-                Terms and conditions
-              </a>
-            </div>
-            <button
-              type="button"
-              className="btn btn-link btn-sm w-100 mt-2 p-0 text-secondary text-decoration-none"
-              onClick={() => !settingsLoginLoading && setShowSettingsLoginPopup(false)}
-            >
-              Cancel
-            </button>
+              />
+            ) : (
+              <>
+                <h2 id="settings-login-title" className="text-center mb-4" style={{ fontSize: '1.15rem', fontWeight: 600, color: '#495057' }}>
+                  Login to your Account
+                </h2>
+                <form onSubmit={handleSettingsLoginSubmit}>
+                  <div className="mb-3">
+                    <input
+                      type="email"
+                      className="form-control"
+                      placeholder="Email"
+                      value={settingsLoginEmail}
+                      onChange={(e) => { setSettingsLoginEmail(e.target.value); setSettingsLoginError(null); }}
+                      autoComplete="email"
+                      style={{ borderRadius: '10px', border: '1px solid #dee2e6' }}
+                    />
+                  </div>
+                  <div className="mb-1">
+                    <input
+                      type="password"
+                      className="form-control"
+                      placeholder="Password"
+                      value={settingsLoginPassword}
+                      onChange={(e) => { setSettingsLoginPassword(e.target.value); setSettingsLoginError(null); }}
+                      autoComplete="current-password"
+                      style={{ borderRadius: '10px', border: '1px solid #dee2e6' }}
+                    />
+                  </div>
+                  <div className="text-end mb-3">
+                    <button
+                      type="button"
+                      className="btn btn-link btn-sm p-0 text-secondary text-decoration-none"
+                      onClick={() => setSettingsLoginView('forgot')}
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  {settingsLoginError && (
+                    <div className="small text-danger mb-2">{settingsLoginError}</div>
+                  )}
+                  <button
+                    type="submit"
+                    className="btn btn-dark rounded-pill w-100"
+                    disabled={settingsLoginLoading}
+                    style={{
+                      borderRadius: '10px',
+                      fontWeight: 500,
+                      padding: '0.6rem 1rem',
+                    }}
+                  >
+                    {settingsLoginLoading ? 'Signing in…' : 'Sign in'}
+                  </button>
+                </form>
+                <p className="text-center mt-3 mb-0 small text-muted">
+                  Create new account?{' '}
+                  <button
+                    type="button"
+                    className="btn btn-link p-0 text-primary text-decoration-none"
+                    onClick={() => { setShowSettingsLoginPopup(false); setShowSignupPopup(true); }}
+                  >
+                    Sign up
+                  </button>
+                </p>
+                <hr className="my-3" />
+                <div className="d-flex flex-wrap gap-3 small justify-content-center">
+                  <a href="https://sembuzz.com/#privacy" target="_blank" rel="noopener noreferrer" className="text-secondary">
+                    Privacy policy
+                  </a>
+                  <a href="https://sembuzz.com/#terms-of-service" target="_blank" rel="noopener noreferrer" className="text-secondary">
+                    Terms and conditions
+                  </a>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-link btn-sm w-100 mt-2 p-0 text-secondary text-decoration-none"
+                  onClick={() => !settingsLoginLoading && setShowSettingsLoginPopup(false)}
+                >
+                  Cancel
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -4341,6 +4480,7 @@ export const PublicEvents = () => {
         activeTab={eventsBottomNavActiveTab}
         onSelectTab={handleEventsBottomNavSelect}
         notifUnreadCount={notifUnreadCount}
+        chatUnreadCount={messagesUnreadCount}
         visible={bottomNavVisible}
         zIndex={
           showSettingsLoginPopup ||

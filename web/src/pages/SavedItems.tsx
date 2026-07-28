@@ -154,8 +154,8 @@ export const SavedItems = () => {
   const notifUnreadCount = unreadNotifData?.unreadCount ?? 0;
 
   const handleBottomNav = (tab: EventsBottomNavTab) => {
-    if (tab === 'blogs') {
-      navigate('/blogs');
+    if (tab === 'chat') {
+      navigate('/messages');
       return;
     }
     navigate('/events', { state: { bottomNav: tab } });

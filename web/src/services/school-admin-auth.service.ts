@@ -22,6 +22,7 @@ export interface SchoolAdminLoginResponse {
 
 export interface SchoolAdminUser {
   id: string;
+  userId?: string;
   name: string;
   email: string;
   schoolId: string;
@@ -51,6 +52,11 @@ export const schoolAdminAuthService = {
 
   getMe: async (): Promise<SchoolAdminUser> => {
     const response = await api.get<SchoolAdminUser>('/school-admin/auth/me');
+    return response.data;
+  },
+
+  updateEmail: async (email: string): Promise<{ userId: string; email: string }> => {
+    const response = await api.patch<{ userId: string; email: string }>('/school-admin/auth/email', { email });
     return response.data;
   },
 };

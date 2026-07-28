@@ -9,6 +9,7 @@ export interface LoginResponse {
   access_token: string;
   user: {
     id: string;
+    userId?: string;
     name: string;
     email: string;
   };
@@ -16,6 +17,7 @@ export interface LoginResponse {
 
 export interface User {
   id: string;
+  userId?: string;
   name: string;
   email: string;
   createdAt: string;
@@ -60,6 +62,11 @@ export const authService = {
 
   getMe: async (): Promise<User> => {
     const response = await api.get<User>('/super-admin/auth/me');
+    return response.data;
+  },
+
+  updateEmail: async (email: string): Promise<{ userId: string; email: string }> => {
+    const response = await api.patch<{ userId: string; email: string }>('/super-admin/auth/email', { email });
     return response.data;
   },
 };

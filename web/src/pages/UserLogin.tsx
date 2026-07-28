@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
+import { UserForgotPasswordPanel } from '../components/UserForgotPasswordPanel';
 import { useUserAuth } from '../contexts/UserAuthContext';
 import { isMobileBrowser, openSembuzzAppWithToken } from '../utils/openSembuzzApp';
 
@@ -12,6 +13,7 @@ export const UserLogin = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [view, setView] = useState<'login' | 'forgot'>('login');
   const successMessage = (location.state as { message?: string } | null)?.message;
 
   useEffect(() => {
@@ -51,6 +53,14 @@ export const UserLogin = () => {
           <div className="col-md-6 col-lg-5">
             <div className="card border-0 shadow-sm" style={{ borderRadius: '12px' }}>
               <div className="card-body p-5">
+                {view === 'forgot' ? (
+                  <UserForgotPasswordPanel
+                    initialEmail={email}
+                    onBackToLogin={() => setView('login')}
+                    onSuccess={() => setPassword('')}
+                  />
+                ) : (
+                  <>
                 <h2
                   className="text-center mb-4"
                   style={{ fontSize: '2rem', fontWeight: '700', color: '#1a1f2e' }}
@@ -109,13 +119,15 @@ export const UserLogin = () => {
                     />
                   </div>
 
-                  <div className="d-flex justify-content-between align-items-center mb-4">
-                    <div className="form-check">
-                      <input className="form-check-input" type="checkbox" id="remember-me" />
-                      <label className="form-check-label" htmlFor="remember-me" style={{ fontSize: '0.9rem' }}>
-                        Remember me
-                      </label>
-                    </div>
+                  <div className="d-flex justify-content-end mb-4">
+                    <button
+                      type="button"
+                      className="btn btn-link p-0 text-secondary text-decoration-none"
+                      style={{ fontSize: '0.9rem' }}
+                      onClick={() => setView('forgot')}
+                    >
+                      Forgot password?
+                    </button>
                   </div>
 
                   <button
@@ -133,6 +145,8 @@ export const UserLogin = () => {
                     {loading ? 'Signing in...' : 'Sign in'}
                   </button>
                 </form>
+                  </>
+                )}
               </div>
             </div>
           </div>

@@ -1,6 +1,8 @@
 import { Injectable, UnauthorizedException, HttpException, HttpStatus } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { PlatformUserService } from '../../platform-user/platform-user.service';
+import { UpdateEmailDto } from '../../platform-user/dto/update-email.dto';
 import * as bcrypt from 'bcrypt';
 import { LoginDto } from '../dto/login.dto';
 
@@ -9,14 +11,20 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private platformUserService: PlatformUserService,
   ) {}
 
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto;
 
     try {
+      const platformUser = await this.platformUserService.findByEmail(email);
+      if (!platformUser) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+
       const superAdmin = await this.prisma.superAdmin.findUnique({
-        where: { email },
+        where: { platformUserId: platformUser.id },
       });
 
       if (!superAdmin) {
@@ -31,7 +39,8 @@ export class AuthService {
 
       const payload = {
         sub: superAdmin.id,
-        email: superAdmin.email,
+        userId: platformUser.id,
+        email: platformUser.email,
         role: 'super_admin',
       };
 
@@ -39,8 +48,9 @@ export class AuthService {
         access_token: this.jwtService.sign(payload),
         user: {
           id: superAdmin.id,
+          userId: platformUser.id,
           name: superAdmin.name,
-          email: superAdmin.email,
+          email: platformUser.email,
         },
       };
     } catch (err) {
@@ -56,12 +66,22 @@ export class AuthService {
     }
   }
 
+  async updateEmail(adminId: string, dto: UpdateEmailDto) {
+    const admin = await this.prisma.superAdmin.findUnique({ where: { id: adminId } });
+    if (!admin) {
+      throw new UnauthorizedException('User not found');
+    }
+    const updated = await this.platformUserService.updateEmail(admin.platformUserId, dto.email);
+    return { userId: updated.id, email: updated.email };
+  }
+
   async validateUser(userId: string) {
     try {
       const superAdmin = await this.prisma.superAdmin.findUnique({
         where: { id: userId },
         select: {
           id: true,
+          platformUserId: true,
           name: true,
           email: true,
           createdAt: true,
@@ -72,7 +92,13 @@ export class AuthService {
         throw new UnauthorizedException('User not found');
       }
 
-      return superAdmin;
+      return {
+        id: superAdmin.id,
+        userId: superAdmin.platformUserId,
+        name: superAdmin.name,
+        email: superAdmin.email,
+        createdAt: superAdmin.createdAt,
+      };
     } catch (err) {
       if (err instanceof UnauthorizedException) {
         throw err;

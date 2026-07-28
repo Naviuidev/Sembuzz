@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { useUserAuth } from '../contexts/UserAuthContext';
 import { imageSrc } from '../utils/image';
 
-/** Matches mobile `AppNavigator` bottom tabs: Search, Home, Settings (profile → school logo → initial), Apps, Blogs, Universities. */
-export type EventsBottomNavTab = 'search' | 'home' | 'settings' | 'apps' | 'blogs' | 'universities';
+/** Matches mobile bottom tabs: Search, Home, Settings, Apps, Chat, Universities. */
+export type EventsBottomNavTab = 'search' | 'home' | 'settings' | 'apps' | 'chat' | 'universities';
 
 type EventsBottomNavProps = {
   activeTab: EventsBottomNavTab;
   onSelectTab: (tab: EventsBottomNavTab) => void;
   notifUnreadCount: number;
+  chatUnreadCount?: number;
   visible?: boolean;
   zIndex?: number;
 };
@@ -17,6 +18,7 @@ export function EventsBottomNav({
   activeTab,
   onSelectTab,
   notifUnreadCount,
+  chatUnreadCount = 0,
   visible = true,
   zIndex = 1030,
 }: EventsBottomNavProps) {
@@ -159,12 +161,34 @@ export function EventsBottomNav({
             </button>
             <button
               type="button"
-              className={`events-bottom-nav-btn ${activeTab === 'blogs' ? 'events-bottom-nav-btn-active' : ''}`}
-              aria-label="Blogs"
-              aria-current={activeTab === 'blogs' ? 'page' : undefined}
-              onClick={() => onSelectTab('blogs')}
+              className={`events-bottom-nav-btn ${activeTab === 'chat' ? 'events-bottom-nav-btn-active' : ''}`}
+              aria-label="Chat"
+              aria-current={activeTab === 'chat' ? 'page' : undefined}
+              onClick={() => onSelectTab('chat')}
             >
-              <i className="bi bi-newspaper" style={{ fontSize: '1.375rem', color: iconColor('blogs') }} />
+              <span className="position-relative d-inline-flex">
+                <i className="bi bi-chat-dots" style={{ fontSize: '1.375rem', color: iconColor('chat') }} />
+                {chatUnreadCount > 0 ? (
+                  <span
+                    className="position-absolute rounded-pill bg-danger text-white"
+                    style={{
+                      top: -6,
+                      right: -10,
+                      minWidth: 16,
+                      height: 16,
+                      fontSize: 9,
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0 3px',
+                      border: '1.5px solid #fff',
+                    }}
+                  >
+                    {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                  </span>
+                ) : null}
+              </span>
             </button>
             <button
               type="button"

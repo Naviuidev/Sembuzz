@@ -12,6 +12,8 @@ import { SubCategoryAdminLoginDto } from '../dto/login.dto';
 import { ChangePasswordDto } from '../dto/change-password.dto';
 import { RequestOtpDto, VerifyOtpDto, ResetPasswordDto } from '../dto/forgot-password.dto';
 import { EmailService } from '../../super-admin/schools/email.service';
+import { PlatformUserService } from '../../platform-user/platform-user.service';
+import { UpdateEmailDto } from '../../platform-user/dto/update-email.dto';
 
 @Injectable()
 export class SubCategoryAdminAuthService {
@@ -19,36 +21,28 @@ export class SubCategoryAdminAuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private emailService: EmailService,
+    private platformUserService: PlatformUserService,
   ) {}
+
+  private async findActiveAdminByEmail(email: string) {
+    const platformUser = await this.platformUserService.findByEmail(email);
+    if (!platformUser) {
+      return null;
+    }
+    return this.prisma.subCategoryAdmin.findFirst({
+      where: { platformUserId: platformUser.id, isActive: true },
+      include: {
+        subCategory: { select: { id: true, name: true } },
+        category: { select: { id: true, name: true } },
+        school: { select: { id: true, name: true, domain: true } },
+      },
+    });
+  }
 
   async login(loginDto: SubCategoryAdminLoginDto) {
     const { email, password } = loginDto;
 
-    // Find subcategory admin by email
-    const admin = await this.prisma.subCategoryAdmin.findUnique({
-      where: { email },
-      include: {
-        subCategory: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        category: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        school: {
-          select: {
-            id: true,
-            name: true,
-            domain: true,
-          },
-        },
-      },
-    });
+    const admin = await this.findActiveAdminByEmail(email);
 
     if (!admin) {
       throw new UnauthorizedException('Invalid credentials');
@@ -66,6 +60,7 @@ export class SubCategoryAdminAuthService {
 
     const payload = {
       sub: admin.id,
+      userId: admin.platformUserId,
       email: admin.email,
       subCategoryId: admin.subCategoryId,
       categoryId: admin.categoryId,
@@ -115,6 +110,7 @@ export class SubCategoryAdminAuthService {
       access_token: this.jwtService.sign(payload),
       user: {
         id: admin.id,
+        userId: admin.platformUserId,
         name: admin.name,
         email: admin.email,
         subCategoryId: admin.subCategoryId,
@@ -281,6 +277,7 @@ export class SubCategoryAdminAuthService {
 
     return {
       id: admin.id,
+      userId: admin.platformUserId,
       name: admin.name,
       email: admin.email,
       subCategoryId: admin.subCategoryId,
@@ -317,9 +314,7 @@ export class SubCategoryAdminAuthService {
   async requestOtp(requestOtpDto: RequestOtpDto) {
     const { email } = requestOtpDto;
 
-    const admin = await this.prisma.subCategoryAdmin.findUnique({
-      where: { email: email.trim(), isActive: true },
-    });
+    const admin = await this.findActiveAdminByEmail(email);
 
     if (!admin) {
       throw new NotFoundException('No subcategory admin found with this email address');
@@ -352,9 +347,7 @@ export class SubCategoryAdminAuthService {
   async verifyOtp(verifyOtpDto: VerifyOtpDto) {
     const { email, otp } = verifyOtpDto;
 
-    const admin = await this.prisma.subCategoryAdmin.findUnique({
-      where: { email: email.trim(), isActive: true },
-    });
+    const admin = await this.findActiveAdminByEmail(email);
 
     if (!admin) {
       throw new NotFoundException('No subcategory admin found with this email address');
@@ -383,9 +376,7 @@ export class SubCategoryAdminAuthService {
       throw new BadRequestException('New password and confirm password do not match');
     }
 
-    const admin = await this.prisma.subCategoryAdmin.findUnique({
-      where: { email: email.trim(), isActive: true },
-    });
+    const admin = await this.findActiveAdminByEmail(email);
 
     if (!admin) {
       throw new NotFoundException('No subcategory admin found with this email address');
@@ -418,5 +409,14 @@ export class SubCategoryAdminAuthService {
     ]);
 
     return { message: 'Password reset successfully. Please login with your new password.' };
+  }
+
+  async updateEmail(adminId: string, dto: UpdateEmailDto) {
+    const admin = await this.prisma.subCategoryAdmin.findUnique({ where: { id: adminId } });
+    if (!admin) {
+      throw new UnauthorizedException('User not found');
+    }
+    const updated = await this.platformUserService.updateEmail(admin.platformUserId, dto.email);
+    return { userId: updated.id, email: updated.email };
   }
 }

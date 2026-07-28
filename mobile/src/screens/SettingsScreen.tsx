@@ -29,6 +29,7 @@ import { getFrontendBaseUrl } from '../config/env';
 import { userHelpService, type UserHelpQueryItem } from '../services/userHelp';
 import { userNotificationsService } from '../services/userNotifications';
 import SignUpModal from '../components/SignUpModal';
+import { UserForgotPasswordPanel } from '../components/UserForgotPasswordPanel';
 import Svg, { Circle } from 'react-native-svg';
 import { UserBookmarkedEventDetailModal } from '../components/UserBookmarkedEventDetail';
 
@@ -81,6 +82,7 @@ export default function SettingsScreen() {
   const [recentLoading, setRecentLoading] = useState(false);
   const [recentError, setRecentError] = useState<string | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [loginModalView, setLoginModalView] = useState<'login' | 'forgot'>('login');
   const [showSignUpModal, setShowSignUpModal] = useState(false);
   const [loginInfoMessage, setLoginInfoMessage] = useState<string | null>(null);
   const [profileImageFailed, setProfileImageFailed] = useState(false);
@@ -90,6 +92,7 @@ export default function SettingsScreen() {
       if (user) return;
       if (route.params?.openLogin) {
         setLoginInfoMessage(null);
+        setLoginModalView('login');
         setShowLoginModal(true);
         navigation.setParams({});
       } else if (route.params?.openSignUp) {
@@ -385,6 +388,9 @@ export default function SettingsScreen() {
                 </TouchableOpacity>
               </View>
               <Text style={styles.userEmail}>{user.email}</Text>
+              {user.userId ? (
+                <Text style={styles.userId}>User ID: {user.userId}</Text>
+              ) : null}
             </View>
           </View>
 
@@ -581,6 +587,7 @@ export default function SettingsScreen() {
     setPassword('');
     setLoginInfoMessage(payload.infoMessage ?? null);
     setError(null);
+    setLoginModalView('login');
     setShowLoginModal(true);
   };
 
@@ -602,6 +609,7 @@ export default function SettingsScreen() {
               style={styles.loginButton}
               onPress={() => {
                 setLoginInfoMessage(null);
+                setLoginModalView('login');
                 setShowLoginModal(true);
               }}
             >
@@ -693,6 +701,18 @@ export default function SettingsScreen() {
                 </TouchableOpacity>
               </View>
               <Text style={styles.modalBrand}>Sembuzz</Text>
+              {loginModalView === 'forgot' ? (
+                <UserForgotPasswordPanel
+                  initialEmail={email}
+                  onBackToLogin={() => setLoginModalView('login')}
+                  onSuccess={() => {
+                    setPassword('');
+                    setError(null);
+                  }}
+                  styles={styles}
+                />
+              ) : (
+                <>
               <Text style={styles.modalTitle}>Login to your Account</Text>
               {loginInfoMessage ? <Text style={styles.modalInfoBanner}>{loginInfoMessage}</Text> : null}
               <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -728,6 +748,13 @@ export default function SettingsScreen() {
                   cursorColor="#1a1f2e"
                   selectionColor="rgba(26, 31, 46, 0.25)"
                 />
+                <TouchableOpacity
+                  onPress={() => setLoginModalView('forgot')}
+                  style={{ alignSelf: 'flex-end', marginBottom: 8, marginTop: -4 }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={{ fontSize: 14, color: '#6c757d' }}>Forgot password?</Text>
+                </TouchableOpacity>
                 {error ? <Text style={styles.modalError}>{error}</Text> : null}
                 <TouchableOpacity
                   style={[styles.modalSignInBtn, loading && styles.buttonDisabled]}
@@ -753,12 +780,15 @@ export default function SettingsScreen() {
               <TouchableOpacity
                 onPress={() => {
                   setLoginInfoMessage(null);
+                  setLoginModalView('login');
                   setShowLoginModal(false);
                 }}
                 style={styles.modalCancel}
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
+                </>
+              )}
             </Pressable>
           </Pressable>
         </Modal>
@@ -960,6 +990,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6c757d',
     marginTop: 4,
+  },
+  userId: {
+    fontSize: 11,
+    color: '#8e8e8e',
+    marginTop: 4,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   actionsIconRow: {
     flexDirection: 'row',

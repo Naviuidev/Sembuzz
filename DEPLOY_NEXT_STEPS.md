@@ -39,6 +39,7 @@ API_URL="https://api.sembuzz.com"
 FRONTEND_URL="https://sembuzz.com"
 SMTP_HOST=smtp.hostinger.com
 SMTP_PORT=587
+SMTP_SECURE=false
 SMTP_USER=admin@sembuzz.com
 SMTP_PASS=your-real-email-password
 SMTP_FROM=admin@sembuzz.com
@@ -47,6 +48,7 @@ SMTP_FROM=admin@sembuzz.com
 - Replace `HOST` with the MySQL host from step 2.
 - Generate `JWT_SECRET`: run `openssl rand -base64 32` and paste the result.
 - Set `SMTP_PASS` to the real password for `admin@sembuzz.com`.
+- `SMTP_FROM` must match a verified mailbox on your domain (same as `SMTP_USER` or a valid alias). Required for registration OTP and forgot-password emails.
 
 ---
 

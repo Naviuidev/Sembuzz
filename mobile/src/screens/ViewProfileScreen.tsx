@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -43,6 +43,10 @@ export default function ViewProfileScreen() {
           <View style={styles.row}>
             <Text style={styles.label}>Last name</Text>
             <Text style={styles.value}>{user?.lastName || user?.name?.split(' ').slice(1).join(' ') || '-'}</Text>
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.label}>User ID</Text>
+            <Text style={[styles.value, styles.monoValue]}>{user?.userId || '—'}</Text>
           </View>
           <View style={styles.row}>
             <Text style={styles.label}>Email</Text>
@@ -96,4 +100,5 @@ const styles = StyleSheet.create({
   row: { paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#e7ebef' },
   label: { fontSize: 12, color: '#7c8590', marginBottom: 2 },
   value: { fontSize: 15, color: '#1a1f2e', fontWeight: '600' },
+  monoValue: { fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontSize: 13 },
 });

@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Body,
   Query,
   UseGuards,
@@ -21,7 +22,13 @@ import { VerifyOtpDto } from '../dto/verify-otp.dto';
 import { ResendOtpDto } from '../dto/resend-otp.dto';
 import { DeleteAccountDto } from '../dto/delete-account.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
+import {
+  RequestPasswordResetOtpDto,
+  VerifyPasswordResetOtpDto,
+  ResetPasswordDto,
+} from '../dto/forgot-password.dto';
 import { UserGuard } from '../guards/user.guard';
+import { UpdateEmailDto } from '../../platform-user/dto/update-email.dto';
 
 const REGISTRATION_DOCS_DIR = path.join(process.cwd(), 'uploads', 'registration-docs');
 const PROFILE_PICS_DIR = path.join(process.cwd(), 'uploads', 'profile-pics');
@@ -158,6 +165,21 @@ export class UserAuthController {
     return this.authService.login(dto);
   }
 
+  @Post('forgot-password/request-otp')
+  async requestPasswordResetOtp(@Body() dto: RequestPasswordResetOtpDto) {
+    return this.authService.requestPasswordResetOtp(dto);
+  }
+
+  @Post('forgot-password/verify-otp')
+  async verifyPasswordResetOtp(@Body() dto: VerifyPasswordResetOtpDto) {
+    return this.authService.verifyPasswordResetOtp(dto);
+  }
+
+  @Post('forgot-password/reset')
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
+  }
+
   @Get('me')
   @UseGuards(UserGuard)
   async getMe(@Request() req: { user: { sub: string } }) {
@@ -180,5 +202,11 @@ export class UserAuthController {
     @Body() dto: UpdateProfileDto,
   ) {
     return this.authService.updateProfile(req.user.sub, dto);
+  }
+
+  @Patch('email')
+  @UseGuards(UserGuard)
+  async updateEmail(@Request() req: { user: { sub: string } }, @Body() dto: UpdateEmailDto) {
+    return this.authService.updateEmail(req.user.sub, dto);
   }
 }

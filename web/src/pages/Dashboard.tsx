@@ -1,12 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
+import { authService } from '../services/auth.service';
 import { schoolsService } from '../services/schools.service';
 import type { School } from '../services/schools.service';
 import { SuperAdminNavbar } from '../components/SuperAdminNavbar';
 import { SuperAdminSidebar } from '../components/SuperAdminSidebar';
+import { AccountIdentityPanel } from '../components/AccountIdentityPanel';
 
 export const Dashboard = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { data: schools, isLoading } = useQuery<School[]>({
     queryKey: ['schools'],
     queryFn: schoolsService.getAll,
@@ -42,6 +44,18 @@ export const Dashboard = () => {
               Manage your schools and view important information
             </p>
           </div>
+
+          {user?.email ? (
+            <AccountIdentityPanel
+              userId={user.userId}
+              email={user.email}
+              className="mb-4"
+              onUpdateEmail={async (email) => {
+                await authService.updateEmail(email);
+                await refreshUser();
+              }}
+            />
+          ) : null}
 
           {/* Schools List */}
           <div className="card border-0 shadow-sm" style={{ borderRadius: '0px' }}>

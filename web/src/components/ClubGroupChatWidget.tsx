@@ -416,7 +416,7 @@ function ChatPanel({
         ) : null}
         {chat.messageMode === 'admin_only' ? (
           <div className="small text-muted text-center py-3 px-3">
-            Only your category admin can send messages here. You can read updates from them.
+            Only your subcategory admin can send messages here. You can read updates from them.
           </div>
         ) : (
           <>

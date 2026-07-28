@@ -2,9 +2,11 @@ import { Link } from 'react-router-dom';
 import { useAdsAdminAuth } from '../contexts/AdsAdminAuthContext';
 import { AdsAdminNavbar } from '../components/AdsAdminNavbar';
 import { AdsAdminSidebar } from '../components/AdsAdminSidebar';
+import { AccountIdentityPanel } from '../components/AccountIdentityPanel';
+import { adsAdminAuthService } from '../services/ads-admin-auth.service';
 
 export const AdsAdminDashboard = () => {
-  const { user } = useAdsAdminAuth();
+  const { user, refreshUser } = useAdsAdminAuth();
 
   return (
     <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
@@ -16,6 +18,19 @@ export const AdsAdminDashboard = () => {
           <p style={{ color: '#6c757d', fontSize: '1rem', marginBottom: '2rem' }}>
             Manage banner and sponsored ads for {user?.schoolName ?? 'your school'}.
           </p>
+
+          {user?.email ? (
+            <AccountIdentityPanel
+              userId={user.userId}
+              email={user.email}
+              className="mb-4"
+              onUpdateEmail={async (email) => {
+                await adsAdminAuthService.updateEmail(email);
+                await refreshUser();
+              }}
+            />
+          ) : null}
+
           <div className="row g-3">
             <div className="col-12 col-md-6">
               <Link

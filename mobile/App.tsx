@@ -125,7 +125,7 @@ export default function App() {
     };
   }, []);
 
-  const handleNavigate = (name: 'Search' | 'Events' | 'Settings' | 'Apps' | 'Blogs') => {
+  const handleNavigate = (name: 'Search' | 'Events' | 'Settings' | 'Apps' | 'Chat') => {
     navRef.current?.dispatch(
       CommonActions.navigate({
         name: 'MainTabs',

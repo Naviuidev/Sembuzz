@@ -4,6 +4,10 @@ import { EventsModule } from './events/events.module';
 import { SubCategoryAdminQueriesModule } from './queries/queries.module';
 import { SubCategoryAdminBlogsModule } from './blogs/blogs.module';
 import { SubCategoryAdminClubGroupChatRequestsModule } from './club-group-chat-requests/subcategory-admin-club-group-chat-requests.module';
+import { SubCategoryAdminClubGroupMembershipsModule } from './club-group-memberships/subcategory-admin-club-group-memberships.module';
+import { SubCategoryAdminClubGroupChatsModule } from './club-group-chats/subcategory-admin-club-group-chats.module';
+import { SubCategoryAdminDirectChatsModule } from './direct-chats/subcategory-admin-direct-chats.module';
+import { SubCategoryAdminStudentChatGroupsModule } from './student-chat-groups/subcategory-admin-student-chat-groups.module';
 
 @Module({
   imports: [
@@ -12,6 +16,10 @@ import { SubCategoryAdminClubGroupChatRequestsModule } from './club-group-chat-r
     SubCategoryAdminQueriesModule,
     SubCategoryAdminBlogsModule,
     SubCategoryAdminClubGroupChatRequestsModule,
+    SubCategoryAdminClubGroupMembershipsModule,
+    SubCategoryAdminClubGroupChatsModule,
+    SubCategoryAdminDirectChatsModule,
+    SubCategoryAdminStudentChatGroupsModule,
   ],
   exports: [SubCategoryAdminAuthModule],
 })

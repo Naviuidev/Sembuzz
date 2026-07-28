@@ -14,6 +14,7 @@ interface AdsAdminAuthContextType {
     confirmPassword: string,
     options?: { skipLogout?: boolean }
   ) => Promise<void>;
+  refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
   loading: boolean;
 }
@@ -72,6 +73,11 @@ export const AdsAdminAuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const refreshUser = async () => {
+    const userData = await adsAdminAuthService.getMe();
+    setUser(userData);
+  };
+
   return (
     <AdsAdminAuthContext.Provider
       value={{
@@ -80,6 +86,7 @@ export const AdsAdminAuthProvider = ({ children }: { children: ReactNode }) => {
         login,
         logout,
         changePassword,
+        refreshUser,
         isAuthenticated: !!token,
         loading,
       }}

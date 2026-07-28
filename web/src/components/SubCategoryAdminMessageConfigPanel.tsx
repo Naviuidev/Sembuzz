@@ -148,7 +148,7 @@ export function SubCategoryAdminMessageConfigPanel() {
       <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
         <div className="card-body">
           <h2 className="h5 mb-3" style={{ color: TEXT_DARK }}>
-            Your requests
+            Your requested chat creations
           </h2>
           {requestsLoading ? (
             <p className="text-muted mb-0">Loading…</p>

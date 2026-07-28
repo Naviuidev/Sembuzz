@@ -22,6 +22,7 @@ export interface CategoryAdminLoginResponse {
 
 export interface CategoryAdminUser {
   id: string;
+  userId?: string;
   name: string;
   email: string;
   categoryId: string;
@@ -51,6 +52,11 @@ export const categoryAdminAuthService = {
 
   getMe: async (): Promise<CategoryAdminUser> => {
     const response = await api.get<CategoryAdminUser>('/category-admin/auth/me');
+    return response.data;
+  },
+
+  updateEmail: async (email: string): Promise<{ userId: string; email: string }> => {
+    const response = await api.patch<{ userId: string; email: string }>('/category-admin/auth/email', { email });
     return response.data;
   },
 };

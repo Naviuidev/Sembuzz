@@ -17,6 +17,15 @@ const prisma = new PrismaClient();
 const DEFAULT_PASSWORD = 'Demo@123';
 const DEMO_REF = 'SB-DEMO-000001';
 
+async function ensurePlatformUser(email: string) {
+  const normalized = email.toLowerCase().trim();
+  return prisma.platformUser.upsert({
+    where: { email: normalized },
+    update: {},
+    create: { email: normalized },
+  });
+}
+
 async function main() {
   console.log('=== Full database seed (all admin portals) ===\n');
 
@@ -58,10 +67,12 @@ async function main() {
   // 2. Super Admin (if none exists)
   let superAdmin = await prisma.superAdmin.findFirst();
   if (!superAdmin) {
+    const platformUser = await ensurePlatformUser('admin@sembuzz.com');
     superAdmin = await prisma.superAdmin.create({
       data: {
+        platformUserId: platformUser.id,
         name: 'Super Admin',
-        email: 'admin@sembuzz.com',
+        email: platformUser.email,
         password: hashedPassword,
       },
     });
@@ -108,12 +119,16 @@ async function main() {
 
   // 5. School Admin
   const schoolAdminEmail = 'schooladmin@demo.edu';
-  let schoolAdmin = await prisma.schoolAdmin.findUnique({ where: { email: schoolAdminEmail } });
+  const schoolAdminPlatformUser = await ensurePlatformUser(schoolAdminEmail);
+  let schoolAdmin = await prisma.schoolAdmin.findFirst({
+    where: { schoolId: school.id, platformUserId: schoolAdminPlatformUser.id },
+  });
   if (!schoolAdmin) {
     schoolAdmin = await prisma.schoolAdmin.create({
       data: {
+        platformUserId: schoolAdminPlatformUser.id,
         name: 'School Admin',
-        email: schoolAdminEmail,
+        email: schoolAdminPlatformUser.email,
         password: hashedPassword,
         schoolId: school.id,
         isActive: true,
@@ -154,14 +169,16 @@ async function main() {
 
   // 8. Category Admin + junction
   const categoryAdminEmail = 'categoryadmin@demo.edu';
-  let categoryAdmin = await prisma.categoryAdmin.findUnique({
-    where: { email: categoryAdminEmail },
+  const categoryAdminPlatformUser = await ensurePlatformUser(categoryAdminEmail);
+  let categoryAdmin = await prisma.categoryAdmin.findFirst({
+    where: { schoolId: school.id, platformUserId: categoryAdminPlatformUser.id },
   });
   if (!categoryAdmin) {
     const created = await prisma.categoryAdmin.create({
       data: {
+        platformUserId: categoryAdminPlatformUser.id,
         name: 'Category Admin',
-        email: categoryAdminEmail,
+        email: categoryAdminPlatformUser.email,
         password: hashedPassword,
         categoryId: category.id,
         schoolId: school.id,
@@ -191,14 +208,16 @@ async function main() {
 
   // 9. SubCategory Admin + junction
   const subCategoryAdminEmail = 'subcategoryadmin@demo.edu';
-  let subCategoryAdmin = await prisma.subCategoryAdmin.findUnique({
-    where: { email: subCategoryAdminEmail },
+  const subCategoryAdminPlatformUser = await ensurePlatformUser(subCategoryAdminEmail);
+  let subCategoryAdmin = await prisma.subCategoryAdmin.findFirst({
+    where: { schoolId: school.id, platformUserId: subCategoryAdminPlatformUser.id },
   });
   if (!subCategoryAdmin) {
     const created = await prisma.subCategoryAdmin.create({
       data: {
+        platformUserId: subCategoryAdminPlatformUser.id,
         name: 'SubCategory Admin',
-        email: subCategoryAdminEmail,
+        email: subCategoryAdminPlatformUser.email,
         password: hashedPassword,
         subCategoryId: subCategory.id,
         categoryId: category.id,
@@ -229,14 +248,16 @@ async function main() {
 
   // 10. Ads Admin (school has ADS feature)
   const adsAdminEmail = 'adsadmin@demo.edu';
-  let adsAdmin = await (prisma as any).adsAdmin.findUnique({
-    where: { email: adsAdminEmail },
+  const adsAdminPlatformUser = await ensurePlatformUser(adsAdminEmail);
+  let adsAdmin = await prisma.adsAdmin.findFirst({
+    where: { schoolId: school.id, platformUserId: adsAdminPlatformUser.id },
   });
   if (!adsAdmin) {
-    adsAdmin = await (prisma as any).adsAdmin.create({
+    adsAdmin = await prisma.adsAdmin.create({
       data: {
+        platformUserId: adsAdminPlatformUser.id,
         name: 'Ads Admin',
-        email: adsAdminEmail,
+        email: adsAdminPlatformUser.email,
         password: hashedPassword,
         schoolId: school.id,
         isActive: true,

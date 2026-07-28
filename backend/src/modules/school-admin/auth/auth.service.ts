@@ -7,6 +7,8 @@ import { SchoolAdminLoginDto } from '../dto/login.dto';
 import { ChangePasswordDto } from '../dto/change-password.dto';
 import { RequestOtpDto, VerifyOtpDto, ResetPasswordDto } from '../dto/forgot-password.dto';
 import { EmailService } from '../../super-admin/schools/email.service';
+import { PlatformUserService } from '../../platform-user/platform-user.service';
+import { UpdateEmailDto } from '../../platform-user/dto/update-email.dto';
 
 @Injectable()
 export class SchoolAdminAuthService {
@@ -14,37 +16,59 @@ export class SchoolAdminAuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private emailService: EmailService,
+    private platformUserService: PlatformUserService,
   ) {}
 
   async login(loginDto: SchoolAdminLoginDto) {
     const { identifier, password } = loginDto;
+    const normalizedEmail = identifier.includes('@')
+      ? this.platformUserService.normalizeEmail(identifier)
+      : null;
 
-    // Find school admin by email or refNum
-    const admin = await this.prisma.schoolAdmin.findFirst({
-      where: {
-        OR: [
-          { email: identifier },
-          {
+    let admin = null as Awaited<ReturnType<typeof this.prisma.schoolAdmin.findFirst>> & {
+      school: {
+        name: string;
+        refNum: string;
+        domain: string | null;
+        features: Array<{ feature: { code: string; name: string } }>;
+      };
+    } | null;
+
+    if (normalizedEmail) {
+      const platformUser = await this.platformUserService.findByEmail(normalizedEmail);
+      if (platformUser) {
+        admin = await this.prisma.schoolAdmin.findFirst({
+          where: { platformUserId: platformUser.id, isActive: true },
+          include: {
             school: {
-              refNum: identifier,
+              include: {
+                features: {
+                  where: { isEnabled: true },
+                  include: { feature: true },
+                },
+              },
             },
           },
-        ],
-        isActive: true,
-      },
-      include: {
-        school: {
-          include: {
-            features: {
-              where: { isEnabled: true },
-              include: {
-                feature: true,
+        });
+      }
+    } else {
+      admin = await this.prisma.schoolAdmin.findFirst({
+        where: {
+          school: { refNum: identifier },
+          isActive: true,
+        },
+        include: {
+          school: {
+            include: {
+              features: {
+                where: { isEnabled: true },
+                include: { feature: true },
               },
             },
           },
         },
-      },
-    });
+      });
+    }
 
     if (!admin) {
       throw new UnauthorizedException('Invalid credentials');
@@ -58,6 +82,7 @@ export class SchoolAdminAuthService {
 
     const payload = {
       sub: admin.id,
+      userId: admin.platformUserId,
       email: admin.email,
       schoolId: admin.schoolId,
       role: 'school_admin',
@@ -68,6 +93,7 @@ export class SchoolAdminAuthService {
       access_token: this.jwtService.sign(payload),
       user: {
         id: admin.id,
+        userId: admin.platformUserId,
         name: admin.name,
         email: admin.email,
         schoolId: admin.schoolId,
@@ -145,6 +171,7 @@ export class SchoolAdminAuthService {
 
     return {
       id: admin.id,
+      userId: admin.platformUserId,
       name: admin.name,
       email: admin.email,
       schoolId: admin.schoolId,
@@ -314,5 +341,14 @@ export class SchoolAdminAuthService {
     return {
       message: 'Password reset successfully. Please login with your new password.',
     };
+  }
+
+  async updateEmail(adminId: string, dto: UpdateEmailDto) {
+    const admin = await this.prisma.schoolAdmin.findUnique({ where: { id: adminId } });
+    if (!admin) {
+      throw new UnauthorizedException('Admin not found');
+    }
+    const updated = await this.platformUserService.updateEmail(admin.platformUserId, dto.email);
+    return { userId: updated.id, email: updated.email };
   }
 }

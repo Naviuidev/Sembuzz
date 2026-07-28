@@ -12,6 +12,7 @@ export interface SubCategoryAdminLoginResponse {
 
 export interface SubCategoryAdminUser {
   id: string;
+  userId?: string;
   name: string;
   email: string;
   subCategoryId: string;
@@ -63,6 +64,11 @@ export const subCategoryAdminAuthService = {
 
   getMe: async (): Promise<SubCategoryAdminUser> => {
     const response = await api.get<SubCategoryAdminUser>('/subcategory-admin/auth/me');
+    return response.data;
+  },
+
+  updateEmail: async (email: string): Promise<{ userId: string; email: string }> => {
+    const response = await api.patch<{ userId: string; email: string }>('/subcategory-admin/auth/email', { email });
     return response.data;
   },
 };

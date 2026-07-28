@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useCategoryAdminAuth } from '../contexts/CategoryAdminAuthContext';
 import { CategoryAdminNavbar } from '../components/CategoryAdminNavbar';
 import { CategoryAdminSidebar } from '../components/CategoryAdminSidebar';
+import { AccountIdentityPanel } from '../components/AccountIdentityPanel';
+import { categoryAdminAuthService } from '../services/category-admin-auth.service';
 import { categoryAdminCategoriesService } from '../services/category-admin-categories.service';
 import { subCategoryAdminsService, type SubCategoryAdmin } from '../services/subcategory-admins.service';
 
@@ -21,7 +23,7 @@ function getSubCategoryNames(admin: SubCategoryAdmin): string[] {
 }
 
 export const CategoryAdminDashboard = () => {
-  const { user, token } = useCategoryAdminAuth();
+  const { user, token, refreshUser } = useCategoryAdminAuth();
 
   const {
     data: categories = [],
@@ -69,6 +71,18 @@ export const CategoryAdminDashboard = () => {
           <p style={{ color: '#6c757d', fontSize: '1rem', marginBottom: '2rem' }}>
             Overview of your category and subcategory admins you have given access to.
           </p>
+
+          {user?.email ? (
+            <AccountIdentityPanel
+              userId={user.userId}
+              email={user.email}
+              className="mb-4"
+              onUpdateEmail={async (email) => {
+                await categoryAdminAuthService.updateEmail(email);
+                await refreshUser();
+              }}
+            />
+          ) : null}
 
           {/* 1. Categories you're associated with (all assigned by school admin) */}
           <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '0px' }}>

@@ -4,6 +4,7 @@ import { FeaturesService } from '../features/features.service';
 import { CreateSchoolDto } from '../dto/create-school.dto';
 import { UpdateSchoolDto } from '../dto/update-school.dto';
 import { EmailService } from './email.service';
+import { PlatformUserService } from '../../platform-user/platform-user.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
@@ -13,6 +14,7 @@ export class SchoolsService {
     private prisma: PrismaService,
     private featuresService: FeaturesService,
     private emailService: EmailService,
+    private platformUserService: PlatformUserService,
   ) {}
 
   /** Cast so generated delegate (adsAdmin) is accepted; run `npx prisma generate` so runtime client matches. */
@@ -85,28 +87,31 @@ export class SchoolsService {
       );
     }
 
-    // Check if admin email already exists
-    const existingAdmin = await this.client.schoolAdmin.findUnique({
-      where: { email: adminEmail },
-    });
+    const normalizedAdminEmail = this.platformUserService.normalizeEmail(adminEmail);
 
-    if (existingAdmin) {
-      throw new BadRequestException('Admin email already exists');
+    // Check if admin email already exists
+    const existingPlatformUser = await this.platformUserService.findByEmail(normalizedAdminEmail);
+    if (existingPlatformUser) {
+      const existingSchoolAdmin = await this.client.schoolAdmin.findFirst({
+        where: { platformUserId: existingPlatformUser.id },
+      });
+      if (existingSchoolAdmin) {
+        throw new BadRequestException('This User ID already has a School Admin role assigned.');
+      }
     }
 
-    // If Ads feature: check Ads Admin email is not already used
+    let adsPlatformUserId: string | null = null;
     if (hasAdsFeature && adsAdminEmail) {
-      const existingAdsAdmin = await this.client.adsAdmin.findUnique({
-        where: { email: adsAdminEmail.trim() },
-      });
-      if (existingAdsAdmin) {
-        throw new BadRequestException('Ads Admin email is already in use.');
-      }
-      const existingSchoolAdminWithAdsEmail = await this.client.schoolAdmin.findUnique({
-        where: { email: adsAdminEmail.trim() },
-      });
-      if (existingSchoolAdminWithAdsEmail) {
-        throw new BadRequestException('Ads Admin email cannot be the same as an existing School Admin.');
+      const normalizedAdsEmail = this.platformUserService.normalizeEmail(adsAdminEmail);
+      const adsPlatformUser = await this.platformUserService.findByEmail(normalizedAdsEmail);
+      if (adsPlatformUser) {
+        const existingAdsAdmin = await this.client.adsAdmin.findFirst({
+          where: { platformUserId: adsPlatformUser.id },
+        });
+        if (existingAdsAdmin) {
+          throw new BadRequestException('This User ID already has an Ads Admin role assigned.');
+        }
+        adsPlatformUserId = adsPlatformUser.id;
       }
     }
 
@@ -175,11 +180,17 @@ export class SchoolsService {
           data: schoolData,
         });
 
+        const schoolAdminPlatformUser = await this.platformUserService.findOrCreateByEmail(
+          normalizedAdminEmail,
+          tx,
+        );
+
         // Create school admin
         const admin = await (tx as any).schoolAdmin.create({
           data: {
+            platformUserId: schoolAdminPlatformUser.id,
             name: adminName,
-            email: adminEmail,
+            email: schoolAdminPlatformUser.email,
             password: hashedPassword,
             schoolId: school.id,
             isActive: true,
@@ -202,10 +213,15 @@ export class SchoolsService {
         // If Ads feature: create Ads Admin for this school
         let adsAdmin: any = undefined;
         if (hasAdsFeature && adsAdminEmail && hashedAdsPassword) {
+          const adsPlatformUser = await this.platformUserService.findOrCreateByEmail(
+            this.platformUserService.normalizeEmail(adsAdminEmail),
+            tx,
+          );
           adsAdmin = await (tx as any).adsAdmin.create({
             data: {
+              platformUserId: adsPlatformUser.id,
               name: adsAdminName!,
-              email: adsAdminEmail.trim(),
+              email: adsPlatformUser.email,
               password: hashedAdsPassword,
               schoolId: school.id,
               isActive: true,
@@ -665,22 +681,11 @@ export class SchoolsService {
         });
 
         if (admin) {
-          // Check if email is already taken by another admin
-          const emailExists = await (tx as any).schoolAdmin.findFirst({
-            where: {
-              email: adminEmail,
-              id: { not: admin.id },
-            },
-          });
-
-          if (emailExists) {
-            throw new BadRequestException('Admin email already exists');
-          }
-
-          await (tx as any).schoolAdmin.update({
-            where: { id: admin.id },
-            data: { email: adminEmail },
-          });
+          await this.platformUserService.updateEmail(
+            admin.platformUserId,
+            adminEmail,
+            tx,
+          );
         }
       }
 

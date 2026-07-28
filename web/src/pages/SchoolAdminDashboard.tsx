@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { SchoolAdminNavbar } from '../components/SchoolAdminNavbar';
 import { SchoolAdminSidebar } from '../components/SchoolAdminSidebar';
+import { AccountIdentityPanel } from '../components/AccountIdentityPanel';
 import { useSchoolAdminAuth } from '../contexts/SchoolAdminAuthContext';
+import { schoolAdminAuthService } from '../services/school-admin-auth.service';
 import { schoolAdminStudentsService } from '../services/school-admin-students.service';
 
 export const SchoolAdminDashboard = () => {
-  const { user } = useSchoolAdminAuth();
+  const { user, refreshUser } = useSchoolAdminAuth();
   const [approvedCount, setApprovedCount] = useState<number | null>(null);
 
   useEffect(() => {
@@ -81,14 +83,6 @@ export const SchoolAdminDashboard = () => {
                 </div>
                 <div className="col-md-6">
                   <label style={{ fontSize: '0.875rem', color: '#6c757d', fontWeight: '500', marginBottom: '0.5rem', display: 'block' }}>
-                    Admin Email
-                  </label>
-                  <div style={{ fontSize: '1rem', color: '#1a1f2e' }}>
-                    {user?.email || 'N/A'}
-                  </div>
-                </div>
-                <div className="col-md-6">
-                  <label style={{ fontSize: '0.875rem', color: '#6c757d', fontWeight: '500', marginBottom: '0.5rem', display: 'block' }}>
                     Admin Name
                   </label>
                   <div style={{ fontSize: '1rem', color: '#1a1f2e' }}>
@@ -124,6 +118,18 @@ export const SchoolAdminDashboard = () => {
               </div>
             </div>
           </div>
+
+          {user?.email ? (
+            <AccountIdentityPanel
+              userId={user.userId}
+              email={user.email}
+              className="mb-4"
+              onUpdateEmail={async (email) => {
+                await schoolAdminAuthService.updateEmail(email);
+                await refreshUser();
+              }}
+            />
+          ) : null}
 
           {/* Quick links: Approved users & User requests */}
           <div className="row g-3 mb-4">

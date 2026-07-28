@@ -57,7 +57,7 @@ export default function EditProfileScreen() {
   const [profilePicUrl, setProfilePicUrl] = useState(
     user?.profilePicUrl || (user as { image?: string | null } | null)?.image || '',
   );
-  const [showEmailTooltip, setShowEmailTooltip] = useState(false);
+  const [email, setEmail] = useState(user?.email ?? '');
   const [changePassword, setChangePassword] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -68,11 +68,6 @@ export default function EditProfileScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const resolvedImageUrl = useMemo(() => imageSrc(profilePicUrl), [profilePicUrl]);
-
-  const showEmailLockedTooltip = () => {
-    setShowEmailTooltip(true);
-    setTimeout(() => setShowEmailTooltip(false), 2000);
-  };
 
   const handleUploadPhoto = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -140,6 +135,15 @@ export default function EditProfileScreen() {
     setSaving(true);
     setError(null);
     try {
+      let nextUserId = user?.userId;
+      const trimmedEmail = email.trim();
+      if (trimmedEmail && user?.email && trimmedEmail.toLowerCase() !== user.email.toLowerCase()) {
+        const emailRes = await api.patch<{ userId: string; email: string }>('/user/auth/email', {
+          email: trimmedEmail,
+        });
+        nextUserId = emailRes.data.userId;
+      }
+
       const payload: Record<string, string> = {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -176,10 +180,11 @@ export default function EditProfileScreen() {
 
       setUser({
         id: updatedUser.id,
+        userId: nextUserId,
         name: updatedUser.name,
         firstName: updatedUser.firstName,
         lastName: updatedUser.lastName,
-        email: updatedUser.email,
+        email: trimmedEmail || updatedUser.email,
         schoolId: updatedUser.schoolId ?? null,
         schoolName: updatedUser.schoolName ?? null,
         schoolImage: updatedUser.schoolImage,
@@ -279,19 +284,25 @@ export default function EditProfileScreen() {
           placeholderTextColor="#9aa0a6"
         />
 
+        <Text style={styles.fieldLabel}>User ID</Text>
+        <TextInput
+          style={[styles.input, styles.emailInput]}
+          value={user?.userId ?? '—'}
+          editable={false}
+          selectTextOnFocus={false}
+        />
+
         <Text style={styles.fieldLabel}>Email address</Text>
-        <View style={styles.emailRow}>
-          <TextInput
-            style={[styles.input, styles.emailInput]}
-            value={user?.email ?? ''}
-            editable={false}
-            selectTextOnFocus={false}
-          />
-          <Pressable onPress={showEmailLockedTooltip} hitSlop={10}>
-            <Text style={styles.editTextDisabled}>Edit</Text>
-          </Pressable>
-        </View>
-        {showEmailTooltip ? <Text style={styles.tooltip}>Email id cannot be edited</Text> : null}
+        <TextInput
+          style={styles.input}
+          value={email}
+          onChangeText={setEmail}
+          placeholder="Email"
+          placeholderTextColor="#9aa0a6"
+          autoCapitalize="none"
+          keyboardType="email-address"
+          autoComplete="email"
+        />
 
         <View style={styles.passwordToggleRow}>
           <Text style={styles.fieldLabel}>Change password</Text>

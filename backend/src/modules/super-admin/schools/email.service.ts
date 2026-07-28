@@ -920,6 +920,71 @@ export class EmailService {
     }
   }
 
+  async sendUserPasswordResetOtp(
+    toEmail: string,
+    userName: string,
+    otp: string,
+    schoolName: string,
+  ): Promise<void> {
+    const mailOptions = {
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: toEmail,
+      subject: 'SemBuzz - Password Reset OTP',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: 'Poppins', Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #1a1f2e; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .content { background-color: #f8f9fa; padding: 30px; border-radius: 0 0 8px 8px; }
+            .otp-box { background-color: white; padding: 30px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1a1f2e; text-align: center; }
+            .otp-code { font-size: 2rem; font-weight: bold; color: #1a1f2e; letter-spacing: 0.5rem; }
+            .footer { text-align: center; margin-top: 30px; color: #6c757d; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Password Reset Request</h1>
+            </div>
+            <div class="content">
+              <p>Dear ${userName},</p>
+              <p>You have requested to reset your password for your SemBuzz account at <strong>${schoolName}</strong> (${toEmail}).</p>
+              <div class="otp-box">
+                <h3 style="margin-top: 0; color: #1a1f2e;">Your OTP Code</h3>
+                <div class="otp-code">${otp}</div>
+                <p style="color: #6c757d; font-size: 0.9rem; margin-top: 15px;">This OTP will expire in 10 minutes.</p>
+              </div>
+              <p style="margin-top: 30px; color: #6c757d; font-size: 14px;">
+                <strong>Important:</strong> If you did not request this password reset, please ignore this email or contact your school admin.
+              </p>
+            </div>
+            <div class="footer">
+              <p>This is an automated email. Please do not reply.</p>
+              <p>&copy; ${new Date().getFullYear()} SemBuzz. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.error('[EmailService] ❌ SMTP credentials not configured! User password reset OTP not sent.');
+      throw new Error('SMTP is not configured. Set SMTP_USER, SMTP_PASS, and SMTP_FROM in .env.');
+    }
+    try {
+      console.log(`[EmailService] 📧 Sending user password reset OTP to ${toEmail}...`);
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log(`[EmailService] ✅ User password reset OTP sent! Message ID: ${info.messageId}`);
+    } catch (error: any) {
+      console.error('[EmailService] ❌ Failed to send user password reset OTP email:', error);
+      throw error;
+    }
+  }
+
   async sendAdsAdminOnboardingEmail(
     adminEmail: string,
     adminName: string,

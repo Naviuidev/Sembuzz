@@ -1,6 +1,7 @@
 import { type FormEvent, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SchoolNavbar } from '../components/SchoolNavbar';
+import { AccountIdentityPanel } from '../components/AccountIdentityPanel';
 import { useUserAuth } from '../contexts/UserAuthContext';
 import { userAuthService } from '../services/user-auth.service';
 import { imageSrc } from '../utils/image';
@@ -167,11 +168,16 @@ export const EditProfile = () => {
               autoComplete="family-name"
             />
           </div>
-          <div className="mb-3">
-            <label className="form-label small text-secondary">Email</label>
-            <input className="form-control bg-light" value={user.email} readOnly disabled />
-            <span className="small text-muted">Email cannot be changed here.</span>
-          </div>
+
+          <AccountIdentityPanel
+            userId={user.userId}
+            email={user.email}
+            className="mb-4"
+            onUpdateEmail={async (email) => {
+              await userAuthService.updateEmail(email);
+              await refreshUser();
+            }}
+          />
 
           <div className="form-check mb-3">
             <input

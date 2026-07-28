@@ -9,6 +9,7 @@ interface SchoolAdminAuthContextType {
   login: (identifier: string, password: string) => Promise<void>;
   logout: () => void;
   changePassword: (currentPassword: string, newPassword: string, confirmPassword: string) => Promise<void>;
+  refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
   loading: boolean;
 }
@@ -67,6 +68,11 @@ export const SchoolAdminAuthProvider = ({ children }: { children: ReactNode }) =
     logout();
   };
 
+  const refreshUser = async () => {
+    const userData = await schoolAdminAuthService.getMe();
+    setUser(userData);
+  };
+
   return (
     <SchoolAdminAuthContext.Provider
       value={{
@@ -75,6 +81,7 @@ export const SchoolAdminAuthProvider = ({ children }: { children: ReactNode }) =
         login,
         logout,
         changePassword,
+        refreshUser,
         isAuthenticated: !!token,
         loading,
       }}

@@ -9,11 +9,13 @@ import {
   EventsScreen,
   SearchScreen,
   AppsScreen,
-  BlogsScreen,
+  ChatScreen,
   LikedNewsScreen,
   SavedNewsScreen,
   NotificationsScreen,
 } from '../screens';
+import StudentGroupChatScreen from '../screens/StudentGroupChatScreen';
+import ClubGroupChatScreen from '../screens/ClubGroupChatScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import ViewProfileScreen from '../screens/ViewProfileScreen';
@@ -31,7 +33,7 @@ const TAB_CONFIG = [
   { name: 'Events' as const, label: 'Home', inactiveIconName: 'home-outline', activeIconName: 'home' },
   { name: 'Settings' as const, label: 'Settings', inactiveIconName: 'settings-outline', activeIconName: 'settings' },
   { name: 'Apps' as const, label: 'Apps', inactiveIconName: 'grid-outline', activeIconName: 'grid' },
-  { name: 'Blogs' as const, label: 'Blogs', inactiveIconName: 'newspaper-outline', activeIconName: 'newspaper' },
+  { name: 'Chat' as const, label: 'Chat', inactiveIconName: 'chatbubbles-outline', activeIconName: 'chatbubbles' },
 ];
 
 function BottomNavBar({ state, descriptors, navigation }: any) {
@@ -184,7 +186,7 @@ function MainTabsNavigator() {
       <Tab.Screen name="Events" component={EventsScreen} options={{ tabBarLabel: 'Home' }} />
       <Tab.Screen name="Settings" component={SettingsStackNavigator} options={{ tabBarLabel: 'Settings' }} />
       <Tab.Screen name="Apps" component={AppsScreen} options={{ tabBarLabel: 'Apps' }} />
-      <Tab.Screen name="Blogs" component={BlogsScreen} options={{ tabBarLabel: 'Blogs' }} />
+      <Tab.Screen name="Chat" component={ChatScreen} options={{ tabBarLabel: 'Chat' }} />
     </Tab.Navigator>
   );
 }
@@ -252,6 +254,16 @@ export default function AppNavigator({ onNavigate }: AppNavigatorProps) {
               title: 'View profile',
               headerBackTitle: 'Back',
             }}
+          />
+          <Stack.Screen
+            name="StudentGroupChat"
+            component={StudentGroupChatScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="ClubGroupChat"
+            component={ClubGroupChatScreen}
+            options={{ headerShown: false }}
           />
         </Stack.Navigator>
       </View>

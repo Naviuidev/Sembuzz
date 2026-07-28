@@ -1,9 +1,35 @@
+import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { SubCategoryAdminLayout } from '../components/SubCategoryAdminLayout';
 import { SubCategoryAdminMessageConfigPanel } from '../components/SubCategoryAdminMessageConfigPanel';
+import { CategoryAdminMessagesPanel } from '../components/CategoryAdminMessagesPanel';
 
 const TEXT_DARK = '#1a1f2e';
 
+type SubCategoryPrivacyTab = 'message-config' | 'messages';
+
+function tabFromParam(tab: string | null): SubCategoryPrivacyTab {
+  if (tab === 'messages') return 'messages';
+  return 'message-config';
+}
+
 export const SubCategoryAdminPrivacy = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [privacyTab, setPrivacyTab] = useState<SubCategoryPrivacyTab>(() =>
+    tabFromParam(searchParams.get('tab')),
+  );
+
+  const handleTabChange = (tab: SubCategoryPrivacyTab) => {
+    setPrivacyTab(tab);
+    const next = new URLSearchParams(searchParams);
+    if (tab === 'message-config') {
+      next.delete('tab');
+    } else {
+      next.set('tab', tab);
+    }
+    setSearchParams(next, { replace: true });
+  };
+
   return (
     <SubCategoryAdminLayout>
       <div className="mb-4">
@@ -16,13 +42,43 @@ export const SubCategoryAdminPrivacy = () => {
             marginBottom: '0.5rem',
           }}
         >
-          Privacy — Message config
+          Privacy — Messaging
         </h1>
         <p style={{ color: '#6c757d', fontSize: '1rem', margin: 0 }}>
-          Request a group chat for a school club. Category and school admins will review your request.
+          Request new club group chats, approve student join requests, and manage group messaging.
         </p>
       </div>
-      <SubCategoryAdminMessageConfigPanel />
+
+      <div className="d-flex gap-2 mb-4 flex-wrap">
+        {(
+          [
+            { id: 'message-config' as const, label: 'Request group chat' },
+            { id: 'messages' as const, label: 'Messages' },
+          ] as const
+        ).map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => handleTabChange(tab.id)}
+            className="btn btn-sm"
+            style={{
+              borderRadius: 50,
+              padding: '0.45rem 1.1rem',
+              backgroundColor: privacyTab === tab.id ? TEXT_DARK : '#fff',
+              color: privacyTab === tab.id ? '#fff' : TEXT_DARK,
+              border: `1px solid ${TEXT_DARK}`,
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {privacyTab === 'message-config' ? (
+        <SubCategoryAdminMessageConfigPanel />
+      ) : (
+        <CategoryAdminMessagesPanel variant="subcategory" />
+      )}
     </SubCategoryAdminLayout>
   );
 };
