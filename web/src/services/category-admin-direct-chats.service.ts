@@ -12,16 +12,6 @@ export interface CategoryAdminDirectConversationRow {
 }
 
 export const categoryAdminDirectChatsService = {
-  getSettings: async (): Promise<{ isEnabled: boolean }> => {
-    const { data } = await api.get<{ isEnabled: boolean }>('/category-admin/direct-chats/settings');
-    return data;
-  },
-
-  updateSettings: async (isEnabled: boolean) => {
-    const { data } = await api.patch('/category-admin/direct-chats/settings', { isEnabled });
-    return data;
-  },
-
   list: async (): Promise<CategoryAdminDirectConversationRow[]> => {
     const { data } = await api.get<CategoryAdminDirectConversationRow[]>('/category-admin/direct-chats');
     return Array.isArray(data) ? data : [];

@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { isStudentChatGroupVisibility } from '../../student-chat-groups/student-chat-message.util';
-import { CreateStudentChatGroupDto } from '../../user/student-chat-groups/dto/create-student-chat-group.dto';
 
 const GROUP_MESSAGING_CODE = 'GROUP_MESSAGING';
 
@@ -94,42 +93,6 @@ export class SubCategoryAdminStudentChatGroupsService {
       take: 30,
     });
     return users;
-  }
-
-  async createGroup(
-    subCategoryAdminId: string,
-    schoolId: string,
-    dto: CreateStudentChatGroupDto,
-  ) {
-    await this.assertGroupMessagingEnabled(schoolId);
-    const name = dto.name.trim();
-    if (name.length < 2) {
-      throw new BadRequestException('Group name must be at least 2 characters.');
-    }
-    const visibility =
-      dto.visibility && isStudentChatGroupVisibility(dto.visibility) ? dto.visibility : 'public';
-
-    const group = await this.prisma.studentChatGroup.create({
-      data: {
-        schoolId,
-        name,
-        description: dto.description?.trim() || null,
-        visibility,
-        createdBySubCategoryAdminId: subCategoryAdminId,
-      },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        avatarUrl: true,
-        visibility: true,
-        createdAt: true,
-        lastMessageAt: true,
-        _count: { select: { members: { where: { status: 'active' } } } },
-      },
-    });
-
-    return this.formatGroupRow(group);
   }
 
   private async getGroupForSchool(groupId: string, schoolId: string) {

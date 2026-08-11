@@ -12,8 +12,6 @@ export const CategoryAdminSidebar = () => {
     { path: '/category-admin/blogs', label: 'View blogs', icon: 'bi-journal-text' },
     { path: '/category-admin/approved-posts', label: 'Approved post', icon: 'bi-check-circle' },
     { path: '/category-admin/analytics', label: 'Analytics', icon: 'bi-graph-up-arrow' },
-    { path: '/category-admin/ads', label: 'Ads', icon: 'bi-megaphone' },
-    { path: '/category-admin/ads-analytics', label: 'Ads Analytics', icon: 'bi-bar-chart-line' },
     { path: '/category-admin/raise-request', label: 'Raise request', icon: 'bi-question-circle' },
     { path: '/category-admin/queries', label: 'Queries', icon: 'bi-chat-left-text' },
     { path: '/category-admin/privacy', label: 'Privacy', icon: 'bi-shield-lock' },

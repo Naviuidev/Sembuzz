@@ -9,18 +9,11 @@ export const SubCategoryAdminSidebar = () => {
   const menuItems = [
     { path: '/subcategory-admin/dashboard', label: 'Dashboard', icon: 'bi-speedometer2' },
     { path: '/subcategory-admin/post-event', label: 'Post the event', icon: 'bi-plus-circle' },
-    { path: '/subcategory-admin/post-blog', label: 'Post blog', icon: 'bi-flag' },
-    { path: '/subcategory-admin/blog-pending', label: 'Blog pending', icon: 'bi-hourglass-split' },
-    { path: '/subcategory-admin/blog-approved', label: 'Blog approved', icon: 'bi-journal-check' },
-    { path: '/subcategory-admin/blog-corrections', label: 'Blog suggestions', icon: 'bi-arrow-down-circle' },
-    { path: '/subcategory-admin/blog-rejected', label: 'Blog rejected', icon: 'bi-x-octagon' },
-    { path: '/subcategory-admin/approvals-pending', label: 'Approvals pending', icon: 'bi-clock-history' },
-    { path: '/subcategory-admin/approved', label: 'Approved', icon: 'bi-check-circle' },
+    { path: '/subcategory-admin/blogs', label: 'Blogs', icon: 'bi-journal-text' },
     { path: '/subcategory-admin/analytics', label: 'Analytics', icon: 'bi-graph-up-arrow' },
     { path: '/subcategory-admin/raise-query', label: 'Raise a query', icon: 'bi-question-circle' },
     { path: '/subcategory-admin/queries', label: 'Queries', icon: 'bi-chat-left-text' },
     { path: '/subcategory-admin/privacy', label: 'Privacy', icon: 'bi-shield-lock' },
-    { path: '/subcategory-admin/received-corrections', label: 'Received corrections', icon: 'bi-arrow-down-circle' },
   ];
 
   return (

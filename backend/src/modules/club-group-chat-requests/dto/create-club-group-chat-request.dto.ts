@@ -9,9 +9,15 @@ export class CreateClubGroupChatRequestDto {
   @MaxLength(200)
   pageName!: string;
 
+  /** Social Share club icon — used to identify the club. */
   @IsString()
   @MaxLength(1000)
-  icon!: string;
+  clubIcon!: string;
+
+  /** Icon shown for the group chat (can differ from the club icon). */
+  @IsString()
+  @MaxLength(1000)
+  groupChatIcon!: string;
 
   @IsOptional()
   @IsString()

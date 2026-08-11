@@ -132,14 +132,45 @@ export class CategoryAdminEventsService {
     if (!event || event.status !== 'pending') {
       throw new ForbiddenException('Only pending events can be approved');
     }
-    const updated = await this.prisma.event.update({
-      where: { id: eventId },
-      data: { status: 'approved' },
-      include: {
-        school: { select: { name: true, image: true } },
-        subCategory: { select: { id: true, name: true } },
-        subCategoryAdmin: { select: { id: true, name: true, email: true } },
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const approved = await tx.event.update({
+        where: { id: eventId },
+        data: { status: 'approved' },
+        include: {
+          school: { select: { name: true, image: true } },
+          subCategory: { select: { id: true, name: true } },
+          subCategoryAdmin: { select: { id: true, name: true, email: true } },
+        },
+      });
+
+      if (event.resubmitFromEventId) {
+        await tx.event.updateMany({
+          where: {
+            id: event.resubmitFromEventId,
+            status: 'reverted',
+          },
+          data: {
+            status: 'superseded',
+            revertNotes: null,
+          },
+        });
+      } else {
+        // Legacy resubmits without a link: clear matching reverted correction rows.
+        await tx.event.updateMany({
+          where: {
+            subCategoryAdminId: event.subCategoryAdminId,
+            subCategoryId: event.subCategoryId,
+            status: 'reverted',
+            title: event.title,
+          },
+          data: {
+            status: 'superseded',
+            revertNotes: null,
+          },
+        });
+      }
+
+      return approved;
     });
     void this.pushNotifications
       .notifyUsersForApprovedEvent({

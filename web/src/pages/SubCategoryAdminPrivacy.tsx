@@ -30,6 +30,11 @@ export const SubCategoryAdminPrivacy = () => {
     setSearchParams(next, { replace: true });
   };
 
+  const tabs: { id: SubCategoryPrivacyTab; label: string }[] = [
+    { id: 'message-config', label: 'Request group chat' },
+    { id: 'messages', label: 'Messages' },
+  ];
+
   return (
     <SubCategoryAdminLayout>
       <div className="mb-4">
@@ -45,17 +50,12 @@ export const SubCategoryAdminPrivacy = () => {
           Privacy — Messaging
         </h1>
         <p style={{ color: '#6c757d', fontSize: '1rem', margin: 0 }}>
-          Request new club group chats, approve student join requests, and manage group messaging.
+          Request club group chats, approve student join requests, and manage group messaging.
         </p>
       </div>
 
       <div className="d-flex gap-2 mb-4 flex-wrap">
-        {(
-          [
-            { id: 'message-config' as const, label: 'Request group chat' },
-            { id: 'messages' as const, label: 'Messages' },
-          ] as const
-        ).map((tab) => (
+        {tabs.map((tab) => (
           <button
             key={tab.id}
             type="button"

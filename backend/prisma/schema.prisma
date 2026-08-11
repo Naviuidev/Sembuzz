@@ -87,6 +87,9 @@ model School {
   schoolSocialAccounts               SchoolSocialAccount[]
   clubGroupChats                     ClubGroupChat[]
   clubGroupChatRequests              ClubGroupChatRequest[]
+  clubGroupChatDeleteRequests        ClubGroupChatDeleteRequest[]
+  studentChatGroupRequests           StudentChatGroupRequest[]
+  studentChatGroupDeleteRequests     StudentChatGroupDeleteRequest[]
   clubGroupMemberships               ClubGroupMembership[]
   studentChatGroups                  StudentChatGroup[]
   studentChatGroupMembers            StudentChatGroupMember[]
@@ -96,6 +99,7 @@ model School {
   bannerAds                          BannerAd[]
   sponsoredAds                       SponsoredAd[]
   blogPosts                          BlogPost[]
+  adminEmailChangeRequests           AdminEmailChangeRequest[]
 
   @@map("schools")
 }
@@ -532,6 +536,9 @@ model SubCategoryAdmin {
   queriesToSuperAdmins SubCategoryAdminToSuperAdminQuery[]
   blogPosts         BlogPost[]
   clubGroupChatRequests ClubGroupChatRequest[]
+  clubGroupChatDeleteRequests ClubGroupChatDeleteRequest[]
+  studentChatGroupRequests StudentChatGroupRequest[]
+  studentChatGroupDeleteRequests StudentChatGroupDeleteRequest[]
   reviewedClubGroupMemberships ClubGroupMembership[] @relation("ClubGroupMembershipReviewedBySubCategoryAdmin")
   clubGroupMessages            ClubGroupMessage[]
   studentChatGroupsCreated     StudentChatGroup[] @relation("StudentChatGroupCreatedBySubCategoryAdmin")
@@ -635,8 +642,9 @@ model Event {
   externalLink       String?  @db.VarChar(500)
   commentsEnabled    Boolean  @default(true)
   imageUrls          String?  @db.Text // JSON array of image URLs
-  status             String   @default("pending") // pending | approved | reverted
+  status             String   @default("pending") // pending | approved | reverted | superseded
   revertNotes        String?  @db.Text // Category admin feedback when reverted
+  resubmitFromEventId String? // Original reverted event when this post is a correction resubmit
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -651,6 +659,7 @@ model Event {
   @@index([subCategoryId])
   @@index([status])
   @@index([schoolId])
+  @@index([resubmitFromEventId])
   @@map("events")
 }
 
@@ -1252,6 +1261,7 @@ model ClubGroupChat {
   messages ClubGroupMessage[]
   memberships ClubGroupMembership[]
   chatRequests ClubGroupChatRequest[]
+  deleteRequests ClubGroupChatDeleteRequest[]
 
   @@unique([schoolId, clubKey])
   @@index([schoolId])
@@ -1282,6 +1292,30 @@ model ClubGroupChatRequest {
   @@index([schoolId, status, createdAt])
   @@index([subCategoryAdminId, createdAt])
   @@map("club_group_chat_requests")
+}
+
+model ClubGroupChatDeleteRequest {
+  id                 String    @id @default(uuid())
+  schoolId           String
+  subCategoryAdminId String
+  clubGroupChatId    String
+  note               String?   @db.Text
+  status             String    @default("pending") // pending | approved | declined
+  reviewedByRole     String?   // category_admin | school_admin
+  reviewedByAdminId  String?
+  declineReason      String?   @db.Text
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  reviewedAt         DateTime?
+
+  school           School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subCategoryAdmin SubCategoryAdmin @relation(fields: [subCategoryAdminId], references: [id], onDelete: Cascade)
+  clubGroupChat    ClubGroupChat    @relation(fields: [clubGroupChatId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, status, createdAt], map: "cgcc_del_req_school_status_created_idx")
+  @@index([subCategoryAdminId, createdAt], map: "cgcc_del_req_subcat_created_idx")
+  @@index([clubGroupChatId, status], map: "cgcc_del_req_chat_status_idx")
+  @@map("club_group_chat_delete_requests")
 }
 
 model ClubGroupMessage {
@@ -1416,6 +1450,8 @@ model StudentChatGroup {
   createdBySubCategoryAdmin SubCategoryAdmin? @relation("StudentChatGroupCreatedBySubCategoryAdmin", fields: [createdBySubCategoryAdminId], references: [id], onDelete: SetNull)
   members                   StudentChatGroupMember[]
   messages                  StudentChatGroupMessage[]
+  chatRequests              StudentChatGroupRequest[]
+  deleteRequests            StudentChatGroupDeleteRequest[]
 
   @@index([schoolId, visibility, isActive])
   @@index([schoolId, lastMessageAt])
@@ -1464,4 +1500,86 @@ model StudentChatGroupMessage {
   @@index([groupId, createdAt])
   @@index([replyToMessageId])
   @@map("student_chat_group_messages")
+}
+
+model StudentChatGroupRequest {
+  id                 String    @id @default(uuid())
+  schoolId           String
+  subCategoryAdminId String
+  name               String    @db.VarChar(120)
+  description        String?   @db.Text
+  visibility         String    @default("public") // public | private
+  status             String    @default("pending") // pending | approved | declined
+  reviewedByRole     String?   // category_admin | school_admin
+  reviewedByAdminId  String?
+  declineReason      String?   @db.Text
+  studentChatGroupId String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  reviewedAt         DateTime?
+
+  school           School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subCategoryAdmin SubCategoryAdmin @relation(fields: [subCategoryAdminId], references: [id], onDelete: Cascade)
+  studentChatGroup StudentChatGroup? @relation(fields: [studentChatGroupId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, status, createdAt])
+  @@index([subCategoryAdminId, createdAt])
+  @@map("student_chat_group_requests")
+}
+
+model StudentChatGroupDeleteRequest {
+  id                 String    @id @default(uuid())
+  schoolId           String
+  subCategoryAdminId String
+  studentChatGroupId String
+  note               String?   @db.Text
+  status             String    @default("pending") // pending | approved | declined
+  reviewedByRole     String?   // category_admin | school_admin
+  reviewedByAdminId  String?
+  declineReason      String?   @db.Text
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  reviewedAt         DateTime?
+
+  school           School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subCategoryAdmin SubCategoryAdmin @relation(fields: [subCategoryAdminId], references: [id], onDelete: Cascade)
+  studentChatGroup StudentChatGroup @relation(fields: [studentChatGroupId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, status, createdAt], map: "scg_del_req_school_status_created_idx")
+  @@index([subCategoryAdminId, createdAt], map: "scg_del_req_subcat_created_idx")
+  @@index([studentChatGroupId, status], map: "scg_del_req_group_status_idx")
+  @@map("student_chat_group_delete_requests")
+}
+
+model AdminEmailChangeRequest {
+  id                 String    @id @default(uuid())
+  schoolId           String
+  targetRole         String // category_admin | subcategory_admin | ads_admin
+  targetAdminId      String
+  targetName         String
+  targetEmail        String
+  initiatedByRole    String // school_admin | category_admin
+  initiatedByAdminId String
+  initiatedByName    String
+  reason             String    @db.Text
+  status             String    @default("pending_otp") // pending_otp | pending | pending_new_email_otp | approved | declined
+  reviewerRole       String    @default("school_admin")
+  otp                String?   @db.VarChar(6)
+  otpExpiresAt       DateTime?
+  otpUsed            Boolean   @default(false)
+  proposedNewEmail   String?
+  newEmailOtp        String?   @db.VarChar(6)
+  newEmailOtpExpiresAt DateTime?
+  newEmailOtpUsed    Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  reviewedAt         DateTime?
+  reviewedByAdminId  String?
+  declineReason      String?   @db.Text
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, status])
+  @@index([targetRole, targetAdminId])
+  @@map("admin_email_change_requests")
 }

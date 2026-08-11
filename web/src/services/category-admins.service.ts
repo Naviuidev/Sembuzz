@@ -2,6 +2,8 @@ import { api } from '../config/api';
 
 export interface CategoryAdmin {
   id: string;
+  userId?: string;
+  platformUserId?: string;
   name: string;
   email: string;
   categoryId: string;
@@ -77,6 +79,11 @@ export const categoryAdminsService = {
 
   unban: async (id: string): Promise<CategoryAdmin> => {
     const response = await api.post<CategoryAdmin>(`/school-admin/category-admins/${id}/unban`);
+    return response.data;
+  },
+
+  updateEmail: async (id: string, email: string): Promise<CategoryAdmin> => {
+    const response = await api.patch<CategoryAdmin>(`/school-admin/category-admins/${id}/email`, { email });
     return response.data;
   },
 };

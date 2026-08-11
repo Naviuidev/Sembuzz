@@ -1,20 +1,45 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { SubCategoryAdminLayout } from '../components/SubCategoryAdminLayout';
+import { SubCategoryAdminApprovalsPendingPanel } from '../components/SubCategoryAdminApprovalsPendingPanel';
+import { SubCategoryAdminApprovedPanel } from '../components/SubCategoryAdminApprovedPanel';
+import { SubCategoryAdminReceivedCorrectionsPanel } from '../components/SubCategoryAdminReceivedCorrectionsPanel';
 import { useSubCategoryAdminAuth } from '../contexts/SubCategoryAdminAuthContext';
-import { subcategoryAdminEventsService } from '../services/subcategory-admin-events.service';
+import { subcategoryAdminEventsService, type RevertedEvent } from '../services/subcategory-admin-events.service';
 
 type CreateMode = 'choose' | 'manual' | 'ai';
 type AIStep = 'banner' | 'form';
+type PostEventPageTab = 'post-event' | 'received-corrections' | 'approvals-pending' | 'approved';
 
 const MAX_IMAGES = 4;
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+const SHOW_AI_EVENT_GENERATION = false;
+const TEXT_DARK = '#1a1f2e';
+const TEXT_MUTED = '#6c757d';
+
+const POST_EVENT_TABS: { id: PostEventPageTab; label: string }[] = [
+  { id: 'post-event', label: 'Post event' },
+  { id: 'received-corrections', label: 'Received corrections' },
+  { id: 'approvals-pending', label: 'Approvals pending' },
+  { id: 'approved', label: 'Approved list' },
+];
 
 export const SubCategoryAdminPostEvent = () => {
-  const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const { user, refreshUser } = useSubCategoryAdminAuth();
-  const resubmitEvent = (location.state as { resubmitEvent?: { title: string; description: string | null; externalLink: string | null; commentsEnabled: boolean; subCategory: { id: string; name: string } } })?.resubmitEvent;
+  const resubmitEvent = (location.state as {
+    resubmitEvent?: {
+      id?: string;
+      title: string;
+      description: string | null;
+      externalLink: string | null;
+      commentsEnabled: boolean;
+      subCategory: { id: string; name: string };
+    };
+  })?.resubmitEvent;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -28,7 +53,21 @@ export const SubCategoryAdminPostEvent = () => {
   const initialSubcategoryId = availableSubcategories.length > 0 ? availableSubcategories[0].id : '';
   const initialSubcategoryName = availableSubcategories.length > 0 ? availableSubcategories[0].name : '';
 
-  const [mode, setMode] = useState<CreateMode>('choose');
+  const [activeTab, setActiveTab] = useState<PostEventPageTab>('post-event');
+  const [resubmitFromEventId, setResubmitFromEventId] = useState<string | undefined>();
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (
+      tab === 'post-event' ||
+      tab === 'received-corrections' ||
+      tab === 'approvals-pending' ||
+      tab === 'approved'
+    ) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+  const [mode, setMode] = useState<CreateMode>(SHOW_AI_EVENT_GENERATION ? 'choose' : 'manual');
   const [aiStep, setAIStep] = useState<AIStep>('banner');
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
@@ -81,25 +120,46 @@ export const SubCategoryAdminPostEvent = () => {
   }, [user]);
 
   const hasAppliedResubmit = useRef(false);
+
+  const applyResubmitEvent = useCallback(
+    (event: {
+      id?: string;
+      title: string;
+      description: string | null;
+      externalLink: string | null;
+      commentsEnabled: boolean;
+      subCategory: { id: string; name: string };
+    }) => {
+      setActiveTab('post-event');
+      setMode('manual');
+      setResubmitFromEventId(event.id);
+      const subcategoryId = event.subCategory?.id ?? (user?.subCategoryId || '');
+      const subcategoryName = event.subCategory?.name ?? (user?.subCategoryName || '');
+      setFormData((prev) => ({
+        ...prev,
+        title: event.title ?? '',
+        description: event.description ?? '',
+        externalLink: event.externalLink ?? '',
+        subcategoryId,
+        subcategory: subcategoryName,
+        commentsEnabled: event.commentsEnabled ?? true,
+        category: user?.categoryName || prev.category,
+      }));
+    },
+    [user],
+  );
+
   // Pre-fill form when resubmitting from Received corrections (once)
   useEffect(() => {
     if (resubmitEvent && user && !hasAppliedResubmit.current) {
       hasAppliedResubmit.current = true;
-      setMode('manual');
-      const subcategoryId = resubmitEvent.subCategory?.id ?? (user.subCategoryId || '');
-      const subcategoryName = resubmitEvent.subCategory?.name ?? (user.subCategoryName || '');
-      setFormData((prev) => ({
-        ...prev,
-        title: resubmitEvent.title ?? '',
-        description: resubmitEvent.description ?? '',
-        externalLink: resubmitEvent.externalLink ?? '',
-        subcategoryId,
-        subcategory: subcategoryName,
-        commentsEnabled: resubmitEvent.commentsEnabled ?? true,
-        category: user.categoryName || prev.category,
-      }));
+      applyResubmitEvent(resubmitEvent);
     }
-  }, [resubmitEvent, user]);
+  }, [resubmitEvent, user, applyResubmitEvent]);
+
+  const handleMakeCorrections = (event: RevertedEvent) => {
+    applyResubmitEvent(event);
+  };
 
   const handleBannerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -175,8 +235,8 @@ export const SubCategoryAdminPostEvent = () => {
         commentsEnabled: formData.commentsEnabled,
         subCategoryId: formData.subcategoryId,
         imageUrls,
+        resubmitFromEventId,
       });
-      // Reset form and go back to choose mode or redirect to approvals pending
       setFormData((prev) => ({
         ...prev,
         title: '',
@@ -184,11 +244,11 @@ export const SubCategoryAdminPostEvent = () => {
         externalLink: '',
         imageFiles: [],
       }));
-      setMode('choose');
-      setAIStep('banner');
-      setBannerFile(null);
-      setBannerPreview(null);
-      navigate('/subcategory-admin/approvals-pending');
+      setResubmitFromEventId(undefined);
+      setMode(SHOW_AI_EVENT_GENERATION ? 'choose' : 'manual');
+      setActiveTab('approvals-pending');
+      await queryClient.invalidateQueries({ queryKey: ['subcategory-admin', 'events', 'reverted'] });
+      await queryClient.invalidateQueries({ queryKey: ['subcategory-admin', 'events', 'pending'] });
     } catch (err: unknown) {
       let text = 'Failed to submit. Try again.';
       if (err && typeof err === 'object' && 'response' in err) {
@@ -262,6 +322,7 @@ export const SubCategoryAdminPostEvent = () => {
           <i className="bi bi-pencil-square" style={{ fontSize: '1.25rem', color: 'inherit' }} aria-hidden />
           <span>create manually</span>
         </button>
+      {SHOW_AI_EVENT_GENERATION ? (
       <button
         type="button"
         onClick={() => setMode('ai')}
@@ -288,6 +349,7 @@ export const SubCategoryAdminPostEvent = () => {
         </svg>
         <span>generate with ai</span>
       </button>
+      ) : null}
     </div>
     </>
   );
@@ -578,52 +640,93 @@ export const SubCategoryAdminPostEvent = () => {
   return (
     <SubCategoryAdminLayout>
       <div className="mb-4">
-        <h1 style={{ fontSize: '2rem', fontWeight: 'normal', color: '#1a1f2e', marginBottom: '0.5rem' }}>
+        <h1 style={{ fontSize: '2rem', fontWeight: 'normal', color: TEXT_DARK, marginBottom: '0.5rem' }}>
           Post the event
         </h1>
-        <p style={{ color: '#6c757d', fontSize: '1rem', marginBottom: 0 }}>
+        <p style={{ color: TEXT_MUTED, fontSize: '1rem', marginBottom: 0 }}>
           Create and submit a new event for approval
         </p>
       </div>
 
-      <div className="card border-0" style={{ borderRadius: '0px', backgroundColor: 'transparent', boxShadow: 'none' }}>
-        <div className="card-body p-4" style={{ backgroundColor: 'transparent' }}>
-          {mode === 'choose' && renderChooseMode()}
-          {mode === 'manual' && (
-            <>
-              <div className="d-flex align-items-center mb-3">
-                <span className="badge bg-secondary me-2">Create manually</span>
-                <button
-                  type="button"
-                  className="btn btn-link p-0 small"
-                  style={{ color: '#6c757d' }}
-                  onClick={() => setMode('choose')}
-                >
-                  Change option
-                </button>
-              </div>
-              {renderEventForm()}
-            </>
-          )}
-          {mode === 'ai' && aiStep === 'banner' && (
-            <>
-              <div className="d-flex align-items-center mb-3">
-                <span className="badge bg-secondary me-2">Generate with AI</span>
-              </div>
-              {renderAIBannerStep()}
-            </>
-          )}
-          {mode === 'ai' && aiStep === 'form' && (
-            <>
-              <div className="d-flex align-items-center mb-3">
-                <span className="badge bg-secondary me-2">Generate with AI</span>
-                <span className="small text-muted">— Review and add images, then submit</span>
-              </div>
-              {renderEventForm()}
-            </>
-          )}
+      <ul className="nav nav-tabs mb-4" style={{ borderBottom: '1px solid #dee2e6' }}>
+        {POST_EVENT_TABS.map((tab) => (
+          <li key={tab.id} className="nav-item">
+            <button
+              type="button"
+              className={`nav-link ${activeTab === tab.id ? 'active' : ''}`}
+              style={{
+                borderRadius: 0,
+                color: activeTab === tab.id ? TEXT_DARK : TEXT_MUTED,
+                fontWeight: activeTab === tab.id ? 600 : 400,
+                background: 'transparent',
+                border: 'none',
+                borderBottom: activeTab === tab.id ? `2px solid ${TEXT_DARK}` : '2px solid transparent',
+              }}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      {activeTab === 'post-event' ? (
+        <>
+          <p style={{ color: TEXT_MUTED, fontSize: '1rem', marginBottom: '1.5rem' }}>
+            Create a post and submit it for category admin approval. Once approved, it appears as news
+            for students.
+          </p>
+        <div
+          className="card border-0"
+          style={{ borderRadius: '0px', backgroundColor: 'transparent', boxShadow: 'none' }}
+        >
+          <div className="card-body p-4" style={{ backgroundColor: 'transparent' }}>
+            {mode === 'choose' && renderChooseMode()}
+            {mode === 'manual' && (
+              <>
+                <div className="d-flex align-items-center mb-3">
+                  <span className="badge bg-secondary me-2">Create manually</span>
+                  {SHOW_AI_EVENT_GENERATION ? (
+                    <button
+                      type="button"
+                      className="btn btn-link p-0 small"
+                      style={{ color: TEXT_MUTED }}
+                      onClick={() => setMode('choose')}
+                    >
+                      Change option
+                    </button>
+                  ) : null}
+                </div>
+                {renderEventForm()}
+              </>
+            )}
+            {SHOW_AI_EVENT_GENERATION && mode === 'ai' && aiStep === 'banner' && (
+              <>
+                <div className="d-flex align-items-center mb-3">
+                  <span className="badge bg-secondary me-2">Generate with AI</span>
+                </div>
+                {renderAIBannerStep()}
+              </>
+            )}
+            {SHOW_AI_EVENT_GENERATION && mode === 'ai' && aiStep === 'form' && (
+              <>
+                <div className="d-flex align-items-center mb-3">
+                  <span className="badge bg-secondary me-2">Generate with AI</span>
+                  <span className="small text-muted">— Review and add images, then submit</span>
+                </div>
+                {renderEventForm()}
+              </>
+            )}
+          </div>
         </div>
-      </div>
+        </>
+      ) : activeTab === 'received-corrections' ? (
+        <SubCategoryAdminReceivedCorrectionsPanel onMakeCorrections={handleMakeCorrections} />
+      ) : activeTab === 'approvals-pending' ? (
+        <SubCategoryAdminApprovalsPendingPanel />
+      ) : (
+        <SubCategoryAdminApprovedPanel />
+      )}
     </SubCategoryAdminLayout>
   );
 };

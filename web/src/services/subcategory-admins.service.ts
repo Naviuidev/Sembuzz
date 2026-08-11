@@ -2,6 +2,8 @@ import { api } from '../config/api';
 
 export interface SubCategoryAdmin {
   id: string;
+  userId?: string;
+  platformUserId?: string;
   name: string;
   email: string;
   subCategoryId: string;
@@ -74,6 +76,13 @@ export const subCategoryAdminsService = {
 
   delete: async (id: string): Promise<{ message: string }> => {
     const response = await api.delete<{ message: string }>(`/category-admin/subcategory-admins/${id}`);
+    return response.data;
+  },
+
+  updateEmail: async (id: string, email: string): Promise<SubCategoryAdmin> => {
+    const response = await api.patch<SubCategoryAdmin>(`/category-admin/subcategory-admins/${id}/email`, {
+      email,
+    });
     return response.data;
   },
 };

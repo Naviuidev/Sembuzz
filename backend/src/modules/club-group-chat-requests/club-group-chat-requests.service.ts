@@ -87,7 +87,7 @@ export class ClubGroupChatRequestsService {
     }
     await this.assertGroupMessagingEnabled(admin.schoolId);
 
-    const expectedKey = clubKeyFromParts(dto.pageName, dto.icon);
+    const expectedKey = clubKeyFromParts(dto.pageName, dto.clubIcon);
     if (dto.clubKey !== expectedKey) {
       throw new BadRequestException('Club selection is invalid. Please choose a club again.');
     }
@@ -96,12 +96,17 @@ export class ClubGroupChatRequestsService {
       where: {
         schoolId: admin.schoolId,
         pageName: dto.pageName,
-        icon: dto.icon,
+        icon: dto.clubIcon,
       },
       select: { id: true },
     });
     if (!clubExists) {
       throw new BadRequestException('Club not found. Ask your school admin to create the club under Social Share.');
+    }
+
+    const groupChatIcon = dto.groupChatIcon.trim();
+    if (!groupChatIcon) {
+      throw new BadRequestException('Group chat icon is required.');
     }
 
     const existingChat = await this.prisma.clubGroupChat.findUnique({
@@ -132,7 +137,7 @@ export class ClubGroupChatRequestsService {
         subCategoryAdminId: admin.id,
         clubKey: dto.clubKey,
         pageName: dto.pageName,
-        icon: dto.icon,
+        icon: groupChatIcon,
         note: dto.note?.trim() || null,
         status: 'pending',
       },
@@ -175,12 +180,15 @@ export class ClubGroupChatRequestsService {
     schoolId: string,
     clubKey: string,
     pageName: string,
-    icon: string,
+    groupChatIcon: string,
   ) {
-    const clubExists = await this.prisma.schoolSocialAccount.findFirst({
-      where: { schoolId, pageName, icon },
-      select: { id: true },
+    const accounts = await this.prisma.schoolSocialAccount.findMany({
+      where: { schoolId },
+      select: { pageName: true, icon: true },
     });
+    const clubExists = accounts.some(
+      (account) => clubKeyFromParts(account.pageName, account.icon) === clubKey,
+    );
     if (!clubExists) {
       throw new BadRequestException('Club no longer exists for this school.');
     }
@@ -191,12 +199,12 @@ export class ClubGroupChatRequestsService {
         schoolId,
         clubKey,
         pageName,
-        icon,
+        icon: groupChatIcon,
         isEnabled: true,
       },
       update: {
         pageName,
-        icon,
+        icon: groupChatIcon,
         isEnabled: true,
       },
       select: { id: true, clubKey: true, pageName: true, icon: true },

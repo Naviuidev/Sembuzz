@@ -13,6 +13,7 @@ export interface CreateEventDto {
   commentsEnabled?: boolean;
   subCategoryId: string;
   imageUrls?: string[];
+  resubmitFromEventId?: string;
 }
 
 export interface PendingEvent {

@@ -1,0 +1,28 @@
+# Local MySQL for development — avoids Hostinger max_connections_per_hour during restarts.
+# Usage:
+#   docker compose up -d
+#   Set DATABASE_URL in .env to:
+#   mysql://root:sembuzz@127.0.0.1:3307/sembuzz?connection_limit=5
+#   npx prisma migrate deploy
+#   npm run start:stable
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: sembuzz-mysql-dev
+    restart: unless-stopped
+    ports:
+      - '3307:3306'
+    environment:
+      MYSQL_ROOT_PASSWORD: sembuzz
+      MYSQL_DATABASE: sembuzz
+    volumes:
+      - sembuzz_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-psembuzz']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  sembuzz_mysql_data:

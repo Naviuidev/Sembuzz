@@ -433,4 +433,14 @@ export class SubCategoryAdminsService {
       where: { id },
     });
   }
+
+  async updateEmail(id: string, categoryId: string, categoryAdminId: string, email: string) {
+    await this.findOne(id, categoryId, categoryAdminId);
+    const admin = await this.prisma.subCategoryAdmin.findUniqueOrThrow({
+      where: { id },
+      select: { platformUserId: true },
+    });
+    await this.platformUserService.updateEmail(admin.platformUserId, email);
+    return this.findOne(id, categoryId, categoryAdminId);
+  }
 }

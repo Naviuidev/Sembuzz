@@ -33,6 +33,22 @@ export class EventsService {
     if (!admin) {
       throw new ForbiddenException('Subcategory admin not found');
     }
+
+    if (dto.resubmitFromEventId) {
+      const original = await this.prisma.event.findFirst({
+        where: {
+          id: dto.resubmitFromEventId,
+          subCategoryAdminId,
+          status: 'reverted',
+        },
+      });
+      if (!original) {
+        throw new BadRequestException(
+          'Original correction request not found or already resolved.',
+        );
+      }
+    }
+
     const imageUrlsJson = dto.imageUrls?.length
       ? JSON.stringify(dto.imageUrls)
       : null;
@@ -49,6 +65,7 @@ export class EventsService {
           commentsEnabled: dto.commentsEnabled ?? true,
           imageUrls: imageUrlsJson,
           status: 'pending',
+          resubmitFromEventId: dto.resubmitFromEventId ?? null,
         },
         include: {
           subCategory: { select: { id: true, name: true } },
@@ -83,7 +100,7 @@ export class EventsService {
   }
 
   async findRevertedBySubCategoryAdmin(subCategoryAdminId: string) {
-    return this.prisma.event.findMany({
+    const reverted = await this.prisma.event.findMany({
       where: {
         subCategoryAdminId,
         status: 'reverted',
@@ -93,6 +110,23 @@ export class EventsService {
       },
       orderBy: { updatedAt: 'desc' },
     });
+
+    if (reverted.length === 0) {
+      return reverted;
+    }
+
+    const approved = await this.prisma.event.findMany({
+      where: { subCategoryAdminId, status: 'approved' },
+      select: { title: true, subCategoryId: true },
+    });
+
+    const approvedKeys = new Set(
+      approved.map((e) => `${e.subCategoryId}:${e.title.trim().toLowerCase()}`),
+    );
+
+    return reverted.filter(
+      (e) => !approvedKeys.has(`${e.subCategoryId}:${e.title.trim().toLowerCase()}`),
+    );
   }
 
   async findApprovedBySubCategoryAdmin(subCategoryAdminId: string) {

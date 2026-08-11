@@ -3,10 +3,22 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CategoryAdminNavbar } from '../components/CategoryAdminNavbar';
 import { CategoryAdminSidebar } from '../components/CategoryAdminSidebar';
-import { PrivacyPageTabs, type PrivacyPageTab } from '../components/PrivacyPageTabs';
+import { CategoryAdminPrivacyTabs, type CategoryAdminPrivacyTab } from '../components/CategoryAdminPrivacyTabs';
+import { CategoryAdminPrivacyOverview } from '../components/CategoryAdminPrivacyOverview';
 import { ClubGroupChatRequestReviewPanel } from '../components/ClubGroupChatRequestReviewPanel';
+import { StudentChatGroupRequestReviewPanel } from '../components/StudentChatGroupRequestReviewPanel';
+import { MessagingDeleteRequestReviewPanel } from '../components/MessagingDeleteRequestReviewPanel';
 import { useCategoryAdminAuth } from '../contexts/CategoryAdminAuthContext';
 import { categoryAdminClubGroupChatRequestsService } from '../services/category-admin-club-group-chat-requests.service';
+import { categoryAdminStudentChatGroupRequestsService } from '../services/category-admin-student-chat-group-requests.service';
+import {
+  categoryAdminClubGroupChatDeleteRequestsService,
+  type ClubGroupChatDeleteRequestItem,
+} from '../services/club-group-chat-delete-requests.service';
+import {
+  categoryAdminStudentChatGroupDeleteRequestsService,
+  type StudentChatGroupDeleteRequestItem,
+} from '../services/student-chat-group-delete-requests.service';
 import { categoryAdminCategoriesService } from '../services/category-admin-categories.service';
 import {
   subCategoryAdminsService,
@@ -15,23 +27,24 @@ import {
   type UpdateSubCategoryAdminSubCategoriesDto,
 } from '../services/subcategory-admins.service';
 
-function privacyTabFromParam(tab: string | null): PrivacyPageTab {
+function privacyTabFromParam(tab: string | null): CategoryAdminPrivacyTab {
   if (tab === 'message-config') return tab;
-  return 'admins';
+  if (tab === 'manage-admins' || tab === 'admins') return 'manage-admins';
+  return 'privacy';
 }
 
 export const CategoryAdminPrivacy = () => {
   const queryClient = useQueryClient();
   const { user, token } = useCategoryAdminAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [privacyTab, setPrivacyTab] = useState<PrivacyPageTab>(() =>
+  const [privacyTab, setPrivacyTab] = useState<CategoryAdminPrivacyTab>(() =>
     privacyTabFromParam(searchParams.get('tab')),
   );
 
-  const handlePrivacyTabChange = (tab: PrivacyPageTab) => {
+  const handlePrivacyTabChange = (tab: CategoryAdminPrivacyTab) => {
     setPrivacyTab(tab);
     const next = new URLSearchParams(searchParams);
-    if (tab === 'admins') {
+    if (tab === 'privacy') {
       next.delete('tab');
     } else {
       next.set('tab', tab);
@@ -233,16 +246,46 @@ export const CategoryAdminPrivacy = () => {
       <div className="admin-shell-body">
         <CategoryAdminSidebar />
         <div className="admin-main">
-          <PrivacyPageTabs
-            activeTab={privacyTab}
-            onChange={handlePrivacyTabChange}
-          />
+          <CategoryAdminPrivacyTabs activeTab={privacyTab} onChange={handlePrivacyTabChange} />
 
           {privacyTab === 'message-config' ? (
+            <>
             <ClubGroupChatRequestReviewPanel
               service={categoryAdminClubGroupChatRequestsService}
               queryKeyPrefix="category-admin"
             />
+            <StudentChatGroupRequestReviewPanel
+              service={categoryAdminStudentChatGroupRequestsService}
+              queryKeyPrefix="category-admin"
+            />
+            <MessagingDeleteRequestReviewPanel
+              title="Group chat delete requests"
+              description="Sub-category admins can request removal of club group chats. Approve to disable the chat for members."
+              queryKeyPrefix="category-admin"
+              queryKey="club-group-chat-delete-requests"
+              service={categoryAdminClubGroupChatDeleteRequestsService}
+              renderTargetName={(row) =>
+                (row as ClubGroupChatDeleteRequestItem).clubGroupChat.pageName || 'Club group chat'
+              }
+              approveSuccessMessage="Group chat deleted (disabled)."
+            />
+            <MessagingDeleteRequestReviewPanel
+              title="Student group delete requests"
+              description="Sub-category admins can request removal of student chat groups. Approve to deactivate the group."
+              queryKeyPrefix="category-admin"
+              queryKey="student-chat-group-delete-requests"
+              service={categoryAdminStudentChatGroupDeleteRequestsService}
+              renderTargetName={(row) =>
+                (row as StudentChatGroupDeleteRequestItem).studentChatGroup.name
+              }
+              renderTargetMeta={(row) =>
+                (row as StudentChatGroupDeleteRequestItem).studentChatGroup.visibility
+              }
+              approveSuccessMessage="Student group deleted (deactivated)."
+            />
+            </>
+          ) : privacyTab === 'privacy' ? (
+            <CategoryAdminPrivacyOverview />
           ) : (
           <>
           <div className="d-flex justify-content-between align-items-center mb-4">

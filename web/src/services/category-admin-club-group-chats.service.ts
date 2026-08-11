@@ -43,13 +43,6 @@ export const categoryAdminClubGroupChatsService = {
     return Array.isArray(data) ? data : [];
   },
 
-  updateMessageMode: async (id: string, messageMode: ClubGroupMessageMode) => {
-    const { data } = await api.patch(`/category-admin/club-group-chats/${id}/message-mode`, {
-      messageMode,
-    });
-    return data;
-  },
-
   listApprovedMembers: async (id: string): Promise<CategoryAdminClubGroupApprovedMember[]> => {
     const { data } = await api.get<CategoryAdminClubGroupApprovedMember[]>(
       `/category-admin/club-group-chats/${id}/approved-members`,

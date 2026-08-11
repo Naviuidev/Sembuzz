@@ -34,14 +34,17 @@ import {
   type SubCategoryAdminStudentChatGroupRow,
   type SubCategoryAdminStudentRow,
 } from '../services/subcategory-admin-student-chat-groups.service';
+import { subCategoryAdminStudentChatGroupRequestsService } from '../services/subcategory-admin-student-chat-group-requests.service';
+import { subCategoryAdminClubGroupChatDeleteRequestsService } from '../services/club-group-chat-delete-requests.service';
+import { subCategoryAdminStudentChatGroupDeleteRequestsService } from '../services/student-chat-group-delete-requests.service';
+import { MessagingDeleteRequestConfirmModal } from './MessagingDeleteRequestConfirmModal';
 
 const TEXT_DARK = '#1a1f2e';
 const TEXT_MUTED = '#6c757d';
 
-type MessagesTab = 'config' | ClubGroupMembershipStatus | 'chat' | 'direct-chats' | 'student-groups';
+type MessagesTab = ClubGroupMembershipStatus | 'chat' | 'direct-chats' | 'student-groups';
 
 const BASE_TABS: { id: MessagesTab; label: string }[] = [
-  { id: 'config', label: 'Chat config' },
   { id: 'pending', label: 'Pending approvals' },
   { id: 'approved', label: 'Approved' },
   { id: 'banned', label: 'Banned users' },
@@ -104,10 +107,9 @@ export function CategoryAdminMessagesPanel({
   );
 
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<MessagesTab>('config');
+  const [activeTab, setActiveTab] = useState<MessagesTab>('pending');
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [actingOnId, setActingOnId] = useState<string | null>(null);
-  const [configModalChat, setConfigModalChat] = useState<CategoryAdminClubGroupChatRow | null>(null);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [chatDraft, setChatDraft] = useState('');
   const [chatSending, setChatSending] = useState(false);
@@ -128,7 +130,7 @@ export function CategoryAdminMessagesPanel({
   const { data: configChats = [], isLoading: configLoading, error: configError } = useQuery({
     queryKey: [queryPrefix, 'club-group-chats'],
     queryFn: clubChatsService.list,
-    enabled: activeTab === 'config' || activeTab === 'chat',
+    enabled: activeTab === 'chat',
   });
 
   const { data: approvedMembers = [], isLoading: membersLoading } = useQuery({
@@ -146,12 +148,6 @@ export function CategoryAdminMessagesPanel({
     queryFn: () => clubChatsService.listMessages(selectedChatId!),
     enabled: activeTab === 'chat' && !!selectedChatId,
     refetchInterval: activeTab === 'chat' && selectedChatId ? 4000 : false,
-  });
-
-  const { data: directSettings, isLoading: directSettingsLoading } = useQuery({
-    queryKey: [queryPrefix, 'direct-chats', 'settings'],
-    queryFn: directChatsService.getSettings,
-    enabled: activeTab === 'config',
   });
 
   const { data: directConversations = [], isLoading: directListLoading, error: directListError } = useQuery({
@@ -242,36 +238,6 @@ export function CategoryAdminMessagesPanel({
     onSettled: () => setActingOnId(null),
   });
 
-  const updateModeMutation = useMutation({
-    mutationFn: ({ id, messageMode }: { id: string; messageMode: ClubGroupMessageMode }) =>
-      categoryAdminClubGroupChatsService.updateMessageMode(id, messageMode),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: [queryPrefix, 'club-group-chats'] });
-      setConfigModalChat(null);
-      setActionMessage({ type: 'success', text: 'Chat settings saved.' });
-    },
-    onError: (err) => {
-      const message =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Failed to save chat settings.';
-      setActionMessage({ type: 'error', text: message });
-    },
-  });
-
-  const updateDirectSettingsMutation = useMutation({
-    mutationFn: (isEnabled: boolean) => directChatsService.updateSettings(isEnabled),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: [queryPrefix, 'direct-chats', 'settings'] });
-      setActionMessage({ type: 'success', text: '1:1 chat settings saved.' });
-    },
-    onError: (err) => {
-      const message =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Failed to save 1:1 chat settings.';
-      setActionMessage({ type: 'error', text: message });
-    },
-  });
-
   const selectedChat = useMemo(
     () => configChats.find((c) => c.id === selectedChatId) ?? null,
     [configChats, selectedChatId],
@@ -298,8 +264,8 @@ export function CategoryAdminMessagesPanel({
   return (
     <>
       <p className="text-muted mb-4">
-        Configure club group chat, review student join requests, and message approved members. You are
-        the primary group moderator as {adminLabel}.
+        Review student join requests, message approved members, and audit 1:1 chats. Chat permissions
+        are configured by your school admin. You are the primary group moderator as {adminLabel}.
       </p>
 
       <ul className="nav nav-tabs mb-4" style={{ borderBottom: '1px solid #dee2e6' }}>
@@ -337,18 +303,7 @@ export function CategoryAdminMessagesPanel({
             </div>
           ) : null}
 
-          {activeTab === 'config' ? (
-            <ChatConfigPanel
-              chats={configChats}
-              isLoading={configLoading}
-              error={configError}
-              onConfigure={setConfigModalChat}
-              directMessagingEnabled={directSettings?.isEnabled ?? true}
-              directSettingsLoading={directSettingsLoading}
-              savingDirectSettings={updateDirectSettingsMutation.isPending}
-              onToggleDirectMessaging={(enabled) => updateDirectSettingsMutation.mutate(enabled)}
-            />
-          ) : activeTab === 'chat' ? (
+          {activeTab === 'chat' ? (
             <AdminChatPanel
               chats={configChats}
               selectedChatId={selectedChatId}
@@ -368,6 +323,9 @@ export function CategoryAdminMessagesPanel({
               messagesEndRef={messagesEndRef}
               isLoading={configLoading}
               error={configError}
+              onDeleteRequested={() => {
+                void queryClient.invalidateQueries({ queryKey: [queryPrefix, 'club-group-chats'] });
+              }}
             />
           ) : activeTab === 'direct-chats' ? (
             <DirectChatsAuditPanel
@@ -393,214 +351,6 @@ export function CategoryAdminMessagesPanel({
               onBan={(id) => banMutation.mutate(id)}
             />
           ) : null}
-
-      {configModalChat ? (
-        <ChatConfigModal
-          chat={configModalChat}
-          saving={updateModeMutation.isPending}
-          onClose={() => setConfigModalChat(null)}
-          onSave={(messageMode) =>
-            updateModeMutation.mutate({ id: configModalChat.id, messageMode })
-          }
-        />
-      ) : null}
-    </>
-  );
-}
-
-function ChatConfigPanel({
-  chats,
-  isLoading,
-  error,
-  onConfigure,
-  directMessagingEnabled,
-  directSettingsLoading,
-  savingDirectSettings,
-  onToggleDirectMessaging,
-}: {
-  chats: (CategoryAdminClubGroupChatRow | SubCategoryAdminClubGroupChatRow)[];
-  isLoading: boolean;
-  error: unknown;
-  onConfigure: (chat: CategoryAdminClubGroupChatRow) => void;
-  directMessagingEnabled: boolean;
-  directSettingsLoading: boolean;
-  savingDirectSettings: boolean;
-  onToggleDirectMessaging: (enabled: boolean) => void;
-}) {
-  return (
-    <div className="d-flex flex-column gap-4">
-      <div className="card border-0 shadow-sm" style={{ borderRadius: 0 }}>
-        <div className="card-body">
-          <h2 className="h6 mb-2" style={{ color: TEXT_DARK }}>
-            1:1 student messaging
-          </h2>
-          <p className="small text-muted mb-3">
-            Allow students at your school to message each other directly. You can review all 1:1
-            chats in the <strong>1:1 chats</strong> tab (read-only).
-          </p>
-          {directSettingsLoading ? (
-            <p className="small text-muted mb-0">Loading settings…</p>
-          ) : (
-            <div className="form-check form-switch">
-              <input
-                className="form-check-input"
-                type="checkbox"
-                role="switch"
-                id="direct-messaging-enabled"
-                checked={directMessagingEnabled}
-                disabled={savingDirectSettings}
-                onChange={(e) => onToggleDirectMessaging(e.target.checked)}
-              />
-              <label className="form-check-label" htmlFor="direct-messaging-enabled">
-                {directMessagingEnabled ? 'Students can send 1:1 messages' : '1:1 messaging is off'}
-              </label>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="card border-0 shadow-sm" style={{ borderRadius: 0 }}>
-        <div className="card-body p-0">
-          <div className="px-4 pt-4 pb-2">
-            <h2 className="h6 mb-1" style={{ color: TEXT_DARK }}>
-              Club group chats
-            </h2>
-            <p className="small text-muted mb-0">Configure who can send messages in each club group.</p>
-          </div>
-        {isLoading ? (
-          <div className="p-4 text-muted">Loading club groups…</div>
-        ) : error ? (
-          <div className="p-4 text-danger">
-            {getQueryErrorMessage(error, 'Failed to load club groups. Restart the backend after running: npx prisma generate')}
-          </div>
-        ) : chats.length === 0 ? (
-          <div className="p-4 text-muted">
-            No club group chats yet. Ask your school admin to enable group chat for a club.
-          </div>
-        ) : (
-          <div className="table-responsive">
-            <table className="table table-hover mb-0 align-middle">
-              <thead style={{ backgroundColor: '#f8f9fa' }}>
-                <tr>
-                  <th className="small text-muted">Club group</th>
-                  <th className="small text-muted">Approved members</th>
-                  <th className="small text-muted">Who can send messages</th>
-                  <th className="small text-muted text-end">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {chats.map((chat) => (
-                  <tr key={chat.id}>
-                    <td className="fw-medium" style={{ color: TEXT_DARK }}>
-                      {chat.pageName || 'Club'}
-                    </td>
-                    <td className="small">{chat.approvedMemberCount}</td>
-                    <td className="small">{MESSAGE_MODE_LABELS[chat.messageMode]}</td>
-                    <td className="text-end">
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-dark"
-                        style={{ borderRadius: 0 }}
-                        onClick={() => onConfigure(chat)}
-                      >
-                        Configure
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-    </div>
-  );
-}
-
-function ChatConfigModal({
-  chat,
-  saving,
-  onClose,
-  onSave,
-}: {
-  chat: CategoryAdminClubGroupChatRow;
-  saving: boolean;
-  onClose: () => void;
-  onSave: (mode: ClubGroupMessageMode) => void;
-}) {
-  const [selectedMode, setSelectedMode] = useState<ClubGroupMessageMode>(chat.messageMode);
-
-  return (
-    <>
-      <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }} role="dialog">
-        <div className="modal-dialog modal-dialog-centered">
-          <div className="modal-content" style={{ borderRadius: 0 }}>
-            <div className="modal-header border-0 pb-0">
-              <h5 className="modal-title" style={{ color: TEXT_DARK }}>
-                Chat settings — {chat.pageName || 'Club'}
-              </h5>
-              <button type="button" className="btn-close" aria-label="Close" onClick={onClose} />
-            </div>
-            <div className="modal-body pt-3">
-              <p className="text-muted small mb-3">Choose who can send messages in this club group chat.</p>
-              <div className="d-flex flex-column gap-3">
-                {(
-                  [
-                    {
-                      mode: 'admin_only' as const,
-                      title: 'Only admin can send messages',
-                      description:
-                        'Approved students can read messages. You send updates from the Chat tab.',
-                    },
-                    {
-                      mode: 'members' as const,
-                      title: 'Allow students to send messages',
-                      description:
-                        'Approved students can read and send messages in the group chat.',
-                    },
-                  ] as const
-                ).map((option) => {
-                  const active = selectedMode === option.mode;
-                  return (
-                    <button
-                      key={option.mode}
-                      type="button"
-                      className="text-start border p-3"
-                      style={{
-                        borderRadius: 0,
-                        borderColor: active ? TEXT_DARK : '#dee2e6',
-                        backgroundColor: active ? '#f8f9fa' : '#fff',
-                        boxShadow: active ? `inset 0 0 0 1px ${TEXT_DARK}` : 'none',
-                      }}
-                      onClick={() => setSelectedMode(option.mode)}
-                    >
-                      <div className="fw-semibold mb-1" style={{ color: TEXT_DARK }}>
-                        {option.title}
-                      </div>
-                      <div className="small text-muted mb-0">{option.description}</div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="modal-footer border-0 pt-0">
-              <button type="button" className="btn btn-outline-secondary" style={{ borderRadius: 0 }} onClick={onClose}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-dark"
-                style={{ borderRadius: 0 }}
-                disabled={saving}
-                onClick={() => onSave(selectedMode)}
-              >
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
     </>
   );
 }
@@ -621,6 +371,7 @@ function AdminChatPanel({
   messagesEndRef,
   isLoading,
   error,
+  onDeleteRequested,
 }: {
   chats: (CategoryAdminClubGroupChatRow | SubCategoryAdminClubGroupChatRow)[];
   selectedChatId: string | null;
@@ -637,7 +388,57 @@ function AdminChatPanel({
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
   isLoading: boolean;
   error: unknown;
+  onDeleteRequested?: () => void;
 }) {
+  const queryClient = useQueryClient();
+  const [deleteFeedback, setDeleteFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
+
+  const { data: deleteRequests = [] } = useQuery({
+    queryKey: ['subcategory-admin', 'club-group-chat-delete-requests'],
+    queryFn: subCategoryAdminClubGroupChatDeleteRequestsService.listMine,
+  });
+
+  const pendingDeleteIds = useMemo(
+    () =>
+      new Set(
+        deleteRequests.filter((r) => r.status === 'pending').map((r) => r.clubGroupChatId),
+      ),
+    [deleteRequests],
+  );
+
+  const deleteMutation = useMutation({
+    mutationFn: (clubGroupChatId: string) =>
+      subCategoryAdminClubGroupChatDeleteRequestsService.create(clubGroupChatId),
+    onSuccess: () => {
+      setDeleteFeedback({
+        type: 'success',
+        text: 'Delete request sent to category and school admins for approval.',
+      });
+      setDeleteConfirm(null);
+      void queryClient.invalidateQueries({
+        queryKey: ['subcategory-admin', 'club-group-chat-delete-requests'],
+      });
+      onDeleteRequested?.();
+    },
+    onError: (err) => {
+      setDeleteFeedback({
+        type: 'error',
+        text: getQueryErrorMessage(err, 'Could not send delete request.'),
+      });
+    },
+  });
+
+  const handleDeleteRequest = (chatId: string, chatName: string) => {
+    if (pendingDeleteIds.has(chatId)) return;
+    setDeleteFeedback(null);
+    setDeleteConfirm({ id: chatId, name: chatName });
+  };
+
+  const confirmDeleteRequest = () => {
+    if (!deleteConfirm) return;
+    deleteMutation.mutate(deleteConfirm.id);
+  };
   if (isLoading) return <div className="p-4 text-muted">Loading chats…</div>;
   if (error) {
     return (
@@ -656,30 +457,59 @@ function AdminChatPanel({
 
   return (
     <div className="card border-0 shadow-sm overflow-hidden" style={{ borderRadius: 0, minHeight: 520 }}>
+      {deleteFeedback ? (
+        <div className={`alert alert-${deleteFeedback.type === 'success' ? 'success' : 'danger'} py-2 mb-0 rounded-0`}>
+          {deleteFeedback.text}
+        </div>
+      ) : null}
       <div className="row g-0" style={{ minHeight: 520 }}>
         <div className="col-md-3 border-end bg-white">
           <div className="p-3 border-bottom fw-semibold" style={{ color: TEXT_DARK }}>
             Club groups
           </div>
           <div className="list-group list-group-flush">
-            {chats.map((chat) => (
-              <button
+            {chats.map((chat) => {
+              const pendingDelete = pendingDeleteIds.has(chat.id);
+              return (
+              <div
                 key={chat.id}
-                type="button"
-                className={`list-group-item list-group-item-action border-0 ${selectedChatId === chat.id ? 'active' : ''}`}
+                className={`list-group-item border-0 d-flex align-items-center gap-2 ${selectedChatId === chat.id ? 'active' : ''}`}
                 style={{
                   borderRadius: 0,
                   backgroundColor: selectedChatId === chat.id ? TEXT_DARK : undefined,
                   color: selectedChatId === chat.id ? '#fff' : TEXT_DARK,
                 }}
-                onClick={() => onSelectChat(chat.id)}
               >
-                <div className="fw-medium">{chat.pageName || 'Club'}</div>
-                <div className={`small ${selectedChatId === chat.id ? 'text-white-50' : 'text-muted'}`}>
-                  {chat.approvedMemberCount} approved
-                </div>
-              </button>
-            ))}
+                <button
+                  type="button"
+                  className="btn btn-link p-0 text-start flex-grow-1 text-decoration-none"
+                  style={{
+                    color: 'inherit',
+                  }}
+                  onClick={() => onSelectChat(chat.id)}
+                >
+                  <div className="fw-medium">{chat.pageName || 'Club'}</div>
+                  <div className={`small ${selectedChatId === chat.id ? 'text-white-50' : 'text-muted'}`}>
+                    {chat.approvedMemberCount} approved
+                    {pendingDelete ? ' · Delete pending' : ''}
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-link p-0 flex-shrink-0"
+                  title={pendingDelete ? 'Delete request pending' : 'Request deletion'}
+                  disabled={pendingDelete || deleteMutation.isPending}
+                  style={{ color: pendingDelete ? '#ffc107' : '#dc3545' }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteRequest(chat.id, chat.pageName || 'Club');
+                  }}
+                >
+                  <i className="bi bi-trash" />
+                </button>
+              </div>
+            );
+            })}
           </div>
         </div>
 
@@ -762,6 +592,15 @@ function AdminChatPanel({
           </div>
         </div>
       </div>
+
+      <MessagingDeleteRequestConfirmModal
+        isOpen={!!deleteConfirm}
+        targetKind="group chat"
+        targetName={deleteConfirm?.name ?? ''}
+        isSubmitting={deleteMutation.isPending}
+        onCancel={() => setDeleteConfirm(null)}
+        onConfirm={confirmDeleteRequest}
+      />
     </div>
   );
 }
@@ -1092,11 +931,65 @@ function StudentGroupsAdminPanel() {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [studentQuery, setStudentQuery] = useState('');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    id: string;
+    name: string;
+    visibility: string;
+  } | null>(null);
 
   const { data: groups = [], isLoading } = useQuery({
     queryKey: ['subcategory-admin', 'student-chat-groups'],
     queryFn: subCategoryAdminStudentChatGroupsService.list,
   });
+
+  const { data: groupRequests = [], isLoading: requestsLoading } = useQuery({
+    queryKey: ['subcategory-admin', 'student-chat-group-requests'],
+    queryFn: subCategoryAdminStudentChatGroupRequestsService.listMine,
+  });
+
+  const { data: deleteRequests = [] } = useQuery({
+    queryKey: ['subcategory-admin', 'student-chat-group-delete-requests'],
+    queryFn: subCategoryAdminStudentChatGroupDeleteRequestsService.listMine,
+  });
+
+  const pendingDeleteGroupIds = useMemo(
+    () =>
+      new Set(
+        deleteRequests.filter((r) => r.status === 'pending').map((r) => r.studentChatGroupId),
+      ),
+    [deleteRequests],
+  );
+
+  const deleteGroupMutation = useMutation({
+    mutationFn: (studentChatGroupId: string) =>
+      subCategoryAdminStudentChatGroupDeleteRequestsService.create(studentChatGroupId),
+    onSuccess: () => {
+      setFeedback({
+        type: 'success',
+        text: 'Delete request sent to category and school admins for approval.',
+      });
+      setDeleteConfirm(null);
+      void queryClient.invalidateQueries({
+        queryKey: ['subcategory-admin', 'student-chat-group-delete-requests'],
+      });
+    },
+    onError: (err) => {
+      setFeedback({
+        type: 'error',
+        text: getQueryErrorMessage(err, 'Could not send delete request.'),
+      });
+    },
+  });
+
+  const handleDeleteGroupRequest = (groupId: string, groupName: string, visibility: string) => {
+    if (pendingDeleteGroupIds.has(groupId)) return;
+    setDeleteConfirm({ id: groupId, name: groupName, visibility });
+  };
+
+  const confirmDeleteGroupRequest = () => {
+    if (!deleteConfirm) return;
+    deleteGroupMutation.mutate(deleteConfirm.id);
+  };
 
   const { data: members = [], isLoading: membersLoading } = useQuery({
     queryKey: ['subcategory-admin', 'student-chat-groups', selectedGroupId, 'members'],
@@ -1112,21 +1005,23 @@ function StudentGroupsAdminPanel() {
 
   const createMutation = useMutation({
     mutationFn: () =>
-      subCategoryAdminStudentChatGroupsService.create({
+      subCategoryAdminStudentChatGroupRequestsService.create({
         name: groupName.trim(),
         description: groupDescription.trim() || undefined,
         visibility: groupVisibility,
       }),
-    onSuccess: (group) => {
+    onSuccess: () => {
       setGroupName('');
       setGroupDescription('');
       setGroupVisibility('public');
-      setSelectedGroupId(group.id);
-      setFeedback({ type: 'success', text: 'Group created. Add students below.' });
-      void queryClient.invalidateQueries({ queryKey: ['subcategory-admin', 'student-chat-groups'] });
+      setFeedback({
+        type: 'success',
+        text: 'Request sent to category and school admins for approval.',
+      });
+      void queryClient.invalidateQueries({ queryKey: ['subcategory-admin', 'student-chat-group-requests'] });
     },
     onError: (err) => {
-      setFeedback({ type: 'error', text: getQueryErrorMessage(err, 'Could not create group.') });
+      setFeedback({ type: 'error', text: getQueryErrorMessage(err, 'Could not send request.') });
     },
   });
 
@@ -1155,7 +1050,7 @@ function StudentGroupsAdminPanel() {
           Student chat groups
         </div>
         <div className="small text-muted">
-          Create public or private groups and add students. Students cannot create groups on their own.
+          Request new student groups for approval. After approval, add students to approved groups below.
         </div>
       </div>
       <div className="p-4">
@@ -1167,7 +1062,7 @@ function StudentGroupsAdminPanel() {
 
         <div className="row g-4">
           <div className="col-lg-5">
-            <h6 className="fw-semibold mb-3">Create a group</h6>
+            <h6 className="fw-semibold mb-3">Request a group</h6>
             <div className="mb-3">
               <label className="form-label small fw-semibold">Group name</label>
               <input
@@ -1209,21 +1104,59 @@ function StudentGroupsAdminPanel() {
               disabled={createMutation.isPending || groupName.trim().length < 2}
               onClick={() => createMutation.mutate()}
             >
-              {createMutation.isPending ? 'Creating…' : 'Create group'}
+              {createMutation.isPending ? 'Sending…' : 'Send request'}
             </button>
 
-            <h6 className="fw-semibold mt-4 mb-3">Your groups</h6>
+            <h6 className="fw-semibold mt-4 mb-3">Your requests</h6>
+            {requestsLoading ? (
+              <p className="small text-muted">Loading requests…</p>
+            ) : groupRequests.length === 0 ? (
+              <p className="small text-muted">No group requests yet.</p>
+            ) : (
+              <ul className="list-group list-group-flush border rounded mb-4">
+                {groupRequests.map((req) => (
+                  <li key={req.id} className="list-group-item py-2">
+                    <div className="d-flex justify-content-between align-items-start gap-2">
+                      <div className="min-w-0">
+                        <div className="small fw-semibold" style={{ color: TEXT_DARK }}>
+                          {req.name}
+                        </div>
+                        <div className="small text-muted text-uppercase">{req.visibility}</div>
+                      </div>
+                      <span
+                        className={`badge ${
+                          req.status === 'approved'
+                            ? 'bg-success'
+                            : req.status === 'declined'
+                              ? 'bg-danger'
+                              : 'bg-warning text-dark'
+                        }`}
+                      >
+                        {req.status}
+                      </span>
+                    </div>
+                    {req.status === 'declined' && req.declineReason ? (
+                      <div className="small text-danger mt-1">{req.declineReason}</div>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <h6 className="fw-semibold mb-3">Approved groups</h6>
             {isLoading ? (
               <p className="small text-muted">Loading groups…</p>
             ) : groups.length === 0 ? (
-              <p className="small text-muted">No student groups yet.</p>
+              <p className="small text-muted">No approved groups yet.</p>
             ) : (
               <ul className="list-group list-group-flush border rounded">
-                {groups.map((g: SubCategoryAdminStudentChatGroupRow) => (
-                  <li key={g.id} className="list-group-item">
+                {groups.map((g: SubCategoryAdminStudentChatGroupRow) => {
+                  const pendingDelete = pendingDeleteGroupIds.has(g.id);
+                  return (
+                  <li key={g.id} className="list-group-item d-flex align-items-center gap-2">
                     <button
                       type="button"
-                      className={`btn btn-link text-start p-0 text-decoration-none w-100 ${selectedGroupId === g.id ? 'fw-semibold' : ''}`}
+                      className={`btn btn-link text-start p-0 text-decoration-none flex-grow-1 ${selectedGroupId === g.id ? 'fw-semibold' : ''}`}
                       onClick={() => {
                         setSelectedGroupId(g.id);
                         setFeedback(null);
@@ -1235,10 +1168,24 @@ function StudentGroupsAdminPanel() {
                           {g.visibility}
                         </span>
                       </div>
-                      <div className="small text-muted">{g.memberCount} member{g.memberCount === 1 ? '' : 's'}</div>
+                      <div className="small text-muted">
+                        {g.memberCount} member{g.memberCount === 1 ? '' : 's'}
+                        {pendingDelete ? ' · Delete pending' : ''}
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-link p-0 flex-shrink-0"
+                      title={pendingDelete ? 'Delete request pending' : 'Request deletion'}
+                      disabled={pendingDelete || deleteGroupMutation.isPending}
+                      style={{ color: pendingDelete ? '#ffc107' : '#dc3545' }}
+                      onClick={() => handleDeleteGroupRequest(g.id, g.name, g.visibility)}
+                    >
+                      <i className="bi bi-trash" />
                     </button>
                   </li>
-                ))}
+                );
+                })}
               </ul>
             )}
           </div>
@@ -1310,6 +1257,16 @@ function StudentGroupsAdminPanel() {
           </div>
         </div>
       </div>
+
+      <MessagingDeleteRequestConfirmModal
+        isOpen={!!deleteConfirm}
+        targetKind="student group"
+        targetName={deleteConfirm?.name ?? ''}
+        targetMeta={deleteConfirm?.visibility}
+        isSubmitting={deleteGroupMutation.isPending}
+        onCancel={() => setDeleteConfirm(null)}
+        onConfirm={confirmDeleteGroupRequest}
+      />
     </div>
   );
 }

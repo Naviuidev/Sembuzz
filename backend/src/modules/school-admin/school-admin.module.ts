@@ -12,6 +12,12 @@ import { SchoolAdminSocialAccountsModule } from './social-accounts/school-admin-
 import { SchoolAdminClubGroupChatsModule } from './club-group-chats/school-admin-club-group-chats.module';
 import { SchoolAdminClubGroupChatRequestsModule } from './club-group-chat-requests/school-admin-club-group-chat-requests.module';
 import { UpcomingPostsModule } from './upcoming-posts/upcoming-posts.module';
+import { SchoolAdminAdsAdminsModule } from './ads-admins/ads-admins.module';
+import { AdminEmailChangeRequestsModule } from '../admin-email-change-requests/admin-email-change-requests.module';
+import { SchoolAdminDirectChatsModule } from './direct-chats/school-admin-direct-chats.module';
+import { SchoolAdminStudentChatGroupRequestsModule } from './student-chat-group-requests/school-admin-student-chat-group-requests.module';
+import { SchoolAdminClubGroupChatDeleteRequestsModule } from './club-group-chat-delete-requests/school-admin-club-group-chat-delete-requests.module';
+import { SchoolAdminStudentChatGroupDeleteRequestsModule } from './student-chat-group-delete-requests/school-admin-student-chat-group-delete-requests.module';
 
 @Module({
   imports: [
@@ -28,6 +34,12 @@ import { UpcomingPostsModule } from './upcoming-posts/upcoming-posts.module';
     SchoolAdminClubGroupChatsModule,
     SchoolAdminClubGroupChatRequestsModule,
     UpcomingPostsModule,
+    SchoolAdminAdsAdminsModule,
+    AdminEmailChangeRequestsModule,
+    SchoolAdminDirectChatsModule,
+    SchoolAdminStudentChatGroupRequestsModule,
+    SchoolAdminClubGroupChatDeleteRequestsModule,
+    SchoolAdminStudentChatGroupDeleteRequestsModule,
   ],
   exports: [
     SchoolAdminAuthModule,
@@ -42,6 +54,7 @@ import { UpcomingPostsModule } from './upcoming-posts/upcoming-posts.module';
     SchoolAdminSocialAccountsModule,
     SchoolAdminClubGroupChatsModule,
     UpcomingPostsModule,
+    SchoolAdminAdsAdminsModule,
   ],
 })
 export class SchoolAdminModule {}

@@ -3,9 +3,23 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { SchoolAdminNavbar } from '../components/SchoolAdminNavbar';
 import { SchoolAdminSidebar } from '../components/SchoolAdminSidebar';
-import { PrivacyPageTabs, type PrivacyPageTab } from '../components/PrivacyPageTabs';
+import { SchoolAdminPrivacyTabs, type SchoolAdminPrivacyTab } from '../components/SchoolAdminPrivacyTabs';
+import { SchoolAdminPrivacyOverview } from '../components/SchoolAdminPrivacyOverview';
 import { ClubGroupChatRequestReviewPanel } from '../components/ClubGroupChatRequestReviewPanel';
+import { SchoolAdminDirectMessagingPanel } from '../components/SchoolAdminDirectMessagingPanel';
+import { SchoolAdminClubGroupChatConfigPanel } from '../components/SchoolAdminClubGroupChatConfigPanel';
+import { StudentChatGroupRequestReviewPanel } from '../components/StudentChatGroupRequestReviewPanel';
+import { MessagingDeleteRequestReviewPanel } from '../components/MessagingDeleteRequestReviewPanel';
 import { schoolAdminClubGroupChatRequestsService } from '../services/school-admin-club-group-chat-requests.service';
+import { schoolAdminStudentChatGroupRequestsService } from '../services/school-admin-student-chat-group-requests.service';
+import {
+  schoolAdminClubGroupChatDeleteRequestsService,
+  type ClubGroupChatDeleteRequestItem,
+} from '../services/club-group-chat-delete-requests.service';
+import {
+  schoolAdminStudentChatGroupDeleteRequestsService,
+  type StudentChatGroupDeleteRequestItem,
+} from '../services/student-chat-group-delete-requests.service';
 import { useSchoolAdminAuth } from '../contexts/SchoolAdminAuthContext';
 import { categoriesService, type Category } from '../services/categories.service';
 import {
@@ -15,23 +29,24 @@ import {
   type UpdateCategoryAdminCategoriesDto,
 } from '../services/category-admins.service';
 
-function schoolPrivacyTabFromParam(tab: string | null): PrivacyPageTab {
+function schoolPrivacyTabFromParam(tab: string | null): SchoolAdminPrivacyTab {
   if (tab === 'message-config') return tab;
-  return 'admins';
+  if (tab === 'manage-admins' || tab === 'admins') return 'manage-admins';
+  return 'privacy';
 }
 
 export const SchoolAdminPrivacy = () => {
   const queryClient = useQueryClient();
   const { user } = useSchoolAdminAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [privacyTab, setPrivacyTab] = useState<PrivacyPageTab>(() =>
+  const [privacyTab, setPrivacyTab] = useState<SchoolAdminPrivacyTab>(() =>
     schoolPrivacyTabFromParam(searchParams.get('tab')),
   );
 
-  const handlePrivacyTabChange = (tab: PrivacyPageTab) => {
+  const handlePrivacyTabChange = (tab: SchoolAdminPrivacyTab) => {
     setPrivacyTab(tab);
     const next = new URLSearchParams(searchParams);
-    if (tab === 'admins') {
+    if (tab === 'privacy') {
       next.delete('tab');
     } else {
       next.set('tab', tab);
@@ -224,13 +239,48 @@ export const SchoolAdminPrivacy = () => {
       <div className="admin-shell-body">
         <SchoolAdminSidebar />
         <div className="admin-main">
-          <PrivacyPageTabs activeTab={privacyTab} onChange={handlePrivacyTabChange} />
+          <SchoolAdminPrivacyTabs activeTab={privacyTab} onChange={handlePrivacyTabChange} />
 
           {privacyTab === 'message-config' ? (
-            <ClubGroupChatRequestReviewPanel
-              service={schoolAdminClubGroupChatRequestsService}
-              queryKeyPrefix="school-admin"
-            />
+            <>
+              <SchoolAdminDirectMessagingPanel />
+              <SchoolAdminClubGroupChatConfigPanel />
+              <ClubGroupChatRequestReviewPanel
+                service={schoolAdminClubGroupChatRequestsService}
+                queryKeyPrefix="school-admin"
+              />
+              <StudentChatGroupRequestReviewPanel
+                service={schoolAdminStudentChatGroupRequestsService}
+                queryKeyPrefix="school-admin"
+              />
+              <MessagingDeleteRequestReviewPanel
+                title="Group chat delete requests"
+                description="Sub-category admins can request removal of club group chats. Approve to disable the chat for members."
+                queryKeyPrefix="school-admin"
+                queryKey="club-group-chat-delete-requests"
+                service={schoolAdminClubGroupChatDeleteRequestsService}
+                renderTargetName={(row) =>
+                  (row as ClubGroupChatDeleteRequestItem).clubGroupChat.pageName || 'Club group chat'
+                }
+                approveSuccessMessage="Group chat deleted (disabled)."
+              />
+              <MessagingDeleteRequestReviewPanel
+                title="Student group delete requests"
+                description="Sub-category admins can request removal of student chat groups. Approve to deactivate the group."
+                queryKeyPrefix="school-admin"
+                queryKey="student-chat-group-delete-requests"
+                service={schoolAdminStudentChatGroupDeleteRequestsService}
+                renderTargetName={(row) =>
+                  (row as StudentChatGroupDeleteRequestItem).studentChatGroup.name
+                }
+                renderTargetMeta={(row) =>
+                  (row as StudentChatGroupDeleteRequestItem).studentChatGroup.visibility
+                }
+                approveSuccessMessage="Student group deleted (deactivated)."
+              />
+            </>
+          ) : privacyTab === 'privacy' ? (
+            <SchoolAdminPrivacyOverview />
           ) : (
           <>
           <div className="d-flex justify-content-between align-items-center mb-4">

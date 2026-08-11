@@ -49,12 +49,24 @@ export const subCategoryAdminClubGroupChatRequestsService = {
   create: async (payload: {
     clubKey: string;
     pageName: string;
-    icon: string;
+    clubIcon: string;
+    groupChatIcon: string;
     note?: string;
   }): Promise<ClubGroupChatRequestItem> => {
     const { data } = await api.post<ClubGroupChatRequestItem>(
       '/subcategory-admin/club-group-chat-requests',
       payload,
+    );
+    return data;
+  },
+
+  uploadGroupChatIcon: async (file: File): Promise<{ url: string }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const { data } = await api.post<{ url: string }>(
+      '/subcategory-admin/club-group-chat-requests/upload-icon',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
     );
     return data;
   },

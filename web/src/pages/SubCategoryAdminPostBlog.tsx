@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { SubCategoryAdminLayout } from '../components/SubCategoryAdminLayout';
 import { useSubCategoryAdminAuth } from '../contexts/SubCategoryAdminAuthContext';
 import {
@@ -43,6 +43,8 @@ type ResubmitBlog = {
   coverImageUrl: string | null;
   subCategory: { id: string; name: string };
 };
+
+export type { ResubmitBlog };
 
 const COL_OPTIONS = [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
 
@@ -115,11 +117,13 @@ function toPreviewBlocks(blocks: EditorBlock[]): ContentBlock[] {
   return list;
 }
 
-export const SubCategoryAdminPostBlog = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const resubmitBlog = (location.state as { resubmitBlog?: ResubmitBlog })
-    ?.resubmitBlog;
+export function SubCategoryAdminPostBlogPanel({
+  resubmitBlog,
+  onSubmitted,
+}: {
+  resubmitBlog?: ResubmitBlog;
+  onSubmitted?: () => void;
+}) {
   const { user, refreshUser } = useSubCategoryAdminAuth();
 
   const availableSubcategories =
@@ -340,9 +344,9 @@ export const SubCategoryAdminPostBlog = () => {
         heroButtonLink: heroButtonLink.trim() || undefined,
         contentBlocks: finalBlocks.length ? finalBlocks : undefined,
       });
-      navigate('/subcategory-admin/blog-pending', {
-        state: { message: 'Blog submitted for category admin approval.' },
-      });
+      if (onSubmitted) {
+        onSubmitted();
+      }
     } catch (err: unknown) {
       const data = (
         err as { response?: { data?: { message?: unknown } } }
@@ -372,24 +376,7 @@ export const SubCategoryAdminPostBlog = () => {
     'Hero subtitle appears here when you fill Banner subtitle or Listing summary.';
 
   return (
-    <SubCategoryAdminLayout>
-      <div className="mb-4">
-        <h1
-          style={{
-            fontSize: '2rem',
-            fontWeight: 'normal',
-            color: '#1a1f2e',
-            marginBottom: '0.5rem',
-          }}
-        >
-          Post blog
-        </h1>
-        <p style={{ color: '#6c757d', fontSize: '1rem', marginBottom: 0 }}>
-          Build your article with blocks, set column width per block (12 = full
-          width), then preview before submitting for approval.
-        </p>
-      </div>
-
+    <>
       {error && (
         <div className="alert alert-danger" style={{ borderRadius: 0 }}>
           {error}
@@ -853,6 +840,33 @@ export const SubCategoryAdminPostBlog = () => {
           </div>
         </div>
       </form>
+    </>
+  );
+};
+
+export const SubCategoryAdminPostBlog = () => {
+  const location = useLocation();
+  const resubmitBlog = (location.state as { resubmitBlog?: ResubmitBlog })?.resubmitBlog;
+
+  return (
+    <SubCategoryAdminLayout>
+      <div className="mb-4">
+        <h1
+          style={{
+            fontSize: '2rem',
+            fontWeight: 'normal',
+            color: '#1a1f2e',
+            marginBottom: '0.5rem',
+          }}
+        >
+          Post blog
+        </h1>
+        <p style={{ color: '#6c757d', fontSize: '1rem', marginBottom: 0 }}>
+          Build your article with blocks, set column width per block (12 = full
+          width), then preview before submitting for approval.
+        </p>
+      </div>
+      <SubCategoryAdminPostBlogPanel resubmitBlog={resubmitBlog} />
     </SubCategoryAdminLayout>
   );
 };

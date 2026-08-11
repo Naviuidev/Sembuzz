@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Param, UseGuards, Request } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { SchoolAdminSubcategoryAdminsService } from './subcategory-admins.service';
 import { SchoolAdminGuard } from '../guards/school-admin.guard';
+import { UpdateEmailDto } from '../../platform-user/dto/update-email.dto';
 
 @Controller('school-admin/subcategory-admins')
 @UseGuards(SchoolAdminGuard)
@@ -20,5 +21,14 @@ export class SchoolAdminSubcategoryAdminsController {
   @Post(':id/unban')
   async unban(@Param('id') id: string, @Request() req: { user: { schoolId: string } }) {
     return this.service.unban(id, req.user.schoolId);
+  }
+
+  @Patch(':id/email')
+  async updateEmail(
+    @Param('id') id: string,
+    @Request() req: { user: { schoolId: string } },
+    @Body() dto: UpdateEmailDto,
+  ) {
+    return this.service.updateEmail(id, req.user.schoolId, dto.email);
   }
 }

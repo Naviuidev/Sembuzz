@@ -12,18 +12,6 @@ export interface SubCategoryAdminDirectConversationRow {
 }
 
 export const subCategoryAdminDirectChatsService = {
-  getSettings: async (): Promise<{ isEnabled: boolean }> => {
-    const { data } = await api.get<{ isEnabled: boolean }>(
-      '/subcategory-admin/direct-chats/settings',
-    );
-    return data;
-  },
-
-  updateSettings: async (isEnabled: boolean) => {
-    const { data } = await api.patch('/subcategory-admin/direct-chats/settings', { isEnabled });
-    return data;
-  },
-
   list: async (): Promise<SubCategoryAdminDirectConversationRow[]> => {
     const { data } = await api.get<SubCategoryAdminDirectConversationRow[]>(
       '/subcategory-admin/direct-chats',

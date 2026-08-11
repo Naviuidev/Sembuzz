@@ -5,6 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import {
+  isClubGroupMessageMode,
+  type ClubGroupMessageMode,
+} from '../../club-group-chats/club-group-message.util';
 import { UpsertClubGroupChatDto } from './dto/upsert-club-group-chat.dto';
 
 const GROUP_MESSAGING_CODE = 'GROUP_MESSAGING';
@@ -29,7 +33,7 @@ export class SchoolAdminClubGroupChatsService {
 
   async listForSchool(schoolId: string) {
     await this.assertGroupMessagingEnabled(schoolId);
-    return this.prisma.clubGroupChat.findMany({
+    const chats = await this.prisma.clubGroupChat.findMany({
       where: { schoolId, isEnabled: true },
       orderBy: { pageName: 'asc' },
       select: {
@@ -38,11 +42,63 @@ export class SchoolAdminClubGroupChatsService {
         pageName: true,
         icon: true,
         isEnabled: true,
+        messageMode: true,
         createdAt: true,
         updatedAt: true,
-        _count: { select: { messages: true } },
+        _count: {
+          select: {
+            messages: true,
+            memberships: { where: { status: 'approved' } },
+          },
+        },
       },
     });
+
+    return chats.map((chat) => ({
+      id: chat.id,
+      clubKey: chat.clubKey,
+      pageName: chat.pageName,
+      icon: chat.icon,
+      isEnabled: chat.isEnabled,
+      messageMode: isClubGroupMessageMode(chat.messageMode) ? chat.messageMode : 'members',
+      approvedMemberCount: chat._count.memberships,
+      createdAt: chat.createdAt,
+      updatedAt: chat.updatedAt,
+      _count: { messages: chat._count.messages },
+    }));
+  }
+
+  async updateMessageMode(
+    groupChatId: string,
+    schoolId: string,
+    messageMode: ClubGroupMessageMode,
+  ) {
+    await this.assertGroupMessagingEnabled(schoolId);
+
+    const chat = await this.prisma.clubGroupChat.findFirst({
+      where: { id: groupChatId, schoolId, isEnabled: true },
+      select: { id: true },
+    });
+    if (!chat) throw new NotFoundException('Group chat not found.');
+
+    const updated = await this.prisma.clubGroupChat.update({
+      where: { id: groupChatId },
+      data: { messageMode },
+      select: {
+        id: true,
+        clubKey: true,
+        pageName: true,
+        icon: true,
+        messageMode: true,
+      },
+    });
+
+    return {
+      ...updated,
+      messageMode: isClubGroupMessageMode(updated.messageMode)
+        ? updated.messageMode
+        : 'members',
+    };
   }
 
   async upsert(schoolId: string, dto: UpsertClubGroupChatDto) {

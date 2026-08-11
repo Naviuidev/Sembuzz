@@ -1,25 +1,11 @@
-import { Body, Controller, Get, NotFoundException, Param, Patch, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, NotFoundException, Param, Request, UseGuards } from '@nestjs/common';
 import { CategoryAdminGuard } from '../guards/category-admin.guard';
 import { CategoryAdminDirectChatsService } from './category-admin-direct-chats.service';
-import { UpdateDirectMessagingSettingDto } from './dto/update-direct-messaging-setting.dto';
 
 @Controller('category-admin/direct-chats')
 @UseGuards(CategoryAdminGuard)
 export class CategoryAdminDirectChatsController {
   constructor(private readonly service: CategoryAdminDirectChatsService) {}
-
-  @Get('settings')
-  async getSettings(@Request() req: { user: { schoolId: string } }) {
-    return this.service.getSetting(req.user.schoolId);
-  }
-
-  @Patch('settings')
-  async updateSettings(
-    @Request() req: { user: { schoolId: string } },
-    @Body() dto: UpdateDirectMessagingSettingDto,
-  ) {
-    return this.service.updateSetting(req.user.schoolId, dto.isEnabled);
-  }
 
   @Get()
   async list(@Request() req: { user: { schoolId: string } }) {

@@ -25,4 +25,8 @@ export class CreateEventDto {
   @IsArray()
   @IsString({ each: true })
   imageUrls?: string[];
+
+  @IsOptional()
+  @IsString()
+  resubmitFromEventId?: string;
 }

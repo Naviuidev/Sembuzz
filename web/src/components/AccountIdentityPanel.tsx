@@ -3,16 +3,24 @@ import { type FormEvent, useEffect, useState } from 'react';
 type AccountIdentityPanelProps = {
   userId?: string | null;
   email: string;
-  onUpdateEmail: (email: string) => Promise<void>;
   className?: string;
-};
+  roleBadge?: string;
+} & (
+  | {
+      mode?: 'direct';
+      onUpdateEmail: (email: string) => Promise<void>;
+      onSendEmailRequest?: never;
+    }
+  | {
+      mode: 'email-request';
+      onSendEmailRequest: () => void;
+      onUpdateEmail?: never;
+    }
+);
 
-export function AccountIdentityPanel({
-  userId,
-  email,
-  onUpdateEmail,
-  className = '',
-}: AccountIdentityPanelProps) {
+export function AccountIdentityPanel(props: AccountIdentityPanelProps) {
+  const { userId, email, className = '', roleBadge } = props;
+  const isRequestMode = props.mode === 'email-request';
   const [editing, setEditing] = useState(false);
   const [nextEmail, setNextEmail] = useState(email);
   const [saving, setSaving] = useState(false);
@@ -41,7 +49,8 @@ export function AccountIdentityPanel({
     setError(null);
     setSuccess(null);
     try {
-      await onUpdateEmail(trimmed);
+      if (props.mode !== 'direct' || !props.onUpdateEmail) return;
+      await props.onUpdateEmail(trimmed);
       setSuccess('Email updated. Use your new email the next time you sign in.');
       setEditing(false);
     } catch (err: unknown) {
@@ -58,12 +67,30 @@ export function AccountIdentityPanel({
   return (
     <div className={`card border-0 shadow-sm ${className}`.trim()} style={{ borderRadius: 0 }}>
       <div className="card-body p-4">
-        <h2 className="h5 mb-3" style={{ color: '#1a1f2e', fontWeight: 500 }}>
-          Account identity
-        </h2>
+        <div className="d-flex align-items-center gap-2 flex-wrap mb-3">
+          <h2 className="h5 mb-0" style={{ color: '#1a1f2e', fontWeight: 500 }}>
+            Account identity
+          </h2>
+          {roleBadge ? (
+            <span
+              className="badge rounded-pill"
+              style={{
+                backgroundColor: '#e7f3ff',
+                color: '#1a1f2e',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                padding: '0.35rem 0.65rem',
+                border: '1px solid #dee2e6',
+              }}
+            >
+              {roleBadge}
+            </span>
+          ) : null}
+        </div>
         <p className="small text-muted mb-3">
-          Your User ID is permanent. Email is used for sign-in and notifications and can be updated without
-          changing your roles or access.
+          {isRequestMode
+            ? 'User ID is permanent. To change this admin’s email, send a request to the school admin. The admin must verify with an OTP sent to their current email.'
+            : 'Your User ID is permanent. Email is used for sign-in and notifications and can be updated without changing your roles or access.'}
         </p>
 
         <div className="mb-3">
@@ -82,18 +109,28 @@ export function AccountIdentityPanel({
               <label className="form-label small text-secondary mb-1">Email</label>
               <div className="form-control bg-light">{email}</div>
             </div>
-            <button
-              type="button"
-              className="btn btn-outline-primary btn-sm"
-              onClick={() => {
-                setNextEmail(email);
-                setError(null);
-                setSuccess(null);
-                setEditing(true);
-              }}
-            >
-              Change email
-            </button>
+            {isRequestMode ? (
+              <button
+                type="button"
+                className="btn btn-outline-primary btn-sm"
+                onClick={props.onSendEmailRequest}
+              >
+                Send email request
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-outline-primary btn-sm"
+                onClick={() => {
+                  setNextEmail(email);
+                  setError(null);
+                  setSuccess(null);
+                  setEditing(true);
+                }}
+              >
+                Change email
+              </button>
+            )}
           </>
         ) : (
           <form onSubmit={(e) => void handleSubmit(e)}>

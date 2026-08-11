@@ -67,18 +67,11 @@ import { SubcategoryAdminResetPassword } from './pages/SubcategoryAdminResetPass
 import { SubCategoryAdminChangePassword } from './pages/SubCategoryAdminChangePassword';
 import { SubCategoryAdminDashboard } from './pages/SubCategoryAdminDashboard';
 import { SubCategoryAdminPostEvent } from './pages/SubCategoryAdminPostEvent';
-import { SubCategoryAdminApprovalsPending } from './pages/SubCategoryAdminApprovalsPending';
-import { SubCategoryAdminApproved } from './pages/SubCategoryAdminApproved';
 import { SubcategoryAdminAnalytics } from './pages/SubcategoryAdminAnalytics.tsx';
 import { SubCategoryAdminRaiseRequest } from './pages/SubCategoryAdminRaiseRequest';
 import { SubCategoryAdminQueries } from './pages/SubCategoryAdminQueries';
-import { SubCategoryAdminReceivedCorrections } from './pages/SubCategoryAdminReceivedCorrections';
 import { SubCategoryAdminPrivacy } from './pages/SubCategoryAdminPrivacy';
-import { SubCategoryAdminPostBlog } from './pages/SubCategoryAdminPostBlog';
-import { SubCategoryAdminBlogPending } from './pages/SubCategoryAdminBlogPending';
-import { SubCategoryAdminBlogApproved } from './pages/SubCategoryAdminBlogApproved';
-import { SubCategoryAdminBlogCorrections } from './pages/SubCategoryAdminBlogCorrections';
-import { SubCategoryAdminBlogRejected } from './pages/SubCategoryAdminBlogRejected';
+import { SubCategoryAdminBlogs } from './pages/SubCategoryAdminBlogs';
 import { AdsAdminLogin } from './pages/AdsAdminLogin';
 import { AdsAdminSetPassword } from './pages/AdsAdminSetPassword';
 import { AdsAdminDashboard } from './pages/AdsAdminDashboard';
@@ -524,52 +517,24 @@ const SubCategoryAdminRoutes = () => {
         }
       />
       <Route
-        path="post-blog"
+        path="blogs"
         element={
           <SubCategoryAdminProtectedRoute>
-            <SubCategoryAdminPostBlog />
+            <SubCategoryAdminBlogs />
           </SubCategoryAdminProtectedRoute>
         }
       />
-      <Route
-        path="blog-pending"
-        element={
-          <SubCategoryAdminProtectedRoute>
-            <SubCategoryAdminBlogPending />
-          </SubCategoryAdminProtectedRoute>
-        }
-      />
-      <Route
-        path="blog-approved"
-        element={
-          <SubCategoryAdminProtectedRoute>
-            <SubCategoryAdminBlogApproved />
-          </SubCategoryAdminProtectedRoute>
-        }
-      />
+      <Route path="post-blog" element={<Navigate to="/subcategory-admin/blogs?tab=post-blog" replace />} />
+      <Route path="blog-pending" element={<Navigate to="/subcategory-admin/blogs?tab=blog-pending" replace />} />
+      <Route path="blog-approved" element={<Navigate to="/subcategory-admin/blogs?tab=blog-approved" replace />} />
       <Route
         path="blog-corrections"
-        element={
-          <SubCategoryAdminProtectedRoute>
-            <SubCategoryAdminBlogCorrections />
-          </SubCategoryAdminProtectedRoute>
-        }
+        element={<Navigate to="/subcategory-admin/blogs?tab=blog-suggestions" replace />}
       />
-      <Route
-        path="blog-rejected"
-        element={
-          <SubCategoryAdminProtectedRoute>
-            <SubCategoryAdminBlogRejected />
-          </SubCategoryAdminProtectedRoute>
-        }
-      />
+      <Route path="blog-rejected" element={<Navigate to="/subcategory-admin/blogs?tab=blog-rejected" replace />} />
       <Route
         path="approvals-pending"
-        element={
-          <SubCategoryAdminProtectedRoute>
-            <SubCategoryAdminApprovalsPending />
-          </SubCategoryAdminProtectedRoute>
-        }
+        element={<Navigate to="/subcategory-admin/post-event?tab=approvals-pending" replace />}
       />
       <Route
         path="approvals-rejected"
@@ -577,11 +542,7 @@ const SubCategoryAdminRoutes = () => {
       />
       <Route
         path="approved"
-        element={
-          <SubCategoryAdminProtectedRoute>
-            <SubCategoryAdminApproved />
-          </SubCategoryAdminProtectedRoute>
-        }
+        element={<Navigate to="/subcategory-admin/post-event?tab=approved" replace />}
       />
       <Route
         path="analytics"
@@ -621,11 +582,7 @@ const SubCategoryAdminRoutes = () => {
       />
       <Route
         path="received-corrections"
-        element={
-          <SubCategoryAdminProtectedRoute>
-            <SubCategoryAdminReceivedCorrections />
-          </SubCategoryAdminProtectedRoute>
-        }
+        element={<Navigate to="/subcategory-admin/post-event?tab=received-corrections" replace />}
       />
     </Routes>
   );

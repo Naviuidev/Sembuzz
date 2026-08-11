@@ -1,7 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Request, UseGuards } from '@nestjs/common';
 import { SubCategoryAdminGuard } from '../guards/subcategory-admin.guard';
 import { SubCategoryAdminClubGroupChatsService } from './subcategory-admin-club-group-chats.service';
-import { UpdateClubGroupMessageModeDto } from './dto/update-message-mode.dto';
 import { SubCategoryAdminSendClubGroupMessageDto } from './dto/send-club-group-message.dto';
 
 @Controller('subcategory-admin/club-group-chats')
@@ -12,15 +11,6 @@ export class SubCategoryAdminClubGroupChatsController {
   @Get()
   async list(@Request() req: { user: { schoolId: string } }) {
     return this.service.listForSchool(req.user.schoolId);
-  }
-
-  @Patch(':id/message-mode')
-  async updateMessageMode(
-    @Request() req: { user: { schoolId: string } },
-    @Param('id') id: string,
-    @Body() dto: UpdateClubGroupMessageModeDto,
-  ) {
-    return this.service.updateMessageMode(id, req.user.schoolId, dto.messageMode);
   }
 
   @Get(':id/approved-members')

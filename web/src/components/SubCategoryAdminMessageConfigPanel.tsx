@@ -50,11 +50,13 @@ function statusBadge(status: string) {
 function resetRequestForm(
   setSearch: (v: string) => void,
   setSelectedClub: (v: SubCategoryAdminClubOption | null) => void,
+  setGroupChatIcon: (v: string) => void,
   setNote: (v: string) => void,
   setError: (v: string | null) => void,
 ) {
   setSearch('');
   setSelectedClub(null);
+  setGroupChatIcon('');
   setNote('');
   setError(null);
 }
@@ -64,6 +66,8 @@ export function SubCategoryAdminMessageConfigPanel() {
   const [requestModalOpen, setRequestModalOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedClub, setSelectedClub] = useState<SubCategoryAdminClubOption | null>(null);
+  const [groupChatIcon, setGroupChatIcon] = useState('');
+  const [iconUploading, setIconUploading] = useState(false);
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [popupShow, setPopupShow] = useState(false);
@@ -86,7 +90,7 @@ export function SubCategoryAdminMessageConfigPanel() {
       setPopupMessage('Request sent to category and school admins for approval.');
       setPopupShow(true);
       setError(null);
-      resetRequestForm(setSearch, setSelectedClub, setNote, setError);
+      resetRequestForm(setSearch, setSelectedClub, setGroupChatIcon, setNote, setError);
       setRequestModalOpen(false);
       void queryClient.invalidateQueries({ queryKey: ['subcategory-admin', 'club-group-chat-requests'] });
     },
@@ -106,11 +110,11 @@ export function SubCategoryAdminMessageConfigPanel() {
 
   const closeModal = () => {
     setRequestModalOpen(false);
-    resetRequestForm(setSearch, setSelectedClub, setNote, setError);
+    resetRequestForm(setSearch, setSelectedClub, setGroupChatIcon, setNote, setError);
   };
 
   const openModal = () => {
-    resetRequestForm(setSearch, setSelectedClub, setNote, setError);
+    resetRequestForm(setSearch, setSelectedClub, setGroupChatIcon, setNote, setError);
     setRequestModalOpen(true);
   };
 
@@ -127,10 +131,15 @@ export function SubCategoryAdminMessageConfigPanel() {
       setError('A request for this club is already pending.');
       return;
     }
+    if (!groupChatIcon.trim()) {
+      setError('Upload a group chat icon before sending the request.');
+      return;
+    }
     createMutation.mutate({
       clubKey: selectedClub.key,
       pageName: selectedClub.pageName,
-      icon: selectedClub.icon,
+      clubIcon: selectedClub.icon,
+      groupChatIcon: groupChatIcon.trim(),
       note: note.trim() || undefined,
     });
   };
@@ -258,6 +267,7 @@ export function SubCategoryAdminMessageConfigPanel() {
                       disabled={disabled}
                       onClick={() => {
                         setSelectedClub(club);
+                        setGroupChatIcon('');
                         setError(null);
                       }}
                     >
@@ -275,6 +285,52 @@ export function SubCategoryAdminMessageConfigPanel() {
                 })}
               </div>
             )}
+
+            {selectedClub ? (
+              <div className="mb-4 p-3 border rounded-3">
+                <label className="form-label small fw-semibold mb-2" style={{ color: TEXT_DARK }}>
+                  Group chat icon
+                </label>
+                <p className="small text-muted mb-2">
+                  Upload a separate icon for this group chat. It can differ from the club&apos;s Social Share icon.
+                </p>
+                <div className="d-flex align-items-center gap-3 mb-2">
+                  <ClubIcon
+                    icon={groupChatIcon || selectedClub.icon}
+                    name={selectedClub.pageName}
+                  />
+                  <div className="small text-muted">
+                    {groupChatIcon ? 'Custom group chat icon' : 'Club icon (upload to replace)'}
+                  </div>
+                </div>
+                <input
+                  type="file"
+                  className="form-control form-control-sm"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  disabled={iconUploading}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setIconUploading(true);
+                    setError(null);
+                    try {
+                      const { url } =
+                        await subCategoryAdminClubGroupChatRequestsService.uploadGroupChatIcon(file);
+                      setGroupChatIcon(url);
+                    } catch (err: unknown) {
+                      const msg =
+                        (err as { response?: { data?: { message?: string } } })?.response?.data
+                          ?.message || 'Failed to upload icon.';
+                      setError(typeof msg === 'string' ? msg : 'Failed to upload icon.');
+                    } finally {
+                      setIconUploading(false);
+                      e.target.value = '';
+                    }
+                  }}
+                />
+                {iconUploading ? <small className="text-muted">Uploading…</small> : null}
+              </div>
+            ) : null}
 
             <label className="form-label small text-muted">Optional note for admins</label>
             <textarea
@@ -298,7 +354,7 @@ export function SubCategoryAdminMessageConfigPanel() {
               <button
                 type="button"
                 className="btn-rounded-dark"
-                disabled={!selectedClub || createMutation.isPending}
+                disabled={!selectedClub || !groupChatIcon.trim() || createMutation.isPending || iconUploading}
                 onClick={handleSubmit}
               >
                 {createMutation.isPending ? 'Sending…' : 'Send request'}

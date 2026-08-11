@@ -2,13 +2,11 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { SchoolAdminNavbar } from '../components/SchoolAdminNavbar';
 import { SchoolAdminSidebar } from '../components/SchoolAdminSidebar';
-import { AccountIdentityPanel } from '../components/AccountIdentityPanel';
 import { useSchoolAdminAuth } from '../contexts/SchoolAdminAuthContext';
-import { schoolAdminAuthService } from '../services/school-admin-auth.service';
 import { schoolAdminStudentsService } from '../services/school-admin-students.service';
 
 export const SchoolAdminDashboard = () => {
-  const { user, refreshUser } = useSchoolAdminAuth();
+  const { user } = useSchoolAdminAuth();
   const [approvedCount, setApprovedCount] = useState<number | null>(null);
 
   useEffect(() => {
@@ -118,18 +116,6 @@ export const SchoolAdminDashboard = () => {
               </div>
             </div>
           </div>
-
-          {user?.email ? (
-            <AccountIdentityPanel
-              userId={user.userId}
-              email={user.email}
-              className="mb-4"
-              onUpdateEmail={async (email) => {
-                await schoolAdminAuthService.updateEmail(email);
-                await refreshUser();
-              }}
-            />
-          ) : null}
 
           {/* Quick links: Approved users & User requests */}
           <div className="row g-3 mb-4">

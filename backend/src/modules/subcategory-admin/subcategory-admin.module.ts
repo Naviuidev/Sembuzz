@@ -8,6 +8,9 @@ import { SubCategoryAdminClubGroupMembershipsModule } from './club-group-members
 import { SubCategoryAdminClubGroupChatsModule } from './club-group-chats/subcategory-admin-club-group-chats.module';
 import { SubCategoryAdminDirectChatsModule } from './direct-chats/subcategory-admin-direct-chats.module';
 import { SubCategoryAdminStudentChatGroupsModule } from './student-chat-groups/subcategory-admin-student-chat-groups.module';
+import { SubCategoryAdminStudentChatGroupRequestsModule } from './student-chat-group-requests/subcategory-admin-student-chat-group-requests.module';
+import { SubCategoryAdminClubGroupChatDeleteRequestsModule } from './club-group-chat-delete-requests/subcategory-admin-club-group-chat-delete-requests.module';
+import { SubCategoryAdminStudentChatGroupDeleteRequestsModule } from './student-chat-group-delete-requests/subcategory-admin-student-chat-group-delete-requests.module';
 
 @Module({
   imports: [
@@ -20,6 +23,9 @@ import { SubCategoryAdminStudentChatGroupsModule } from './student-chat-groups/s
     SubCategoryAdminClubGroupChatsModule,
     SubCategoryAdminDirectChatsModule,
     SubCategoryAdminStudentChatGroupsModule,
+    SubCategoryAdminStudentChatGroupRequestsModule,
+    SubCategoryAdminClubGroupChatDeleteRequestsModule,
+    SubCategoryAdminStudentChatGroupDeleteRequestsModule,
   ],
   exports: [SubCategoryAdminAuthModule],
 })

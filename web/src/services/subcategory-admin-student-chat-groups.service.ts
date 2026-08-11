@@ -42,18 +42,6 @@ export const subCategoryAdminStudentChatGroupsService = {
     return Array.isArray(data) ? data : [];
   },
 
-  create: async (payload: {
-    name: string;
-    description?: string;
-    visibility?: StudentChatGroupVisibility;
-  }): Promise<SubCategoryAdminStudentChatGroupRow> => {
-    const { data } = await api.post<SubCategoryAdminStudentChatGroupRow>(
-      '/subcategory-admin/student-chat-groups',
-      payload,
-    );
-    return data;
-  },
-
   listMembers: async (groupId: string): Promise<SubCategoryAdminStudentGroupMemberRow[]> => {
     const { data } = await api.get<SubCategoryAdminStudentGroupMemberRow[]>(
       `/subcategory-admin/student-chat-groups/${groupId}/members`,

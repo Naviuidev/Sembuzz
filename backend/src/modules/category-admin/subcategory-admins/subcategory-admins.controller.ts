@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -13,6 +14,7 @@ import { SubCategoryAdminsService } from './subcategory-admins.service';
 import { CategoryAdminGuard } from '../guards/category-admin.guard';
 import { CreateSubCategoryAdminDto } from '../dto/create-subcategory-admin.dto';
 import { UpdateSubCategoryAdminSubCategoriesDto } from '../dto/update-subcategory-admin-subcategories.dto';
+import { UpdateEmailDto } from '../../platform-user/dto/update-email.dto';
 
 @Controller('category-admin/subcategory-admins')
 @UseGuards(CategoryAdminGuard)
@@ -56,5 +58,16 @@ export class SubCategoryAdminsController {
     const categoryId = req.user.categoryId;
     const categoryAdminId = req.user.sub;
     return this.subCategoryAdminsService.remove(id, categoryId, categoryAdminId);
+  }
+
+  @Patch(':id/email')
+  async updateEmail(
+    @Param('id') id: string,
+    @Request() req,
+    @Body() dto: UpdateEmailDto,
+  ) {
+    const categoryId = req.user.categoryId;
+    const categoryAdminId = req.user.sub;
+    return this.subCategoryAdminsService.updateEmail(id, categoryId, categoryAdminId, dto.email);
   }
 }

@@ -385,4 +385,17 @@ export class CategoryAdminsService {
       data: { isActive: true },
     });
   }
+
+  async updateEmail(id: string, schoolId: string, email: string) {
+    const admin = await this.prisma.categoryAdmin.findFirst({
+      where: { id, schoolId },
+      select: { id: true, platformUserId: true },
+    });
+    if (!admin) {
+      throw new NotFoundException('Category admin not found.');
+    }
+
+    await this.platformUserService.updateEmail(admin.platformUserId, email);
+    return this.findOne(id, schoolId);
+  }
 }

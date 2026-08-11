@@ -850,6 +850,227 @@ export class EmailService {
     }
   }
 
+  async sendAdminEmailChangeOtpEmail(
+    adminEmail: string,
+    adminName: string,
+    schoolName: string,
+    otp: string,
+  ) {
+    const mailOptions = {
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: adminEmail,
+      subject: 'SemBuzz - Email change request verification',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: 'Poppins', Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #1a1f2e; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .content { background-color: #f8f9fa; padding: 30px; border-radius: 0 0 8px 8px; }
+            .otp-box { background-color: white; padding: 30px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1a1f2e; text-align: center; }
+            .otp-code { font-size: 2rem; font-weight: bold; color: #1a1f2e; letter-spacing: 0.5rem; }
+            .footer { text-align: center; margin-top: 30px; color: #6c757d; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Email change request</h1>
+            </div>
+            <div class="content">
+              <p>Hello ${adminName},</p>
+              <p>An email change request was initiated for your admin account at <strong>${schoolName}</strong>.</p>
+              <p>Enter this OTP to confirm the request:</p>
+              <div class="otp-box">
+                <div class="otp-code">${otp}</div>
+                <p style="color: #6c757d; font-size: 0.9rem; margin-top: 15px;">
+                  This OTP expires in 10 minutes.
+                </p>
+              </div>
+              <p style="margin-top: 30px; color: #6c757d; font-size: 14px;">
+                If you did not expect this, ignore this email or contact your school administrator.
+              </p>
+            </div>
+            <div class="footer">
+              <p>This is an automated email. Please do not reply.</p>
+              <p>&copy; ${new Date().getFullYear()} SemBuzz. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    try {
+      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        console.error('[EmailService] ❌ SMTP credentials not configured! OTP email not sent.');
+        return;
+      }
+      await this.transporter.sendMail(mailOptions);
+      console.log('[EmailService] ✅ Admin email change OTP sent to', adminEmail);
+    } catch (error: any) {
+      console.error('[EmailService] ❌ Failed to send admin email change OTP:', error);
+      throw error;
+    }
+  }
+
+  async sendAdminEmailChangeNewEmailOtpEmail(
+    newEmail: string,
+    adminName: string,
+    schoolName: string,
+    otp: string,
+  ) {
+    const mailOptions = {
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: newEmail,
+      subject: 'SemBuzz - Verify your new admin email',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: 'Poppins', Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #1a1f2e; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .content { background-color: #f8f9fa; padding: 30px; border-radius: 0 0 8px 8px; }
+            .otp-box { background-color: white; padding: 30px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1a1f2e; text-align: center; }
+            .otp-code { font-size: 2rem; font-weight: bold; color: #1a1f2e; letter-spacing: 0.5rem; }
+            .footer { text-align: center; margin-top: 30px; color: #6c757d; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Verify new email</h1>
+            </div>
+            <div class="content">
+              <p>Hello,</p>
+              <p>Your school administrator is updating the login email for <strong>${adminName}</strong> at <strong>${schoolName}</strong>.</p>
+              <p>Enter this OTP to confirm you own this email address:</p>
+              <div class="otp-box">
+                <div class="otp-code">${otp}</div>
+                <p style="color: #6c757d; font-size: 0.9rem; margin-top: 15px;">
+                  This OTP expires in 10 minutes.
+                </p>
+              </div>
+              <p style="margin-top: 30px; color: #6c757d; font-size: 14px;">
+                If you did not expect this, ignore this email.
+              </p>
+            </div>
+            <div class="footer">
+              <p>This is an automated email. Please do not reply.</p>
+              <p>&copy; ${new Date().getFullYear()} SemBuzz. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    try {
+      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        console.error('[EmailService] ❌ SMTP credentials not configured! OTP email not sent.');
+        return;
+      }
+      await this.transporter.sendMail(mailOptions);
+      console.log('[EmailService] ✅ New admin email verification OTP sent to', newEmail);
+    } catch (error: any) {
+      console.error('[EmailService] ❌ Failed to send new email verification OTP:', error);
+      throw error;
+    }
+  }
+
+  async sendAdminEmailChangeWelcomeEmail(
+    adminEmail: string,
+    adminName: string,
+    schoolName: string,
+    roleLabel: string,
+    loginPath: string,
+    tempPassword: string,
+  ) {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const loginUrl = `${frontendUrl}${loginPath}`;
+    const mailOptions = {
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: adminEmail,
+      subject: 'SemBuzz - Your admin email has been updated',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: 'Poppins', Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #1a1f2e; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .content { background-color: #f8f9fa; padding: 30px; border-radius: 0 0 8px 8px; }
+            .credentials { background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1a1f2e; }
+            .button { display: inline-block; padding: 12px 30px; background-color: #1a1f2e; color: white; text-decoration: none; border-radius: 50px; margin-top: 20px; }
+            .footer { text-align: center; margin-top: 30px; color: #6c757d; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Your admin email has been updated</h1>
+            </div>
+            <div class="content">
+              <p>Dear ${adminName},</p>
+              <p>Your <strong>${roleLabel}</strong> login email for <strong>${schoolName}</strong> has been updated by your school administrator.</p>
+              <p>Your existing roles, permissions, and data are unchanged — only your sign-in email and password have been reset for security.</p>
+              <div class="credentials">
+                <h3 style="margin-top: 0; color: #1a1f2e;">New login credentials</h3>
+                <p><strong>Email:</strong> ${adminEmail}</p>
+                <p><strong>Temporary password:</strong> <code style="background: #f0f0f0; padding: 4px 8px; border-radius: 4px;">${tempPassword}</code></p>
+              </div>
+              <h3 style="color: #1a1f2e;">Next steps</h3>
+              <ol>
+                <li>Log in using your new email as your User ID</li>
+                <li>Use the temporary password above</li>
+                <li>You will be prompted to create a new password immediately after login</li>
+              </ol>
+              <p style="margin-top: 30px;">
+                <a href="${loginUrl}" class="button">Log in to SemBuzz</a>
+              </p>
+              <p style="margin-top: 30px; color: #6c757d; font-size: 14px;">
+                <strong>Important:</strong> If you did not expect this change, contact your school administrator right away.
+              </p>
+            </div>
+            <div class="footer">
+              <p>This is an automated email. Please do not reply.</p>
+              <p>&copy; ${new Date().getFullYear()} SemBuzz. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    const isDev = process.env.NODE_ENV !== 'production';
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      if (isDev) {
+        console.warn('[EmailService] ⚠️  SMTP not configured. Admin email-change welcome credentials:');
+        console.warn(`[EmailService] 📧 ${adminEmail} / temp password: ${tempPassword}`);
+        return;
+      }
+      console.error('[EmailService] ❌ SMTP credentials not configured! Welcome email not sent.');
+      return;
+    }
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      console.log('[EmailService] ✅ Admin email-change welcome email sent to', adminEmail);
+    } catch (error: any) {
+      if (isDev) {
+        console.warn('[EmailService] ⚠️  Welcome email send failed (dev). Temp password:', tempPassword);
+        return;
+      }
+      console.error('[EmailService] ❌ Failed to send admin email-change welcome email:', error);
+      throw error;
+    }
+  }
+
   async sendCategoryAdminPasswordResetOtp(adminEmail: string, adminName: string, otp: string) {
     const mailOptions = {
       from: process.env.SMTP_FROM || process.env.SMTP_USER,

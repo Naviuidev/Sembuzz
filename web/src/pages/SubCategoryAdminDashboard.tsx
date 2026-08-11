@@ -1,8 +1,6 @@
 import { useEffect } from 'react';
 import { useSubCategoryAdminAuth } from '../contexts/SubCategoryAdminAuthContext';
 import { SubCategoryAdminLayout } from '../components/SubCategoryAdminLayout';
-import { AccountIdentityPanel } from '../components/AccountIdentityPanel';
-import { subCategoryAdminAuthService } from '../services/subcategory-admin-auth.service';
 
 export const SubCategoryAdminDashboard = () => {
   const { user, refreshUser } = useSubCategoryAdminAuth();
@@ -81,18 +79,6 @@ export const SubCategoryAdminDashboard = () => {
           Refresh
         </button>
       </div>
-
-      {user?.email ? (
-        <AccountIdentityPanel
-          userId={user.userId}
-          email={user.email}
-          className="mb-4"
-          onUpdateEmail={async (email) => {
-            await subCategoryAdminAuthService.updateEmail(email);
-            await refreshUser();
-          }}
-        />
-      ) : null}
 
       {/* Categories and Subcategories Table */}
       <div className="card" style={{ borderRadius: '0px' }}>
