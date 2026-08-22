@@ -8,10 +8,11 @@ export type SettingsStackParamList = {
 
 export type MainTabParamList = {
   Search: undefined;
-  Events: undefined;
+  Events: { focusEventId?: string } | undefined;
   Settings: NavigatorScreenParams<SettingsStackParamList> | undefined;
   Apps: undefined;
   Chat: undefined;
+  Universities: undefined;
 };
 
 export type RootStackParamList = {
@@ -33,4 +34,15 @@ export type RootStackParamList = {
     icon: string;
     messageMode?: 'admin_only' | 'members';
   };
+  DirectChat: {
+    conversationId: string;
+    peerId: string;
+    peerName: string;
+    peerEmail: string;
+    peerProfilePicUrl?: string | null;
+  };
+  Blogs: undefined;
+  BlogDetail: { blogId: string };
+  UniversityEvents: { universityId: string; universityName: string };
+  AllUniversityEvents: undefined;
 };

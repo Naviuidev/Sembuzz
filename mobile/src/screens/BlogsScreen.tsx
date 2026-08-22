@@ -15,6 +15,8 @@ import {
   Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   imageSrc,
   listPublicBlogs,
@@ -22,6 +24,7 @@ import {
   PublishedBlogListItem,
 } from '../services/publicBlogs';
 import { getFrontendBaseUrl } from '../config/env';
+import type { RootStackParamList } from '../navigation/types';
 
 function excerpt(text: string, max = 130): string {
   const t = String(text || '').replace(/\s+/g, ' ').trim();
@@ -30,6 +33,7 @@ function excerpt(text: string, max = 130): string {
 }
 
 export default function BlogsScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const webBase = getFrontendBaseUrl();
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -64,13 +68,13 @@ export default function BlogsScreen() {
     setRefreshing(false);
   }, [load]);
 
-  /** Full post content opens in the website (same routes as web: /blogs/:id). */
-  const openBlogInBrowser = useCallback((id: string) => {
-    const url = `${webBase}/blogs/${id}`;
-    Linking.openURL(url).catch(() => {
-      setError('Could not open the blog in your browser.');
-    });
-  }, [webBase]);
+  /** Full post opens in-app; website link remains optional in detail screen. */
+  const openBlog = useCallback(
+    (id: string) => {
+      navigation.navigate('BlogDetail', { blogId: id });
+    },
+    [navigation],
+  );
 
   const openBlogsIndexInBrowser = useCallback(() => {
     Linking.openURL(`${webBase}/blogs`).catch(() => {
@@ -146,7 +150,7 @@ export default function BlogsScreen() {
             <Text style={styles.openWebBtnText}>Open on website</Text>
           </TouchableOpacity>
         </View>
-        <Text style={styles.headerHint}>Tap a post to read it in your browser.</Text>
+        <Text style={styles.headerHint}>Tap a post to read it in the app.</Text>
         <TextInput
           value={search}
           onChangeText={setSearch}
@@ -182,7 +186,7 @@ export default function BlogsScreen() {
             rows[0] ? (
               <TouchableOpacity
                 style={styles.featuredCard}
-                onPress={() => openBlogInBrowser(rows[0].id)}
+                onPress={() => openBlog(rows[0].id)}
                 activeOpacity={0.85}
               >
                 {resolveBlogImage(rows[0], `featured-${rows[0].id}`) ? (
@@ -204,7 +208,7 @@ export default function BlogsScreen() {
             ) : null
           }
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.card} onPress={() => openBlogInBrowser(item.id)} activeOpacity={0.8}>
+            <TouchableOpacity style={styles.card} onPress={() => openBlog(item.id)} activeOpacity={0.8}>
               {resolveBlogImage(item, `card-${item.id}`) ? (
                 <Image
                   source={{ uri: resolveBlogImage(item, `card-${item.id}`) }}

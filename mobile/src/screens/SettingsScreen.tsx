@@ -22,12 +22,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList, SettingsStackParamList } from '../navigation/types';
+import type { MainTabParamList, RootStackParamList, SettingsStackParamList } from '../navigation/types';
 import { useAuth } from '../contexts/AuthContext';
 import { getApprovedEvents, imageSrc, ApprovedEventPublic } from '../services/events';
 import { getFrontendBaseUrl } from '../config/env';
 import { userHelpService, type UserHelpQueryItem } from '../services/userHelp';
 import { userNotificationsService } from '../services/userNotifications';
+import { useMessagesUnreadCount } from '../hooks/useMessagesUnreadCount';
 import SignUpModal from '../components/SignUpModal';
 import { UserForgotPasswordPanel } from '../components/UserForgotPasswordPanel';
 import Svg, { Circle } from 'react-native-svg';
@@ -74,6 +75,18 @@ export default function SettingsScreen() {
     },
     [navigation],
   );
+
+  const navigateTab = useCallback(
+    <K extends keyof MainTabParamList>(name: K, params?: MainTabParamList[K]) => {
+      const tab = navigation.getParent();
+      if (tab && typeof (tab as { navigate?: unknown }).navigate === 'function') {
+        (tab as { navigate: (n: K, p?: MainTabParamList[K]) => void }).navigate(name, params);
+      }
+    },
+    [navigation],
+  );
+
+  const { count: messagesUnreadCount } = useMessagesUnreadCount();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -244,13 +257,21 @@ export default function SettingsScreen() {
     }
   }, [helpMessage, loadHelpQueries]);
 
-  const handleActionPress = useCallback((action: 'categories' | 'liked' | 'notifications' | 'saved' | 'help') => {
+  const handleActionPress = useCallback((action: 'categories' | 'messages' | 'liked' | 'notifications' | 'saved' | 'help' | 'blogs' | 'universities') => {
     if (action === 'categories') {
       if (!user?.schoolId) {
         Alert.alert('School required', 'Your account must be linked to a school to change categories.');
         return;
       }
       navigation.navigate('ChangeCategories' as never);
+      return;
+    }
+    if (action === 'messages') {
+      if (!user) {
+        setShowLoginModal(true);
+        return;
+      }
+      navigateTab('Chat');
       return;
     }
     if (action === 'liked') {
@@ -269,7 +290,14 @@ export default function SettingsScreen() {
       openHelpModal();
       return;
     }
-  }, [user?.schoolId, navigation, navigateRoot, openHelpModal]);
+    if (action === 'blogs') {
+      navigateRoot('Blogs');
+      return;
+    }
+    if (action === 'universities') {
+      navigateTab('Universities');
+    }
+  }, [user, user?.schoolId, navigation, navigateRoot, navigateTab, openHelpModal]);
 
   const openRecentNews = useCallback(
     (ev: ApprovedEventPublic) => {
@@ -285,6 +313,13 @@ export default function SettingsScreen() {
         title: 'Change categories',
         subtitle: 'Update your preferred categories and subcategories.',
         icon: 'folder-outline' as const,
+      },
+      {
+        key: 'messages' as const,
+        title: 'Messages',
+        subtitle: 'Chat with classmates and join group conversations.',
+        icon: 'chatbubbles-outline' as const,
+        badge: messagesUnreadCount,
       },
       {
         key: 'liked' as const,
@@ -306,13 +341,25 @@ export default function SettingsScreen() {
         icon: 'bookmark-outline' as const,
       },
       {
+        key: 'blogs' as const,
+        title: 'Blogs',
+        subtitle: 'Read published blog posts from schools and clubs.',
+        icon: 'newspaper-outline' as const,
+      },
+      {
+        key: 'universities' as const,
+        title: 'Universities',
+        subtitle: 'Browse events synced from university calendar feeds.',
+        icon: 'school-outline' as const,
+      },
+      {
         key: 'help' as const,
         title: 'Feedback/Query/Ask your School Admin',
         subtitle: 'Send feedback or ask questions directly to your school admin.',
         icon: 'help-circle-outline' as const,
       },
     ],
-    [unreadCount],
+    [unreadCount, messagesUnreadCount],
   );
 
   if (authLoading) {
@@ -625,6 +672,41 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        <View style={styles.sectionDivider} />
+        <TouchableOpacity
+          style={styles.actionListItem}
+          activeOpacity={0.85}
+          onPress={() => navigateRoot('Blogs')}
+        >
+          <View style={styles.actionListLeft}>
+            <View style={styles.actionListIconWrap}>
+              <Ionicons name="newspaper-outline" size={18} color="#1a1f2e" />
+            </View>
+            <View style={styles.actionListTextWrap}>
+              <Text style={styles.actionListTitle}>Blogs</Text>
+              <Text style={styles.actionListSubtitle}>Read published blog posts</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#8e8e8e" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionListItem}
+          activeOpacity={0.85}
+          onPress={() => navigateTab('Universities')}
+        >
+          <View style={styles.actionListLeft}>
+            <View style={styles.actionListIconWrap}>
+              <Ionicons name="school-outline" size={18} color="#1a1f2e" />
+            </View>
+            <View style={styles.actionListTextWrap}>
+              <Text style={styles.actionListTitle}>Universities</Text>
+              <Text style={styles.actionListSubtitle}>Browse university calendar events</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#8e8e8e" />
+        </TouchableOpacity>
 
         <View style={styles.sectionDivider} />
         <Text style={styles.sectionTitle}>Recently added schools / news</Text>

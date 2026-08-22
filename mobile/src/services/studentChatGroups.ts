@@ -15,6 +15,8 @@ export interface StudentChatGroupInboxItem {
   unreadCount: number;
   lastMessagePreview: string | null;
   lastMessageSenderName: string | null;
+  isMember?: boolean;
+  isOwner?: boolean;
 }
 
 export interface StudentChatGroupMessageItem {
@@ -47,6 +49,11 @@ export interface SendStudentChatGroupMessagePayload {
   attachmentType?: 'image' | 'pdf';
   attachmentName?: string;
   replyToMessageId?: string;
+}
+
+export async function getStudentChatGroupUnreadCount(): Promise<{ unreadCount: number }> {
+  const response = await api.get<{ unreadCount: number }>('/user/student-chat-groups/unread-count');
+  return response.data ?? { unreadCount: 0 };
 }
 
 export async function listStudentChatGroupInbox(): Promise<StudentChatGroupInboxItem[]> {

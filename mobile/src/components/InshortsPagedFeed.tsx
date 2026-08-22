@@ -434,6 +434,8 @@ type Props = {
   onCommentAdded: () => void;
   /** Same as web InshortsHomeFeed: banner items map onto event slides as inline ads. */
   onBannerClick: (banner: BannerAdPublic) => void;
+  /** Scroll to this event on mount (push notification deep link). */
+  initialEventId?: string | null;
 };
 
 export function InshortsPagedFeed({
@@ -448,6 +450,7 @@ export function InshortsPagedFeed({
   onSave,
   onCommentAdded,
   onBannerClick,
+  initialEventId,
 }: Props) {
   const listRef = React.useRef<FlatList<Exclude<PublicFeedItem, { type: 'banner' }>> | null>(null);
   /** Match web: do not render standalone banner slides — map banners onto news cards. */
@@ -501,6 +504,22 @@ export function InshortsPagedFeed({
     return () => cancelAnimationFrame(id);
   }, [slides, alignTop]);
 
+  React.useEffect(() => {
+    if (!initialEventId || slides.length === 0) return;
+    const index = slides.findIndex(
+      (item) => item.type === 'event' && item.event.id === initialEventId,
+    );
+    if (index < 0) return;
+    const t = setTimeout(() => {
+      try {
+        listRef.current?.scrollToIndex({ index, animated: true });
+      } catch {
+        listRef.current?.scrollToOffset({ offset: index * pageHeight, animated: true });
+      }
+    }, 350);
+    return () => clearTimeout(t);
+  }, [initialEventId, slides, pageHeight]);
+
   const renderItem: ListRenderItem<Exclude<PublicFeedItem, { type: 'banner' }>> = useCallback(
     ({ item, index }) => (
       <View style={{ height: pageHeight, justifyContent: alignTop ? 'flex-start' : 'center' }}>
@@ -549,6 +568,9 @@ export function InshortsPagedFeed({
       renderItem={renderItem}
       keyExtractor={keyExtractor}
       getItemLayout={getItemLayout}
+      onScrollToIndexFailed={({ index }) => {
+        listRef.current?.scrollToOffset({ offset: index * pageHeight, animated: true });
+      }}
       snapToInterval={pageHeight}
       snapToAlignment="start"
       decelerationRate="fast"

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../config/api';
+import { unregisterCurrentPushToken } from '../utils/pushToken';
 
 const TOKEN_KEY = 'user-token';
 
@@ -47,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const logout = useCallback(async () => {
+    await unregisterCurrentPushToken();
     await AsyncStorage.removeItem(TOKEN_KEY);
     setToken(null);
     setUser(null);

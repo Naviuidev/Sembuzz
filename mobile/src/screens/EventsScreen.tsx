@@ -17,7 +17,9 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { Ionicons } from '@expo/vector-icons';
 import FunnelIcon from 'react-native-bootstrap-icons/icons/funnel';
 import NewspaperIcon from 'react-native-bootstrap-icons/icons/newspaper';
 import BuildingIcon from 'react-native-bootstrap-icons/icons/building';
@@ -28,13 +30,19 @@ import {
   getActiveBannerAds,
   getActiveSponsoredAds,
   recordBannerAdClick,
+  getUpcomingByDate,
+  buildGoogleCalendarAddAuthUrl,
   imageSrc,
   schoolLogoSrc,
   ApprovedEventPublic,
   CategoryPublic,
   SponsoredAdPublic,
   BannerAdPublic,
+  UpcomingPostPublic,
 } from '../services/events';
+import { parseImageUrls } from '../services/publicBlogs';
+import { getFrontendBaseUrl } from '../config/env';
+import type { MainTabParamList } from '../navigation/types';
 import { useAuth } from '../contexts/AuthContext';
 import { buildPublicFeedItems, type PublicFeedItem } from '../utils/publicFeed';
 import { InshortsPagedFeed } from '../components/InshortsPagedFeed';
@@ -48,8 +56,28 @@ import {
 import { userNotificationsService } from '../services/userNotifications';
 import { CATEGORY_PREFS_CHANGED, READY_FOR_PUSH_PERMISSION } from '../constants/appEvents';
 
+type EventsRoute = RouteProp<MainTabParamList, 'Events'>;
+
+function toYmd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function formatUpcomingHeader(dateYmd: string): string {
+  return new Date(`${dateYmd}T12:00:00`).toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
 export default function EventsScreen() {
   const navigation = useNavigation();
+  const route = useRoute<EventsRoute>();
+  const focusEventId = route.params?.focusEventId;
   const { user } = useAuth();
   const [showAllSchools, setShowAllSchools] = useState(false);
   const [events, setEvents] = useState<ApprovedEventPublic[]>([]);
@@ -68,6 +96,13 @@ export default function EventsScreen() {
   const [persistedPrefSubIds, setPersistedPrefSubIds] = useState<string[]>([]);
   const [expandedCategoryId, setExpandedCategoryId] = useState<string | null>(null);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const [upcomingDateFilter, setUpcomingDateFilter] = useState<string | null>(null);
+  const [selectedUpcomingPost, setSelectedUpcomingPost] = useState<UpcomingPostPublic | null>(null);
+  const [upcomingPosts, setUpcomingPosts] = useState<UpcomingPostPublic[]>([]);
+  const [upcomingLoading, setUpcomingLoading] = useState(false);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [calendarDraftDate, setCalendarDraftDate] = useState(() => new Date());
+  const [showNativeDatePicker, setShowNativeDatePicker] = useState(Platform.OS === 'ios');
   /** Emit push-permission readiness once per login so the OS dialog does not stack on first-login Modals (iPad). */
   const pushPermissionReadyEmittedForUser = useRef<string | null>(null);
 
@@ -294,6 +329,38 @@ export default function EventsScreen() {
     if (user && showAllSchools) setHomeFilterMenuOpen(false);
   }, [user, showAllSchools]);
 
+  useEffect(() => {
+    if (!upcomingDateFilter) {
+      setUpcomingPosts([]);
+      return;
+    }
+    setUpcomingLoading(true);
+    getUpcomingByDate(upcomingDateFilter)
+      .then(setUpcomingPosts)
+      .catch(() => setUpcomingPosts([]))
+      .finally(() => setUpcomingLoading(false));
+  }, [upcomingDateFilter]);
+
+  const clearUpcomingView = useCallback(() => {
+    setUpcomingDateFilter(null);
+    setSelectedUpcomingPost(null);
+    setUpcomingPosts([]);
+  }, []);
+
+  const applyCalendarDate = useCallback(() => {
+    setUpcomingDateFilter(toYmd(calendarDraftDate));
+    setShowCalendarModal(false);
+    setSelectedUpcomingPost(null);
+  }, [calendarDraftDate]);
+
+  const addUpcomingToGoogleCalendar = useCallback((post: UpcomingPostPublic) => {
+    const returnUrl = `${getFrontendBaseUrl().replace(/\/$/, '')}/events`;
+    const url = buildGoogleCalendarAddAuthUrl(post, returnUrl);
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Could not open calendar', 'Try again in a browser.');
+    });
+  }, []);
+
   const [engagementCounts, setEngagementCounts] = useState<{
     likes: Record<string, number>;
     commentCounts: Record<string, number>;
@@ -495,13 +562,15 @@ export default function EventsScreen() {
     setExpandedCategoryId(null);
     setHomeFilterMenuOpen(false);
     setShowAllSchools(false);
-  }, []);
+    clearUpcomingView();
+  }, [clearUpcomingView]);
 
   const switchToAllSchools = useCallback(() => {
     setExpandedCategoryId(null);
     setHomeFilterMenuOpen(false);
     setShowAllSchools(true);
-  }, []);
+    clearUpcomingView();
+  }, [clearUpcomingView]);
 
   const mySchoolLogo = useMemo(() => {
     if (!schoolId) return '';
@@ -649,7 +718,28 @@ export default function EventsScreen() {
           )}
         </ScrollView>
         {!allSchoolsSortInline ? (
-          <View style={styles.filterFunnelWrap}>
+          <>
+            <TouchableOpacity
+              style={[
+                styles.calendarIconOnlyBtn,
+                (showCalendarModal || upcomingDateFilter) && styles.calendarIconBtnActive,
+              ]}
+              onPress={() => {
+                setHomeFilterMenuOpen(false);
+                setShowCalendarModal(true);
+                if (upcomingDateFilter) {
+                  setCalendarDraftDate(new Date(`${upcomingDateFilter}T12:00:00`));
+                }
+              }}
+              accessibilityLabel="Upcoming news by date"
+            >
+              <Ionicons
+                name="calendar-outline"
+                size={20}
+                color={upcomingDateFilter ? '#087990' : '#6c757d'}
+              />
+            </TouchableOpacity>
+            <View style={styles.filterFunnelWrap}>
             <TouchableOpacity
               style={[
                 styles.homeFilterBtn,
@@ -704,6 +794,7 @@ export default function EventsScreen() {
               </View>
             ) : null}
           </View>
+          </>
         ) : null}
       </View>
 
@@ -731,7 +822,125 @@ export default function EventsScreen() {
         </ScrollView>
       ) : null}
 
-      {error ? (
+      {selectedUpcomingPost ? (
+        <ScrollView style={styles.upcomingDetailScroll} contentContainerStyle={styles.upcomingDetailContent}>
+          <View style={styles.upcomingDetailHeader}>
+            <View style={styles.upcomingDetailSchoolRow}>
+              {selectedUpcomingPost.school?.image ? (
+                <Image
+                  source={{ uri: imageSrc(selectedUpcomingPost.school.image) }}
+                  style={styles.upcomingDetailLogo}
+                />
+              ) : (
+                <View style={styles.upcomingDetailLogoFallback}>
+                  <Text style={styles.upcomingDetailLogoLetter}>
+                    {(selectedUpcomingPost.school?.name?.charAt(0) || '?').toUpperCase()}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.upcomingDetailSchoolText}>
+                <Text style={styles.upcomingDetailSchoolName}>
+                  {selectedUpcomingPost.school?.name ?? 'School'}
+                </Text>
+                <Text style={styles.upcomingDetailSubCat}>
+                  {selectedUpcomingPost.subCategory?.name ?? 'News'}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={() => setSelectedUpcomingPost(null)} style={styles.upcomingDetailCloseBtn}>
+              <Text style={styles.upcomingDetailCloseText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.upcomingBadgeWrap}>
+            <View style={styles.upcomingBadgePill}>
+              <Text style={styles.upcomingBadgeText}>Upcoming</Text>
+            </View>
+          </View>
+          {parseImageUrls(selectedUpcomingPost.imageUrls)[0] ? (
+            <Image
+              source={{ uri: imageSrc(parseImageUrls(selectedUpcomingPost.imageUrls)[0]) }}
+              style={styles.upcomingDetailImage}
+            />
+          ) : null}
+          <Text style={styles.upcomingDetailTitle}>{selectedUpcomingPost.title}</Text>
+          {selectedUpcomingPost.description ? (
+            <Text style={styles.upcomingDetailDesc}>{selectedUpcomingPost.description}</Text>
+          ) : null}
+          <TouchableOpacity
+            style={styles.addToCalBtn}
+            onPress={() => addUpcomingToGoogleCalendar(selectedUpcomingPost)}
+          >
+            <Ionicons name="calendar-outline" size={14} color="#fff" />
+            <Text style={styles.addToCalBtnText}>Add to Google Calendar</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      ) : upcomingDateFilter ? (
+        <ScrollView
+          style={styles.upcomingFeedScroll}
+          contentContainerStyle={styles.upcomingFeedContent}
+          refreshControl={<RefreshControl refreshing={upcomingLoading} onRefresh={() => {
+            if (upcomingDateFilter) {
+              setUpcomingLoading(true);
+              getUpcomingByDate(upcomingDateFilter)
+                .then(setUpcomingPosts)
+                .finally(() => setUpcomingLoading(false));
+            }
+          }} />}
+        >
+          <View style={styles.upcomingHeaderRow}>
+            <Text style={styles.upcomingHeaderLabel}>
+              Upcoming for {formatUpcomingHeader(upcomingDateFilter)}
+            </Text>
+            <TouchableOpacity onPress={clearUpcomingView} style={styles.upcomingBackBtn}>
+              <Text style={styles.upcomingBackBtnText}>Show regular feed</Text>
+            </TouchableOpacity>
+          </View>
+          {upcomingLoading ? (
+            <ActivityIndicator size="large" color="#1a1f2e" style={{ marginVertical: 24 }} />
+          ) : upcomingPosts.length === 0 ? (
+            <Text style={styles.upcomingEmpty}>No upcoming news for this date.</Text>
+          ) : (
+            upcomingPosts.map((post) => (
+              <View key={post.id} style={styles.upcomingCard}>
+                <TouchableOpacity
+                  style={styles.upcomingItem}
+                  onPress={() => setSelectedUpcomingPost(post)}
+                  activeOpacity={0.85}
+                >
+                  {post.school?.image ? (
+                    <Image
+                      source={{ uri: imageSrc(post.school.image) }}
+                      style={styles.upcomingItemLogo}
+                    />
+                  ) : (
+                    <View style={styles.upcomingItemLogoFallback}>
+                      <Text style={styles.upcomingItemLogoLetter}>
+                        {(post.school?.name?.charAt(0) || '?').toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.upcomingItemText}>
+                    <Text style={styles.upcomingItemTitle} numberOfLines={1}>
+                      {post.title}
+                    </Text>
+                    <Text style={styles.upcomingItemSub} numberOfLines={1}>
+                      {post.school?.name ?? 'School'}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#8e8e8e" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.upcomingCalIconBtn}
+                  onPress={() => addUpcomingToGoogleCalendar(post)}
+                  accessibilityLabel="Add to Google Calendar"
+                >
+                  <Ionicons name="calendar-outline" size={20} color="#6c757d" />
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
+        </ScrollView>
+      ) : error ? (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>{error}</Text>
         </View>
@@ -797,6 +1006,7 @@ export default function EventsScreen() {
               onSave={onInshortsSave}
               onCommentAdded={onInshortsCommentAdded}
               onBannerClick={onBannerAdPress}
+              initialEventId={focusEventId}
             />
           ) : (
             <View style={styles.centered}>
@@ -805,6 +1015,71 @@ export default function EventsScreen() {
           )}
         </View>
       )}
+
+      {showCalendarModal ? (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowCalendarModal(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setShowCalendarModal(false)}>
+            <Pressable style={styles.calendarModalBox} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.calendarModalHeader}>
+                <Text style={styles.calendarModalTitle}>Upcoming news</Text>
+                <TouchableOpacity onPress={() => setShowCalendarModal(false)}>
+                  <Text style={styles.calendarModalClose}>×</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.whatsHappeningRow}>
+                <View style={styles.whatsHappeningBox}>
+                  <Text style={styles.whatsHappeningTitle}>Quick pick</Text>
+                  <TouchableOpacity
+                    style={styles.calendarQuickBtn}
+                    onPress={() => setCalendarDraftDate(new Date())}
+                  >
+                    <Text style={styles.calendarQuickBtnText}>Today</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.calendarQuickBtn}
+                    onPress={() => {
+                      const d = new Date();
+                      d.setDate(d.getDate() + 1);
+                      setCalendarDraftDate(d);
+                    }}
+                  >
+                    <Text style={styles.calendarQuickBtnText}>Tomorrow</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              {Platform.OS === 'android' && !showNativeDatePicker ? (
+                <TouchableOpacity
+                  style={styles.dateFieldBtn}
+                  onPress={() => setShowNativeDatePicker(true)}
+                >
+                  <Text style={styles.dateFieldLabel}>{toYmd(calendarDraftDate)}</Text>
+                </TouchableOpacity>
+              ) : null}
+              {(Platform.OS === 'ios' || showNativeDatePicker) ? (
+                <DateTimePicker
+                  value={calendarDraftDate}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                  onChange={(_event, date) => {
+                    if (date) setCalendarDraftDate(date);
+                    if (Platform.OS === 'android') setShowNativeDatePicker(false);
+                  }}
+                />
+              ) : null}
+              <View style={styles.calendarOkRow}>
+                <TouchableOpacity style={styles.calendarOkBtn} onPress={applyCalendarDate}>
+                  <Text style={styles.calendarOkBtnText}>Show upcoming</Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      ) : null}
 
       {/* Subcategory dropdown — unmount when closed so iOS does not keep a stale touch layer (iPad). */}
       {!!expandedCategory && showCategories ? (
@@ -1562,7 +1837,101 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6c757d',
     marginVertical: 16,
+    textAlign: 'center',
   },
+  upcomingFeedScroll: { flex: 1 },
+  upcomingFeedContent: { paddingHorizontal: 16, paddingBottom: 24 },
+  upcomingHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  upcomingHeaderLabel: { flex: 1, fontSize: 13, color: '#6c757d' },
+  upcomingBackBtn: {
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  upcomingBackBtnText: { fontSize: 12, color: '#1a1f2e', fontWeight: '600' },
+  upcomingCard: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 8,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  upcomingCalIconBtn: {
+    width: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderLeftWidth: 1,
+    borderLeftColor: '#eee',
+  },
+  upcomingItemLogo: { width: 48, height: 48, borderRadius: 24 },
+  upcomingItemLogoFallback: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#e9ecef',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  upcomingItemLogoLetter: { fontSize: 16, fontWeight: '700', color: '#1a1f2e' },
+  upcomingDetailScroll: { flex: 1, backgroundColor: '#fff' },
+  upcomingDetailContent: { padding: 16, paddingBottom: 32 },
+  upcomingDetailHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  upcomingDetailSchoolRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  upcomingDetailLogo: { width: 36, height: 36, borderRadius: 18 },
+  upcomingDetailLogoFallback: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#e9ecef',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  upcomingDetailLogoLetter: { fontWeight: '700', color: '#1a1f2e' },
+  upcomingDetailSchoolText: { flex: 1 },
+  upcomingDetailSchoolName: { fontSize: 15, fontWeight: '600', color: '#1a1f2e' },
+  upcomingDetailSubCat: { fontSize: 12, color: '#8e8e8e', marginTop: 2 },
+  upcomingDetailCloseBtn: {
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  upcomingDetailCloseText: { fontSize: 13, color: '#1a1f2e' },
+  upcomingBadgeWrap: { alignSelf: 'flex-start', marginBottom: 10 },
+  upcomingBadgePill: {
+    backgroundColor: '#1a1f2e',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  upcomingBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  upcomingDetailImage: { width: '100%', height: 200, borderRadius: 10, marginBottom: 12 },
+  upcomingDetailTitle: { fontSize: 20, fontWeight: '700', color: '#1a1f2e', marginBottom: 10 },
+  upcomingDetailDesc: { fontSize: 15, color: '#2c3338', lineHeight: 22, marginBottom: 16 },
   sortPill: {
     paddingHorizontal: 14,
     paddingVertical: 6,

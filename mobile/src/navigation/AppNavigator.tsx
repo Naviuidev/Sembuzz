@@ -16,6 +16,12 @@ import {
 } from '../screens';
 import StudentGroupChatScreen from '../screens/StudentGroupChatScreen';
 import ClubGroupChatScreen from '../screens/ClubGroupChatScreen';
+import DirectChatScreen from '../screens/DirectChatScreen';
+import BlogsScreen from '../screens/BlogsScreen';
+import BlogDetailScreen from '../screens/BlogDetailScreen';
+import UniversitiesScreen from '../screens/UniversitiesScreen';
+import UniversityEventsScreen from '../screens/UniversityEventsScreen';
+import AllUniversityEventsScreen from '../screens/AllUniversityEventsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import ViewProfileScreen from '../screens/ViewProfileScreen';
@@ -24,6 +30,7 @@ import type { MainTabParamList, RootStackParamList } from './types';
 import { useAuth } from '../contexts/AuthContext';
 import { imageSrc } from '../utils/image';
 import { userNotificationsService } from '../services/userNotifications';
+import { useMessagesUnreadCount } from '../hooks/useMessagesUnreadCount';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -34,12 +41,14 @@ const TAB_CONFIG = [
   { name: 'Settings' as const, label: 'Settings', inactiveIconName: 'settings-outline', activeIconName: 'settings' },
   { name: 'Apps' as const, label: 'Apps', inactiveIconName: 'grid-outline', activeIconName: 'grid' },
   { name: 'Chat' as const, label: 'Chat', inactiveIconName: 'chatbubbles-outline', activeIconName: 'chatbubbles' },
+  { name: 'Universities' as const, label: 'Universities', inactiveIconName: 'calendar-outline', activeIconName: 'calendar' },
 ];
 
 function BottomNavBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
   const { user, token } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
+  const { count: chatUnreadCount } = useMessagesUnreadCount(state.index);
   /** Same as web `EventsBottomNav`: profile photo → school logo → initials. */
   const profileImageValue = useMemo(
     () => user?.profilePicUrl?.trim() || user?.image?.trim() || '',
@@ -162,11 +171,20 @@ function BottomNavBar({ state, descriptors, navigation }: any) {
                 ) : null}
               </View>
             ) : (
-              <Ionicons
-                name={(focused ? activeIconName : inactiveIconName) as any}
-                size={22}
-                color={focused ? '#1a1f2e' : '#6c757d'}
-              />
+              <View style={styles.tabIconWrap}>
+                <Ionicons
+                  name={(focused ? activeIconName : inactiveIconName) as any}
+                  size={22}
+                  color={focused ? '#1a1f2e' : '#6c757d'}
+                />
+                {route.name === 'Chat' && chatUnreadCount > 0 ? (
+                  <View style={styles.chatBadge}>
+                    <Text style={styles.chatBadgeText}>
+                      {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
             )}
           </TouchableOpacity>
         );
@@ -187,6 +205,7 @@ function MainTabsNavigator() {
       <Tab.Screen name="Settings" component={SettingsStackNavigator} options={{ tabBarLabel: 'Settings' }} />
       <Tab.Screen name="Apps" component={AppsScreen} options={{ tabBarLabel: 'Apps' }} />
       <Tab.Screen name="Chat" component={ChatScreen} options={{ tabBarLabel: 'Chat' }} />
+      <Tab.Screen name="Universities" component={UniversitiesScreen} options={{ tabBarLabel: 'Universities' }} />
     </Tab.Navigator>
   );
 }
@@ -264,6 +283,47 @@ export default function AppNavigator({ onNavigate }: AppNavigatorProps) {
             name="ClubGroupChat"
             component={ClubGroupChatScreen}
             options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="DirectChat"
+            component={DirectChatScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Blogs"
+            component={BlogsScreen}
+            options={{
+              headerShown: true,
+              title: 'Blogs',
+              headerBackTitle: 'Back',
+            }}
+          />
+          <Stack.Screen
+            name="BlogDetail"
+            component={BlogDetailScreen}
+            options={{
+              headerShown: true,
+              title: 'Blog',
+              headerBackTitle: 'Back',
+            }}
+          />
+          <Stack.Screen
+            name="UniversityEvents"
+            component={UniversityEventsScreen}
+            options={({ route }) => ({
+              headerShown: true,
+              title: route.params.universityName,
+              headerBackTitle: 'Back',
+            })}
+          />
+          <Stack.Screen
+            name="AllUniversityEvents"
+            component={AllUniversityEventsScreen}
+            options={{
+              headerShown: true,
+              title: 'All university events',
+              headerBackTitle: 'Back',
+            }}
           />
         </Stack.Navigator>
       </View>
@@ -356,6 +416,31 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   profileBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  tabIconWrap: {
+    position: 'relative',
+    overflow: 'visible',
+  },
+  chatBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -10,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 999,
+    backgroundColor: '#dc3545',
+    borderWidth: 1.5,
+    borderColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    zIndex: 10,
+    elevation: 12,
+  },
+  chatBadgeText: {
     color: '#fff',
     fontSize: 9,
     fontWeight: '700',

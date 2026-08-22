@@ -8,6 +8,7 @@ import { useFonts, Poppins_400Regular, Poppins_600SemiBold } from '@expo-google-
 import * as Notifications from 'expo-notifications';
 import { AuthProvider } from './src/contexts/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
+import type { MainTabParamList } from './src/navigation/types';
 import { useRegisterPushToken } from './src/hooks/useRegisterPushToken';
 import { NATIVE_UI_TOUCH_RECOVERY } from './src/constants/appEvents';
 
@@ -125,7 +126,7 @@ export default function App() {
     };
   }, []);
 
-  const handleNavigate = (name: 'Search' | 'Events' | 'Settings' | 'Apps' | 'Chat') => {
+  const handleNavigate = (name: keyof MainTabParamList) => {
     navRef.current?.dispatch(
       CommonActions.navigate({
         name: 'MainTabs',
@@ -149,7 +150,10 @@ export default function App() {
         navRef.current?.dispatch(
           CommonActions.navigate({
             name: 'MainTabs',
-            params: { screen: 'Events' },
+            params: {
+              screen: 'Events',
+              params: data.eventId ? { focusEventId: data.eventId } : undefined,
+            },
           }),
         );
       }, 250);

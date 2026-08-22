@@ -54,17 +54,28 @@ type DirectStep = 'inbox' | 'new-chat' | 'chat';
 interface Props {
   currentUserId?: string | null;
   onMessagingActivity?: () => void;
+  initialConversation?: { conversationId: string; peer: DirectChatUser };
+  startInChat?: boolean;
 }
 
-export function DirectChatPanel({ currentUserId, onMessagingActivity }: Props) {
-  const [step, setStep] = useState<DirectStep>('inbox');
+export function DirectChatPanel({
+  currentUserId,
+  onMessagingActivity,
+  initialConversation,
+  startInChat = false,
+}: Props) {
+  const [step, setStep] = useState<DirectStep>(startInChat && initialConversation ? 'chat' : 'inbox');
   const [available, setAvailable] = useState<boolean | null>(null);
   const [inbox, setInbox] = useState<DirectChatInboxItem[]>([]);
   const [students, setStudents] = useState<DirectChatStudentRow[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activePeer, setActivePeer] = useState<DirectChatUser | null>(null);
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [activePeer, setActivePeer] = useState<DirectChatUser | null>(
+    initialConversation?.peer ?? null,
+  );
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(
+    initialConversation?.conversationId ?? null,
+  );
   const [messages, setMessages] = useState<DirectMessageItem[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [draft, setDraft] = useState('');
