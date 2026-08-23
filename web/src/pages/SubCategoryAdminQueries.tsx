@@ -7,6 +7,7 @@ import {
   type FromSchoolAdminQueryItem,
   type FromCategoryAdminQueryItem,
 } from '../services/subcategory-admin-queries.service';
+import { invalidateAdminActionItems } from '../services/admin-action-items.service';
 
 const cardStyle = {
   border: '1px solid rgb(26, 31, 46)',
@@ -80,6 +81,7 @@ export const SubCategoryAdminQueries = () => {
       } else {
         queryClient.invalidateQueries({ queryKey: ['subcategory-admin-queries-from-category'] });
       }
+      void invalidateAdminActionItems(queryClient, 'subcategory-admin');
     },
     onError: (err) => {
       setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to send reply.');

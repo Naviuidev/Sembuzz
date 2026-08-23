@@ -41,8 +41,10 @@ const TAB_CONFIG = [
   { name: 'Settings' as const, label: 'Settings', inactiveIconName: 'settings-outline', activeIconName: 'settings' },
   { name: 'Apps' as const, label: 'Apps', inactiveIconName: 'grid-outline', activeIconName: 'grid' },
   { name: 'Chat' as const, label: 'Chat', inactiveIconName: 'chatbubbles-outline', activeIconName: 'chatbubbles' },
-  { name: 'Universities' as const, label: 'Universities', inactiveIconName: 'calendar-outline', activeIconName: 'calendar' },
 ];
+
+/** Tabs registered on the navigator but hidden from the bottom bar (e.g. deep-linked from Settings). */
+const HIDDEN_TAB_NAMES = new Set<string>(['Universities']);
 
 function BottomNavBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -110,8 +112,10 @@ function BottomNavBar({ state, descriptors, navigation }: any) {
   }, [user?.id, refreshUnread]);
   return (
     <View style={[styles.tabBar, { paddingBottom: Math.max(10, insets.bottom) }]}>
-      {state.routes.map((route: { key: string; name: string }, index: number) => {
-        const focused = state.index === index;
+      {state.routes
+        .filter((route: { name: string }) => !HIDDEN_TAB_NAMES.has(route.name))
+        .map((route: { key: string; name: string }) => {
+        const focused = state.routes[state.index]?.name === route.name;
         const config =
           TAB_CONFIG.find((c) => c.name === route.name) ??
           { label: route.name, inactiveIconName: 'ellipse-outline', activeIconName: 'ellipse' };

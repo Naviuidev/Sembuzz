@@ -38,6 +38,7 @@ import { subCategoryAdminStudentChatGroupRequestsService } from '../services/sub
 import { subCategoryAdminClubGroupChatDeleteRequestsService } from '../services/club-group-chat-delete-requests.service';
 import { subCategoryAdminStudentChatGroupDeleteRequestsService } from '../services/student-chat-group-delete-requests.service';
 import { MessagingDeleteRequestConfirmModal } from './MessagingDeleteRequestConfirmModal';
+import { invalidateAdminActionItemsForPrefix } from '../services/admin-action-items.service';
 
 const TEXT_DARK = '#1a1f2e';
 const TEXT_MUTED = '#6c757d';
@@ -193,6 +194,7 @@ export function CategoryAdminMessagesPanel({
 
   const invalidateMemberships = () => {
     void queryClient.invalidateQueries({ queryKey: [queryPrefix, 'club-group-memberships'] });
+    invalidateAdminActionItemsForPrefix(queryClient, queryPrefix);
   };
 
   const approveMutation = useMutation({

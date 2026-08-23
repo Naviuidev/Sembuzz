@@ -153,7 +153,7 @@ export function ChatGroupsView({
     >
   >([]);
   const [students, setStudents] = useState<DirectChatStudentRow[]>([]);
-  const [directAvailable, setDirectAvailable] = useState(false);
+  const [directAvailable, setDirectAvailable] = useState<boolean | null>(null);
   const [myChatsUnread, setMyChatsUnread] = useState(0);
   const [pendingIncoming, setPendingIncoming] = useState<DirectChatInboxItem[]>([]);
 
@@ -166,11 +166,13 @@ export function ChatGroupsView({
     }
 
     try {
+      const availability = await getDirectChatAvailability().catch(() => ({ available: false }));
+      setDirectAvailable(availability.available);
+
       if (filterTab === 'my-chats') {
-        const availability = await getDirectChatAvailability();
-        setDirectAvailable(availability.available);
         if (!availability.available) {
           setStudents([]);
+          setPendingIncoming([]);
           return;
         }
         const [studentRows, unread, inbox] = await Promise.all([
@@ -189,7 +191,9 @@ export function ChatGroupsView({
       const [discover, clubs, unread] = await Promise.all([
         listDiscoverableStudentChatGroups().catch(() => []),
         listJoinableClubGroupChats().catch(() => []),
-        getDirectChatUnreadCount().catch(() => ({ unreadCount: 0, pendingIncomingCount: 0 })),
+        availability.available
+          ? getDirectChatUnreadCount().catch(() => ({ unreadCount: 0, pendingIncomingCount: 0 }))
+          : Promise.resolve({ unreadCount: 0, pendingIncomingCount: 0 }),
       ]);
       setStudentGroups(discover);
       setClubGroups(clubs);
@@ -338,11 +342,26 @@ export function ChatGroupsView({
     }
   };
 
-  const tabs: { id: FilterTab; label: string; badge?: number }[] = [
-    { id: 'all', label: 'All' },
-    { id: 'joined', label: 'Joined' },
-    { id: 'my-chats', label: 'My Chats', badge: myChatsUnread > 0 ? myChatsUnread : undefined },
-  ];
+  React.useEffect(() => {
+    if (directAvailable === false && filterTab === 'my-chats') {
+      setFilterTab('all');
+    }
+  }, [directAvailable, filterTab]);
+
+  const tabs = useMemo((): { id: FilterTab; label: string; badge?: number }[] => {
+    const base: { id: FilterTab; label: string; badge?: number }[] = [
+      { id: 'all', label: 'All' },
+      { id: 'joined', label: 'Joined' },
+    ];
+    if (directAvailable === true) {
+      base.push({
+        id: 'my-chats',
+        label: 'My Chats',
+        badge: myChatsUnread > 0 ? myChatsUnread : undefined,
+      });
+    }
+    return base;
+  }, [directAvailable, myChatsUnread]);
 
   const renderGroupRow = (item: ChatGroupListItem) => {
     const joining =
@@ -526,14 +545,7 @@ export function ChatGroupsView({
         </View>
       ) : null}
 
-      {filterTab === 'my-chats' && !directAvailable ? (
-        <View style={styles.emptyWrap}>
-          <Text style={styles.emptyTitle}>Direct messaging is off</Text>
-          <Text style={styles.emptyText}>
-            Your school admin has not enabled 1:1 messaging yet.
-          </Text>
-        </View>
-      ) : loading && listData.length === 0 ? (
+      {loading && listData.length === 0 ? (
         <View style={styles.loaderWrap}>
           <ActivityIndicator size="small" color={TEXT_DARK} />
         </View>

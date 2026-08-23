@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -1397,6 +1397,12 @@ export const PublicEvents = () => {
     refetchInterval: 15_000,
   });
 
+  const { data: directAvailability } = useQuery({
+    queryKey: ['user', 'direct-chats', 'availability'],
+    queryFn: userDirectChatsService.getAvailability,
+    enabled: !!user,
+  });
+
   const { data: groupUnreadData } = useQuery({
     queryKey: USER_STUDENT_CHAT_GROUPS_UNREAD_QUERY_KEY,
     queryFn: userStudentChatGroupsService.getUnreadCount,
@@ -1405,9 +1411,9 @@ export const PublicEvents = () => {
   });
 
   const messagesUnreadCount =
-    (directUnreadData?.unreadCount ?? 0) +
-    (directUnreadData?.pendingIncomingCount ?? 0) +
-    (groupUnreadData?.unreadCount ?? 0);
+    (directAvailability?.available
+      ? (directUnreadData?.unreadCount ?? 0) + (directUnreadData?.pendingIncomingCount ?? 0)
+      : 0) + (groupUnreadData?.unreadCount ?? 0);
 
   const settingsActions = useMemo(
     (): Array<{
@@ -1913,7 +1919,7 @@ export const PublicEvents = () => {
   const { data: allSchools = [], isLoading: schoolsLoading } = useQuery({
     queryKey: ['user', 'auth', 'schools'],
     queryFn: () => userAuthService.getSchools(),
-    enabled: filterMode === 'school',
+    enabled: filterMode === 'school' || (!user && bottomNavActive === 'home'),
   });
 
   const schoolsForFilter = useMemo(() => {
@@ -1934,6 +1940,18 @@ export const PublicEvents = () => {
     }));
     return fromEvents;
   }, [filterMode, allSchools, events]);
+
+  const selectedGuestSchoolName = useMemo(() => {
+    if (user || !schoolId) return null;
+    const fromApi = allSchools.find((s) => s.id === schoolId)?.name;
+    if (fromApi) return fromApi;
+    return events.find((e) => e.schoolId === schoolId)?.school?.name ?? null;
+  }, [user, schoolId, allSchools, events]);
+
+  const openGuestLogin = useCallback(() => {
+    setSettingsLoginView('login');
+    setShowSettingsLoginPopup(true);
+  }, []);
 
   const isLoading = eventsLoading;
 
@@ -3352,6 +3370,28 @@ export const PublicEvents = () => {
               </div>
             </div>
           )}
+          {!user && (
+            <div
+              className="d-flex align-items-start gap-2 mb-2 px-1 py-2 rounded"
+              style={{
+                backgroundColor: '#fff8e6',
+                border: '1px solid #ffe8a3',
+              }}
+            >
+              <i className="bi bi-info-circle-fill flex-shrink-0 mt-1" style={{ color: '#997404', fontSize: '0.95rem' }} aria-hidden />
+              <p className="mb-0 small flex-grow-1" style={{ color: '#664d03', lineHeight: 1.45 }}>
+                Sign in to customize your school feed and join school chat groups.
+              </p>
+              <button
+                type="button"
+                className="btn btn-link btn-sm p-0 text-nowrap flex-shrink-0 text-decoration-none fw-semibold"
+                style={{ color: '#664d03' }}
+                onClick={openGuestLogin}
+              >
+                Sign in
+              </button>
+            </div>
+          )}
           <div className="d-flex justify-content-between align-items-center gap-2">
             <div
               ref={contentCategoriesRef}
@@ -3386,7 +3426,7 @@ export const PublicEvents = () => {
                     Popular
                   </button>
                 </>
-              ) : (
+              ) : !user ? null : (
                 <>
                   {user && !showAllSchoolsFeed && homeContentCategories.length > 0 && (
                     <>
@@ -3440,10 +3480,10 @@ export const PublicEvents = () => {
                 type="button"
                 className="btn border-0 py-1 px-2 rounded d-flex align-items-center"
                 style={{
-                  backgroundColor: filterDropdownOpen || feedSort !== 'latest'
+                  backgroundColor: filterDropdownOpen || feedSort !== 'latest' || (!user && !!schoolId)
                     ? 'rgba(13, 202, 240, 0.15)'
                     : 'transparent',
-                  color: filterDropdownOpen ? '#087990' : '#6c757d',
+                  color: filterDropdownOpen || (!user && !!schoolId) ? '#087990' : '#6c757d',
                 }}
                 onClick={() => setFilterDropdownOpen((o) => !o)}
                 title="Filter: Latest, Popular"
@@ -3502,12 +3542,71 @@ export const PublicEvents = () => {
                         Popular
                       </button>
                     </div>
+                    {!user && (
+                      <>
+                        <div className="px-3 py-1 small text-muted border-top mt-1 pt-2">School</div>
+                        <div className="px-3 pt-1 pb-2">
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-dark rounded-pill d-inline-flex align-items-center gap-2"
+                            onClick={() => {
+                              setFilterDropdownOpen(false);
+                              setFilterMode('school');
+                            }}
+                          >
+                            <i className="bi bi-building" aria-hidden />
+                            Filter by school
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </>
               )}
             </div>
             )}
           </div>
+
+          {!user && schoolId && (
+            <div
+              className="d-flex flex-wrap align-items-center gap-2 px-2 py-2 small"
+              style={{
+                backgroundColor: '#fff',
+                borderRadius: '0 0 8px 8px',
+                marginTop: -1,
+              }}
+            >
+              <span className="text-muted">Showing:</span>
+              <span
+                className="d-inline-flex align-items-center rounded-pill"
+                style={{
+                  backgroundColor: '#212529',
+                  color: '#fff',
+                  fontSize: '0.8125rem',
+                  fontWeight: 600,
+                  padding: '6px 12px',
+                  lineHeight: 1.2,
+                }}
+              >
+                {selectedGuestSchoolName ?? 'Selected school'}
+              </span>
+              <button
+                type="button"
+                className="btn btn-link btn-sm p-0 text-decoration-none"
+                onClick={() => setFilterMode('school')}
+              >
+                Change school
+              </button>
+              <span className="text-muted">·</span>
+              <button
+                type="button"
+                className="btn btn-link btn-sm p-0 text-decoration-none"
+                onClick={clearSchoolFilter}
+              >
+                Clear filter
+              </button>
+            </div>
+          )}
 
           {user && !showAllSchoolsFeed && selectedSubCategoryMeta.length > 0 && (
             <div
@@ -3888,7 +3987,16 @@ export const PublicEvents = () => {
             <div className="d-flex justify-content-between align-items-center mb-2">
               <span style={{ fontWeight: 600, color: '#1a1f2e' }}>Select a school</span>
               <div className="d-flex gap-2">
-                {schoolId && (
+                {schoolId && !user && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-link text-decoration-none"
+                    onClick={() => { clearSchoolFilter(); setFilterMode('none'); }}
+                  >
+                    Clear filter
+                  </button>
+                )}
+                {schoolId && user && (
                   <button
                     type="button"
                     className="btn btn-sm btn-link text-decoration-none"

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateAdminActionItemsForPrefix } from '../services/admin-action-items.service';
 
 const TEXT_DARK = '#1a1f2e';
 
@@ -54,6 +55,7 @@ export function MessagingDeleteRequestReviewPanel({
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: [queryKeyPrefix, queryKey] });
+    invalidateAdminActionItemsForPrefix(queryClient, queryKeyPrefix);
   };
 
   const approveMutation = useMutation({

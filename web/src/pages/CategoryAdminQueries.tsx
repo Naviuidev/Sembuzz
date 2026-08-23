@@ -9,6 +9,7 @@ import {
   type SchoolAdminQueryItem,
   type RaisedToSuperAdminQueryItem,
 } from '../services/category-admin-queries.service';
+import { invalidateAdminActionItems } from '../services/admin-action-items.service';
 
 const cardStyle = {
   border: '1px solid rgb(26, 31, 46)',
@@ -142,6 +143,7 @@ export const CategoryAdminQueries = () => {
       queryClient.invalidateQueries({ queryKey: ['category-admin-queries-from-school'] });
       queryClient.invalidateQueries({ queryKey: ['category-admin-queries-from-subcategory'] });
       queryClient.invalidateQueries({ queryKey: ['category-admin-queries-raised-to-super-admin'] });
+      void invalidateAdminActionItems(queryClient, 'category-admin');
     },
     onError: (err) => {
       setSending(false);

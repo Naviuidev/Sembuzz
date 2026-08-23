@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  TextInput,
   FlatList,
   ActivityIndicator,
   StyleSheet,
@@ -28,6 +27,7 @@ import {
   ChatBubble,
   PendingAttachmentBar,
   ReplyComposerBar,
+  ChatComposer,
 } from '../components/ChatMessageParts';
 import {
   type ChatMessageReplyTo,
@@ -230,42 +230,17 @@ export default function StudentGroupChatScreen() {
         ) : null}
         {uploading ? <Text style={styles.uploadHint}>Uploading… (max 5 MB)</Text> : null}
 
-        <View style={styles.composer}>
-          <TouchableOpacity
-            style={styles.attachBtn}
-            onPress={() => void pickImage()}
-            disabled={uploading || !!pendingAttachment}
-          >
-            <Text style={styles.attachBtnText}>IMG</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.attachBtn}
-            onPress={() => void pickPdf()}
-            disabled={uploading || !!pendingAttachment}
-          >
-            <Text style={styles.attachBtnText}>PDF</Text>
-          </TouchableOpacity>
-          <TextInput
-            style={styles.input}
-            placeholder="Type a message…"
-            placeholderTextColor="#adb5bd"
-            value={draft}
-            onChangeText={setDraft}
-            editable={!sending && !uploading}
-            returnKeyType="send"
-            onSubmitEditing={() => void handleSend()}
-          />
-          <TouchableOpacity
-            style={[
-              styles.sendBtn,
-              ((!draft.trim() && !pendingAttachment) || sending || uploading) && styles.sendBtnDisabled,
-            ]}
-            onPress={() => void handleSend()}
-            disabled={(!draft.trim() && !pendingAttachment) || sending || uploading}
-          >
-            <Text style={styles.sendBtnText}>{sending ? '…' : 'Send'}</Text>
-          </TouchableOpacity>
-        </View>
+        <ChatComposer
+          draft={draft}
+          onDraftChange={setDraft}
+          onSend={() => void handleSend()}
+          sending={sending}
+          uploading={uploading}
+          onPickImage={() => void pickImage()}
+          onPickPdf={() => void pickPdf()}
+          attachmentsDisabled={!!pendingAttachment}
+          hasPendingAttachment={!!pendingAttachment}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -304,42 +279,4 @@ const styles = StyleSheet.create({
   senderName: { fontSize: 12, color: TEXT_MUTED, marginBottom: 2, marginLeft: 4 },
   sendError: { color: '#b42318', fontSize: 12, paddingHorizontal: 14, paddingVertical: 6 },
   uploadHint: { fontSize: 12, color: TEXT_MUTED, paddingHorizontal: 14, paddingBottom: 4 },
-  composer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#e8ecf1',
-    backgroundColor: '#fff',
-  },
-  attachBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: '#f1f3f5',
-  },
-  attachBtnText: { fontSize: 11, fontWeight: '700', color: TEXT_DARK },
-  input: {
-    flex: 1,
-    minHeight: 40,
-    maxHeight: 100,
-    borderWidth: 1,
-    borderColor: '#dee2e6',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    fontSize: 15,
-    color: TEXT_DARK,
-    backgroundColor: '#fff',
-  },
-  sendBtn: {
-    backgroundColor: TEXT_DARK,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  sendBtnDisabled: { opacity: 0.45 },
-  sendBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
 });

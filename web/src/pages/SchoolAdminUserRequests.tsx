@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { SchoolAdminNavbar } from '../components/SchoolAdminNavbar';
 import { SchoolAdminSidebar } from '../components/SchoolAdminSidebar';
 import {
   schoolAdminPendingUsersService,
   type PendingUser,
 } from '../services/school-admin-pending-users.service';
+import { invalidateAdminActionItems } from '../services/admin-action-items.service';
 import { imageSrc } from '../utils/image';
 
 function formatDate(iso: string) {
@@ -31,6 +33,7 @@ function getDocFilename(url: string): string {
 }
 
 export const SchoolAdminUserRequests = () => {
+  const queryClient = useQueryClient();
   const [pending, setPending] = useState<PendingUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +69,7 @@ export const SchoolAdminUserRequests = () => {
     try {
       await schoolAdminPendingUsersService.approve(user.id);
       setPending((prev) => prev.filter((u) => u.id !== user.id));
+      void invalidateAdminActionItems(queryClient, 'school-admin');
     } catch (err: unknown) {
       const msg =
         err && typeof err === 'object' && 'response' in err
@@ -83,6 +87,7 @@ export const SchoolAdminUserRequests = () => {
     try {
       await schoolAdminPendingUsersService.reject(user.id);
       setPending((prev) => prev.filter((u) => u.id !== user.id));
+      void invalidateAdminActionItems(queryClient, 'school-admin');
     } catch (err: unknown) {
       const msg =
         err && typeof err === 'object' && 'response' in err

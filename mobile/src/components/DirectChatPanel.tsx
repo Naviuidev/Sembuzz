@@ -34,6 +34,7 @@ import {
   ChatBubble,
   PendingAttachmentBar,
   ReplyComposerBar,
+  ChatComposer,
 } from './ChatMessageParts';
 import {
   type ChatMessageReplyTo,
@@ -396,10 +397,8 @@ export function DirectChatPanel({
     ]);
   };
 
-  if (available === false) {
-    return (
-      <Text style={styles.body}>Direct messaging is not available for your school right now.</Text>
-    );
+  if (available === false && !initialConversation) {
+    return null;
   }
 
   if (listLoading && available === null && step === 'inbox') {
@@ -578,45 +577,18 @@ export function DirectChatPanel({
             />
           ) : null}
           {uploading ? <Text style={styles.body}>Uploading… (max 5 MB)</Text> : null}
-          <View style={styles.composer}>
-            <TouchableOpacity style={styles.attachBtn} onPress={() => void pickImage()} disabled={uploading || !!pendingAttachment}>
-              <Text style={styles.attachBtnText}>IMG</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.attachBtn} onPress={() => void pickPdf()} disabled={uploading || !!pendingAttachment}>
-              <Text style={styles.attachBtnText}>PDF</Text>
-            </TouchableOpacity>
-            <TextInput
-              style={[styles.input, styles.composerInput]}
-              placeholder="Type a message…"
-              placeholderTextColor="#adb5bd"
-              value={draft}
-              onChangeText={setDraft}
-              editable={!sending && !uploading && !isBlockedByMe && !isBlockedByPeer}
-              returnKeyType="send"
-              onSubmitEditing={() => void handleSend()}
-            />
-            <TouchableOpacity
-              style={[
-                styles.sendBtn,
-                ((!draft.trim() && !pendingAttachment) ||
-                  sending ||
-                  uploading ||
-                  isBlockedByMe ||
-                  isBlockedByPeer) &&
-                  styles.sendBtnDisabled,
-              ]}
-              onPress={() => void handleSend()}
-              disabled={
-                (!draft.trim() && !pendingAttachment) ||
-                sending ||
-                uploading ||
-                isBlockedByMe ||
-                isBlockedByPeer
-              }
-            >
-              <Text style={styles.sendBtnText}>{sending ? '…' : 'Send'}</Text>
-            </TouchableOpacity>
-          </View>
+          <ChatComposer
+            draft={draft}
+            onDraftChange={setDraft}
+            onSend={() => void handleSend()}
+            sending={sending}
+            uploading={uploading}
+            disabled={isBlockedByMe || isBlockedByPeer}
+            onPickImage={() => void pickImage()}
+            onPickPdf={() => void pickPdf()}
+            attachmentsDisabled={!!pendingAttachment}
+            hasPendingAttachment={!!pendingAttachment}
+          />
         </>
       ) : null}
     </KeyboardAvoidingView>
@@ -887,20 +859,4 @@ const styles = StyleSheet.create({
   bubbleTime: { fontSize: 10, color: TEXT_MUTED, marginTop: 2 },
   errorText: { color: '#dc3545', fontSize: 13, marginTop: 8 },
   successText: { color: '#198754', fontSize: 13, marginBottom: 8 },
-  composer: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  attachBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#dee2e6',
-  },
-  attachBtnText: { fontSize: 10, fontWeight: '700', color: TEXT_MUTED },
-  sendBtn: {
-    backgroundColor: TEXT_DARK,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  sendBtnDisabled: { opacity: 0.5 },
-  sendBtnText: { color: '#fff', fontWeight: '600' },
 });

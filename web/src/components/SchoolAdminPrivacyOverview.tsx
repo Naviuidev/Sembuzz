@@ -16,6 +16,7 @@ import {
   schoolAdminEmailChangeRequestsService,
   type AdminEmailChangeTargetRole,
 } from '../services/admin-email-change-requests.service';
+import { invalidateAdminActionItems } from '../services/admin-action-items.service';
 
 const TEXT_DARK = '#1a1f2e';
 const TEXT_MUTED = '#6c757d';
@@ -61,7 +62,7 @@ export function SchoolAdminPrivacyOverview() {
 
   const invalidateAfterRequest = () => {
     void queryClient.invalidateQueries({ queryKey: ['school-admin', 'email-change-requests'] });
-    void queryClient.invalidateQueries({ queryKey: ['school-admin', 'action-items'] });
+    void invalidateAdminActionItems(queryClient, 'school-admin');
   };
 
   const initiateMutation = useMutation({

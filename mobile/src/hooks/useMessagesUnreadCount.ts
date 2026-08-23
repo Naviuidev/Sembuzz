@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
-import { getDirectChatUnreadCount } from '../services/directChat';
+import { getDirectChatUnreadCount, getDirectChatAvailability } from '../services/directChat';
 import { getStudentChatGroupUnreadCount } from '../services/studentChatGroups';
 
 /** DM + pending incoming + student group unread — matches web `messagesUnreadCount`. */
@@ -15,8 +15,11 @@ export function useMessagesUnreadCount(refreshKey?: unknown) {
       return;
     }
     try {
+      const availability = await getDirectChatAvailability().catch(() => ({ available: false }));
       const [direct, groups] = await Promise.all([
-        getDirectChatUnreadCount().catch(() => ({ unreadCount: 0, pendingIncomingCount: 0 })),
+        availability.available
+          ? getDirectChatUnreadCount().catch(() => ({ unreadCount: 0, pendingIncomingCount: 0 }))
+          : Promise.resolve({ unreadCount: 0, pendingIncomingCount: 0 }),
         getStudentChatGroupUnreadCount().catch(() => ({ unreadCount: 0 })),
       ]);
       setCount(

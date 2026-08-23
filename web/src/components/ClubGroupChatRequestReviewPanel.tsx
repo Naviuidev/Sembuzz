@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateAdminActionItemsForPrefix } from '../services/admin-action-items.service';
 import { imageSrc, isImageIconValue } from '../utils/image';
 import type { ClubGroupChatRequestItem } from '../services/subcategory-admin-club-group-chat-requests.service';
 
@@ -62,6 +63,7 @@ export function ClubGroupChatRequestReviewPanel({
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: [queryKeyPrefix, 'club-group-chat-requests'] });
+    invalidateAdminActionItemsForPrefix(queryClient, queryKeyPrefix);
   };
 
   const approveMutation = useMutation({

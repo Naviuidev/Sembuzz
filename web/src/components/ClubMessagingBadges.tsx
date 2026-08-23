@@ -48,8 +48,18 @@ export function ClubMessagingBadges({
     refetchInterval: isAuthenticated ? 8000 : false,
   });
 
+  const { data: directAvailability } = useQuery({
+    queryKey: ['user', 'direct-chats', 'availability'],
+    queryFn: userDirectChatsService.getAvailability,
+    enabled: isAuthenticated,
+  });
+
+  const showDirectMessaging = directAvailability?.available === true;
+
   const yourChatBadgeCount =
-    (directUnread?.unreadCount ?? 0) + (directUnread?.pendingIncomingCount ?? 0);
+    showDirectMessaging
+      ? (directUnread?.unreadCount ?? 0) + (directUnread?.pendingIncomingCount ?? 0)
+      : 0;
 
   const requestMutation = useMutation({
     mutationFn: (groupChatId: string) => userClubGroupChatsService.requestJoin(groupChatId),
@@ -123,6 +133,7 @@ export function ClubMessagingBadges({
           <i className="bi bi-people-fill" aria-hidden />
           Group chat
         </button>
+        {showDirectMessaging ? (
         <button
           type="button"
           className="btn d-inline-flex align-items-center gap-2 position-relative"
@@ -148,6 +159,7 @@ export function ClubMessagingBadges({
             </span>
           ) : null}
         </button>
+        ) : null}
       </div>
 
       {activeBadge === 'group-chat' ? (
@@ -261,7 +273,7 @@ export function ClubMessagingBadges({
         </ModalShell>
       ) : null}
 
-      {activeBadge === 'your-chat' ? (
+      {activeBadge === 'your-chat' && showDirectMessaging ? (
         <ModalShell title="Messages" onClose={closeModal} wide>
           <DirectChatPanel currentUserId={currentUserId} />
         </ModalShell>

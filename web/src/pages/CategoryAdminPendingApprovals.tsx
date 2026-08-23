@@ -7,6 +7,7 @@ import {
   type PendingEventForCategoryAdmin,
   type UpdateEventDto,
 } from '../services/category-admin-events.service';
+import { invalidateAdminActionItems } from '../services/admin-action-items.service';
 
 function formatDate(iso: string) {
   try {
@@ -71,6 +72,7 @@ export const CategoryAdminPendingApprovals = () => {
       categoryAdminEventsService.update(eventId, dto),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
+      void invalidateAdminActionItems(queryClient, 'category-admin');
       setEditEvent(null);
       setEditForm({});
     },
@@ -81,6 +83,7 @@ export const CategoryAdminPendingApprovals = () => {
       categoryAdminEventsService.revert(eventId, notes),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
+      void invalidateAdminActionItems(queryClient, 'category-admin');
       setRevertEvent(null);
       setRevertNotes('');
     },
@@ -90,6 +93,7 @@ export const CategoryAdminPendingApprovals = () => {
     mutationFn: (eventId: string) => categoryAdminEventsService.approve(eventId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
+      void invalidateAdminActionItems(queryClient, 'category-admin');
       setApproveEvent(null);
     },
   });

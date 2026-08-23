@@ -5,6 +5,7 @@ import { SuperAdminSidebar } from '../components/SuperAdminSidebar';
 import { StatusPopup } from '../components/StatusPopup';
 import { supportService, type SuperAdminQuery } from '../services/support.service';
 import { schoolsService, type School } from '../services/schools.service';
+import { invalidateAdminActionItems } from '../services/admin-action-items.service';
 
 const cardStyle = {
   border: '1px solid rgb(26, 31, 46)',
@@ -184,6 +185,7 @@ export const Queries = () => {
       if (src === 'school') queryClient.invalidateQueries({ queryKey: ['queries', 'from-school'] });
       if (src === 'category') queryClient.invalidateQueries({ queryKey: ['queries', 'from-category'] });
       if (src === 'subcategory') queryClient.invalidateQueries({ queryKey: ['queries', 'from-subcategory'] });
+      void invalidateAdminActionItems(queryClient, 'super-admin');
     },
     onError: (error: unknown) => {
       setPopupType('error');

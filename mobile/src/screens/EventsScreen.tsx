@@ -55,6 +55,7 @@ import {
 } from '../utils/userCategoryPrefs';
 import { userNotificationsService } from '../services/userNotifications';
 import { CATEGORY_PREFS_CHANGED, READY_FOR_PUSH_PERMISSION } from '../constants/appEvents';
+import { getSchools, type SchoolOption } from '../services/userAuth';
 
 type EventsRoute = RouteProp<MainTabParamList, 'Events'>;
 
@@ -105,11 +106,15 @@ export default function EventsScreen() {
   const [showNativeDatePicker, setShowNativeDatePicker] = useState(Platform.OS === 'ios');
   /** Emit push-permission readiness once per login so the OS dialog does not stack on first-login Modals (iPad). */
   const pushPermissionReadyEmittedForUser = useRef<string | null>(null);
+  const [guestSchoolId, setGuestSchoolId] = useState<string | null>(null);
+  const [guestSchools, setGuestSchools] = useState<SchoolOption[]>([]);
+  const [guestSchoolsLoading, setGuestSchoolsLoading] = useState(false);
+  const [guestSchoolModalVisible, setGuestSchoolModalVisible] = useState(false);
 
   const schoolId = user?.schoolId ?? null;
   const showCategories = !!user && !showAllSchools;
-  /** Logged-in All schools tab: show Latest/Popular as category-style pills, not the funnel menu. */
-  const allSchoolsSortInline = !!user && showAllSchools;
+  /** Logged-in All schools tab: Latest/Popular pills in the strip (guest uses funnel dropdown only). */
+  const showSortPillsInline = !!user && showAllSchools;
   const isMySchoolFeed = !!user && !showAllSchools && !!schoolId;
 
   const clearSubCategoryFilter = useCallback(() => setSelectedSubCategoryIds([]), []);
@@ -127,8 +132,55 @@ export default function EventsScreen() {
       .catch(() => {});
   }, []);
 
+  const fetchGuestSchools = useCallback(async () => {
+    setGuestSchoolsLoading(true);
+    try {
+      const list = await getSchools();
+      setGuestSchools(list);
+    } catch {
+      setGuestSchools([]);
+    } finally {
+      setGuestSchoolsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (guestSchoolModalVisible) void fetchGuestSchools();
+  }, [guestSchoolModalVisible, fetchGuestSchools]);
+
+  const openGuestLogin = useCallback(() => {
+    (navigation as { navigate: (name: string, params?: object) => void }).navigate('Settings', {
+      screen: 'SettingsMain',
+      params: { openLogin: true },
+    });
+  }, [navigation]);
+
+  useEffect(() => {
+    if (user?.id) setGuestSchoolId(null);
+  }, [user?.id]);
+
+  const clearGuestSchoolFilter = useCallback(() => {
+    setGuestSchoolId(null);
+    setGuestSchoolModalVisible(false);
+  }, []);
+
+  const selectGuestSchool = useCallback((id: string) => {
+    setGuestSchoolId(id);
+    setGuestSchoolModalVisible(false);
+    setHomeFilterMenuOpen(false);
+  }, []);
+
+  const guestSchoolName = useMemo(() => {
+    if (!guestSchoolId) return null;
+    const fromList = guestSchools.find((s) => s.id === guestSchoolId)?.name;
+    if (fromList) return fromList;
+    return events.find((e) => e.schoolId === guestSchoolId)?.school?.name ?? null;
+  }, [guestSchoolId, guestSchools, events]);
+
+  const isGuestSchoolFeed = !user && !!guestSchoolId;
+
   const fetchEvents = useCallback(async () => {
-    const school = showAllSchools ? null : schoolId ?? null;
+    const school = !user ? guestSchoolId : showAllSchools ? null : schoolId ?? null;
     const subIds = showCategories && selectedSubCategoryIds.length > 0 ? selectedSubCategoryIds : undefined;
     try {
       const list = await getApprovedEvents(school, subIds);
@@ -177,7 +229,7 @@ export default function EventsScreen() {
       }
       setError('Unable to load events right now. Pull to refresh and try again.');
     }
-  }, [showAllSchools, schoolId, showCategories, selectedSubCategoryIds, user]);
+  }, [showAllSchools, schoolId, showCategories, selectedSubCategoryIds, user, guestSchoolId]);
 
   useEffect(() => {
     if (showCategories && schoolId) {
@@ -506,11 +558,11 @@ export default function EventsScreen() {
   const [activeBannerAds, setActiveBannerAds] = useState<BannerAdPublic[]>([]);
   const [activeSponsoredAds, setActiveSponsoredAds] = useState<SponsoredAdPublic[]>([]);
 
-  /** Match web: logged-in + all schools → no school filter; else user’s school. Guests → all schools. */
+  /** Match web: logged-in + all schools → no school filter; else user’s school. Guests → optional school filter. */
   const effectiveSchoolId = useMemo(() => {
-    if (!user) return null;
+    if (!user) return guestSchoolId;
     return showAllSchools ? null : schoolId;
-  }, [user, showAllSchools, schoolId]);
+  }, [user, showAllSchools, schoolId, guestSchoolId]);
 
   const loadAds = useCallback(async () => {
     try {
@@ -589,57 +641,15 @@ export default function EventsScreen() {
       .filter((v): v is { id: string; name: string } => !!v);
   }, [selectedSubCategoryIds, categories]);
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* My school / All schools tabs — same order as web (above category + filter row) */}
-      {user ? (
-        <View style={styles.tabBar}>
-          <TouchableOpacity
-            style={[styles.tab, showAllSchools ? null : styles.tabActive]}
-            onPress={switchToMySchool}
-          >
-            <View style={styles.tabContent}>
-              {mySchoolLogo ? (
-                <Image source={{ uri: mySchoolLogo }} style={styles.tabSchoolLogo} />
-              ) : (
-                <View style={styles.tabSchoolLogoFallback}>
-                  <Text style={styles.tabSchoolLogoFallbackText}>
-                    {(user?.name?.trim()?.charAt(0) || 'S').toUpperCase()}
-                  </Text>
-                </View>
-              )}
-              <Text style={[styles.tabText, showAllSchools ? styles.tabTextInactive : styles.tabTextActive]}>
-                My school
-              </Text>
-            </View>
-            {!showAllSchools && <View style={styles.tabUnderline} />}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, showAllSchools ? styles.tabActive : null]}
-            onPress={switchToAllSchools}
-          >
-            <View style={styles.tabContent}>
-              <View style={styles.tabSchoolLogoFallback}>
-                <BuildingIcon width={14} height={14} fill="#4b5563" />
-              </View>
-              <Text style={[styles.tabText, showAllSchools ? styles.tabTextActive : styles.tabTextInactive]}>
-                All schools
-              </Text>
-            </View>
-            {showAllSchools && <View style={styles.tabUnderline} />}
-          </TouchableOpacity>
-        </View>
-      ) : null}
-
-      {/* My school: category pills + funnel (Latest/Popular). All schools (logged in): Latest/Popular pills only, no funnel. */}
-      <View style={styles.homeFilterRow}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoriesStrip}
-          contentContainerStyle={styles.categoriesStripContent}
-        >
-          {allSchoolsSortInline ? (
+  const homeFilterRow = (
+    <View style={[styles.homeFilterRow, !user ? styles.guestHomeFilterRow : null]}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.categoriesStrip}
+        contentContainerStyle={styles.categoriesStripContent}
+      >
+        {showSortPillsInline ? (
             <>
               <TouchableOpacity
                 style={[
@@ -717,7 +727,7 @@ export default function EventsScreen() {
             </>
           )}
         </ScrollView>
-        {!allSchoolsSortInline ? (
+        {(!user || !showSortPillsInline) ? (
           <>
             <TouchableOpacity
               style={[
@@ -743,15 +753,15 @@ export default function EventsScreen() {
             <TouchableOpacity
               style={[
                 styles.homeFilterBtn,
-                (homeFilterMenuOpen || feedSort !== 'latest') && styles.homeFilterBtnActive,
+                (homeFilterMenuOpen || feedSort !== 'latest' || isGuestSchoolFeed) && styles.homeFilterBtnActive,
               ]}
               onPress={() => setHomeFilterMenuOpen((o) => !o)}
-              accessibilityLabel="Filter: Latest, Popular"
+              accessibilityLabel="Filter"
             >
               <FunnelIcon
                 width={22}
                 height={22}
-                fill={homeFilterMenuOpen ? '#087990' : '#6c757d'}
+                fill={homeFilterMenuOpen || isGuestSchoolFeed || feedSort !== 'latest' ? '#087990' : '#6c757d'}
               />
             </TouchableOpacity>
             {homeFilterMenuOpen ? (
@@ -791,12 +801,103 @@ export default function EventsScreen() {
                     </Text>
                   </TouchableOpacity>
                 </View>
+                {!user ? (
+                  <>
+                    <Text style={[styles.sortDropdownSubLabel, styles.sortDropdownSchoolLabel]}>School</Text>
+                    <TouchableOpacity
+                      style={styles.guestSchoolFilterBtn}
+                      onPress={() => {
+                        setHomeFilterMenuOpen(false);
+                        setGuestSchoolModalVisible(true);
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <BuildingIcon width={16} height={16} fill="#1a1f2e" />
+                      <Text style={styles.guestSchoolFilterBtnText}>Filter by school</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : null}
               </View>
             ) : null}
           </View>
           </>
         ) : null}
-      </View>
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {!user ? (
+        <View style={styles.guestHomeHeader}>
+          <View style={styles.guestLoginBanner}>
+            <Ionicons name="information-circle" size={16} color="#997404" style={styles.guestLoginBannerIcon} />
+            <Text style={styles.guestLoginBannerText}>
+              Sign in to customize your school feed and join school chat groups.
+            </Text>
+            <TouchableOpacity onPress={openGuestLogin} hitSlop={8}>
+              <Text style={styles.guestLoginBannerAction}>Sign in</Text>
+            </TouchableOpacity>
+          </View>
+          {homeFilterRow}
+          {!user && guestSchoolId ? (
+            <View style={styles.guestSchoolChipRow}>
+              <Text style={styles.guestSchoolChipLabel}>Showing:</Text>
+              <View style={styles.guestSchoolBadge}>
+                <Text style={styles.guestSchoolBadgeText} numberOfLines={1}>
+                  {guestSchoolName ?? 'Selected school'}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setGuestSchoolModalVisible(true)} hitSlop={8}>
+                <Text style={styles.guestSchoolChipAction}>Change school</Text>
+              </TouchableOpacity>
+              <Text style={styles.guestSchoolChipDot}>·</Text>
+              <TouchableOpacity onPress={clearGuestSchoolFilter} hitSlop={8}>
+                <Text style={styles.guestSchoolChipAction}>Clear filter</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+        </View>
+      ) : (
+        <>
+          <View style={styles.tabBar}>
+            <TouchableOpacity
+              style={[styles.tab, showAllSchools ? null : styles.tabActive]}
+              onPress={switchToMySchool}
+            >
+              <View style={styles.tabContent}>
+                {mySchoolLogo ? (
+                  <Image source={{ uri: mySchoolLogo }} style={styles.tabSchoolLogo} />
+                ) : (
+                  <View style={styles.tabSchoolLogoFallback}>
+                    <Text style={styles.tabSchoolLogoFallbackText}>
+                      {(user?.name?.trim()?.charAt(0) || 'S').toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+                <Text style={[styles.tabText, showAllSchools ? styles.tabTextInactive : styles.tabTextActive]}>
+                  My school
+                </Text>
+              </View>
+              {!showAllSchools && <View style={styles.tabUnderline} />}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, showAllSchools ? styles.tabActive : null]}
+              onPress={switchToAllSchools}
+            >
+              <View style={styles.tabContent}>
+                <View style={styles.tabSchoolLogoFallback}>
+                  <BuildingIcon width={14} height={14} fill="#4b5563" />
+                </View>
+                <Text style={[styles.tabText, showAllSchools ? styles.tabTextActive : styles.tabTextInactive]}>
+                  All schools
+                </Text>
+              </View>
+              {showAllSchools && <View style={styles.tabUnderline} />}
+            </TouchableOpacity>
+          </View>
+          {homeFilterRow}
+        </>
+      )}
 
       {isMySchoolFeed && selectedSubCategoryMeta.length > 0 ? (
         <ScrollView
@@ -961,9 +1062,11 @@ export default function EventsScreen() {
               <NewspaperIcon width={40} height={40} fill="#6c757d" />
             </View>
             <Text style={styles.emptyFeedPrimary}>
-              {isMySchoolFeed ? 'No approved news for this school yet.' : 'No approved news yet.'}
+              {isMySchoolFeed || isGuestSchoolFeed
+                ? 'No approved news for this school yet.'
+                : 'No approved news yet.'}
             </Text>
-            {isMySchoolFeed ? (
+            {isMySchoolFeed || isGuestSchoolFeed ? (
               <TouchableOpacity onPress={openSchoolEmptyMessage} style={styles.emptyFeedViewMsg}>
                 <Text style={styles.emptyFeedViewMsgText}>View message</Text>
               </TouchableOpacity>
@@ -1015,6 +1118,54 @@ export default function EventsScreen() {
           )}
         </View>
       )}
+
+      {guestSchoolModalVisible ? (
+        <Modal visible animationType="slide" transparent onRequestClose={() => setGuestSchoolModalVisible(false)}>
+          <Pressable style={styles.schoolPickerOverlay} onPress={() => setGuestSchoolModalVisible(false)}>
+            <Pressable style={styles.schoolPickerContent} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.schoolPickerHeader}>
+                <Text style={styles.schoolPickerTitle}>Select a school</Text>
+                <TouchableOpacity onPress={() => setGuestSchoolModalVisible(false)}>
+                  <Text style={styles.schoolPickerClose}>Close</Text>
+                </TouchableOpacity>
+              </View>
+              {guestSchoolId ? (
+                <TouchableOpacity style={styles.schoolPickerShowAll} onPress={clearGuestSchoolFilter}>
+                  <Text style={styles.guestSchoolChipAction}>Clear filter</Text>
+                </TouchableOpacity>
+              ) : null}
+              {guestSchoolsLoading ? (
+                <ActivityIndicator size="small" color="#1a1f2e" style={{ marginVertical: 24 }} />
+              ) : guestSchools.length === 0 ? (
+                <Text style={styles.schoolPickerEmpty}>No schools found.</Text>
+              ) : (
+                <ScrollView style={styles.schoolPickerList}>
+                  {guestSchools.map((s) => {
+                    const isSelected = guestSchoolId === s.id;
+                    return (
+                      <TouchableOpacity
+                        key={s.id}
+                        style={[styles.schoolPickerItem, isSelected && styles.schoolPickerItemSelected]}
+                        onPress={() => selectGuestSchool(s.id)}
+                        activeOpacity={0.85}
+                      >
+                        {s.image ? (
+                          <Image source={{ uri: imageSrc(s.image) }} style={styles.schoolPickerLogo} />
+                        ) : (
+                          <View style={styles.schoolPickerLogoPlaceholder}>
+                            <Text style={styles.schoolPickerLogoLetter}>{s.name?.charAt(0) ?? '?'}</Text>
+                          </View>
+                        )}
+                        <Text style={styles.schoolPickerName}>{s.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
+            </Pressable>
+          </Pressable>
+        </Modal>
+      ) : null}
 
       {showCalendarModal ? (
         <Modal
@@ -1216,6 +1367,109 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f7fb',
     position: 'relative',
   },
+  guestHomeHeader: {
+    backgroundColor: '#fff',
+    marginBottom: 8,
+  },
+  guestHomeFilterRow: {
+    borderBottomWidth: 0,
+  },
+  guestLoginBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginHorizontal: 4,
+    marginTop: 4,
+    marginBottom: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#fff8e6',
+    borderWidth: 1,
+    borderColor: '#ffe8a3',
+  },
+  guestLoginBannerIcon: {
+    marginTop: 2,
+    flexShrink: 0,
+  },
+  guestLoginBannerText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#664d03',
+  },
+  guestLoginBannerAction: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#664d03',
+    flexShrink: 0,
+  },
+  /** Match web `btn-sm rounded-pill btn-outline-dark` / `btn-dark` guest school pills */
+  guestSchoolPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#343a40',
+    backgroundColor: 'transparent',
+    maxWidth: 180,
+  },
+  guestSchoolPillPlain: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  guestSchoolPillWithLogo: {
+    paddingLeft: 7,
+    paddingRight: 10,
+    paddingVertical: 6,
+    gap: 8,
+  },
+  guestSchoolPillActive: {
+    backgroundColor: '#212529',
+    borderColor: '#212529',
+  },
+  guestSchoolPillText: {
+    fontSize: 13,
+    fontWeight: '400',
+    color: '#212529',
+    flexShrink: 1,
+  },
+  guestSchoolPillTextActive: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  guestSchoolStripLogo: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    flexShrink: 0,
+  },
+  guestSchoolStripLogoFallback: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(26,31,46,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  guestSchoolStripLogoFallbackActive: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  guestSchoolStripLogoLetter: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#1a1f2e',
+  },
+  guestSchoolStripLogoLetterActive: {
+    color: '#fff',
+  },
+  guestSchoolStripLoadingText: {
+    fontSize: 13,
+    color: '#6c757d',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
   homeFilterRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1285,6 +1539,145 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6c757d',
     marginBottom: 8,
+  },
+  sortDropdownSchoolLabel: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#dee2e6',
+    marginTop: 8,
+    paddingTop: 8,
+  },
+  guestSchoolFilterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    alignSelf: 'flex-start',
+  },
+  guestSchoolFilterBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1a1f2e',
+  },
+  guestSchoolChipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#eee',
+  },
+  guestSchoolChipLabel: {
+    fontSize: 13,
+    color: '#6c757d',
+  },
+  guestSchoolBadge: {
+    backgroundColor: '#212529',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    maxWidth: '46%',
+  },
+  guestSchoolBadgeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  guestSchoolChipAction: {
+    fontSize: 13,
+    color: '#087990',
+    fontWeight: '500',
+  },
+  guestSchoolChipDot: {
+    fontSize: 13,
+    color: '#adb5bd',
+  },
+  schoolPickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  schoolPickerContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: '70%',
+    paddingBottom: 32,
+  },
+  schoolPickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  schoolPickerTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1a1f2e',
+  },
+  schoolPickerClose: {
+    fontSize: 15,
+    color: '#6c757d',
+  },
+  schoolPickerShowAll: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  schoolPickerEmpty: {
+    textAlign: 'center',
+    color: '#8e8e8e',
+    paddingVertical: 24,
+  },
+  schoolPickerList: {
+    padding: 16,
+  },
+  schoolPickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  schoolPickerItemSelected: {
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  schoolPickerLogo: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+  },
+  schoolPickerLogoPlaceholder: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    backgroundColor: 'rgba(26,31,46,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  schoolPickerLogoLetter: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1a1f2e',
+  },
+  schoolPickerName: {
+    marginLeft: 12,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1a1f2e',
+    flex: 1,
   },
   sortPillRow: {
     flexDirection: 'row',
@@ -1593,8 +1986,8 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   categoriesStripContent: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     gap: 8,
     flexDirection: 'row',
     alignItems: 'center',

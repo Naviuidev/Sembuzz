@@ -7,6 +7,7 @@ import { SubCategoryAdminApprovedPanel } from '../components/SubCategoryAdminApp
 import { SubCategoryAdminReceivedCorrectionsPanel } from '../components/SubCategoryAdminReceivedCorrectionsPanel';
 import { useSubCategoryAdminAuth } from '../contexts/SubCategoryAdminAuthContext';
 import { subcategoryAdminEventsService, type RevertedEvent } from '../services/subcategory-admin-events.service';
+import { invalidateAdminActionItems } from '../services/admin-action-items.service';
 
 type CreateMode = 'choose' | 'manual' | 'ai';
 type AIStep = 'banner' | 'form';
@@ -249,6 +250,7 @@ export const SubCategoryAdminPostEvent = () => {
       setActiveTab('approvals-pending');
       await queryClient.invalidateQueries({ queryKey: ['subcategory-admin', 'events', 'reverted'] });
       await queryClient.invalidateQueries({ queryKey: ['subcategory-admin', 'events', 'pending'] });
+      void invalidateAdminActionItems(queryClient, 'subcategory-admin');
     } catch (err: unknown) {
       let text = 'Failed to submit. Try again.';
       if (err && typeof err === 'object' && 'response' in err) {

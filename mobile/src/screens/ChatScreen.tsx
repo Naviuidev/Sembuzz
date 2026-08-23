@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -6,6 +6,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../contexts/AuthContext';
 import { ChatGroupsView, type ChatGroupListItem } from '../components/ChatGroupsView';
+import { getDirectChatAvailability } from '../services/directChat';
 import type { MainTabParamList, RootStackParamList } from '../navigation/types';
 
 const TEXT_DARK = '#1a1f2e';
@@ -15,6 +16,17 @@ export default function ChatScreen() {
   const { user } = useAuth();
   const tabNavigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
   const rootNavigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [directAvailable, setDirectAvailable] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      setDirectAvailable(null);
+      return;
+    }
+    void getDirectChatAvailability()
+      .then((result) => setDirectAvailable(result.available))
+      .catch(() => setDirectAvailable(false));
+  }, [user]);
 
   const openLogin = useCallback(() => {
     tabNavigation.navigate('Settings', {
@@ -64,7 +76,11 @@ export default function ChatScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Chat Groups</Text>
-        <Text style={styles.headerSubtitle}>Groups, club chats, and direct messages</Text>
+        <Text style={styles.headerSubtitle}>
+          {directAvailable === true
+            ? 'Groups, club chats, and direct messages'
+            : 'Groups and club chats'}
+        </Text>
       </View>
       <ChatGroupsView
         isLoggedIn={!!user}

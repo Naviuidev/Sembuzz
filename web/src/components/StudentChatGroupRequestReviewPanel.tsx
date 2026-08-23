@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateAdminActionItemsForPrefix } from '../services/admin-action-items.service';
 import type { StudentChatGroupRequestItem } from '../services/subcategory-admin-student-chat-group-requests.service';
 
 const TEXT_DARK = '#1a1f2e';
@@ -34,6 +35,7 @@ export function StudentChatGroupRequestReviewPanel({
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: [queryKeyPrefix, 'student-chat-group-requests'] });
+    invalidateAdminActionItemsForPrefix(queryClient, queryKeyPrefix);
   };
 
   const approveMutation = useMutation({

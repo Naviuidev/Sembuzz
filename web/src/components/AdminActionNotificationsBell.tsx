@@ -1,46 +1,55 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../config/api';
-
-export interface AdminActionItem {
-  id: string;
-  kind: string;
-  title: string;
-  summary: string;
-  href: string;
-  count: number;
-  createdAt?: string;
-}
-
-export interface AdminActionItemsResponse {
-  totalCount: number;
-  items: AdminActionItem[];
-}
-
-export type AdminActionItemsRole =
-  | 'school-admin'
-  | 'category-admin'
-  | 'subcategory-admin'
-  | 'super-admin'
-  | 'ads-admin';
-
-export function fetchAdminActionItems(role: AdminActionItemsRole) {
-  return api.get<AdminActionItemsResponse>(`/${role}/action-items`).then((r) => r.data);
-}
+import {
+  adminActionItemsQueryKey,
+  fetchAdminActionItems,
+  type AdminActionItemsRole,
+} from '../services/admin-action-items.service';
 
 const TEXT_DARK = '#1a1f2e';
 
+export type { AdminActionItem, AdminActionItemsResponse, AdminActionItemsRole } from '../services/admin-action-items.service';
+
 export function AdminActionNotificationsBell({ role }: { role: AdminActionItemsRole }) {
   const [open, setOpen] = useState(false);
+  const [justCleared, setJustCleared] = useState(false);
+  const [justResolved, setJustResolved] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const prevTotalRef = useRef<number | null>(null);
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ['admin-action-items', role],
+    queryKey: adminActionItemsQueryKey(role),
     queryFn: () => fetchAdminActionItems(role),
     refetchInterval: 60_000,
-    staleTime: 30_000,
+    staleTime: 15_000,
   });
+
+  const total = data?.totalCount ?? 0;
+  const items = data?.items ?? [];
+
+  useEffect(() => {
+    const prev = prevTotalRef.current;
+    if (prev != null && prev > total) {
+      if (total === 0) {
+        setJustCleared(true);
+        setJustResolved(false);
+        const t = setTimeout(() => setJustCleared(false), 2500);
+        prevTotalRef.current = total;
+        return () => clearTimeout(t);
+      }
+      setJustResolved(true);
+      setJustCleared(false);
+      const t = setTimeout(() => setJustResolved(false), 1800);
+      prevTotalRef.current = total;
+      return () => clearTimeout(t);
+    }
+    prevTotalRef.current = total;
+    if (total > 0) {
+      setJustCleared(false);
+      setJustResolved(false);
+    }
+  }, [total]);
 
   useEffect(() => {
     if (!open) return;
@@ -52,9 +61,6 @@ export function AdminActionNotificationsBell({ role }: { role: AdminActionItemsR
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [open]);
-
-  const total = data?.totalCount ?? 0;
-  const items = data?.items ?? [];
 
   return (
     <div className="position-relative" ref={rootRef}>
@@ -80,10 +86,26 @@ export function AdminActionNotificationsBell({ role }: { role: AdminActionItemsR
         <i className="bi bi-bell" style={{ fontSize: '1.1rem' }} aria-hidden />
         {total > 0 ? (
           <span
-            className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-            style={{ fontSize: '0.65rem', minWidth: 18 }}
+            className={`position-absolute top-0 start-100 translate-middle badge rounded-pill d-flex align-items-center justify-content-center${
+              justResolved ? '' : ' bg-danger'
+            }`}
+            style={{
+              fontSize: '0.65rem',
+              minWidth: 18,
+              backgroundColor: justResolved ? '#198754' : undefined,
+              transition: 'background-color 0.25s ease',
+            }}
+            title={justResolved ? 'Action completed' : undefined}
           >
-            {total > 99 ? '99+' : total}
+            {justResolved ? <i className="bi bi-check-lg" aria-hidden /> : total > 99 ? '99+' : total}
+          </span>
+        ) : justCleared ? (
+          <span
+            className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success d-flex align-items-center justify-content-center"
+            style={{ fontSize: '0.65rem', width: 18, height: 18, padding: 0 }}
+            title="All caught up"
+          >
+            <i className="bi bi-check-lg" aria-hidden />
           </span>
         ) : null}
       </button>

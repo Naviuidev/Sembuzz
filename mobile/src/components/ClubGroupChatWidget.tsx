@@ -31,6 +31,7 @@ import {
   ChatBubble,
   PendingAttachmentBar,
   ReplyComposerBar,
+  ChatComposer,
 } from './ChatMessageParts';
 import {
   type ChatMessageReplyTo,
@@ -350,42 +351,17 @@ export function ClubGroupChatWidget({
                       />
                     ) : null}
                     {uploading ? <Text style={styles.readOnlyHint}>Uploading… (max 5 MB)</Text> : null}
-                    <View style={styles.composer}>
-                      <TouchableOpacity
-                        style={styles.attachBtn}
-                        onPress={() => void pickImage()}
-                        disabled={uploading || !!pendingAttachment}
-                      >
-                        <Text style={styles.attachBtnText}>IMG</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.attachBtn}
-                        onPress={() => void pickPdf()}
-                        disabled={uploading || !!pendingAttachment}
-                      >
-                        <Text style={styles.attachBtnText}>PDF</Text>
-                      </TouchableOpacity>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="Type a message…"
-                        placeholderTextColor="#adb5bd"
-                        value={draft}
-                        onChangeText={setDraft}
-                        editable={!sending && !uploading}
-                        returnKeyType="send"
-                        onSubmitEditing={() => void handleSend()}
-                      />
-                      <TouchableOpacity
-                        style={[
-                          styles.sendBtn,
-                          ((!draft.trim() && !pendingAttachment) || sending || uploading) && styles.sendBtnDisabled,
-                        ]}
-                        onPress={() => void handleSend()}
-                        disabled={(!draft.trim() && !pendingAttachment) || sending || uploading}
-                      >
-                        <Text style={styles.sendBtnText}>{sending ? '…' : 'Send'}</Text>
-                      </TouchableOpacity>
-                    </View>
+                    <ChatComposer
+                      draft={draft}
+                      onDraftChange={setDraft}
+                      onSend={() => void handleSend()}
+                      sending={sending}
+                      uploading={uploading}
+                      onPickImage={() => void pickImage()}
+                      onPickPdf={() => void pickPdf()}
+                      attachmentsDisabled={!!pendingAttachment}
+                      hasPendingAttachment={!!pendingAttachment}
+                    />
                   </>
                 )}
               </KeyboardAvoidingView>
@@ -582,46 +558,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#eee',
     backgroundColor: '#fff',
-  },
-  composer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    backgroundColor: '#fff',
-  },
-  attachBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#dee2e6',
-  },
-  attachBtnText: { fontSize: 10, fontWeight: '700', color: TEXT_MUTED },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#dee2e6',
-    paddingHorizontal: 12,
-    paddingVertical: Platform.OS === 'ios' ? 10 : 8,
-    fontSize: 15,
-    color: TEXT_DARK,
-    borderRadius: 0,
-  },
-  sendBtn: {
-    backgroundColor: TEXT_DARK,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 0,
-  },
-  sendBtnDisabled: {
-    opacity: 0.5,
-  },
-  sendBtnText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
   },
   clubIconWrap: {
     backgroundColor: 'rgba(26, 31, 46, 0.08)',

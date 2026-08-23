@@ -403,11 +403,7 @@ export function DirectChatPanel({
     }
 
     if (availability && !availability.available) {
-      return (
-        <p className="small text-muted mb-0">
-          Direct messaging is not available for your school right now.
-        </p>
-      );
+      return null;
     }
   }
 

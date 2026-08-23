@@ -14,7 +14,7 @@ import {
   listJoinableClubGroupChats,
   requestJoinClubGroup,
 } from '../services/clubGroupChat';
-import { getDirectChatUnreadCount } from '../services/directChat';
+import { getDirectChatAvailability, getDirectChatUnreadCount } from '../services/directChat';
 import { DirectChatPanel } from './DirectChatPanel';
 import { imageSrc, isImageIconValue } from '../utils/image';
 
@@ -41,13 +41,21 @@ export function ClubMessagingBadges({ isAuthenticated, currentUserId, onRequireL
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [yourChatBadgeCount, setYourChatBadgeCount] = useState(0);
+  const [directAvailable, setDirectAvailable] = useState(false);
 
   const loadDirectUnread = useCallback(async () => {
     if (!isAuthenticated) {
       setYourChatBadgeCount(0);
+      setDirectAvailable(false);
       return;
     }
     try {
+      const availability = await getDirectChatAvailability().catch(() => ({ available: false }));
+      setDirectAvailable(availability.available);
+      if (!availability.available) {
+        setYourChatBadgeCount(0);
+        return;
+      }
       const counts = await getDirectChatUnreadCount();
       setYourChatBadgeCount((counts.unreadCount ?? 0) + (counts.pendingIncomingCount ?? 0));
     } catch {
@@ -144,6 +152,7 @@ export function ClubMessagingBadges({ isAuthenticated, currentUserId, onRequireL
         <TouchableOpacity style={styles.badge} onPress={openGroup} activeOpacity={0.85}>
           <Text style={styles.badgeText}>Group chat</Text>
         </TouchableOpacity>
+        {directAvailable ? (
         <TouchableOpacity
           style={styles.badgeOutline}
           onPress={() => (isAuthenticated ? setYourChatOpen(true) : onRequireLogin())}
@@ -158,6 +167,7 @@ export function ClubMessagingBadges({ isAuthenticated, currentUserId, onRequireL
             </View>
           ) : null}
         </TouchableOpacity>
+        ) : null}
       </View>
 
       <Modal visible={groupOpen} transparent animationType="fade" onRequestClose={() => setGroupOpen(false)}>
@@ -246,6 +256,7 @@ export function ClubMessagingBadges({ isAuthenticated, currentUserId, onRequireL
         </Pressable>
       </Modal>
 
+      {directAvailable ? (
       <Modal visible={yourChatOpen} transparent animationType="fade" onRequestClose={() => setYourChatOpen(false)}>
         <Pressable style={styles.overlay} onPress={() => setYourChatOpen(false)}>
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
@@ -257,6 +268,7 @@ export function ClubMessagingBadges({ isAuthenticated, currentUserId, onRequireL
           </Pressable>
         </Pressable>
       </Modal>
+      ) : null}
     </>
   );
 }

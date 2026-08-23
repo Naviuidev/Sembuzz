@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { userStudentChatGroupsService } from '../services/user-student-chat-groups.service';
 import { userClubGroupChatsService } from '../services/user-club-group-chats.service';
@@ -386,6 +386,13 @@ export function ChatGroupsView({
 
   const pendingCount = unreadCounts?.pendingIncomingCount ?? pendingIncoming.length;
   const myChatsUnreadTotal = unreadCounts?.unreadCount ?? 0;
+  const showDirectMessaging = directAvailability?.available === true;
+
+  useEffect(() => {
+    if (directAvailability && !directAvailability.available && filterTab === 'my-chats') {
+      setFilterTab('all');
+    }
+  }, [directAvailability, filterTab]);
 
   const unreadByUserId = useMemo(() => {
     const map = new Map<string, number>();
@@ -574,11 +581,16 @@ export function ChatGroupsView({
     [filtered],
   );
 
-  const tabs: { id: FilterTab; label: string; badge?: number }[] = [
-    { id: 'all', label: 'All' },
-    { id: 'joined', label: 'Joined' },
-    { id: 'my-chats', label: 'My Chats', badge: myChatsUnreadTotal },
-  ];
+  const tabs: { id: FilterTab; label: string; badge?: number }[] = useMemo(() => {
+    const base: { id: FilterTab; label: string; badge?: number }[] = [
+      { id: 'all', label: 'All' },
+      { id: 'joined', label: 'Joined' },
+    ];
+    if (showDirectMessaging) {
+      base.push({ id: 'my-chats', label: 'My Chats', badge: myChatsUnreadTotal });
+    }
+    return base;
+  }, [showDirectMessaging, myChatsUnreadTotal]);
 
   const handleBack = () => {
     if (overlayView === 'notifications') {
@@ -617,7 +629,7 @@ export function ChatGroupsView({
             {headerTitle}
           </h1>
           <div className="d-flex align-items-center gap-1">
-            {overlayView === 'none' && onClose ? (
+            {overlayView === 'none' && onClose && showDirectMessaging ? (
               <button
                 type="button"
                 className="btn btn-link p-0 text-decoration-none position-relative"
@@ -767,13 +779,7 @@ export function ChatGroupsView({
             </section>
           )
         ) : filterTab === 'my-chats' ? (
-          directAvailability && !directAvailability.available ? (
-            <div className="text-center px-4 py-5">
-              <p className="small text-muted mb-0">
-                Direct messaging is not available for your school right now.
-              </p>
-            </div>
-          ) : isLoading ? (
+          isLoading ? (
             <p className="text-center text-muted py-5 mb-0">Loading students…</p>
           ) : filteredStudents.length === 0 ? (
             <div className="text-center px-4 py-5">

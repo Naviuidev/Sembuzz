@@ -9,6 +9,7 @@ import {
   type RaisedToSuperAdminQueryItem,
   type SubCategoryAdminQueryItem,
 } from '../services/school-admin-queries.service';
+import { invalidateAdminActionItems } from '../services/admin-action-items.service';
 
 const cardStyle = {
   border: '1px solid rgb(26, 31, 46)',
@@ -142,6 +143,7 @@ export const SchoolAdminQueries = () => {
       setSending(false);
       queryClient.invalidateQueries({ queryKey: ['school-admin-queries-from-category-admins'] });
       queryClient.invalidateQueries({ queryKey: ['school-admin-queries-from-subcategory-admins'] });
+      void invalidateAdminActionItems(queryClient, 'school-admin');
     },
     onError: () => setSending(false),
   });
@@ -179,6 +181,7 @@ export const SchoolAdminQueries = () => {
         queryClient.invalidateQueries({ queryKey: ['school-admin-queries-from-subcategory-admins'] });
       }
       setDeleteConfirmRow(null);
+      void invalidateAdminActionItems(queryClient, 'school-admin');
     } catch (err) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to delete.';
       setError(msg);

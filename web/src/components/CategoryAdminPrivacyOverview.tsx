@@ -10,6 +10,7 @@ import {
   categoryAdminEmailChangeRequestsService,
   type AdminEmailChangeTargetRole,
 } from '../services/admin-email-change-requests.service';
+import { invalidateAdminActionItems } from '../services/admin-action-items.service';
 
 const TEXT_DARK = '#1a1f2e';
 const TEXT_MUTED = '#6c757d';
@@ -65,7 +66,8 @@ export function CategoryAdminPrivacyOverview() {
     mutationFn: ({ requestId, otp }: { requestId: string; otp: string }) =>
       categoryAdminEmailChangeRequestsService.confirmOtp(requestId, otp),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['school-admin', 'action-items'] });
+      void invalidateAdminActionItems(queryClient, 'category-admin');
+      void invalidateAdminActionItems(queryClient, 'school-admin');
     },
   });
 

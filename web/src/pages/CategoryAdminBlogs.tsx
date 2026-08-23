@@ -7,6 +7,7 @@ import {
   type BlogForCategoryAdmin,
   type UpdateBlogDto,
 } from '../services/category-admin-blogs.service';
+import { invalidateAdminActionItems } from '../services/admin-action-items.service';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -65,6 +66,7 @@ export const CategoryAdminBlogs = () => {
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['category-admin', 'blogs'] });
+    void invalidateAdminActionItems(queryClient, 'category-admin');
   };
 
   const updateM = useMutation({
