@@ -2,6 +2,7 @@ import { api } from '../config/api';
 
 export interface PendingEventForCategoryAdmin {
   id: string;
+  schoolId: string;
   title: string;
   description: string | null;
   externalLink: string | null;
