@@ -1,7 +1,9 @@
-import { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { schoolAdminAuthService } from '../services/school-admin-auth.service';
 import type { SchoolAdminUser } from '../services/school-admin-auth.service';
+
+const IDLE_LOGOUT_MS = 10 * 60 * 1000; // 10 minutes
 
 interface SchoolAdminAuthContextType {
   user: SchoolAdminUser | null;
@@ -21,7 +23,14 @@ export const SchoolAdminAuthProvider = ({ children }: { children: ReactNode }) =
   const [token, setToken] = useState<string | null>(localStorage.getItem('school-admin-token'));
   const [loading, setLoading] = useState(true);
 
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const getMeSucceededRef = useRef(false);
+
+  const logout = useCallback(() => {
+    localStorage.removeItem('school-admin-token');
+    setToken(null);
+    setUser(null);
+  }, []);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -49,17 +58,46 @@ export const SchoolAdminAuthProvider = ({ children }: { children: ReactNode }) =
     initAuth();
   }, []);
 
+  // 10-minute idle timeout: logout only when user is on school-admin and has been inactive for 10 mins
+  useEffect(() => {
+    if (!token) return;
+
+    const scheduleIdleLogout = () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = setTimeout(() => {
+        const path = window.location.pathname;
+        if (path.startsWith('/school-admin') && path !== '/school-admin/login') {
+          logout();
+          window.location.href = '/school-admin/login';
+        }
+        idleTimerRef.current = null;
+      }, IDLE_LOGOUT_MS);
+    };
+
+    const onActivity = () => scheduleIdleLogout();
+
+    scheduleIdleLogout();
+    window.addEventListener('mousemove', onActivity);
+    window.addEventListener('keydown', onActivity);
+    window.addEventListener('click', onActivity);
+    window.addEventListener('touchstart', onActivity);
+    window.addEventListener('scroll', onActivity);
+
+    return () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      window.removeEventListener('mousemove', onActivity);
+      window.removeEventListener('keydown', onActivity);
+      window.removeEventListener('click', onActivity);
+      window.removeEventListener('touchstart', onActivity);
+      window.removeEventListener('scroll', onActivity);
+    };
+  }, [token, logout]);
+
   const login = async (identifier: string, password: string) => {
     const response = await schoolAdminAuthService.login({ identifier, password });
     localStorage.setItem('school-admin-token', response.access_token);
     setToken(response.access_token);
     setUser(response.user);
-  };
-
-  const logout = () => {
-    localStorage.removeItem('school-admin-token');
-    setToken(null);
-    setUser(null);
   };
 
   const changePassword = async (currentPassword: string, newPassword: string, confirmPassword: string) => {

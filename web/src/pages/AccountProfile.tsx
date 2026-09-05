@@ -135,14 +135,14 @@ export const AccountProfile = () => {
           icon="bi-shield-check"
           label="Privacy policy"
           onClick={() => {
-            window.open(legalHref('/#privacy'), '_blank', 'noopener,noreferrer');
+            window.open(legalHref('/privacy'), '_blank', 'noopener,noreferrer');
           }}
         />
         <OptionRow
           icon="bi-file-text"
           label="Terms and conditions"
           onClick={() => {
-            window.open(legalHref('/#terms-of-service'), '_blank', 'noopener,noreferrer');
+            window.open(legalHref('/terms'), '_blank', 'noopener,noreferrer');
           }}
         />
         <OptionRow

@@ -16,7 +16,8 @@ import {
 } from 'react-native';
 import { assignBannersToEventSlides, type PublicFeedItem } from '../utils/publicFeed';
 import type { ApprovedEventPublic, SponsoredAdPublic, BannerAdPublic } from '../services/events';
-import { canPrefetchImage, imageSrc, schoolLogoSrc } from '../utils/image';
+import { canPrefetchImage, imageSrc } from '../utils/image';
+import { SchoolLogo } from './SchoolLogo';
 import {
   recordBannerAdView,
   recordBannerAdClick,
@@ -98,7 +99,6 @@ function InshortsEventPage({
   const images = event.imageUrls ? parseImageUrlsJson(event.imageUrls) : [];
   const firstImage = images[0];
   const imgH = Math.max(160, Math.round(pageHeight * 0.42));
-  const schoolLogoUri = schoolLogoSrc(event.school?.image);
   const [commentsOpen, setCommentsOpen] = React.useState(false);
   const [comments, setComments] = React.useState<EventCommentResponse[]>([]);
   const [commentsLoading, setCommentsLoading] = React.useState(false);
@@ -231,13 +231,7 @@ function InshortsEventPage({
           </View>
         </View>
         <View style={styles.metaRow}>
-          {schoolLogoUri ? (
-            <Image source={{ uri: schoolLogoUri }} style={styles.smallLogo} />
-          ) : (
-            <View style={styles.smallLogoPh}>
-              <Text style={styles.smallLogoLetter}>{event.school?.name?.charAt(0) ?? '?'}</Text>
-            </View>
-          )}
+          <SchoolLogo school={event.school} size={28} borderRadius={6} />
           <Text style={styles.sourceName} numberOfLines={1}>
             {event.school?.name ?? 'School'}
           </Text>
@@ -354,7 +348,6 @@ function InshortsSponsoredPage({ ad, pageHeight, alignTop }: { ad: SponsoredAdPu
   const firstImage = images[0];
   const imgH = Math.max(160, Math.round(pageHeight * 0.42));
   const schoolName = ad.school?.name ?? 'School';
-  const schoolLogoUri = schoolLogoSrc(ad.school?.image);
 
   React.useEffect(() => {
     recordSponsoredAdView(ad.id).catch(() => {});
@@ -391,13 +384,7 @@ function InshortsSponsoredPage({ ad, pageHeight, alignTop }: { ad: SponsoredAdPu
           </View>
         )}
         <View style={styles.metaRow}>
-          {schoolLogoUri ? (
-            <Image source={{ uri: schoolLogoUri }} style={styles.smallLogo} />
-          ) : (
-            <View style={styles.smallLogoPh}>
-              <Text style={styles.smallLogoLetter}>{schoolName.charAt(0)}</Text>
-            </View>
-          )}
+          <SchoolLogo school={ad.school} size={28} borderRadius={6} />
           <Text style={styles.sourceName} numberOfLines={1}>
             {schoolName}
           </Text>
@@ -469,15 +456,15 @@ export function InshortsPagedFeed({
       if (item.type === 'event') {
         const first = parseImageUrlsJson(item.event.imageUrls ?? '')[0];
         if (first) urls.push(imageSrc(first));
-        const schoolLogo = schoolLogoSrc(item.event.school?.image);
-        if (schoolLogo) urls.push(schoolLogo);
+        const schoolLogo = item.event.school?.image ? imageSrc(item.event.school.image) : '';
+        if (schoolLogo && canPrefetchImage(schoolLogo)) urls.push(schoolLogo);
         const banner = bannerBySlideIndex.get(index);
         if (banner?.imageUrl) urls.push(imageSrc(banner.imageUrl));
       } else {
         const first = parseImageUrlsJson(item.ad.imageUrls ?? '')[0];
         if (first) urls.push(imageSrc(first));
-        const adSchoolLogo = schoolLogoSrc(item.ad.school?.image);
-        if (adSchoolLogo) urls.push(adSchoolLogo);
+        const adSchoolLogo = item.ad.school?.image ? imageSrc(item.ad.school.image) : '';
+        if (adSchoolLogo && canPrefetchImage(adSchoolLogo)) urls.push(adSchoolLogo);
       }
     });
     return Array.from(new Set(urls));

@@ -206,7 +206,11 @@ function MainTabsNavigator() {
     >
       <Tab.Screen name="Search" component={SearchScreen} options={{ tabBarLabel: 'Search' }} />
       <Tab.Screen name="Events" component={EventsScreen} options={{ tabBarLabel: 'Home' }} />
-      <Tab.Screen name="Settings" component={SettingsStackNavigator} options={{ tabBarLabel: 'Settings' }} />
+      <Tab.Screen
+        name="Settings"
+        component={SettingsStackNavigator}
+        options={{ tabBarLabel: 'Settings', freezeOnBlur: false }}
+      />
       <Tab.Screen name="Apps" component={AppsScreen} options={{ tabBarLabel: 'Apps' }} />
       <Tab.Screen name="Chat" component={ChatScreen} options={{ tabBarLabel: 'Chat' }} />
       <Tab.Screen name="Universities" component={UniversitiesScreen} options={{ tabBarLabel: 'Universities' }} />

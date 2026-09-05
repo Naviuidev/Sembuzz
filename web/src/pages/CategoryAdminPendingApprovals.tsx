@@ -8,6 +8,7 @@ import {
   type UpdateEventDto,
 } from '../services/category-admin-events.service';
 import { invalidateAdminActionItems } from '../services/admin-action-items.service';
+import { eventStatusBadge, formatPublishAt, dateTimeLocalToIso, defaultFutureDateTimeLocal } from '../utils/eventPublishing';
 
 function formatDate(iso: string) {
   try {
@@ -61,6 +62,8 @@ export const CategoryAdminPendingApprovals = () => {
   const [revertEvent, setRevertEvent] = useState<PendingEventForCategoryAdmin | null>(null);
   const [revertNotes, setRevertNotes] = useState('');
   const [approveEvent, setApproveEvent] = useState<PendingEventForCategoryAdmin | null>(null);
+  const [approvePublishNow, setApprovePublishNow] = useState(true);
+  const [approveRescheduleAt, setApproveRescheduleAt] = useState(defaultFutureDateTimeLocal);
 
   const { data: pendingEvents = [], isLoading, error } = useQuery({
     queryKey,
@@ -90,7 +93,13 @@ export const CategoryAdminPendingApprovals = () => {
   });
 
   const approveMutation = useMutation({
-    mutationFn: (eventId: string) => categoryAdminEventsService.approve(eventId),
+    mutationFn: ({
+      eventId,
+      options,
+    }: {
+      eventId: string;
+      options?: { publishNow?: boolean; publishAt?: string };
+    }) => categoryAdminEventsService.approve(eventId, options),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
       void invalidateAdminActionItems(queryClient, 'category-admin');
@@ -130,14 +139,27 @@ export const CategoryAdminPendingApprovals = () => {
 
   const handleApproveConfirm = () => {
     if (!approveEvent) return;
-    approveMutation.mutate(approveEvent.id, { onError: () => {} });
+    const isMissed = approveEvent.status === 'schedule_missed';
+    const options =
+      isMissed && !approvePublishNow
+        ? { publishNow: false, publishAt: dateTimeLocalToIso(approveRescheduleAt) }
+        : isMissed
+          ? { publishNow: true }
+          : undefined;
+    approveMutation.mutate({ eventId: approveEvent.id, options }, { onError: () => {} });
+  };
+
+  const openApproveModal = (row: PendingEventForCategoryAdmin) => {
+    setApproveEvent(row);
+    setApprovePublishNow(row.status !== 'schedule_missed');
+    setApproveRescheduleAt(defaultFutureDateTimeLocal());
   };
 
   const renderDetailRow = (row: PendingEventForCategoryAdmin) => {
     const images = parseImageUrls(row.imageUrls);
     return (
       <tr key={`${row.id}-detail`} style={{ backgroundColor: '#f8f9fa', borderBottom: '1px solid #dee2e6' }}>
-        <td colSpan={5} style={{ padding: '1rem 1rem 1.5rem', verticalAlign: 'top' }}>
+        <td colSpan={6} style={{ padding: '1rem 1rem 1.5rem', verticalAlign: 'top' }}>
           <div style={{ maxWidth: '100%' }}>
             <h6 style={{ color: '#1a1f2e', marginBottom: '0.75rem', fontWeight: '600' }}>Event details</h6>
             {row.description && (
@@ -151,6 +173,10 @@ export const CategoryAdminPendingApprovals = () => {
             )}
             <p className="mb-1"><strong>Subcategory:</strong> {row.subCategory?.name ?? '—'}</p>
             <p className="mb-1"><strong>Submitted by:</strong> {row.subCategoryAdmin?.name ?? '—'} ({row.subCategoryAdmin?.email ?? '—'})</p>
+            <p className="mb-1"><strong>Requested publish:</strong> {formatPublishAt(row.publishAt)}</p>
+            {row.status === 'schedule_missed' && (
+              <p className="mb-1 text-danger"><strong>Original scheduled time has passed.</strong></p>
+            )}
             <p className="mb-1"><strong>Date:</strong> {formatDate(row.createdAt)}</p>
             <p className="mb-2"><strong>Comments:</strong> {row.commentsEnabled ? 'Enabled' : 'Disabled'}</p>
             {images.length > 0 && (
@@ -231,6 +257,8 @@ export const CategoryAdminPendingApprovals = () => {
                         <th style={{ color: '#1a1f2e', fontWeight: '600', padding: '1rem', backgroundColor: '#f8f9fa' }}>Title</th>
                         <th style={{ color: '#1a1f2e', fontWeight: '600', padding: '1rem', backgroundColor: '#f8f9fa' }}>Subcategory</th>
                         <th style={{ color: '#1a1f2e', fontWeight: '600', padding: '1rem', backgroundColor: '#f8f9fa' }}>Submitted by</th>
+                        <th style={{ color: '#1a1f2e', fontWeight: '600', padding: '1rem', backgroundColor: '#f8f9fa' }}>Publish</th>
+                        <th style={{ color: '#1a1f2e', fontWeight: '600', padding: '1rem', backgroundColor: '#f8f9fa' }}>Status</th>
                         <th style={{ color: '#1a1f2e', fontWeight: '600', padding: '1rem', backgroundColor: '#f8f9fa' }}>Date</th>
                         <th style={{ color: '#1a1f2e', fontWeight: '600', padding: '1rem', backgroundColor: '#f8f9fa' }}>Actions</th>
                       </tr>
@@ -246,6 +274,14 @@ export const CategoryAdminPendingApprovals = () => {
                               {row.subCategoryAdmin?.email && (
                                 <span className="d-block small text-muted">{row.subCategoryAdmin.email}</span>
                               )}
+                            </td>
+                            <td style={{ padding: '1rem', verticalAlign: 'middle', color: '#6c757d' }}>
+                              {formatPublishAt(row.publishAt)}
+                            </td>
+                            <td style={{ padding: '1rem', verticalAlign: 'middle' }}>
+                              <span className={`badge ${eventStatusBadge(row.status).className}`}>
+                                {eventStatusBadge(row.status).label}
+                              </span>
                             </td>
                             <td style={{ padding: '1rem', verticalAlign: 'middle', color: '#6c757d' }}>{formatDate(row.createdAt)}</td>
                             <td style={{ padding: '1rem', verticalAlign: 'middle' }}>
@@ -277,7 +313,7 @@ export const CategoryAdminPendingApprovals = () => {
                                 type="button"
                                 className="btn btn-success btn-sm"
                                 style={btnStyle}
-                                onClick={() => setApproveEvent(row)}
+                                onClick={() => openApproveModal(row)}
                               >
                                 Approve
                               </button>
@@ -428,7 +464,45 @@ export const CategoryAdminPendingApprovals = () => {
                     {(approveMutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to approve event.'}
                   </div>
                 )}
-                <p className="mb-0">Approve &quot;{approveEvent.title}&quot;? This will publish the post on the website for your school.</p>
+                {approveEvent.status === 'schedule_missed' ? (
+                  <>
+                    <p className="mb-2">
+                      The original publish time for &quot;{approveEvent.title}&quot; has passed while this post was still pending approval.
+                    </p>
+                    <label className="d-flex align-items-center gap-2 mb-2">
+                      <input
+                        type="radio"
+                        checked={approvePublishNow}
+                        onChange={() => setApprovePublishNow(true)}
+                      />
+                      Publish immediately after approval
+                    </label>
+                    <label className="d-flex align-items-center gap-2 mb-2">
+                      <input
+                        type="radio"
+                        checked={!approvePublishNow}
+                        onChange={() => setApprovePublishNow(false)}
+                      />
+                      Reschedule to a new date &amp; time
+                    </label>
+                    {!approvePublishNow && (
+                      <input
+                        type="datetime-local"
+                        className="form-control"
+                        value={approveRescheduleAt}
+                        min={new Date().toISOString().slice(0, 16)}
+                        onChange={(e) => setApproveRescheduleAt(e.target.value)}
+                      />
+                    )}
+                  </>
+                ) : approveEvent.publishAt ? (
+                  <p className="mb-0">
+                    Approve &quot;{approveEvent.title}&quot;? It will enter the scheduled queue and publish automatically at{' '}
+                    <strong>{formatPublishAt(approveEvent.publishAt)}</strong>.
+                  </p>
+                ) : (
+                  <p className="mb-0">Approve &quot;{approveEvent.title}&quot;? This will publish the post immediately on the website.</p>
+                )}
               </div>
               <div className="modal-footer" style={{ borderTop: '1px solid #dee2e6' }}>
                 <button type="button" className="btn btn-secondary" style={{ borderRadius: '0px' }} onClick={() => setApproveEvent(null)} disabled={approveMutation.isPending}>Cancel</button>

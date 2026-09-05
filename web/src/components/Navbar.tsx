@@ -1,7 +1,51 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { Link, useLocation, useNavigate, type LinkProps } from 'react-router-dom';
+import { useState, type ReactNode } from 'react';
 import { useUserAuth } from '../contexts/UserAuthContext';
 import { useEventsFilter } from '../contexts/EventsFilterContext';
+import { HOME_FEATURE_SECTIONS } from '../constants/homeFeatures';
+
+const navLinkStyle = {
+  color: '#1a1f2e',
+  fontWeight: '400' as const,
+  padding: '0.5rem 1rem',
+  transition: 'color 0.3s',
+};
+
+const navLinkHoverColor = '#0b4a99';
+
+const loginButtonStyle = {
+  backgroundColor: '#1a1f2e',
+  border: 'none',
+  borderRadius: '50px',
+  padding: '0.5rem 1.5rem',
+  fontWeight: '500',
+  color: '#fff',
+  transition: 'all 0.3s',
+  boxShadow: '0 2px 8px rgba(26, 31, 46, 0.15)',
+};
+
+function NavLinkHover({
+  children,
+  className = 'nav-link',
+  style,
+  ...props
+}: LinkProps & { children: ReactNode }) {
+  return (
+    <Link
+      className={className}
+      style={{ ...navLinkStyle, ...style }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.color = navLinkHoverColor;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.color = '#1a1f2e';
+      }}
+      {...props}
+    >
+      {children}
+    </Link>
+  );
+}
 
 export const Navbar = () => {
   const location = useLocation();
@@ -10,465 +54,248 @@ export const Navbar = () => {
   const eventsFilter = useEventsFilter();
   const isActive = (path: string) => location.pathname === path;
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [sembuzzForDropdownOpen, setSembuzzForDropdownOpen] = useState(false);
-  const [sembuzzPolicyDropdownOpen, setSembuzzPolicyDropdownOpen] = useState(false);
+  const [featuresDropdownOpen, setFeaturesDropdownOpen] = useState(false);
+  const [mobileFeaturesOpen, setMobileFeaturesOpen] = useState(false);
   const isEventsPage = location.pathname === '/events';
-  const showEventsNav =
-    isAuthenticated && isEventsPage && eventsFilter;
-
-  const navLinkStyle = {
-    color: '#fff',
-    fontWeight: '400' as const,
-    padding: '0.5rem 1rem',
-    transition: 'color 0.3s',
-  };
-
-  const dropdownMenuStyle = {
-    position: 'absolute' as const,
-    top: '100%',
-    left: 0,
-    zIndex: 1050,
-    backgroundColor: '#fff',
-    border: '1px solid #dee2e6',
-    borderRadius: '8px',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    padding: '0.25rem 0',
-    minWidth: '200px',
-  };
-
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
+  const showEventsNav = isAuthenticated && isEventsPage && eventsFilter;
 
   const closeMobileMenu = () => {
     setIsMobileMenuOpen(false);
+    setMobileFeaturesOpen(false);
+  };
+
+  const openLogin = () => {
+    navigate('/events', { state: { openAuth: 'login', bottomNav: 'settings' } });
+  };
+
+  const scrollToFeature = (sectionId: string) => {
+    closeMobileMenu();
+    setFeaturesDropdownOpen(false);
+
+    if (location.pathname === '/') {
+      const el = document.getElementById(sectionId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        window.history.replaceState(null, '', `#${sectionId}`);
+      }
+      return;
+    }
+
+    navigate(`/#${sectionId}`);
   };
 
   return (
     <>
-      <nav className="navbar sticky-top navbar-expand-lg navbar-dark" style={{ 
-        backgroundColor: 'transparent',
-        padding: '1rem 0'
-      }}>
-        <div className="container-fluid " style={{
-          border: '1px solid rgba(255, 255, 255, 0.15)',
-          borderRadius: '50px',
-          padding: '0.35rem 2rem',
-          backgroundColor: '#1a1f2e',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-          backdropFilter: 'blur(10px)'
-        }}>
-          {/* Brand/Logo - Left: scroll to top on home, else go to home */}
-          <Link
-            className="navbar-brand d-flex align-items-center"
-            to="/"
-            style={{ fontSize: '1.5rem', fontWeight: '600' }}
-            onClick={(e) => {
-              if (location.pathname === '/') {
-                e.preventDefault();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }
-            }}
-          >
-            <img src="/logo.png" alt="Sembuzz" style={{ height: '32px', width: 'auto', marginRight: '8px' }} />
-            <span style={{ color: '#fff' }}>Sembuzz</span>
-          </Link>
+      <nav className="navbar sticky-top navbar-expand-lg site-navbar">
+        <div className="container-fluid site-navbar-inner px-3 px-lg-4">
+          {/* Desktop — logo left, links center, login right */}
+          <div className="w-100 site-navbar-desktop">
+            <div className="site-navbar-left">
+              <Link
+                className="navbar-brand d-flex align-items-center site-navbar-brand mb-0"
+                to="/"
+                onClick={(e) => {
+                  if (location.pathname === '/') {
+                    e.preventDefault();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }
+                }}
+              >
+                <img src="/logo.png" alt="Sembuzz" className="site-navbar-logo" />
+                <span>Sembuzz</span>
+              </Link>
+            </div>
 
-          {/* Desktop Navigation Links - Center */}
-          <div className="d-none d-lg-flex w-100 align-items-center">
-            <ul className="navbar-nav ms-auto mb-0 align-items-center">
-              <li className="nav-item">
-                <Link
-                  className="nav-link"
-                  to="/#about"
-                  style={navLinkStyle}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = '#4dabf7'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = '#fff'; }}
+            <div className="site-navbar-center">
+              <ul className="navbar-nav flex-row align-items-center mb-0 site-navbar-links">
+                <li
+                  className="nav-item site-navbar-features-dropdown"
+                  onMouseEnter={() => setFeaturesDropdownOpen(true)}
+                  onMouseLeave={() => setFeaturesDropdownOpen(false)}
                 >
-                  About
-                </Link>
-              </li>
-              <li
-                className="nav-item dropdown"
-                style={{ position: 'relative' }}
-                onMouseEnter={() => setSembuzzForDropdownOpen(true)}
-                onMouseLeave={() => setSembuzzForDropdownOpen(false)}
-              >
-                <button
-                  type="button"
-                  className="nav-link dropdown-toggle border-0 bg-transparent d-flex align-items-center gap-1"
-                  style={{ ...navLinkStyle, cursor: 'pointer' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = '#4dabf7'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = '#fff'; }}
-                  aria-expanded={sembuzzForDropdownOpen}
-                  aria-haspopup="true"
-                >
-                  Sembuzz is for
-                  <i
-                    className="bi bi-chevron-down"
-                    style={{ fontSize: '0.75rem', transition: 'transform 0.2s ease', transform: sembuzzForDropdownOpen ? 'rotate(180deg)' : 'none' }}
-                    aria-hidden
-                  />
-                </button>
-                <ul
-                  className="dropdown-menu list-unstyled mb-0"
-                  style={{
-                    ...dropdownMenuStyle,
-                    display: sembuzzForDropdownOpen ? 'block' : 'none',
-                  }}
-                >
-                  <li>
-                    <Link
-                      className="dropdown-item"
-                      to="/#for-students"
-                      style={{ color: '#1a1f2e', padding: '0.5rem 1rem', textDecoration: 'none', display: 'block' }}
-                    >
-                      For Students
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      className="dropdown-item"
-                      to="/#for-universities"
-                      style={{ color: '#1a1f2e', padding: '0.5rem 1rem', textDecoration: 'none', display: 'block' }}
-                    >
-                      For Universities
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      className="dropdown-item"
-                      to="/#for-employers"
-                      style={{ color: '#1a1f2e', padding: '0.5rem 1rem', textDecoration: 'none', display: 'block' }}
-                    >
-                      For Employers
-                    </Link>
-                  </li>
-                </ul>
-              </li>
-              <li
-                className="nav-item dropdown"
-                style={{ position: 'relative' }}
-                onMouseEnter={() => setSembuzzPolicyDropdownOpen(true)}
-                onMouseLeave={() => setSembuzzPolicyDropdownOpen(false)}
-              >
-                <button
-                  type="button"
-                  className="nav-link dropdown-toggle border-0 bg-transparent d-flex align-items-center gap-1"
-                  style={{ ...navLinkStyle, cursor: 'pointer' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = '#4dabf7'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = '#fff'; }}
-                  aria-expanded={sembuzzPolicyDropdownOpen}
-                  aria-haspopup="true"
-                >
-                  Sembuzz Policy
-                  <i
-                    className="bi bi-chevron-down"
-                    style={{ fontSize: '0.75rem', transition: 'transform 0.2s ease', transform: sembuzzPolicyDropdownOpen ? 'rotate(180deg)' : 'none' }}
-                    aria-hidden
-                  />
-                </button>
-                <ul
-                  className="dropdown-menu list-unstyled mb-0"
-                  style={{
-                    ...dropdownMenuStyle,
-                    display: sembuzzPolicyDropdownOpen ? 'block' : 'none',
-                  }}
-                >
-                  <li>
-                    <Link
-                      className="dropdown-item"
-                      to="/#privacy"
-                      style={{ color: '#1a1f2e', padding: '0.5rem 1rem', textDecoration: 'none', display: 'block' }}
-                    >
-                      Privacy Policy
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      className="dropdown-item"
-                      to="/#community-guidelines"
-                      style={{ color: '#1a1f2e', padding: '0.5rem 1rem', textDecoration: 'none', display: 'block' }}
-                    >
-                      Community Guidelines
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      className="dropdown-item"
-                      to="/#terms-of-service"
-                      style={{ color: '#1a1f2e', padding: '0.5rem 1rem', textDecoration: 'none', display: 'block' }}
-                    >
-                      Terms and Conditions
-                    </Link>
-                  </li>
-                </ul>
-              </li>
-              <li className="nav-item">
-                <Link
-                  className={`nav-link ${isActive('/events') ? 'active' : ''}`}
-                  to="/events"
-                  style={navLinkStyle}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = '#4dabf7'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = '#fff'; }}
-                >
-                  Events
-                </Link>
-              </li>
-              <li className="nav-item">
-                <Link
-                  className={`nav-link ${location.pathname.startsWith('/blogs') ? 'active' : ''}`}
-                  to="/blogs"
-                  style={navLinkStyle}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = '#4dabf7'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = '#fff'; }}
-                >
-                  Blogs
-                </Link>
-              </li>
-              <li className="nav-item">
-                <Link
-                  className="nav-link"
-                  to="/#faqs"
-                  style={navLinkStyle}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = '#4dabf7'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = '#fff'; }}
-                >
-                  FAQs
-                </Link>
-              </li>
-              {!isAuthenticated && (
-                <li className="nav-item">
                   <button
                     type="button"
-                    className="nav-link border-0 bg-transparent"
+                    className="nav-link site-navbar-features-trigger border-0 bg-transparent d-flex align-items-center gap-1"
                     style={{ ...navLinkStyle, cursor: 'pointer' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = '#4dabf7'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = '#fff'; }}
-                    onClick={() => navigate('/events', { state: { openAuth: 'signup', bottomNav: 'settings' } })}
-                  >
-                    Register
-                  </button>
-                </li>
-              )}
-              <li className="nav-item">
-                <Link
-                  className="nav-link"
-                  to="/#contact-us"
-                  style={navLinkStyle}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = '#4dabf7'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = '#fff'; }}
-                >
-                  Contact
-                </Link>
-              </li>
-            </ul>
-
-            {/* Right: Social icons, Register, Login (or Events page tools + User) */}
-            <div className="d-flex align-items-center gap-2 ms-auto">
-              <a
-                href="https://www.instagram.com/sembuzzofficial?igsh=MWRxaHRldjZ1N3Z2cg=="
-                target="_blank"
-                rel="noopener noreferrer"
-                className="d-flex align-items-center justify-content-center"
-                style={{ color: 'rgba(255,255,255,0.9)', width: 32, height: 32, borderRadius: '50%', transition: 'color 0.2s' }}
-                aria-label="Instagram"
-                onMouseEnter={(e) => { e.currentTarget.style.color = '#4dabf7'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.9)'; }}
-              >
-                <i className="bi bi-instagram" style={{ fontSize: '1.2rem' }} />
-              </a>
-              <a
-                href="https://www.facebook.com/people/Sembuzzofficial/61555782134710/?ref=1"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="d-flex align-items-center justify-content-center"
-                style={{ color: 'rgba(255,255,255,0.9)', width: 32, height: 32, borderRadius: '50%', transition: 'color 0.2s' }}
-                aria-label="Facebook"
-                onMouseEnter={(e) => { e.currentTarget.style.color = '#4dabf7'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.9)'; }}
-              >
-                <i className="bi bi-facebook" style={{ fontSize: '1.2rem' }} />
-              </a>
-              <a
-                href="https://www.linkedin.com/company/sembuzzsdmlhq/posts/?feedView=all"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="d-flex align-items-center justify-content-center"
-                style={{ color: 'rgba(255,255,255,0.9)', width: 32, height: 32, borderRadius: '50%', transition: 'color 0.2s' }}
-                aria-label="LinkedIn"
-                onMouseEnter={(e) => { e.currentTarget.style.color = '#4dabf7'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.9)'; }}
-              >
-                <i className="bi bi-linkedin" style={{ fontSize: '1.2rem' }} />
-              </a>
-              {showEventsNav && (
-                <>
-                  <span
-                    className="d-flex align-items-center rounded-3 px-2 py-1"
-                    style={{
-                      backgroundColor: 'rgba(255,255,255,0.1)',
-                      color: 'rgba(255,255,255,0.95)',
-                      fontSize: '0.85rem',
-                      maxWidth: '140px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                    title={eventsFilter.selectedCategoryName ?? 'Category'}
-                  >
-                    <i className="bi bi-folder2 me-1" />
-                    {eventsFilter.selectedCategoryName ?? 'Category'}
-                  </span>
-                  <input
-                    type="search"
-                    placeholder="Search"
-                    className="form-control form-control-sm"
-                    value={eventsFilter.searchQuery}
-                    onChange={(e) => eventsFilter.setSearchQuery(e.target.value)}
-                    style={{
-                      width: '100px',
-                      borderRadius: '50px',
-                      backgroundColor: 'rgba(255,255,255,0.1)',
-                      border: '1px solid rgba(255,255,255,0.2)',
-                      color: '#fff',
-                      fontSize: '0.85rem',
-                    }}
-                  />
-                  <Link
-                    to="/events"
-                    className="btn btn-link p-1"
-                    style={{ color: 'rgba(255,255,255,0.9)', textDecoration: 'none' }}
-                    title="Settings"
-                    aria-label="Settings"
-                  >
-                    <i className="bi bi-gear" style={{ fontSize: '1.1rem' }} />
-                  </Link>
-                  <button
-                    type="button"
-                    className="btn btn-link p-1"
-                    style={{ color: 'rgba(255,255,255,0.9)', textDecoration: 'none' }}
-                    title="More"
-                    aria-label="More options"
-                  >
-                    <i className="bi bi-three-dots-vertical" style={{ fontSize: '1.1rem' }} />
-                  </button>
-                </>
-              )}
-              {isAuthenticated && user ? (
-                <>
-                  <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.9rem' }}>
-                    {user.name}
-                  </span>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() => { logout(); navigate('/'); }}
-                    style={{
-                      backgroundColor: 'white',
-                      border: 'none',
-                      borderRadius: '50px',
-                      padding: '0.5rem 1.5rem',
-                      fontWeight: '500',
-                      color: 'black',
-                      transition: 'all 0.3s',
-                      boxShadow: '0 2px 8px rgba(77, 171, 247, 0.3)'
-                    }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#1a1f2e';
-                      e.currentTarget.style.color = 'white';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(77, 171, 247, 0.4)';
+                      e.currentTarget.style.color = navLinkHoverColor;
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'white';
-                      e.currentTarget.style.color = 'black';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(77, 171, 247, 0.3)';
+                      e.currentTarget.style.color = '#1a1f2e';
                     }}
+                    aria-expanded={featuresDropdownOpen}
+                    aria-haspopup="true"
                   >
-                    Log out
+                    Sembuzz is for
+                    <i
+                      className="bi bi-chevron-down site-navbar-features-chevron"
+                      style={{
+                        transform: featuresDropdownOpen ? 'rotate(180deg)' : 'none',
+                      }}
+                      aria-hidden
+                    />
                   </button>
-                </>
-              ) : (
+                  <ul
+                    className={`site-navbar-features-menu list-unstyled mb-0${featuresDropdownOpen ? ' is-open' : ''}`}
+                    role="menu"
+                    aria-label="Sembuzz is for"
+                  >
+                    {HOME_FEATURE_SECTIONS.map((feature) => (
+                      <li key={feature.id} role="none">
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="site-navbar-features-item"
+                          onClick={() => scrollToFeature(feature.id)}
+                        >
+                          <i className={`bi ${feature.icon}`} aria-hidden />
+                          <span>{feature.label}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+                <li className="nav-item">
+                  <NavLinkHover to="/#faqs">FAQ</NavLinkHover>
+                </li>
+                <li className="nav-item">
+                  <NavLinkHover to="/events" className={`nav-link ${isActive('/events') ? 'active' : ''}`}>
+                    Events
+                  </NavLinkHover>
+                </li>
+                <li className="nav-item">
+                  <NavLinkHover
+                    to="/blogs"
+                    className={`nav-link ${location.pathname.startsWith('/blogs') ? 'active' : ''}`}
+                  >
+                    Blogs
+                  </NavLinkHover>
+                </li>
+                <li className="nav-item">
+                  <NavLinkHover to="/#contact-us">Contact</NavLinkHover>
+                </li>
+              </ul>
+            </div>
+
+            <div className="site-navbar-right d-flex align-items-center justify-content-end gap-2">
+            {showEventsNav && (
+              <div className="d-flex align-items-center gap-2 site-navbar-events-tools">
+                <span
+                  className="d-flex align-items-center rounded-3 px-2 py-1 site-navbar-events-chip"
+                  title={eventsFilter.selectedCategoryName ?? 'Category'}
+                >
+                  <i className="bi bi-folder2 me-1" />
+                  {eventsFilter.selectedCategoryName ?? 'Category'}
+                </span>
+                <input
+                  type="search"
+                  placeholder="Search"
+                  className="form-control form-control-sm site-navbar-events-search"
+                  value={eventsFilter.searchQuery}
+                  onChange={(e) => eventsFilter.setSearchQuery(e.target.value)}
+                />
+                <Link
+                  to="/events"
+                  className="btn btn-link p-1 site-navbar-icon-btn"
+                  title="Settings"
+                  aria-label="Settings"
+                >
+                  <i className="bi bi-gear" style={{ fontSize: '1.1rem' }} />
+                </Link>
                 <button
                   type="button"
-                  className="btn btn-primary"
-                  style={{
-                    backgroundColor: 'white',
-                    border: 'none',
-                    borderRadius: '50px',
-                    padding: '0.5rem 1.5rem',
-                    fontWeight: '500',
-                    color: 'black',
-                    transition: 'all 0.3s',
-                    boxShadow: '0 2px 8px rgba(77, 171, 247, 0.3)'
+                  className="btn btn-link p-1 site-navbar-icon-btn"
+                  title="More"
+                  aria-label="More options"
+                >
+                  <i className="bi bi-three-dots-vertical" style={{ fontSize: '1.1rem' }} />
+                </button>
+              </div>
+            )}
+
+            {isAuthenticated && user ? (
+              <div className="d-flex align-items-center gap-2">
+                <span className="site-navbar-user-name">{user.name}</span>
+                <button
+                  type="button"
+                  className="btn site-navbar-auth-btn"
+                  onClick={() => {
+                    logout();
+                    navigate('/');
                   }}
+                  style={loginButtonStyle}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#1a1f2e';
-                    e.currentTarget.style.color = 'white';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(77, 171, 247, 0.4)';
+                    e.currentTarget.style.backgroundColor = '#0b4a99';
                   }}
-                  onClick={() => navigate('/events', { state: { openAuth: 'login', bottomNav: 'settings' } })}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'white';
-                    e.currentTarget.style.color = 'black';
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(77, 171, 247, 0.3)';
+                    e.currentTarget.style.backgroundColor = '#1a1f2e';
                   }}
                 >
-                  Log In
+                  Log out
                 </button>
-              )}
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="btn site-navbar-auth-btn"
+                style={loginButtonStyle}
+                onClick={openLogin}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0b4a99';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#1a1f2e';
+                }}
+              >
+                Log In
+              </button>
+            )}
             </div>
           </div>
 
-          {/* Mobile Hamburger Button */}
-          <button
-            className="d-lg-none navbar-toggler border-0"
-            type="button"
-            onClick={toggleMobileMenu}
-            style={{
-              backgroundColor: 'transparent',
-              border: 'none',
-              padding: '0.25rem 0.5rem',
-              outline: 'none'
-            }}
-            aria-label="Toggle navigation"
-          >
-            <span style={{
-              display: 'block',
-              width: '25px',
-              height: '3px',
-              backgroundColor: '#fff',
-              margin: '5px 0',
-              transition: '0.3s',
-              transform: isMobileMenuOpen ? 'rotate(45deg) translateY(8px)' : 'none'
-            }}></span>
-            <span style={{
-              display: 'block',
-              width: '25px',
-              height: '3px',
-              backgroundColor: '#fff',
-              margin: '5px 0',
-              transition: '0.3s',
-              opacity: isMobileMenuOpen ? 0 : 1
-            }}></span>
-            <span style={{
-              display: 'block',
-              width: '25px',
-              height: '3px',
-              backgroundColor: '#fff',
-              margin: '5px 0',
-              transition: '0.3s',
-              transform: isMobileMenuOpen ? 'rotate(-45deg) translateY(-8px)' : 'none'
-            }}></span>
-          </button>
+          {/* Mobile — logo left, menu right */}
+          <div className="d-lg-none d-flex w-100 align-items-center justify-content-between">
+            <Link
+              className="navbar-brand d-flex align-items-center site-navbar-brand"
+              to="/"
+              onClick={(e) => {
+                if (location.pathname === '/') {
+                  e.preventDefault();
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              }}
+            >
+              <img src="/logo.png" alt="Sembuzz" className="site-navbar-logo" />
+              <span>Sembuzz</span>
+            </Link>
+
+            <button
+              className="navbar-toggler border-0 site-navbar-toggler"
+              type="button"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              aria-label="Toggle navigation"
+            >
+              <span
+                className="site-navbar-toggler-bar"
+                style={{
+                  transform: isMobileMenuOpen ? 'rotate(45deg) translateY(8px)' : 'none',
+                }}
+              />
+              <span
+                className="site-navbar-toggler-bar"
+                style={{ opacity: isMobileMenuOpen ? 0 : 1 }}
+              />
+              <span
+                className="site-navbar-toggler-bar"
+                style={{
+                  transform: isMobileMenuOpen ? 'rotate(-45deg) translateY(-8px)' : 'none',
+                }}
+              />
+            </button>
+          </div>
         </div>
       </nav>
 
-      {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div
           className="mobile-menu-overlay"
@@ -481,14 +308,11 @@ export const Navbar = () => {
             bottom: 0,
             backgroundColor: 'rgba(0, 0, 0, 0.5)',
             zIndex: 1040,
-            animation: 'fadeIn 0.3s ease-in-out'
           }}
-        ></div>
+        />
       )}
 
-      {/* Mobile Menu Sidebar */}
       <div
-        className={`mobile-menu ${isMobileMenuOpen ? 'open' : ''}`}
         style={{
           position: 'fixed',
           top: 0,
@@ -499,11 +323,10 @@ export const Navbar = () => {
           zIndex: 1050,
           transition: 'left 0.3s ease-in-out',
           boxShadow: '2px 0 10px rgba(0,0,0,0.3)',
-          overflowY: 'auto'
+          overflowY: 'auto',
         }}
       >
         <div className="p-4">
-          {/* Close Button */}
           <div className="d-flex justify-content-between align-items-center mb-4">
             <Link
               to="/"
@@ -520,6 +343,7 @@ export const Navbar = () => {
               <span style={{ color: '#fff' }}>Sembuzz</span>
             </Link>
             <button
+              type="button"
               onClick={closeMobileMenu}
               style={{
                 backgroundColor: 'transparent',
@@ -527,88 +351,73 @@ export const Navbar = () => {
                 color: '#fff',
                 fontSize: '1.5rem',
                 cursor: 'pointer',
-                padding: '0',
+                padding: 0,
                 width: '30px',
                 height: '30px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
               }}
+              aria-label="Close menu"
             >
               ×
             </button>
           </div>
 
-          {/* Mobile Navigation Links */}
           <ul className="list-unstyled">
-            <li className="mb-3">
-              <Link to="/#about" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
-                About
-              </Link>
-            </li>
-            <li className="mb-2 ms-3 small text-white-50">Sembuzz is for</li>
-            <li className="mb-3">
-              <Link to="/#for-students" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
-                For Students
-              </Link>
-            </li>
-            <li className="mb-3">
-              <Link to="/#for-universities" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
-                For Universities
-              </Link>
-            </li>
-            <li className="mb-3">
-              <Link to="/#for-employers" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
-                For Employers
-              </Link>
-            </li>
-            <li className="mb-2 ms-3 small text-white-50">Sembuzz Policy</li>
-            <li className="mb-3">
-              <Link to="/#privacy" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
-                Privacy Policy
-              </Link>
-            </li>
-            <li className="mb-3">
-              <Link to="/#community-guidelines" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
-                Community Guidelines
-              </Link>
-            </li>
-            <li className="mb-3">
-              <Link to="/#terms-of-service" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
-                Terms and Conditions
-              </Link>
+            <li className="mb-2">
+              <button
+                type="button"
+                className="mobile-nav-link mobile-nav-features-toggle d-flex align-items-center justify-content-between w-100 border-0 bg-transparent"
+                onClick={() => setMobileFeaturesOpen((open) => !open)}
+                aria-expanded={mobileFeaturesOpen}
+              >
+                <span>Sembuzz is for</span>
+                <i
+                  className="bi bi-chevron-down"
+                  style={{
+                    fontSize: '0.75rem',
+                    transition: 'transform 0.2s ease',
+                    transform: mobileFeaturesOpen ? 'rotate(180deg)' : 'none',
+                  }}
+                  aria-hidden
+                />
+              </button>
+              {mobileFeaturesOpen && (
+                <ul className="list-unstyled mobile-nav-features-list mb-0">
+                  {HOME_FEATURE_SECTIONS.map((feature) => (
+                    <li key={feature.id}>
+                      <button
+                        type="button"
+                        className="mobile-nav-feature-item"
+                        onClick={() => scrollToFeature(feature.id)}
+                      >
+                        <i className={`bi ${feature.icon}`} aria-hidden />
+                        {feature.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </li>
             <li className="mb-3">
-              <Link to="/events" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
+              <Link to="/#faqs" onClick={closeMobileMenu} className="d-block py-2 px-3 mobile-nav-link">
+                FAQ
+              </Link>
+            </li>
+            <li className="mb-3">
+              <Link to="/events" onClick={closeMobileMenu} className="d-block py-2 px-3 mobile-nav-link">
                 Events
               </Link>
             </li>
             <li className="mb-3">
-              <Link to="/blogs" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
+              <Link to="/blogs" onClick={closeMobileMenu} className="d-block py-2 px-3 mobile-nav-link">
                 Blogs
               </Link>
             </li>
             <li className="mb-3">
-              <Link to="/#faqs" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
-                FAQs
+              <Link to="/#contact-us" onClick={closeMobileMenu} className="d-block py-2 px-3 mobile-nav-link">
+                Contact
               </Link>
             </li>
-            <li className="mb-3">
-              <Link to="/#contact-us" onClick={closeMobileMenu} className="d-block py-2 px-3" style={{ color: '#fff', textDecoration: 'none', borderRadius: '8px' }}>
-                Contact us
-              </Link>
-            </li>
-            <li className="mb-3 d-flex gap-2">
-              <a href="https://www.instagram.com/sembuzzofficial?igsh=MWRxaHRldjZ1N3Z2cg==" target="_blank" rel="noopener noreferrer" style={{ color: '#fff', padding: '0.5rem' }} aria-label="Instagram">
-                <i className="bi bi-instagram" style={{ fontSize: '1.25rem' }} />
-              </a>
-              <a href="https://www.facebook.com/people/Sembuzzofficial/61555782134710/?ref=1" target="_blank" rel="noopener noreferrer" style={{ color: '#fff', padding: '0.5rem' }} aria-label="Facebook">
-                <i className="bi bi-facebook" style={{ fontSize: '1.25rem' }} />
-              </a>
-              <a href="https://www.linkedin.com/company/sembuzzsdmlhq/posts/?feedView=all" target="_blank" rel="noopener noreferrer" style={{ color: '#fff', padding: '0.5rem' }} aria-label="LinkedIn">
-                <i className="bi bi-linkedin" style={{ fontSize: '1.25rem' }} />
-              </a>
-            </li>
+
             {showEventsNav && (
               <li className="mb-3">
                 <div className="d-flex flex-wrap align-items-center gap-2 py-2 px-3">
@@ -629,79 +438,35 @@ export const Navbar = () => {
                       maxWidth: '120px',
                     }}
                   />
-                  <Link to="/events" className="btn btn-link p-1 text-white" title="Settings" aria-label="Settings">
-                    <i className="bi bi-gear" />
-                  </Link>
-                  <button type="button" className="btn btn-link p-1 text-white" title="More" aria-label="More">
-                    <i className="bi bi-three-dots-vertical" />
-                  </button>
                 </div>
               </li>
             )}
+
             <li className="mt-4">
               {isAuthenticated && user ? (
                 <button
                   type="button"
-                  className="btn btn-outline-light w-100 text-center d-block"
-                  onClick={() => { closeMobileMenu(); logout(); navigate('/'); }}
-                  style={{
-                    borderRadius: '8px',
-                    padding: '0.75rem 1.5rem',
-                    fontWeight: '500',
-                    textDecoration: 'none',
-                    border: '1px solid rgba(255,255,255,0.5)',
-                    color: '#fff',
-                    backgroundColor: 'transparent'
+                  className="btn btn-outline-light w-100"
+                  onClick={() => {
+                    closeMobileMenu();
+                    logout();
+                    navigate('/');
                   }}
                 >
                   Log out ({user.name})
                 </button>
               ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => { closeMobileMenu(); navigate('/events', { state: { openAuth: 'signup', bottomNav: 'settings' } }); }}
-                    className="btn btn-outline-light w-100 text-center d-block mb-2"
-                    style={{
-                      borderRadius: '8px',
-                      padding: '0.75rem 1.5rem',
-                      fontWeight: '500',
-                      border: '1px solid rgba(255,255,255,0.5)',
-                      color: '#fff',
-                      backgroundColor: 'transparent',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Register
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { closeMobileMenu(); navigate('/events', { state: { openAuth: 'login', bottomNav: 'settings' } }); }}
-                    className="btn btn-primary w-100 text-center d-block"
-                  style={{
-                    backgroundColor: '#4dabf7',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '0.75rem 1.5rem',
-                    fontWeight: '500',
-                    textDecoration: 'none',
-                    transition: 'all 0.3s',
-                    boxShadow: '0 2px 8px rgba(77, 171, 247, 0.3)'
+                <button
+                  type="button"
+                  className="btn btn-primary w-100"
+                  style={{ backgroundColor: '#4dabf7', border: 'none', borderRadius: '8px' }}
+                  onClick={() => {
+                    closeMobileMenu();
+                    openLogin();
                   }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#339af0';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(77, 171, 247, 0.4)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#4dabf7';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(77, 171, 247, 0.3)';
-                }}
-              >
-                Log In
-              </button>
-              </>
+                >
+                  Log In
+                </button>
               )}
             </li>
           </ul>

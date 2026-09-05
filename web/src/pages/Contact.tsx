@@ -1,4 +1,5 @@
 import { Navbar } from '../components/Navbar';
+import { SiteFooter } from '../components/SiteFooter';
 import { useState } from 'react';
 import { submitContact } from '../services/contact.service';
 
@@ -207,6 +208,7 @@ export const Contact = () => {
           </div>
         </div>
       )}
+      <SiteFooter />
     </div>
   );
 };

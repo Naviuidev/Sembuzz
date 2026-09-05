@@ -16,6 +16,7 @@ export const SchoolAdminSidebar = () => {
     { path: '/school-admin/categories', label: 'Categories', icon: 'bi-folder' },
     { path: '/school-admin/user-help', label: 'Users help', icon: 'bi-question-circle' },
     { path: '/school-admin/privacy', label: 'Privacy', icon: 'bi-shield-lock' },
+    { path: '/school-admin/create-post', label: 'Create post', icon: 'bi-plus-circle' },
     { path: '/school-admin/approved-posts', label: 'Approved posts', icon: 'bi-globe' },
     { path: '/school-admin/posts', label: 'Posts', icon: 'bi-file-post' },
     { path: '/school-admin/upcoming-news', label: 'Upcoming news', icon: 'bi-calendar-event' },

@@ -30,6 +30,7 @@ import { SchoolAdminDashboard } from './pages/SchoolAdminDashboard';
 import { SchoolAdminCategories } from './pages/SchoolAdminCategories';
 import { SchoolAdminPrivacy } from './pages/SchoolAdminPrivacy';
 import { SchoolAdminPosts } from './pages/SchoolAdminPosts';
+import { SchoolAdminCreatePost } from './pages/SchoolAdminCreatePost';
 import { SchoolAdminQueries } from './pages/SchoolAdminQueries';
 import { SchoolAdminSettingsQueries } from './pages/SchoolAdminSettingsQueries';
 import { SchoolAdminRaiseRequest } from './pages/SchoolAdminRaiseRequest';
@@ -79,6 +80,8 @@ import { AdsAdminAds } from './pages/AdsAdminAds';
 import { AdsAdminAdsAnalytics } from './pages/AdsAdminAdsAnalytics';
 import { About } from './pages/About';
 import { Contact } from './pages/Contact';
+import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import { TermsOfService } from './pages/TermsOfService';
 import { FAQs } from './pages/FAQs';
 import { Register } from './pages/Register';
 import { UpdateVerificationDoc } from './pages/UpdateVerificationDoc';
@@ -297,6 +300,14 @@ const SchoolAdminRoutes = () => {
         element={
           <SchoolAdminProtectedRoute>
             <SchoolAdminPrivacy />
+          </SchoolAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="create-post"
+        element={
+          <SchoolAdminProtectedRoute>
+            <SchoolAdminCreatePost />
           </SchoolAdminProtectedRoute>
         }
       />
@@ -634,6 +645,8 @@ const AppRoutes = () => {
       <Route path="/universities/:id" element={<PublicUniversityEvents />} />
       <Route path="/about" element={<About />} />
       <Route path="/contact" element={<Contact />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/terms" element={<TermsOfService />} />
       <Route path="/faqs" element={<FAQs />} />
       <Route path="/register" element={<Register />} />
       <Route path="/update-verification-doc" element={<UpdateVerificationDoc />} />

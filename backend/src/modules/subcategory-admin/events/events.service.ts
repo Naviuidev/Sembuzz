@@ -4,6 +4,11 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import OpenAI from 'openai';
 import { CreateEventDto } from './dto/create-event.dto';
+import {
+  EVENT_STATUS,
+  EVENT_APPROVED_LIST_STATUSES,
+  parsePublishAt,
+} from '../../events/event-publishing.constants';
 
 export interface AnalyzeBannerResult {
   title: string;
@@ -52,6 +57,10 @@ export class EventsService {
     const imageUrlsJson = dto.imageUrls?.length
       ? JSON.stringify(dto.imageUrls)
       : null;
+    const publishAt = parsePublishAt(dto.publishAt);
+    if (dto.publishAt && !publishAt) {
+      throw new BadRequestException('publishAt must be a valid ISO 8601 datetime.');
+    }
     try {
       return await this.prisma.event.create({
         data: {
@@ -64,7 +73,8 @@ export class EventsService {
           externalLink: dto.externalLink ?? null,
           commentsEnabled: dto.commentsEnabled ?? true,
           imageUrls: imageUrlsJson,
-          status: 'pending',
+          status: EVENT_STATUS.PENDING,
+          publishAt,
           resubmitFromEventId: dto.resubmitFromEventId ?? null,
         },
         include: {
@@ -90,7 +100,7 @@ export class EventsService {
     return this.prisma.event.findMany({
       where: {
         subCategoryAdminId,
-        status: 'pending',
+        status: { in: [EVENT_STATUS.PENDING, EVENT_STATUS.SCHEDULE_MISSED] },
       },
       include: {
         subCategory: { select: { id: true, name: true } },
@@ -116,7 +126,7 @@ export class EventsService {
     }
 
     const approved = await this.prisma.event.findMany({
-      where: { subCategoryAdminId, status: 'approved' },
+      where: { subCategoryAdminId, status: { in: [...EVENT_APPROVED_LIST_STATUSES] } },
       select: { title: true, subCategoryId: true },
     });
 
@@ -133,7 +143,7 @@ export class EventsService {
     return this.prisma.event.findMany({
       where: {
         subCategoryAdminId,
-        status: 'approved',
+        status: { in: [...EVENT_APPROVED_LIST_STATUSES] },
       },
       include: {
         subCategory: { select: { id: true, name: true } },

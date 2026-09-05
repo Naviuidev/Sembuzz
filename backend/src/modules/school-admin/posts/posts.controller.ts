@@ -19,6 +19,7 @@ import * as fs from 'fs';
 import { SchoolAdminPostsService } from './posts.service';
 import { SchoolAdminGuard } from '../guards/school-admin.guard';
 import { UpdatePostDto } from './dto/update-post.dto';
+import { CreateSchoolAdminPostDto } from './dto/create-post.dto';
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
@@ -29,17 +30,17 @@ const POST_IMAGES_DIR = path.join(process.cwd(), 'uploads', 'school-admin-post-i
 export class SchoolAdminPostsController {
   constructor(private readonly postsService: SchoolAdminPostsService) {}
 
+  @Post()
+  async create(
+    @Body() body: CreateSchoolAdminPostDto,
+    @Request() req: { user: { sub: string; schoolId: string } },
+  ) {
+    return this.postsService.create(req.user.sub, req.user.schoolId, body);
+  }
+
   @Get()
   async list(@Request() req: { user: { schoolId: string } }) {
     return this.postsService.findAllForSchool(req.user.schoolId);
-  }
-
-  @Get(':id')
-  async getOne(
-    @Param('id') id: string,
-    @Request() req: { user: { schoolId: string } },
-  ) {
-    return this.postsService.findOne(id, req.user.schoolId);
   }
 
   @Post('upload-image')
@@ -70,6 +71,14 @@ export class SchoolAdminPostsController {
     };
   }
 
+  @Get(':id')
+  async getOne(
+    @Param('id') id: string,
+    @Request() req: { user: { schoolId: string } },
+  ) {
+    return this.postsService.findOne(id, req.user.schoolId);
+  }
+
   @Patch(':id')
   async update(
     @Param('id') id: string,
@@ -83,6 +92,14 @@ export class SchoolAdminPostsController {
       commentsEnabled: body.commentsEnabled,
       imageUrls: body.imageUrls,
     });
+  }
+
+  @Post(':id/cancel')
+  async cancel(
+    @Param('id') id: string,
+    @Request() req: { user: { schoolId: string } },
+  ) {
+    return this.postsService.cancelScheduled(id, req.user.schoolId);
   }
 
   @Delete(':id')

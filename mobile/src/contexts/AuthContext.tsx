@@ -143,14 +143,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password,
     });
     const t = res.data?.access_token;
-    const u = res.data?.user ?? null;
-    if (!t || !u) {
+    if (!t) {
       throw new Error('Invalid login response from server.');
     }
-    await AsyncStorage.setItem(TOKEN_KEY, t);
-    setToken(t);
-    setUser({ ...u, schoolId: u.schoolId ?? null });
-  }, []);
+    // Load the full profile from /me so Settings and tab avatar match a cold start.
+    await applyBearerToken(t);
+  }, [applyBearerToken]);
 
   return (
     <AuthContext.Provider value={{ user, token, loading, login, logout, refreshMe, setUser }}>

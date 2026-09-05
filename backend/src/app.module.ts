@@ -17,6 +17,7 @@ import { ContactModule } from './modules/contact/contact.module';
 import { AdminActionItemsModule } from './modules/admin-action-items/admin-action-items.module';
 import { PlatformUserModule } from './modules/platform-user/platform-user.module';
 import { AdminEmailChangeRequestsModule } from './modules/admin-email-change-requests/admin-email-change-requests.module';
+import { EventsPublishingModule } from './modules/events/events-publishing.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { AdminEmailChangeRequestsModule } from './modules/admin-email-change-req
     ContactModule,
     AdminActionItemsModule,
     AdminEmailChangeRequestsModule,
+    EventsPublishingModule,
   ],
   controllers: [AppController, GoogleAuthController, EventsPublicController],
   providers: [AppService, PublishedBlogsService],

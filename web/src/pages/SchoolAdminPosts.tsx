@@ -83,9 +83,13 @@ export const SchoolAdminPosts = () => {
 
   const statusBadge = (status: string) => {
     const map: Record<string, { label: string; className: string }> = {
-      pending: { label: 'Pending', className: 'bg-warning text-dark' },
-      approved: { label: 'Approved', className: 'bg-success' },
-      reverted: { label: 'Reverted', className: 'bg-secondary' },
+      pending: { label: 'Pending approval', className: 'bg-warning text-dark' },
+      scheduled: { label: 'Scheduled', className: 'bg-info text-dark' },
+      published: { label: 'Published', className: 'bg-success' },
+      approved: { label: 'Published', className: 'bg-success' },
+      reverted: { label: 'Changes requested', className: 'bg-secondary' },
+      schedule_missed: { label: 'Schedule missed', className: 'bg-danger' },
+      cancelled: { label: 'Cancelled', className: 'bg-secondary' },
     };
     const s = map[status] || { label: status, className: 'bg-secondary' };
     return <span className={`badge ${s.className}`}>{s.label}</span>;

@@ -7,13 +7,12 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { userEventsService, type LikedEventItem } from '../services/userEvents';
-import { imageSrc } from '../utils/image';
 import { UserBookmarkedEventDetailModal } from '../components/UserBookmarkedEventDetail';
+import { SchoolLogo } from '../components/SchoolLogo';
 
 export default function LikedNewsScreen() {
   const [items, setItems] = useState<LikedEventItem[]>([]);
@@ -49,8 +48,6 @@ export default function LikedNewsScreen() {
   };
 
   const renderItem = ({ item }: { item: LikedEventItem }) => {
-    const schoolName = item.school?.name ?? 'School';
-    const schoolLogo = item.school?.image ?? null;
     const sub = item.school?.city ?? item.school?.name ?? item.subCategory?.name ?? '—';
     return (
       <TouchableOpacity
@@ -58,13 +55,7 @@ export default function LikedNewsScreen() {
         onPress={() => setSelected(item)}
         activeOpacity={0.7}
       >
-        {schoolLogo ? (
-          <Image source={{ uri: imageSrc(schoolLogo) }} style={styles.logo} />
-        ) : (
-          <View style={styles.logoPh}>
-            <Text style={styles.logoLetter}>{schoolName.charAt(0)?.toUpperCase() ?? '?'}</Text>
-          </View>
-        )}
+        <SchoolLogo school={item.school} size={40} borderRadius={20} />
         <View style={styles.rowText}>
           <Text style={styles.rowTitle} numberOfLines={2}>
             {item.title}

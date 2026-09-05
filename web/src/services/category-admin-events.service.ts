@@ -8,7 +8,8 @@ export interface PendingEventForCategoryAdmin {
   commentsEnabled: boolean;
   imageUrls: string | null;
   status: string;
-  schoolId?: string;
+  publishAt?: string | null;
+  publishedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   subCategory: { id: string; name: string };
@@ -54,9 +55,13 @@ export const categoryAdminEventsService = {
     return response.data;
   },
 
-  approve: async (eventId: string): Promise<unknown> => {
+  approve: async (
+    eventId: string,
+    options?: { publishNow?: boolean; publishAt?: string },
+  ): Promise<unknown> => {
     const response = await api.post(
       `/category-admin/events/${eventId}/approve`,
+      options ?? {},
     );
     return response.data;
   },

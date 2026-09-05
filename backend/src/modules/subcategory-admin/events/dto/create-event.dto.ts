@@ -29,4 +29,9 @@ export class CreateEventDto {
   @IsOptional()
   @IsString()
   resubmitFromEventId?: string;
+
+  /** ISO 8601 datetime — post goes live at this time after category admin approval. Omit for immediate publish on approval. */
+  @IsOptional()
+  @IsString()
+  publishAt?: string;
 }

@@ -14,6 +14,7 @@ export interface CreateEventDto {
   subCategoryId: string;
   imageUrls?: string[];
   resubmitFromEventId?: string;
+  publishAt?: string;
 }
 
 export interface PendingEvent {
@@ -24,6 +25,8 @@ export interface PendingEvent {
   commentsEnabled: boolean;
   imageUrls: string | null;
   status: string;
+  publishAt?: string | null;
+  publishedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   subCategory: { id: string; name: string };

@@ -1,5 +1,6 @@
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { isEventPubliclyVisible } from '../../events/event-publishing.constants';
 
 @Injectable()
 export class UserEventsService {
@@ -21,7 +22,7 @@ export class UserEventsService {
       select: { schoolId: true, status: true },
     });
     if (!event) throw new NotFoundException('Event not found');
-    if (event.status !== 'approved') throw new NotFoundException('Event not found');
+    if (!event || !isEventPubliclyVisible(event.status)) throw new NotFoundException('Event not found');
     return event.schoolId;
   }
 
@@ -188,7 +189,7 @@ export class UserEventsService {
       },
     });
     return likes
-      .filter((l) => l.event != null && l.event.status === 'approved')
+      .filter((l) => l.event != null && isEventPubliclyVisible(l.event.status))
       .map((l) => {
         const e = l.event!;
         return {

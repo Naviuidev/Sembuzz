@@ -62,7 +62,7 @@ function getEventThumbUrl(ev: ApprovedEventPublic): string {
 export default function SettingsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<SettingsStackParamList, 'SettingsMain'>>();
   const route = useRoute<RouteProp<SettingsStackParamList, 'SettingsMain'>>();
-  const { user, login, logout, loading: authLoading } = useAuth();
+  const { user, token, login, logout, loading: authLoading, refreshMe } = useAuth();
 
   /** Root stack screens (Liked/Saved/Profile) — Settings lives in a nested stack under the tab. */
   const navigateRoot = useCallback(
@@ -113,6 +113,14 @@ export default function SettingsScreen() {
         navigation.setParams({});
       }
     }, [user, route.params?.openLogin, route.params?.openSignUp, navigation]),
+  );
+
+  /** Re-sync profile when the tab is focused (fixes stale UI after first login). */
+  useFocusEffect(
+    useCallback(() => {
+      if (!token) return;
+      void refreshMe();
+    }, [token, refreshMe]),
   );
 
   const [showHelpModal, setShowHelpModal] = useState(false);
@@ -362,7 +370,7 @@ export default function SettingsScreen() {
     [unreadCount, messagesUnreadCount],
   );
 
-  if (authLoading) {
+  if (authLoading || (token && !user)) {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.centered}>
@@ -435,9 +443,6 @@ export default function SettingsScreen() {
                 </TouchableOpacity>
               </View>
               <Text style={styles.userEmail}>{user.email}</Text>
-              {user.userId ? (
-                <Text style={styles.userId}>User ID: {user.userId}</Text>
-              ) : null}
             </View>
           </View>
 
@@ -1072,12 +1077,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6c757d',
     marginTop: 4,
-  },
-  userId: {
-    fontSize: 11,
-    color: '#8e8e8e',
-    marginTop: 4,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   actionsIconRow: {
     flexDirection: 'row',

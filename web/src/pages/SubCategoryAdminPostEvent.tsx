@@ -8,6 +8,8 @@ import { SubCategoryAdminReceivedCorrectionsPanel } from '../components/SubCateg
 import { useSubCategoryAdminAuth } from '../contexts/SubCategoryAdminAuthContext';
 import { subcategoryAdminEventsService, type RevertedEvent } from '../services/subcategory-admin-events.service';
 import { invalidateAdminActionItems } from '../services/admin-action-items.service';
+import { PublishScheduleFields } from '../components/PublishScheduleFields';
+import { dateTimeLocalToIso, defaultFutureDateTimeLocal } from '../utils/eventPublishing';
 
 type CreateMode = 'choose' | 'manual' | 'ai';
 type AIStep = 'banner' | 'form';
@@ -218,6 +220,8 @@ export const SubCategoryAdminPostEvent = () => {
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [publishMode, setPublishMode] = useState<'now' | 'schedule'>('now');
+  const [scheduledAt, setScheduledAt] = useState(defaultFutureDateTimeLocal);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -237,6 +241,10 @@ export const SubCategoryAdminPostEvent = () => {
         subCategoryId: formData.subcategoryId,
         imageUrls,
         resubmitFromEventId,
+        publishAt:
+          publishMode === 'schedule' && scheduledAt
+            ? dateTimeLocalToIso(scheduledAt)
+            : undefined,
       });
       setFormData((prev) => ({
         ...prev,
@@ -583,6 +591,16 @@ export const SubCategoryAdminPostEvent = () => {
           <p className="mt-1 small text-muted">
             Click an empty box to add images (JPEG, PNG, GIF, WebP). Up to {MAX_IMAGES} images.
           </p>
+        </div>
+
+        <div className="col-12">
+          <PublishScheduleFields
+            publishMode={publishMode}
+            onPublishModeChange={setPublishMode}
+            scheduledAt={scheduledAt}
+            onScheduledAtChange={setScheduledAt}
+            helperText="Subcategory admin posts require category admin approval before they enter the scheduled queue or go live."
+          />
         </div>
 
         <div className="col-12">

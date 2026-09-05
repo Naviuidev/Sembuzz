@@ -33,7 +33,6 @@ import {
   getUpcomingByDate,
   buildGoogleCalendarAddAuthUrl,
   imageSrc,
-  schoolLogoSrc,
   ApprovedEventPublic,
   CategoryPublic,
   SponsoredAdPublic,
@@ -46,6 +45,7 @@ import type { MainTabParamList } from '../navigation/types';
 import { useAuth } from '../contexts/AuthContext';
 import { buildPublicFeedItems, type PublicFeedItem } from '../utils/publicFeed';
 import { InshortsPagedFeed } from '../components/InshortsPagedFeed';
+import { SchoolLogo } from '../components/SchoolLogo';
 import { userEventsService } from '../services/userEvents';
 import {
   getUserCategoryDone,
@@ -625,10 +625,11 @@ export default function EventsScreen() {
   }, [clearUpcomingView]);
 
   const mySchoolLogo = useMemo(() => {
+    if (user?.schoolImage?.trim()) return imageSrc(user.schoolImage);
     if (!schoolId) return '';
-    const hit = events.find((e) => e.schoolId === schoolId && e.school?.image);
-    return hit?.school?.image ? schoolLogoSrc(hit.school.image) : '';
-  }, [events, schoolId]);
+    const hit = events.find((e) => e.schoolId === schoolId && e.school?.image?.trim());
+    return hit?.school?.image ? imageSrc(hit.school.image) : '';
+  }, [events, schoolId, user?.schoolImage]);
 
   const selectedSubCategoryMeta = useMemo(() => {
     if (!selectedSubCategoryIds.length || !categories.length) return [];
@@ -870,7 +871,7 @@ export default function EventsScreen() {
                 ) : (
                   <View style={styles.tabSchoolLogoFallback}>
                     <Text style={styles.tabSchoolLogoFallbackText}>
-                      {(user?.name?.trim()?.charAt(0) || 'S').toUpperCase()}
+                      {(user?.schoolName?.trim()?.charAt(0) || user?.name?.trim()?.charAt(0) || 'S').toUpperCase()}
                     </Text>
                   </View>
                 )}
@@ -927,18 +928,7 @@ export default function EventsScreen() {
         <ScrollView style={styles.upcomingDetailScroll} contentContainerStyle={styles.upcomingDetailContent}>
           <View style={styles.upcomingDetailHeader}>
             <View style={styles.upcomingDetailSchoolRow}>
-              {selectedUpcomingPost.school?.image ? (
-                <Image
-                  source={{ uri: imageSrc(selectedUpcomingPost.school.image) }}
-                  style={styles.upcomingDetailLogo}
-                />
-              ) : (
-                <View style={styles.upcomingDetailLogoFallback}>
-                  <Text style={styles.upcomingDetailLogoLetter}>
-                    {(selectedUpcomingPost.school?.name?.charAt(0) || '?').toUpperCase()}
-                  </Text>
-                </View>
-              )}
+              <SchoolLogo school={selectedUpcomingPost.school} size={40} borderRadius={20} />
               <View style={styles.upcomingDetailSchoolText}>
                 <Text style={styles.upcomingDetailSchoolName}>
                   {selectedUpcomingPost.school?.name ?? 'School'}
@@ -1008,18 +998,7 @@ export default function EventsScreen() {
                   onPress={() => setSelectedUpcomingPost(post)}
                   activeOpacity={0.85}
                 >
-                  {post.school?.image ? (
-                    <Image
-                      source={{ uri: imageSrc(post.school.image) }}
-                      style={styles.upcomingItemLogo}
-                    />
-                  ) : (
-                    <View style={styles.upcomingItemLogoFallback}>
-                      <Text style={styles.upcomingItemLogoLetter}>
-                        {(post.school?.name?.charAt(0) || '?').toUpperCase()}
-                      </Text>
-                    </View>
-                  )}
+                  <SchoolLogo school={post.school} size={36} borderRadius={18} />
                   <View style={styles.upcomingItemText}>
                     <Text style={styles.upcomingItemTitle} numberOfLines={1}>
                       {post.title}

@@ -53,7 +53,7 @@ export const SchoolAdminApprovedPosts = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const approvedPosts = useMemo(
-    () => posts.filter((p) => p.status === 'approved'),
+    () => posts.filter((p) => ['published', 'approved', 'scheduled'].includes(p.status)),
     [posts],
   );
 

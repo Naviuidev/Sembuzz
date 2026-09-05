@@ -122,6 +122,7 @@ model SchoolAdmin {
   queriesToCategoryAdmins    SchoolAdminToCategoryAdminQuery[]
   queriesToSubCategoryAdmins SchoolAdminToSubCategoryAdminQuery[]
   passwordResetOtps PasswordResetOtp[]
+  events            Event[]
 
   @@unique([schoolId, platformUserId])
   @@index([email])
@@ -633,7 +634,8 @@ model CategoryAdminQuery {
 
 model Event {
   id                 String   @id @default(uuid())
-  subCategoryAdminId String
+  subCategoryAdminId String?
+  schoolAdminId      String?
   subCategoryId      String
   categoryId         String
   schoolId           String
@@ -642,22 +644,27 @@ model Event {
   externalLink       String?  @db.VarChar(500)
   commentsEnabled    Boolean  @default(true)
   imageUrls          String?  @db.Text // JSON array of image URLs
-  status             String   @default("pending") // pending | approved | reverted | superseded
+  status             String   @default("pending") // draft | pending | scheduled | published | reverted | rejected | schedule_missed | cancelled | superseded
+  publishAt          DateTime? // when post should go live; null = immediate upon approval
+  publishedAt        DateTime? // when post actually went live
   revertNotes        String?  @db.Text // Category admin feedback when reverted
   resubmitFromEventId String? // Original reverted event when this post is a correction resubmit
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
   school             School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  subCategoryAdmin   SubCategoryAdmin   @relation(fields: [subCategoryAdminId], references: [id], onDelete: Cascade)
+  subCategoryAdmin   SubCategoryAdmin?  @relation(fields: [subCategoryAdminId], references: [id], onDelete: Cascade)
+  schoolAdmin        SchoolAdmin?       @relation(fields: [schoolAdminId], references: [id], onDelete: SetNull)
   subCategory        SubCategory        @relation(fields: [subCategoryId], references: [id], onDelete: Cascade)
   likes              EventLike[]
   comments           EventComment[]
   savedBy            UserSavedEvent[]
 
   @@index([subCategoryAdminId])
+  @@index([schoolAdminId])
   @@index([subCategoryId])
   @@index([status])
+  @@index([publishAt])
   @@index([schoolId])
   @@index([resubmitFromEventId])
   @@map("events")

@@ -1,7 +1,16 @@
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { UpdateEventDto } from './dto/update-event.dto';
+import { ApproveEventDto } from './dto/approve-event.dto';
 import { PushNotificationService } from '../../push/push-notification.service';
+import {
+  EVENT_STATUS,
+  EVENT_PUBLIC_STATUSES,
+  EVENT_PENDING_APPROVAL_STATUSES,
+  EVENT_APPROVED_LIST_STATUSES,
+  parsePublishAt,
+  resolveCategoryAdminApproveStatus,
+} from '../../events/event-publishing.constants';
 
 @Injectable()
 export class CategoryAdminEventsService {
@@ -48,7 +57,7 @@ export class CategoryAdminEventsService {
     return this.prisma.event.findMany({
       where: {
         categoryId: { in: categoryIds },
-        status: 'pending',
+        status: { in: [...EVENT_PENDING_APPROVAL_STATUSES] },
       },
       include: {
         subCategory: { select: { id: true, name: true } },
@@ -67,7 +76,7 @@ export class CategoryAdminEventsService {
     return this.prisma.event.findMany({
       where: {
         categoryId: { in: categoryIds },
-        status: 'approved',
+        status: { in: [...EVENT_APPROVED_LIST_STATUSES] },
       },
       include: {
         subCategory: { select: { id: true, name: true } },
@@ -82,8 +91,8 @@ export class CategoryAdminEventsService {
   async delete(eventId: string, categoryAdminId: string) {
     await this.ensureEventAccess(eventId, categoryAdminId);
     const event = await this.prisma.event.findUnique({ where: { id: eventId } });
-    if (!event || event.status !== 'approved') {
-      throw new ForbiddenException('Only approved events can be deleted');
+    if (!event || !(EVENT_PUBLIC_STATUSES as readonly string[]).includes(event.status)) {
+      throw new ForbiddenException('Only published events can be deleted');
     }
     await this.prisma.event.delete({ where: { id: eventId } });
     return { deleted: true };
@@ -92,7 +101,7 @@ export class CategoryAdminEventsService {
   async update(eventId: string, categoryAdminId: string, dto: UpdateEventDto) {
     await this.ensureEventAccess(eventId, categoryAdminId);
     const event = await this.prisma.event.findUnique({ where: { id: eventId } });
-    if (!event || event.status !== 'pending') {
+    if (!event || !(EVENT_PENDING_APPROVAL_STATUSES as readonly string[]).includes(event.status)) {
       throw new ForbiddenException('Only pending events can be edited');
     }
     return this.prisma.event.update({
@@ -113,12 +122,12 @@ export class CategoryAdminEventsService {
   async revert(eventId: string, categoryAdminId: string, revertNotes: string) {
     await this.ensureEventAccess(eventId, categoryAdminId);
     const event = await this.prisma.event.findUnique({ where: { id: eventId } });
-    if (!event || event.status !== 'pending') {
+    if (!event || !(EVENT_PENDING_APPROVAL_STATUSES as readonly string[]).includes(event.status)) {
       throw new ForbiddenException('Only pending events can be reverted');
     }
     return this.prisma.event.update({
       where: { id: eventId },
-      data: { status: 'reverted', revertNotes },
+      data: { status: EVENT_STATUS.REVERTED, revertNotes },
       include: {
         subCategory: { select: { id: true, name: true } },
         subCategoryAdmin: { select: { id: true, name: true, email: true } },
@@ -126,16 +135,36 @@ export class CategoryAdminEventsService {
     });
   }
 
-  async approve(eventId: string, categoryAdminId: string) {
+  async approve(eventId: string, categoryAdminId: string, dto: ApproveEventDto = {}) {
     await this.ensureEventAccess(eventId, categoryAdminId);
     const event = await this.prisma.event.findUnique({ where: { id: eventId } });
-    if (!event || event.status !== 'pending') {
+    if (!event || !(EVENT_PENDING_APPROVAL_STATUSES as readonly string[]).includes(event.status)) {
       throw new ForbiddenException('Only pending events can be approved');
     }
+
+    const newPublishAt = parsePublishAt(dto.publishAt);
+    if (dto.publishAt && !newPublishAt) {
+      throw new ForbiddenException('publishAt must be a valid ISO 8601 datetime.');
+    }
+
+    const wasScheduleMissed = event.status === EVENT_STATUS.SCHEDULE_MISSED;
+    const resolved = resolveCategoryAdminApproveStatus(
+      event.publishAt,
+      {
+        publishNow: dto.publishNow,
+        newPublishAt,
+        wasScheduleMissed,
+      },
+    );
+
     const updated = await this.prisma.$transaction(async (tx) => {
       const approved = await tx.event.update({
         where: { id: eventId },
-        data: { status: 'approved' },
+        data: {
+          status: resolved.status,
+          publishAt: resolved.publishAt,
+          publishedAt: resolved.publishedAt,
+        },
         include: {
           school: { select: { name: true, image: true } },
           subCategory: { select: { id: true, name: true } },
@@ -172,18 +201,21 @@ export class CategoryAdminEventsService {
 
       return approved;
     });
-    void this.pushNotifications
-      .notifyUsersForApprovedEvent({
-        id: updated.id,
-        schoolId: updated.schoolId,
-        subCategoryId: updated.subCategoryId,
-        title: updated.title,
-        schoolName: updated.school?.name ?? undefined,
-        schoolLogoUrl: updated.school?.image ?? null,
-      })
-      .catch((err) => {
-        console.error('[CategoryAdminEvents] push notify failed', err);
-      });
+
+    if (resolved.status === EVENT_STATUS.PUBLISHED) {
+      void this.pushNotifications
+        .notifyUsersForApprovedEvent({
+          id: updated.id,
+          schoolId: updated.schoolId,
+          subCategoryId: updated.subCategoryId,
+          title: updated.title,
+          schoolName: updated.school?.name ?? undefined,
+          schoolLogoUrl: updated.school?.image ?? null,
+        })
+        .catch((err) => {
+          console.error('[CategoryAdminEvents] push notify failed', err);
+        });
+    }
     return updated;
   }
 }

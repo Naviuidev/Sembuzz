@@ -3,6 +3,7 @@ import { CategoryAdminGuard } from '../guards/category-admin.guard';
 import { CategoryAdminEventsService } from './events.service';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { RevertEventDto } from './dto/revert-event.dto';
+import { ApproveEventDto } from './dto/approve-event.dto';
 
 @Controller('category-admin/events')
 @UseGuards(CategoryAdminGuard)
@@ -49,7 +50,8 @@ export class CategoryAdminEventsController {
   async approve(
     @Param('id') id: string,
     @Request() req: { user: { sub: string } },
+    @Body() dto: ApproveEventDto,
   ) {
-    return this.eventsService.approve(id, req.user.sub);
+    return this.eventsService.approve(id, req.user.sub, dto);
   }
 }

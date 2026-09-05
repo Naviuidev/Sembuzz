@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
 import { PublishedBlogsService } from './published-blogs.service';
+import { EVENT_PUBLIC_STATUSES } from './modules/events/event-publishing.constants';
 
 @Controller('events')
 export class EventsPublicController {
@@ -42,7 +43,7 @@ export class EventsPublicController {
         : undefined;
     const sid = typeof schoolId === 'string' ? schoolId.trim() : '';
     const where = {
-      status: 'approved' as const,
+      status: { in: [...EVENT_PUBLIC_STATUSES] },
       ...(sid ? { schoolId: sid } : {}),
       ...(subCategoryIds?.length
         ? { subCategoryId: { in: subCategoryIds } }
@@ -53,7 +54,7 @@ export class EventsPublicController {
       // Debug: log counts so we can see if approved events exist in DB
       const [totalEvents, approvedCount, list] = await Promise.all([
         this.prisma.event.count(),
-        this.prisma.event.count({ where: { status: 'approved' } }),
+        this.prisma.event.count({ where: { status: { in: [...EVENT_PUBLIC_STATUSES] } } }),
         this.prisma.event.findMany({
           where,
           include: {

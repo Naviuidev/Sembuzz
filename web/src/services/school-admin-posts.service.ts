@@ -20,14 +20,38 @@ export interface SchoolAdminPost {
   commentsEnabled: boolean;
   imageUrls: string | null;
   status: string;
+  publishAt?: string | null;
+  publishedAt?: string | null;
   revertNotes: string | null;
   createdAt: string;
   updatedAt: string;
   subCategory: SchoolAdminPostSubCategory;
-  subCategoryAdmin: SchoolAdminPostAuthor;
+  subCategoryAdmin: SchoolAdminPostAuthor | null;
+  schoolAdmin?: SchoolAdminPostAuthor | null;
+}
+
+export interface CreateSchoolAdminPostDto {
+  title: string;
+  description?: string;
+  externalLink?: string;
+  commentsEnabled?: boolean;
+  categoryId: string;
+  subCategoryId: string;
+  imageUrls?: string[];
+  publishAt?: string;
 }
 
 export const schoolAdminPostsService = {
+  createPost: async (dto: CreateSchoolAdminPostDto): Promise<SchoolAdminPost> => {
+    const response = await api.post<SchoolAdminPost>('/school-admin/posts', dto);
+    return response.data;
+  },
+
+  cancelScheduledPost: async (id: string): Promise<SchoolAdminPost> => {
+    const response = await api.post<SchoolAdminPost>(`/school-admin/posts/${id}/cancel`);
+    return response.data;
+  },
+
   getPosts: async (): Promise<SchoolAdminPost[]> => {
     const response = await api.get<SchoolAdminPost[]>('/school-admin/posts');
     return response.data;

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { parseImageUrls } from '../services/publicBlogs';
 import { imageSrc } from '../utils/image';
+import { SchoolLogo } from './SchoolLogo';
 import type { LikedEventItem, SavedEventItem } from '../services/userEvents';
 import type { ApprovedEventPublic } from '../services/events';
 
@@ -37,7 +38,6 @@ export function UserBookmarkedEventDetailModal({ visible, event, onClose }: Prop
   if (!event) return null;
 
   const schoolName = event.school?.name ?? 'School';
-  const schoolLogo = event.school?.image ?? null;
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -52,13 +52,7 @@ export function UserBookmarkedEventDetailModal({ visible, event, onClose }: Prop
           </View>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollInner}>
             <View style={styles.cardHeader}>
-              {schoolLogo ? (
-                <Image source={{ uri: imageSrc(schoolLogo) }} style={styles.avatar} />
-              ) : (
-                <View style={styles.avatarPh}>
-                  <Text style={styles.avatarLetter}>{schoolName.charAt(0)?.toUpperCase() ?? '?'}</Text>
-                </View>
-              )}
+              <SchoolLogo school={event.school} size={44} borderRadius={22} />
               <View style={styles.headerText}>
                 <Text style={styles.schoolName}>{schoolName}</Text>
                 <Text style={styles.subCat}>{event.subCategory?.name ?? 'Post'}</Text>
