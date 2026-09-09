@@ -11,6 +11,8 @@ export interface ApprovedEventPublic {
   commentsEnabled: boolean;
   imageUrls: string | null;
   status: string;
+  publishedAt?: string | null;
+  publishAt?: string | null;
   createdAt: string;
   updatedAt: string;
   school?: { name: string; image: string | null } | null;
@@ -112,10 +114,12 @@ export async function recordSponsoredAdClick(
 export async function getApprovedEvents(
   schoolId?: string | null,
   subCategoryIds?: string[],
+  date?: string | null,
 ): Promise<ApprovedEventPublic[]> {
   const params: Record<string, string> = {};
   if (schoolId != null && String(schoolId).trim()) params.schoolId = String(schoolId).trim();
   if (subCategoryIds?.length) params.subCategoryIds = subCategoryIds.join(',');
+  if (date != null && String(date).trim()) params.date = String(date).trim();
   const response = await api.get<ApprovedEventPublic[] | { data?: ApprovedEventPublic[] }>('/events/approved', {
     params,
   });
@@ -135,8 +139,19 @@ export async function getCategoriesBySchool(schoolId: string): Promise<CategoryP
   return Array.isArray(response.data) ? response.data : [];
 }
 
-export async function getUpcomingByDate(date: string): Promise<UpcomingPostPublic[]> {
-  const response = await api.get<UpcomingPostPublic[]>('/events/upcoming', { params: { date } });
+export async function getScheduledEvents(schoolId: string): Promise<ApprovedEventPublic[]> {
+  const sid = String(schoolId ?? '').trim();
+  if (!sid) return [];
+  const response = await api.get<ApprovedEventPublic[]>('/events/scheduled', {
+    params: { schoolId: sid },
+  });
+  return Array.isArray(response.data) ? response.data : [];
+}
+
+export async function getUpcomingByDate(date: string, schoolId?: string | null): Promise<UpcomingPostPublic[]> {
+  const params: Record<string, string> = { date };
+  if (schoolId != null && String(schoolId).trim()) params.schoolId = String(schoolId).trim();
+  const response = await api.get<UpcomingPostPublic[]>('/events/upcoming', { params });
   return Array.isArray(response.data) ? response.data : [];
 }
 

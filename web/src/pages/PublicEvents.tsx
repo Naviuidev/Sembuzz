@@ -19,6 +19,7 @@ import {
   type SponsoredAdPublic,
 } from '../services/public-events.service';
 import { buildPublicFeedItems } from '../utils/publicFeed';
+import { eventMatchesCalendarDateYmd } from '../utils/eventFeedDate';
 import { InshortsHomeFeed } from '../components/InshortsHomeFeed';
 import {
   userEventsService,
@@ -86,6 +87,22 @@ function formatDate(iso: string) {
   } catch {
     return iso;
   }
+}
+
+function toYmd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function formatYmdLabel(ymd: string): string {
+  return new Date(`${ymd}T12:00:00`).toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
 
 function parseImageUrls(imageUrls: string | null): string[] {
@@ -1118,6 +1135,13 @@ export const PublicEvents = () => {
   const [categorySelectionSelectedIds, setCategorySelectionSelectedIds] = useState<string[]>([]);
   const [selectedLikedEvent, setSelectedLikedEvent] = useState<import('../services/user-events.service').LikedEventItem | null>(null);
   const [upcomingDateFilter, setUpcomingDateFilter] = useState<string | null>(null);
+  const [calendarFilterSchoolId, setCalendarFilterSchoolId] = useState<string | null>(null);
+  const [calendarFilterOpen, setCalendarFilterOpen] = useState(false);
+  const [calendarFilterStep, setCalendarFilterStep] = useState<'date' | 'school'>('date');
+  const [calendarFilterDraftDate, setCalendarFilterDraftDate] = useState(() => toYmd(new Date()));
+  const [guestSchoolPickerOpen, setGuestSchoolPickerOpen] = useState(false);
+  const [schoolPickerTarget, setSchoolPickerTarget] = useState<'guest' | 'allSchools'>('guest');
+  const [allSchoolsFilterSchoolId, setAllSchoolsFilterSchoolId] = useState<string | null>(null);
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   const [selectedUpcomingPost, setSelectedUpcomingPost] = useState<UpcomingPostPublic | null>(null);
   const [googleCalDropdownPostId, setGoogleCalDropdownPostId] = useState<string | null>(null);
@@ -1191,10 +1215,10 @@ export const PublicEvents = () => {
   const isLoggedInHome = !!user && bottomNavActive === 'home';
   const homeFeedSchoolId = isLoggedInHome && user ? user.schoolId : null;
 
-  // When "What's happening in all schools" is on, show all schools' news (effectiveSchoolId = null, no subcategory filter)
+  // When "All schools" is on, show all schools' news unless the user picks one school to filter.
   const effectiveSchoolId =
     isLoggedInHome && showAllSchoolsFeed
-      ? null
+      ? allSchoolsFilterSchoolId
       : isLoggedInHome && homeFeedSchoolId
         ? homeFeedSchoolId
         : schoolId;
@@ -1261,10 +1285,46 @@ export const PublicEvents = () => {
   });
 
   // Upcoming posts by date (when user selects a date from calendar and clicks OK)
-  const { data: upcomingPostsByDate = [] } = useQuery({
-    queryKey: ['public', 'events', 'upcoming', upcomingDateFilter ?? ''],
-    queryFn: () => publicEventsService.getUpcomingByDate(upcomingDateFilter!),
-    enabled: !!upcomingDateFilter && !!upcomingDateFilter.trim(),
+  const calendarFilterActive = !!upcomingDateFilter && !!calendarFilterSchoolId;
+
+  const { data: upcomingPostsByDate = [], isLoading: upcomingPostsLoading } = useQuery({
+    queryKey: ['public', 'events', 'upcoming', upcomingDateFilter ?? '', calendarFilterSchoolId ?? ''],
+    queryFn: () => publicEventsService.getUpcomingByDate(upcomingDateFilter!, calendarFilterSchoolId),
+    enabled: calendarFilterActive,
+  });
+
+  const { data: calendarApprovedEvents = [], isLoading: calendarApprovedLoading } = useQuery({
+    queryKey: ['public', 'events', 'approved', 'calendar', calendarFilterSchoolId ?? '', upcomingDateFilter ?? ''],
+    queryFn: async () => {
+      const all = await publicEventsService.getApproved(calendarFilterSchoolId!);
+      return all.filter((e) => eventMatchesCalendarDateYmd(e, upcomingDateFilter!));
+    },
+    enabled: calendarFilterActive,
+  });
+
+  const { data: calendarScheduledEvents = [], isLoading: calendarScheduledLoading } = useQuery({
+    queryKey: ['public', 'events', 'scheduled', 'calendar', calendarFilterSchoolId ?? '', upcomingDateFilter ?? ''],
+    queryFn: async () => {
+      const all = await publicEventsService.getScheduled(calendarFilterSchoolId!);
+      return all.filter((e) => eventMatchesCalendarDateYmd(e, upcomingDateFilter!));
+    },
+    enabled: calendarFilterActive,
+  });
+
+  const calendarFeedItems = useMemo(
+    () => buildPublicFeedItems(calendarApprovedEvents, [], [], feedSort),
+    [calendarApprovedEvents, feedSort],
+  );
+
+  const calendarEventIds = useMemo(
+    () => calendarApprovedEvents.map((e) => e.id),
+    [calendarApprovedEvents],
+  );
+
+  const { data: calendarPublicEngagementCounts } = useQuery({
+    queryKey: ['public', 'events', 'engagement-counts', 'calendar', calendarEventIds.join(',')],
+    queryFn: () => publicEventsService.getEngagementCounts(calendarEventIds),
+    enabled: calendarFilterActive && calendarEventIds.length > 0,
   });
 
   // Categories for first-login / change-category flow (by user's school)
@@ -1919,8 +1979,32 @@ export const PublicEvents = () => {
   const { data: allSchools = [], isLoading: schoolsLoading } = useQuery({
     queryKey: ['user', 'auth', 'schools'],
     queryFn: () => userAuthService.getSchools(),
-    enabled: filterMode === 'school' || (!user && bottomNavActive === 'home'),
+    enabled:
+      filterMode === 'school'
+      || guestSchoolPickerOpen
+      || calendarFilterOpen
+      || (!!user && showAllSchoolsFeed && bottomNavActive === 'home')
+      || (!user && bottomNavActive === 'home'),
   });
+
+  const selectedGuestSchoolName = useMemo(() => {
+    if (user || !schoolId) return null;
+    const fromApi = allSchools.find((s) => s.id === schoolId)?.name;
+    if (fromApi) return fromApi;
+    return events.find((e) => e.schoolId === schoolId)?.school?.name ?? null;
+  }, [user, schoolId, allSchools, events]);
+
+  const calendarFilterSchoolName = useMemo(() => {
+    if (!calendarFilterSchoolId) return null;
+    return allSchools.find((s) => s.id === calendarFilterSchoolId)?.name ?? null;
+  }, [calendarFilterSchoolId, allSchools]);
+
+  const selectedAllSchoolsFilterName = useMemo(() => {
+    if (!allSchoolsFilterSchoolId) return null;
+    const fromApi = allSchools.find((s) => s.id === allSchoolsFilterSchoolId)?.name;
+    if (fromApi) return fromApi;
+    return events.find((e) => e.schoolId === allSchoolsFilterSchoolId)?.school?.name ?? null;
+  }, [allSchoolsFilterSchoolId, allSchools, events]);
 
   const schoolsForFilter = useMemo(() => {
     if (filterMode === 'school' && allSchools.length > 0) {
@@ -1941,13 +2025,6 @@ export const PublicEvents = () => {
     return fromEvents;
   }, [filterMode, allSchools, events]);
 
-  const selectedGuestSchoolName = useMemo(() => {
-    if (user || !schoolId) return null;
-    const fromApi = allSchools.find((s) => s.id === schoolId)?.name;
-    if (fromApi) return fromApi;
-    return events.find((e) => e.schoolId === schoolId)?.school?.name ?? null;
-  }, [user, schoolId, allSchools, events]);
-
   const openGuestLogin = useCallback(() => {
     setSettingsLoginView('login');
     setShowSettingsLoginPopup(true);
@@ -1962,6 +2039,64 @@ export const PublicEvents = () => {
       return next;
     });
     setFilterMode('none');
+    setShowNoNewsPopup(false);
+  };
+
+  /** Guest home: inline school filter (no full-screen loading popup). */
+  const applyGuestSchoolFilter = (id: string | null) => {
+    if (!id) {
+      clearSchoolFilter();
+      return;
+    }
+    setUpcomingDateFilter(null);
+    setCalendarFilterSchoolId(null);
+    setSelectedUpcomingPost(null);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('schoolId', id);
+      return next;
+    });
+    setFilterMode('none');
+    setShowNoNewsPopup(false);
+    setGuestSchoolPickerOpen(false);
+    queryClient.invalidateQueries({
+      queryKey: ['public', 'events', 'approved', id, selectedSubCategoryIds],
+    });
+  };
+
+  const applySchoolPickerSelection = (id: string | null) => {
+    setGuestSchoolPickerOpen(false);
+    if (schoolPickerTarget === 'allSchools') {
+      setAllSchoolsFilterSchoolId(id);
+      return;
+    }
+    applyGuestSchoolFilter(id);
+  };
+
+  const openSchoolPicker = (target: 'guest' | 'allSchools') => {
+    setSchoolPickerTarget(target);
+    setGuestSchoolPickerOpen(true);
+  };
+
+  const openCalendarFilter = () => {
+    setCalendarFilterDraftDate(toYmd(new Date()));
+    setCalendarFilterStep('date');
+    setCalendarFilterOpen(true);
+    setFilterDropdownOpen(false);
+  };
+
+  const applyCalendarFilter = (schoolIdForCalendar: string) => {
+    setUpcomingDateFilter(calendarFilterDraftDate);
+    setCalendarFilterSchoolId(schoolIdForCalendar);
+    setSelectedUpcomingPost(null);
+    setCalendarFilterOpen(false);
+    clearSchoolFilter();
+  };
+
+  const clearCalendarFilter = () => {
+    setUpcomingDateFilter(null);
+    setCalendarFilterSchoolId(null);
+    setSelectedUpcomingPost(null);
   };
 
   const selectSchoolForSearch = (id: string) => {
@@ -3333,7 +3468,7 @@ export const PublicEvents = () => {
                   type="button"
                   role="tab"
                   className={`home-feed-tab ${!showAllSchoolsFeed ? 'active' : ''}`}
-                  onClick={() => { setShowAllSchoolsFeed(false); setUpcomingDateFilter(null); setSelectedUpcomingPost(null); }}
+                  onClick={() => { setShowAllSchoolsFeed(false); setAllSchoolsFilterSchoolId(null); setUpcomingDateFilter(null); setSelectedUpcomingPost(null); }}
                   aria-pressed={!showAllSchoolsFeed}
                 >
                   <span className="home-feed-tab-inner">
@@ -3411,6 +3546,25 @@ export const PublicEvents = () => {
                 <>
                   <button
                     type="button"
+                    className={`btn btn-sm rounded-pill flex-shrink-0 text-nowrap d-inline-flex align-items-center gap-2 ${allSchoolsFilterSchoolId ? 'btn-dark' : 'btn-outline-dark'}`}
+                    style={{ fontWeight: allSchoolsFilterSchoolId ? 600 : 500, padding: '0.35rem 0.85rem', fontSize: '0.875rem' }}
+                    onClick={() => openSchoolPicker('allSchools')}
+                  >
+                    <i className="bi bi-building" aria-hidden />
+                    {selectedAllSchoolsFilterName ?? 'Select school'}
+                    <i className="bi bi-chevron-down" style={{ fontSize: '0.75rem' }} aria-hidden />
+                  </button>
+                  {allSchoolsFilterSchoolId && (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-link flex-shrink-0 text-nowrap text-decoration-none px-1"
+                      onClick={() => setAllSchoolsFilterSchoolId(null)}
+                    >
+                      Clear
+                    </button>
+                  )}
+                  <button
+                    type="button"
                     className={`btn btn-sm rounded-pill flex-shrink-0 text-nowrap ${feedSort === 'latest' ? 'btn-dark' : 'btn-outline-dark'}`}
                     style={{ fontWeight: feedSort === 'latest' ? 600 : 400, padding: '0.35rem 0.75rem', fontSize: '0.875rem' }}
                     onClick={() => setFeedSort('latest')}
@@ -3426,7 +3580,29 @@ export const PublicEvents = () => {
                     Popular
                   </button>
                 </>
-              ) : !user ? null : (
+              ) : !user ? (
+                <>
+                  <button
+                    type="button"
+                    className={`btn btn-sm rounded-pill flex-shrink-0 text-nowrap d-inline-flex align-items-center gap-2 ${schoolId ? 'btn-dark' : 'btn-outline-dark'}`}
+                    style={{ fontWeight: schoolId ? 600 : 500, padding: '0.35rem 0.85rem', fontSize: '0.875rem' }}
+                    onClick={() => openSchoolPicker('guest')}
+                  >
+                    <i className="bi bi-building" aria-hidden />
+                    {selectedGuestSchoolName ?? 'Select school'}
+                    <i className="bi bi-chevron-down" style={{ fontSize: '0.75rem' }} aria-hidden />
+                  </button>
+                  {schoolId && (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-link flex-shrink-0 text-nowrap text-decoration-none px-1"
+                      onClick={() => applyGuestSchoolFilter(null)}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </>
+              ) : (
                 <>
                   {user && !showAllSchoolsFeed && homeContentCategories.length > 0 && (
                     <>
@@ -3480,10 +3656,10 @@ export const PublicEvents = () => {
                 type="button"
                 className="btn border-0 py-1 px-2 rounded d-flex align-items-center"
                 style={{
-                  backgroundColor: filterDropdownOpen || feedSort !== 'latest' || (!user && !!schoolId)
+                  backgroundColor: filterDropdownOpen || feedSort !== 'latest' || (!user && !!schoolId) || !!upcomingDateFilter
                     ? 'rgba(13, 202, 240, 0.15)'
                     : 'transparent',
-                  color: filterDropdownOpen || (!user && !!schoolId) ? '#087990' : '#6c757d',
+                  color: filterDropdownOpen || (!user && !!schoolId) || !!upcomingDateFilter ? '#087990' : '#6c757d',
                 }}
                 onClick={() => setFilterDropdownOpen((o) => !o)}
                 title="Filter: Latest, Popular"
@@ -3542,71 +3718,23 @@ export const PublicEvents = () => {
                         Popular
                       </button>
                     </div>
-                    {!user && (
-                      <>
-                        <div className="px-3 py-1 small text-muted border-top mt-1 pt-2">School</div>
-                        <div className="px-3 pt-1 pb-2">
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-outline-dark rounded-pill d-inline-flex align-items-center gap-2"
-                            onClick={() => {
-                              setFilterDropdownOpen(false);
-                              setFilterMode('school');
-                            }}
-                          >
-                            <i className="bi bi-building" aria-hidden />
-                            Filter by school
-                          </button>
-                        </div>
-                      </>
-                    )}
+                    <div className="px-3 py-1 small text-muted border-top mt-1 pt-2">View by date</div>
+                    <div className="px-3 pt-1 pb-2">
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-dark rounded-pill d-inline-flex align-items-center gap-2"
+                        onClick={openCalendarFilter}
+                      >
+                        <i className="bi bi-calendar3" aria-hidden />
+                        Calendar
+                      </button>
+                    </div>
                   </div>
                 </>
               )}
             </div>
             )}
           </div>
-
-          {!user && schoolId && (
-            <div
-              className="d-flex flex-wrap align-items-center gap-2 px-2 py-2 small"
-              style={{
-                backgroundColor: '#fff',
-                borderRadius: '0 0 8px 8px',
-                marginTop: -1,
-              }}
-            >
-              <span className="text-muted">Showing:</span>
-              <span
-                className="d-inline-flex align-items-center rounded-pill"
-                style={{
-                  backgroundColor: '#212529',
-                  color: '#fff',
-                  fontSize: '0.8125rem',
-                  fontWeight: 600,
-                  padding: '6px 12px',
-                  lineHeight: 1.2,
-                }}
-              >
-                {selectedGuestSchoolName ?? 'Selected school'}
-              </span>
-              <button
-                type="button"
-                className="btn btn-link btn-sm p-0 text-decoration-none"
-                onClick={() => setFilterMode('school')}
-              >
-                Change school
-              </button>
-              <span className="text-muted">·</span>
-              <button
-                type="button"
-                className="btn btn-link btn-sm p-0 text-decoration-none"
-                onClick={clearSchoolFilter}
-              >
-                Clear filter
-              </button>
-            </div>
-          )}
 
           {user && !showAllSchoolsFeed && selectedSubCategoryMeta.length > 0 && (
             <div
@@ -3754,6 +3882,189 @@ export const PublicEvents = () => {
               </div>
             );
           })()}
+
+        {guestSchoolPickerOpen && (
+          <div
+            role="presentation"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 1060,
+              backgroundColor: 'rgba(0,0,0,0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 20,
+            }}
+            onClick={() => setGuestSchoolPickerOpen(false)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="guest-school-picker-title"
+              className="bg-white rounded-3 shadow"
+              style={{ width: '100%', maxWidth: 420, maxHeight: '78vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="d-flex align-items-center justify-content-between px-3 py-3 border-bottom">
+                <h2 id="guest-school-picker-title" className="h6 mb-0 fw-semibold">Select a school</h2>
+                <button type="button" className="btn btn-link p-0 text-secondary" onClick={() => setGuestSchoolPickerOpen(false)} aria-label="Close">
+                  <i className="bi bi-x-lg" />
+                </button>
+              </div>
+              <div className="overflow-auto p-2">
+                <button
+                  type="button"
+                  className="btn btn-sm btn-link text-decoration-none mb-2"
+                  onClick={() => applySchoolPickerSelection(null)}
+                >
+                  All schools
+                </button>
+                {schoolsLoading ? (
+                  <div className="text-center py-4">
+                    <div className="spinner-border spinner-border-sm text-secondary" role="status" />
+                    <p className="small text-muted mt-2 mb-0">Loading schools…</p>
+                  </div>
+                ) : allSchools.length === 0 ? (
+                  <p className="small text-muted text-center py-4 mb-0">No schools found.</p>
+                ) : (
+                  allSchools.map((s) => {
+                    const logoUrl = s.image ? imageSrc(s.image) : '';
+                    const isSelected = schoolPickerTarget === 'allSchools'
+                      ? allSchoolsFilterSchoolId === s.id
+                      : schoolId === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        className={`w-100 btn text-start d-flex align-items-center gap-3 py-2 px-2 mb-1 ${isSelected ? 'btn-dark' : 'btn-light'}`}
+                        onClick={() => applySchoolPickerSelection(s.id)}
+                      >
+                        {logoUrl ? (
+                          <img src={logoUrl} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} />
+                        ) : (
+                          <span className="d-inline-flex align-items-center justify-content-center" style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(26,31,46,0.08)' }}>
+                            <i className="bi bi-building" />
+                          </span>
+                        )}
+                        <span className="fw-medium">{s.name}</span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {calendarFilterOpen && (
+          <div
+            role="presentation"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 1060,
+              backgroundColor: 'rgba(0,0,0,0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 20,
+            }}
+            onClick={() => setCalendarFilterOpen(false)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="calendar-filter-title"
+              className="bg-white rounded-3 shadow"
+              style={{ width: '100%', maxWidth: 420, maxHeight: '78vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="d-flex align-items-center justify-content-between px-3 py-3 border-bottom">
+                <h2 id="calendar-filter-title" className="h6 mb-0 fw-semibold">
+                  {calendarFilterStep === 'date' ? 'Pick a date' : 'Select a school'}
+                </h2>
+                <button type="button" className="btn btn-link p-0 text-secondary" onClick={() => setCalendarFilterOpen(false)} aria-label="Close">
+                  <i className="bi bi-x-lg" />
+                </button>
+              </div>
+              {calendarFilterStep === 'date' ? (
+                <div className="p-3">
+                  <p className="small text-muted mb-3">Choose a date to see events scheduled for that day (the date set when the post was created).</p>
+                  <label htmlFor="calendar-filter-date" className="form-label small fw-semibold">Date</label>
+                  <input
+                    id="calendar-filter-date"
+                    type="date"
+                    className="form-control mb-3"
+                    value={calendarFilterDraftDate}
+                    onChange={(e) => setCalendarFilterDraftDate(e.target.value)}
+                  />
+                  <div className="d-flex gap-2 flex-wrap">
+                    <button type="button" className="btn btn-sm btn-outline-dark rounded-pill" onClick={() => setCalendarFilterDraftDate(toYmd(new Date()))}>
+                      Today
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-dark rounded-pill"
+                      onClick={() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + 1);
+                        setCalendarFilterDraftDate(toYmd(d));
+                      }}
+                    >
+                      Tomorrow
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-dark w-100 rounded-pill mt-3"
+                    disabled={!calendarFilterDraftDate}
+                    onClick={() => setCalendarFilterStep('school')}
+                  >
+                    Next — choose school
+                  </button>
+                </div>
+              ) : (
+                <div className="overflow-auto p-2">
+                  <p className="small text-muted px-2 mb-2">
+                    Events on <strong>{formatYmdLabel(calendarFilterDraftDate)}</strong>
+                  </p>
+                  <button type="button" className="btn btn-sm btn-link text-decoration-none mb-2" onClick={() => setCalendarFilterStep('date')}>
+                    ← Change date
+                  </button>
+                  {schoolsLoading ? (
+                    <div className="text-center py-4">
+                      <div className="spinner-border spinner-border-sm text-secondary" role="status" />
+                    </div>
+                  ) : allSchools.length === 0 ? (
+                    <p className="small text-muted text-center py-4 mb-0">No schools found.</p>
+                  ) : (
+                    allSchools.map((s) => {
+                      const logoUrl = s.image ? imageSrc(s.image) : '';
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          className="w-100 btn btn-light text-start d-flex align-items-center gap-3 py-2 px-2 mb-1"
+                          onClick={() => applyCalendarFilter(s.id)}
+                        >
+                          {logoUrl ? (
+                            <img src={logoUrl} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} />
+                          ) : (
+                            <span className="d-inline-flex align-items-center justify-content-center" style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(26,31,46,0.08)' }}>
+                              <i className="bi bi-building" />
+                            </span>
+                          )}
+                          <span className="fw-medium">{s.name}</span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Loading popup: 3 sec when school has approved news, then close filter and show news */}
         {showSchoolLoadingPopup && (
@@ -4110,6 +4421,192 @@ export const PublicEvents = () => {
               onCommentAdded={() => queryClient.invalidateQueries({ queryKey: ['public', 'events', 'engagement'] })}
             />
           </div>
+        ) : selectedUpcomingPost ? (
+          <UpcomingPostDetailCard
+            post={selectedUpcomingPost}
+            onClose={() => { setSelectedUpcomingPost(null); }}
+          />
+        ) : upcomingDateFilter ? (
+          <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+            <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+              <span className="small text-muted">
+                News for {formatYmdLabel(upcomingDateFilter)}
+                {calendarFilterSchoolName ? ` · ${calendarFilterSchoolName}` : ''}
+              </span>
+              <button type="button" className="btn btn-sm btn-outline-secondary" onClick={clearCalendarFilter}>Show regular feed</button>
+            </div>
+            {calendarApprovedLoading || calendarScheduledLoading || upcomingPostsLoading ? (
+              <div className="text-center py-5">
+                <div className="spinner-border text-secondary" role="status" />
+                <p className="mt-2 mb-0 small text-muted">Loading news for this date…</p>
+              </div>
+            ) : calendarFeedItems.length === 0 && calendarScheduledEvents.length === 0 && upcomingPostsByDate.length === 0 ? (
+              <p className="text-muted text-center py-4">
+                {calendarFilterSchoolName
+                  ? `No posted, scheduled, or upcoming news for ${calendarFilterSchoolName} on this date.`
+                  : 'No news for this date.'}
+              </p>
+            ) : (
+              <>
+            {calendarFeedItems.length > 0 && (
+              <div className="mb-4">
+                <p className="small fw-semibold text-secondary mb-2">Posted news</p>
+                {bottomNavActive === 'home' ? (
+                  <InshortsHomeFeed
+                    feedItems={calendarFeedItems}
+                    onFeedSwipeDirection={(direction) => setBottomNavVisible(direction === 'down')}
+                    userId={user?.id}
+                    likeCount={(id) =>
+                      user
+                        ? (engagement?.likes?.[id] ?? calendarPublicEngagementCounts?.likes?.[id] ?? 0)
+                        : (calendarPublicEngagementCounts?.likes?.[id] ?? 0)}
+                    commentCount={(id) =>
+                      user
+                        ? (engagement?.commentCounts?.[id] ?? calendarPublicEngagementCounts?.commentCounts?.[id] ?? 0)
+                        : (calendarPublicEngagementCounts?.commentCounts?.[id] ?? 0)}
+                    isLiked={(id) => !!user && (engagement?.likedByMe?.includes(id) ?? false)}
+                    isSaved={(id) => !!user && (engagement?.savedByMe?.includes(id) ?? false)}
+                    onLike={(eventId) => likeMutation.mutate(eventId)}
+                    onSave={(eventId) => saveMutation.mutate(eventId)}
+                    onCommentAdded={() => queryClient.invalidateQueries({ queryKey: ['public', 'events', 'engagement'] })}
+                    onSponsoredClick={() => {}}
+                    onBannerClick={() => {}}
+                  />
+                ) : (
+                  calendarFeedItems.map((item) =>
+                    item.type === 'event' ? (
+                      <EventPostCard
+                        key={item.event.id}
+                        event={item.event}
+                        likeCount={calendarPublicEngagementCounts?.likes?.[item.event.id] ?? 0}
+                        commentCount={calendarPublicEngagementCounts?.commentCounts?.[item.event.id] ?? 0}
+                        isLiked={!!user && (engagement?.likedByMe?.includes(item.event.id) ?? false)}
+                        isSaved={!!user && (engagement?.savedByMe?.includes(item.event.id) ?? false)}
+                        currentUserId={user?.id}
+                        onLike={() => likeMutation.mutate(item.event.id)}
+                        onSave={() => saveMutation.mutate(item.event.id)}
+                        onCommentAdded={() => queryClient.invalidateQueries({ queryKey: ['public', 'events', 'engagement'] })}
+                      />
+                    ) : null,
+                  )
+                )}
+              </div>
+            )}
+            {calendarScheduledEvents.length > 0 && (
+              <div className="mb-4">
+                <p className="small fw-semibold text-secondary mb-2">Scheduled news</p>
+                <div className="d-flex flex-column gap-2">
+                  {calendarScheduledEvents.map((event: ApprovedEventPublic) => (
+                    <div key={event.id} className="shadow-sm rounded-3 p-3 d-flex align-items-center gap-3" style={{ backgroundColor: '#fff' }}>
+                      {event.school?.image ? (
+                        <img src={imageSrc(event.school.image)} alt="" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                      ) : (
+                        <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(63deg, rgb(39 158 247 / 35%), rgb(87 177 245 / 36%))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#1a1f2e', fontSize: '1rem', flexShrink: 0 }}>
+                          {event.school?.name?.charAt(0)?.toUpperCase() ?? '?'}
+                        </div>
+                      )}
+                      <div style={{ flex: '1 1 0', minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, color: '#1a1f2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={event.title}>{event.title}</div>
+                        <div className="small text-muted">
+                          {event.publishAt ? formatDate(event.publishAt) : 'Scheduled'}
+                          {event.subCategory?.name ? ` · ${event.subCategory.name}` : ''}
+                        </div>
+                      </div>
+                      <span className="badge text-bg-warning" style={{ flexShrink: 0 }}>Scheduled</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {upcomingPostsByDate.length > 0 && (
+              <div>
+                <p className="small fw-semibold text-secondary mb-2">Upcoming news</p>
+              <div className="d-flex flex-column gap-2">
+                {upcomingPostsByDate.map((post: UpcomingPostPublic) => (
+                  <div key={post.id} className="shadow-sm rounded-3 p-0 d-flex align-items-stretch" style={{ backgroundColor: '#fff', overflow: 'visible' }}>
+                    <button
+                      type="button"
+                      className="border-0 text-start p-3 bg-transparent flex-grow-1"
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        cursor: 'pointer',
+                        minWidth: 0,
+                      }}
+                      onClick={() => setSelectedUpcomingPost(post)}
+                    >
+                      {post.school?.image ? (
+                        <img src={imageSrc(post.school.image)} alt="" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                      ) : (
+                        <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(63deg, rgb(39 158 247 / 35%), rgb(87 177 245 / 36%))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#1a1f2e', fontSize: '1rem', flexShrink: 0 }}>
+                          {post.school?.name?.charAt(0)?.toUpperCase() ?? '?'}
+                        </div>
+                      )}
+                      <span style={{ flex: '1 1 0', minWidth: 0, fontWeight: 600, color: '#1a1f2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }} title={post.title}>{post.title}</span>
+                      <span className="small text-muted" style={{ flexShrink: 0, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={post.school?.name ?? 'School'}>{post.school?.name ?? 'School'}</span>
+                      <i className="bi bi-chevron-right text-muted" style={{ flexShrink: 0 }} />
+                    </button>
+                    <div className="d-flex align-items-center pe-2" style={{ position: 'relative' }}>
+                      <button
+                        ref={googleCalDropdownPostId === post.id ? googleCalAnchorRef : undefined}
+                        type="button"
+                        className="btn btn-link p-1 text-secondary border-0"
+                        style={{ minWidth: 36, minHeight: 36 }}
+                        aria-label="Add to Google Calendar"
+                        aria-expanded={googleCalDropdownPostId === post.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setGoogleCalDropdownPostId(googleCalDropdownPostId === post.id ? null : post.id);
+                        }}
+                      >
+                        <i className="bi bi-calendar-plus" style={{ fontSize: '1.25rem' }} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              </div>
+            )}
+              </>
+            )}
+            {googleCalDropdownPostId && googleCalDropdownPosition && (() => {
+              const post = upcomingPostsByDate.find((p: UpcomingPostPublic) => p.id === googleCalDropdownPostId);
+              if (!post) return null;
+              const { top, left } = googleCalDropdownPosition;
+              return createPortal(
+                <div
+                  className="dropdown-menu show shadow-sm border py-1 bg-white"
+                  style={{
+                    position: 'fixed',
+                    left,
+                    top,
+                    minWidth: '200px',
+                    borderRadius: '8px',
+                    zIndex: 1060,
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    className="dropdown-item small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const returnUrl = `${window.location.origin}/events`;
+                      const url = buildGoogleCalendarAddAuthUrl(post, returnUrl);
+                      window.open(url, '_blank', 'noopener,noreferrer');
+                      setGoogleCalDropdownPostId(null);
+                      setGoogleCalDropdownPosition(null);
+                    }}
+                  >
+                    Add to Google Calendar
+                  </button>
+                </div>,
+                document.body,
+              );
+            })()}
+          </div>
         ) : isLoading ? (
           <div className="text-center py-5">
             <div className="spinner-border text-secondary" role="status" />
@@ -4159,103 +4656,6 @@ export const PublicEvents = () => {
                 </p>
               )}
             </div>
-          </div>
-        ) : selectedUpcomingPost ? (
-          <UpcomingPostDetailCard
-            post={selectedUpcomingPost}
-            onClose={() => { setSelectedUpcomingPost(null); setUpcomingDateFilter(null); window.location.reload(); }}
-          />
-        ) : upcomingDateFilter ? (
-          <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-            <div className="d-flex align-items-center justify-content-between mb-3">
-              <span className="small text-muted">Upcoming for {new Date(upcomingDateFilter + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
-              <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => { setUpcomingDateFilter(null); setSelectedUpcomingPost(null); window.location.reload(); }}>Show regular feed</button>
-            </div>
-            {upcomingPostsByDate.length === 0 ? (
-              <p className="text-muted text-center py-4">No upcoming news for this date.</p>
-            ) : (
-              <div className="d-flex flex-column gap-2">
-                {upcomingPostsByDate.map((post: UpcomingPostPublic) => (
-                  <div key={post.id} className="shadow-sm rounded-3 p-0 d-flex align-items-stretch" style={{ backgroundColor: '#fff', overflow: 'visible' }}>
-                    <button
-                      type="button"
-                      className="border-0 text-start p-3 bg-transparent flex-grow-1"
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: '0.75rem',
-                        cursor: 'pointer',
-                        minWidth: 0,
-                      }}
-                      onClick={() => setSelectedUpcomingPost(post)}
-                    >
-                      {post.school?.image ? (
-                        <img src={imageSrc(post.school.image)} alt="" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-                      ) : (
-                        <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(63deg, rgb(39 158 247 / 35%), rgb(87 177 245 / 36%))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#1a1f2e', fontSize: '1rem', flexShrink: 0 }}>
-                          {post.school?.name?.charAt(0)?.toUpperCase() ?? '?'}
-                        </div>
-                      )}
-                      <span style={{ flex: '1 1 0', minWidth: 0, fontWeight: 600, color: '#1a1f2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }} title={post.title}>{post.title}</span>
-                      <span className="small text-muted" style={{ flexShrink: 0, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={post.school?.name ?? 'School'}>{post.school?.name ?? 'School'}</span>
-                      <i className="bi bi-chevron-right text-muted" style={{ flexShrink: 0 }} />
-                    </button>
-                    <div className="d-flex align-items-center pe-2" style={{ position: 'relative' }}>
-                      <button
-                        ref={googleCalDropdownPostId === post.id ? googleCalAnchorRef : undefined}
-                        type="button"
-                        className="btn btn-link p-1 text-secondary border-0"
-                        style={{ minWidth: 36, minHeight: 36 }}
-                        aria-label="Add to Google Calendar"
-                        aria-expanded={googleCalDropdownPostId === post.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setGoogleCalDropdownPostId(googleCalDropdownPostId === post.id ? null : post.id);
-                        }}
-                      >
-                        <i className="bi bi-calendar-plus" style={{ fontSize: '1.25rem' }} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {googleCalDropdownPostId && googleCalDropdownPosition && (() => {
-              const post = upcomingPostsByDate.find((p: UpcomingPostPublic) => p.id === googleCalDropdownPostId);
-              if (!post) return null;
-              const { top, left } = googleCalDropdownPosition;
-              return createPortal(
-                <div
-                  className="dropdown-menu show shadow-sm border py-1 bg-white"
-                  style={{
-                    position: 'fixed',
-                    left,
-                    top,
-                    minWidth: '200px',
-                    borderRadius: '8px',
-                    zIndex: 1060,
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button
-                    type="button"
-                    className="dropdown-item small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const returnUrl = `${window.location.origin}/events`;
-                      const url = buildGoogleCalendarAddAuthUrl(post, returnUrl);
-                      window.open(url, '_blank', 'noopener,noreferrer');
-                      setGoogleCalDropdownPostId(null);
-                      setGoogleCalDropdownPosition(null);
-                    }}
-                  >
-                    Add to Google Calendar
-                  </button>
-                </div>,
-                document.body,
-              );
-            })()}
           </div>
         ) : bottomNavActive === 'home' ? (
           <div style={{ maxWidth: '600px', margin: '0 auto' }}>

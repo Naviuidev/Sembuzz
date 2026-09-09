@@ -9,7 +9,10 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
 import { PublishedBlogsService } from './published-blogs.service';
-import { EVENT_PUBLIC_STATUSES } from './modules/events/event-publishing.constants';
+import {
+  EVENT_PUBLIC_STATUSES,
+  EVENT_SCHEDULED_STATUSES,
+} from './modules/events/event-publishing.constants';
 
 @Controller('events')
 export class EventsPublicController {
@@ -36,18 +39,33 @@ export class EventsPublicController {
   async findApproved(
     @Query('schoolId') schoolId?: string,
     @Query('subCategoryIds') subCategoryIdsStr?: string,
+    @Query('date') dateStr?: string,
   ) {
     const subCategoryIds =
       subCategoryIdsStr && subCategoryIdsStr.trim()
         ? subCategoryIdsStr.split(',').map((id) => id.trim()).filter(Boolean)
         : undefined;
     const sid = typeof schoolId === 'string' ? schoolId.trim() : '';
+    const date = typeof dateStr === 'string' ? dateStr.trim() : '';
+    let publishedOnDay: { OR: Record<string, unknown>[] } | undefined;
+    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      const dayStart = new Date(`${date}T00:00:00.000Z`);
+      const dayEnd = new Date(`${date}T23:59:59.999Z`);
+      publishedOnDay = {
+        OR: [
+          { publishedAt: { gte: dayStart, lte: dayEnd } },
+          { createdAt: { gte: dayStart, lte: dayEnd } },
+          { updatedAt: { gte: dayStart, lte: dayEnd } },
+        ],
+      };
+    }
     const where = {
       status: { in: [...EVENT_PUBLIC_STATUSES] },
       ...(sid ? { schoolId: sid } : {}),
       ...(subCategoryIds?.length
         ? { subCategoryId: { in: subCategoryIds } }
         : {}),
+      ...(publishedOnDay ?? {}),
     };
 
     try {
@@ -80,6 +98,36 @@ export class EventsPublicController {
     }
   }
 
+  /** Approved events waiting for publishAt (category-admin approved, not yet live). Public calendar use. */
+  @Get('scheduled')
+  async findScheduledApproved(@Query('schoolId') schoolId?: string) {
+    const sid = typeof schoolId === 'string' ? schoolId.trim() : '';
+    if (!sid) return [];
+
+    try {
+      return await this.prisma.event.findMany({
+        where: {
+          status: { in: [...EVENT_SCHEDULED_STATUSES] },
+          schoolId: sid,
+          publishAt: { not: null },
+        },
+        include: {
+          school: { select: { name: true, image: true } },
+          subCategory: { select: { id: true, name: true } },
+        },
+        orderBy: { publishAt: 'asc' },
+        take: 500,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[Events] GET /events/scheduled error:', message, err);
+      throw new HttpException(
+        { statusCode: 500, message: 'Failed to load scheduled events' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   /** Upcoming/scheduled posts by date/range (school admin created). Public, no auth.
    * - date=YYYY-MM-DD (single day)
    * - from=YYYY-MM-DD&to=YYYY-MM-DD (inclusive range)
@@ -89,6 +137,7 @@ export class EventsPublicController {
     @Query('date') dateStr?: string,
     @Query('from') fromStr?: string,
     @Query('to') toStr?: string,
+    @Query('schoolId') schoolId?: string,
   ) {
     let dayStart: Date;
     let dayEnd: Date;
@@ -96,13 +145,15 @@ export class EventsPublicController {
     const from = typeof fromStr === 'string' ? fromStr.trim() : '';
     const to = typeof toStr === 'string' ? toStr.trim() : '';
     const date = typeof dateStr === 'string' ? dateStr.trim() : '';
+    const sid = typeof schoolId === 'string' ? schoolId.trim() : '';
 
     if (from && to) {
-      dayStart = new Date(`${from}T00:00:00.000Z`);
-      dayEnd = new Date(`${to}T23:59:59.999Z`);
+      dayStart = new Date(`${from}T12:00:00.000Z`);
+      dayEnd = new Date(`${to}T12:00:00.000Z`);
     } else if (date) {
-      dayStart = new Date(`${date}T00:00:00.000Z`);
-      dayEnd = new Date(`${date}T23:59:59.999Z`);
+      // UpcomingPost.scheduledTo is stored as DATE at noon UTC (see UpcomingPostsService).
+      dayStart = new Date(`${date}T12:00:00.000Z`);
+      dayEnd = dayStart;
     } else {
       return [];
     }
@@ -110,8 +161,16 @@ export class EventsPublicController {
     if (Number.isNaN(dayStart.getTime()) || Number.isNaN(dayEnd.getTime())) return [];
     if (dayStart > dayEnd) return [];
 
+    const scheduledFilter =
+      from && to
+        ? { scheduledTo: { gte: dayStart, lte: dayEnd } }
+        : { scheduledTo: dayStart };
+
     return this.prisma.upcomingPost.findMany({
-      where: { scheduledTo: { gte: dayStart, lte: dayEnd } },
+      where: {
+        ...scheduledFilter,
+        ...(sid ? { schoolId: sid } : {}),
+      },
       include: {
         school: { select: { id: true, name: true, image: true } },
         category: { select: { id: true, name: true } },
