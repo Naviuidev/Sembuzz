@@ -18,9 +18,8 @@ import { NATIVE_UI_TOUCH_RECOVERY } from './src/constants/appEvents';
  */
 const ONBOARDING_BG = require('./assets/onboarding-bg.webp');
 
-/** Solid peach for main onboarding body; translucent for status / home-indicator strips only. */
-const ONBOARDING_CONTENT_BG = '#f9bf8540';
-const ONBOARDING_SAFE_STRIP_BG = '#f9bf8540';
+/** Opaque warm peach — must not use alpha or Android tints body text and shows seams. */
+const ONBOARDING_BG_SOLID = '#F2D4A2';
 
 function PushNotificationBootstrap() {
   /** Force a subtree re-render after the system notification sheet dismisses (mitigates iPad stuck touches). */
@@ -42,63 +41,39 @@ function StartScreen({ onStart }: { onStart: () => void }) {
   const insets = useSafeAreaInsets();
   const { height: screenH } = useWindowDimensions();
   const isAndroid = Platform.OS === 'android';
-  /** Hero band below status bar (white bar stays for clock / battery). */
-  const heroHeight = Math.round(screenH * (isAndroid ? 0.46 : 0.48));
+  const heroHeight = Math.round(screenH * (isAndroid ? 0.44 : 0.48));
 
   return (
-    <View style={[styles.startScreenWrap, { backgroundColor: ONBOARDING_CONTENT_BG }]}>
-      <View
-        pointerEvents="none"
-        style={[styles.safeStripTop, { height: insets.top, backgroundColor: ONBOARDING_SAFE_STRIP_BG }]}
-      />
-      <View
-        pointerEvents="none"
-        style={[
-          styles.safeStripBottom,
-          { height: Math.max(insets.bottom, 0), backgroundColor: ONBOARDING_SAFE_STRIP_BG },
-        ]}
-      />
-      <SafeAreaView style={styles.startRoot} edges={['top', 'bottom']}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={styles.startRoot} edges={['top', 'bottom']}>
+      <StatusBar style="dark" backgroundColor={ONBOARDING_BG_SOLID} />
 
       <View style={[styles.heroContainer, { height: heroHeight }]}>
-        <View style={styles.heroInner}>
-          <Image source={ONBOARDING_BG} style={styles.heroImage} resizeMode="cover" />
-        </View>
+        <Image source={ONBOARDING_BG} style={styles.heroImage} resizeMode="cover" />
+        <View style={styles.heroBottomFade} pointerEvents="none" />
       </View>
 
-      <View style={[styles.startCard, { flex: 1, marginTop: isAndroid ? -20 : -28 }]}>
-        <View
-          style={[
-            styles.startCardInner,
-            { paddingBottom: Math.max(insets.bottom, 8) },
-          ]}
-        >
-          <View style={styles.startTextBlock}>
-            <Text style={styles.startTagline}>
-              Welcome{'\n'}to Your Campus
-            </Text>
-            <Text style={styles.startPara}>
-              Explore everything happening on campus from events and updates to opportunities all in one place.
-            </Text>
-          </View>
+      <View style={styles.startContent}>
+        <View style={styles.startTextBlock}>
+          <Text style={styles.startTagline}>
+            Welcome{'\n'}to Your Campus
+          </Text>
+          <Text style={[styles.startPara, isAndroid && styles.startParaAndroid]}>
+            Explore everything happening on campus — events, updates, and opportunities — all in one place.
+          </Text>
+        </View>
 
-          <View style={styles.paraToButtonGap} />
-
-          <View style={styles.startButtonWrap}>
-            <Pressable
-              style={({ pressed }) => [styles.startButton, pressed && styles.startButtonPressed]}
-              onPress={onStart}
-              accessibilityRole="button"
-              accessibilityLabel="Start"
-            >
-              <Text style={styles.startButtonText}>Start</Text>
-            </Pressable>
-          </View>
+        <View style={[styles.startButtonWrap, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+          <Pressable
+            style={({ pressed }) => [styles.startButton, pressed && styles.startButtonPressed]}
+            onPress={onStart}
+            accessibilityRole="button"
+            accessibilityLabel="Start"
+          >
+            <Text style={styles.startButtonText}>Start</Text>
+          </Pressable>
         </View>
       </View>
-      </SafeAreaView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -198,88 +173,70 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  startScreenWrap: {
-    flex: 1,
-  },
-  safeStripTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1,
-  },
-  safeStripBottom: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1,
-  },
   startRoot: {
     flex: 1,
-    backgroundColor: 'transparent',
-    zIndex: 2,
+    backgroundColor: ONBOARDING_BG_SOLID,
   },
   heroContainer: {
     width: '100%',
-    alignSelf: 'stretch',
     overflow: 'hidden',
-    /** Keeps status-bar / notch area visually clean above the illustration. */
-    backgroundColor: '#f9bf8540',
-    alignItems: 'stretch',
-  },
-  heroInner: {
-    flex: 1,
-    width: '100%',
-    overflow: 'hidden',
+    backgroundColor: ONBOARDING_BG_SOLID,
   },
   heroImage: {
     width: '100%',
     height: '100%',
   },
-  startCard: {
-    backgroundColor: ONBOARDING_CONTENT_BG,
-    paddingHorizontal: 22,
-    paddingTop: 12,
+  heroBottomFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 48,
+    backgroundColor: ONBOARDING_BG_SOLID,
+    opacity: 0.85,
   },
-  startCardInner: {
+  startContent: {
     flex: 1,
-    justifyContent: 'flex-end',
+    backgroundColor: ONBOARDING_BG_SOLID,
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    justifyContent: 'space-between',
   },
   startTextBlock: {
     alignItems: 'center',
-  },
-  paraToButtonGap: {
-    height: 20,
+    paddingTop: 4,
   },
   startTagline: {
-    fontSize: 35,
+    fontSize: 32,
     fontFamily: 'Poppins_600SemiBold',
     color: '#111827',
     textAlign: 'center',
-    /** Must be ≥ fontSize per line or multi-line text overlaps (was 34 vs 55). */
-    lineHeight: 44,
-    marginBottom: 14,
-    paddingHorizontal: 8,
-    includeFontPadding: false,
+    lineHeight: 40,
+    marginBottom: 16,
+    paddingHorizontal: 4,
+    ...(Platform.OS === 'android' ? { includeFontPadding: false } : {}),
   },
   startPara: {
-    fontSize: 22,
+    fontSize: 17,
     fontFamily: 'Poppins_400Regular',
-    color: '#6b7280',
+    color: '#1f2937',
     textAlign: 'center',
-    lineHeight: 35,
-    maxWidth: 350,
-    marginBottom: 0,
-    includeFontPadding: false,
+    lineHeight: 26,
+    maxWidth: 340,
+    ...(Platform.OS === 'android' ? { includeFontPadding: false } : {}),
+  },
+  startParaAndroid: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#374151',
   },
   startButtonWrap: {
     alignItems: 'center',
     width: '100%',
-    paddingBottom: 4,
+    paddingTop: 16,
   },
   startButton: {
-    minWidth: 200,
+    minWidth: 220,
     paddingVertical: 16,
     paddingHorizontal: 48,
     borderRadius: 999,
@@ -292,9 +249,9 @@ const styles = StyleSheet.create({
   },
   startButtonText: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: 18,
     fontFamily: 'Poppins_600SemiBold',
     letterSpacing: 0.5,
-    includeFontPadding: false,
+    ...(Platform.OS === 'android' ? { includeFontPadding: false } : {}),
   },
 });

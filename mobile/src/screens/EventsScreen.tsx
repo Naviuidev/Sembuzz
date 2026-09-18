@@ -77,6 +77,9 @@ function formatUpcomingHeader(dateYmd: string): string {
   });
 }
 
+/** Calendar filter (icon + funnel). Hidden on mobile for now; set true to re-enable. */
+const CALENDAR_FILTER_ENABLED = false;
+
 export default function EventsScreen() {
   const navigation = useNavigation();
   const route = useRoute<EventsRoute>();
@@ -1122,20 +1125,22 @@ export default function EventsScreen() {
         </ScrollView>
         {(!user || !showSortPillsInline) ? (
           <>
-            <TouchableOpacity
-              style={[
-                styles.calendarIconOnlyBtn,
-                (showCalendarModal || upcomingDateFilter) && styles.calendarIconBtnActive,
-              ]}
-              onPress={openCalendarFilter}
-              accessibilityLabel="Upcoming news by date"
-            >
-              <Ionicons
-                name="calendar-outline"
-                size={20}
-                color={upcomingDateFilter ? '#087990' : '#6c757d'}
-              />
-            </TouchableOpacity>
+            {CALENDAR_FILTER_ENABLED ? (
+              <TouchableOpacity
+                style={[
+                  styles.calendarIconOnlyBtn,
+                  (showCalendarModal || upcomingDateFilter) && styles.calendarIconBtnActive,
+                ]}
+                onPress={openCalendarFilter}
+                accessibilityLabel="Upcoming news by date"
+              >
+                <Ionicons
+                  name="calendar-outline"
+                  size={20}
+                  color={upcomingDateFilter ? '#087990' : '#6c757d'}
+                />
+              </TouchableOpacity>
+            ) : null}
             <View style={styles.filterFunnelWrap}>
             <TouchableOpacity
               style={[
@@ -1188,15 +1193,19 @@ export default function EventsScreen() {
                     </Text>
                   </TouchableOpacity>
                 </View>
-                <Text style={[styles.sortDropdownSubLabel, styles.sortDropdownSchoolLabel]}>View by date</Text>
-                <TouchableOpacity
-                  style={styles.guestSchoolFilterBtn}
-                  onPress={openCalendarFilter}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name="calendar-outline" size={16} color="#1a1f2e" />
-                  <Text style={styles.guestSchoolFilterBtnText}>Calendar</Text>
-                </TouchableOpacity>
+                {CALENDAR_FILTER_ENABLED ? (
+                  <>
+                    <Text style={[styles.sortDropdownSubLabel, styles.sortDropdownSchoolLabel]}>View by date</Text>
+                    <TouchableOpacity
+                      style={styles.guestSchoolFilterBtn}
+                      onPress={openCalendarFilter}
+                      activeOpacity={0.85}
+                    >
+                      <Ionicons name="calendar-outline" size={16} color="#1a1f2e" />
+                      <Text style={styles.guestSchoolFilterBtnText}>Calendar</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : null}
               </View>
             ) : null}
           </View>
@@ -1342,7 +1351,7 @@ export default function EventsScreen() {
         </ScrollView>
       ) : null}
 
-      {selectedUpcomingPost ? (
+      {CALENDAR_FILTER_ENABLED && selectedUpcomingPost ? (
         <ScrollView style={styles.upcomingDetailScroll} contentContainerStyle={styles.upcomingDetailContent}>
           <View style={styles.upcomingDetailHeader}>
             <View style={styles.upcomingDetailSchoolRow}>
@@ -1383,7 +1392,7 @@ export default function EventsScreen() {
             <Text style={styles.addToCalBtnText}>Add to Google Calendar</Text>
           </TouchableOpacity>
         </ScrollView>
-      ) : upcomingDateFilter ? (
+      ) : CALENDAR_FILTER_ENABLED && upcomingDateFilter ? (
         calendarHasPosted ? (
           <View style={styles.calendarPostedHost}>
             <View style={styles.calendarPostedHeaderWrap}>
@@ -1465,7 +1474,7 @@ export default function EventsScreen() {
         </View>
       ) : null}
 
-      {!upcomingDateFilter && !selectedUpcomingPost && (loading ? (
+      {!(CALENDAR_FILTER_ENABLED && upcomingDateFilter) && !selectedUpcomingPost && (loading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#1a1f2e" />
         </View>
@@ -1537,7 +1546,7 @@ export default function EventsScreen() {
         </View>
       ))}
 
-      {calendarExtrasModalVisible ? (
+      {CALENDAR_FILTER_ENABLED && calendarExtrasModalVisible ? (
         <Modal
           visible
           animationType="slide"
@@ -1619,7 +1628,7 @@ export default function EventsScreen() {
         </Modal>
       ) : null}
 
-      {showCalendarModal ? (
+      {CALENDAR_FILTER_ENABLED && showCalendarModal ? (
         <Modal
           visible
           transparent
