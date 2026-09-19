@@ -9,6 +9,15 @@ import { useSubCategoryAdminAuth } from '../contexts/SubCategoryAdminAuthContext
 import { subcategoryAdminEventsService, type RevertedEvent } from '../services/subcategory-admin-events.service';
 import { invalidateAdminActionItems } from '../services/admin-action-items.service';
 import { PublishScheduleFields } from '../components/PublishScheduleFields';
+import {
+  EventPostDetailFields,
+  actionButtonsForApi,
+  eventDateToInputValue,
+  eventTimeToInputValue,
+  parseStoredActionButtons,
+  validateActionButtons,
+} from '../components/EventPostDetailFields';
+import type { EventActionButton } from '../types/event-post';
 import { dateTimeLocalToIso, defaultFutureDateTimeLocal } from '../utils/eventPublishing';
 
 type CreateMode = 'choose' | 'manual' | 'ai';
@@ -39,6 +48,11 @@ export const SubCategoryAdminPostEvent = () => {
       title: string;
       description: string | null;
       externalLink: string | null;
+      eventDate?: string | null;
+      eventStartTime?: string | null;
+      eventEndTime?: string | null;
+      eventLocation?: string | null;
+      actionButtons?: string | null;
       commentsEnabled: boolean;
       subCategory: { id: string; name: string };
     };
@@ -84,9 +98,14 @@ export const SubCategoryAdminPostEvent = () => {
     category: user?.categoryName || '',
     subcategoryId: initialSubcategoryId,
     subcategory: initialSubcategoryName,
-    commentsEnabled: true,
+    commentsEnabled: false,
     imageFiles: [] as File[],
+    eventDate: '',
+    eventStartTime: '',
+    eventEndTime: '',
+    eventLocation: '',
   });
+  const [actionButtons, setActionButtons] = useState<EventActionButton[]>([]);
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
 
   useEffect(() => {
@@ -130,6 +149,11 @@ export const SubCategoryAdminPostEvent = () => {
       title: string;
       description: string | null;
       externalLink: string | null;
+      eventDate?: string | null;
+      eventStartTime?: string | null;
+      eventEndTime?: string | null;
+      eventLocation?: string | null;
+      actionButtons?: string | null;
       commentsEnabled: boolean;
       subCategory: { id: string; name: string };
     }) => {
@@ -145,9 +169,14 @@ export const SubCategoryAdminPostEvent = () => {
         externalLink: event.externalLink ?? '',
         subcategoryId,
         subcategory: subcategoryName,
-        commentsEnabled: event.commentsEnabled ?? true,
+        commentsEnabled: event.commentsEnabled ?? false,
         category: user?.categoryName || prev.category,
+        eventDate: eventDateToInputValue(event.eventDate ?? null),
+        eventStartTime: eventTimeToInputValue(event.eventStartTime ?? null),
+        eventEndTime: eventTimeToInputValue(event.eventEndTime ?? null),
+        eventLocation: event.eventLocation?.trim() ?? '',
       }));
+      setActionButtons(parseStoredActionButtons(event.actionButtons));
     },
     [user],
   );
@@ -225,6 +254,11 @@ export const SubCategoryAdminPostEvent = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const actionBtnError = validateActionButtons(actionButtons);
+    if (actionBtnError) {
+      setSubmitError(actionBtnError);
+      return;
+    }
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -245,6 +279,11 @@ export const SubCategoryAdminPostEvent = () => {
           publishMode === 'schedule' && scheduledAt
             ? dateTimeLocalToIso(scheduledAt)
             : undefined,
+        eventDate: formData.eventDate.trim() || undefined,
+        eventStartTime: formData.eventStartTime.trim() || undefined,
+        eventEndTime: formData.eventEndTime.trim() || undefined,
+        eventLocation: formData.eventLocation.trim() || undefined,
+        actionButtons: actionButtonsForApi(actionButtons),
       });
       setFormData((prev) => ({
         ...prev,
@@ -252,7 +291,13 @@ export const SubCategoryAdminPostEvent = () => {
         description: '',
         externalLink: '',
         imageFiles: [],
+        eventDate: '',
+        eventStartTime: '',
+        eventEndTime: '',
+        eventLocation: '',
+        commentsEnabled: false,
       }));
+      setActionButtons([]);
       setResubmitFromEventId(undefined);
       setMode(SHOW_AI_EVENT_GENERATION ? 'choose' : 'manual');
       setActiveTab('approvals-pending');
@@ -516,6 +561,18 @@ export const SubCategoryAdminPostEvent = () => {
             onChange={(e) => setFormData({ ...formData, externalLink: e.target.value })}
           />
         </div>
+
+        <EventPostDetailFields
+          details={{
+            eventDate: formData.eventDate,
+            eventStartTime: formData.eventStartTime,
+            eventEndTime: formData.eventEndTime,
+            eventLocation: formData.eventLocation,
+          }}
+          onDetailsChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
+          actionButtons={actionButtons}
+          onActionButtonsChange={setActionButtons}
+        />
 
         <div className="col-12">
           <label className="form-label" style={{ color: '#1a1f2e', fontWeight: '500' }}>Images (optional, up to {MAX_IMAGES})</label>

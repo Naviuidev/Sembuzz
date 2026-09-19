@@ -9,6 +9,16 @@ import {
 } from '../services/category-admin-events.service';
 import { invalidateAdminActionItems } from '../services/admin-action-items.service';
 import { eventStatusBadge, formatPublishAt, dateTimeLocalToIso, defaultFutureDateTimeLocal } from '../utils/eventPublishing';
+import { EventPostReviewSummary, hasEventPostReviewContent } from '../components/EventPostReviewSummary';
+import {
+  EventPostDetailFields,
+  actionButtonsForApi,
+  eventDateToInputValue,
+  eventTimeToInputValue,
+  parseStoredActionButtons,
+  validateActionButtons,
+} from '../components/EventPostDetailFields';
+import type { EventActionButton } from '../types/event-post';
 
 function formatDate(iso: string) {
   try {
@@ -59,6 +69,8 @@ export const CategoryAdminPendingApprovals = () => {
   const [expandedViewId, setExpandedViewId] = useState<string | null>(null);
   const [editEvent, setEditEvent] = useState<PendingEventForCategoryAdmin | null>(null);
   const [editForm, setEditForm] = useState<UpdateEventDto>({});
+  const [editActionButtons, setEditActionButtons] = useState<EventActionButton[]>([]);
+  const [editFieldError, setEditFieldError] = useState<string | null>(null);
   const [revertEvent, setRevertEvent] = useState<PendingEventForCategoryAdmin | null>(null);
   const [revertNotes, setRevertNotes] = useState('');
   const [approveEvent, setApproveEvent] = useState<PendingEventForCategoryAdmin | null>(null);
@@ -78,6 +90,8 @@ export const CategoryAdminPendingApprovals = () => {
       void invalidateAdminActionItems(queryClient, 'category-admin');
       setEditEvent(null);
       setEditForm({});
+      setEditActionButtons([]);
+      setEditFieldError(null);
     },
   });
 
@@ -108,19 +122,41 @@ export const CategoryAdminPendingApprovals = () => {
   });
 
   const handleEditOpen = (row: PendingEventForCategoryAdmin) => {
+    setEditFieldError(null);
     setEditEvent(row);
     setEditForm({
       title: row.title,
       description: row.description ?? '',
       externalLink: row.externalLink ?? '',
+      eventDate: eventDateToInputValue(row.eventDate ?? null),
+      eventStartTime: eventTimeToInputValue(row.eventStartTime ?? null),
+      eventEndTime: eventTimeToInputValue(row.eventEndTime ?? null),
+      eventLocation: row.eventLocation?.trim() ?? '',
       commentsEnabled: row.commentsEnabled,
     });
+    setEditActionButtons(parseStoredActionButtons(row.actionButtons));
   };
 
   const handleEditSubmit = () => {
     if (!editEvent) return;
+    const actionBtnError = validateActionButtons(editActionButtons);
+    if (actionBtnError) {
+      setEditFieldError(actionBtnError);
+      return;
+    }
+    setEditFieldError(null);
     updateMutation.mutate(
-      { eventId: editEvent.id, dto: editForm },
+      {
+        eventId: editEvent.id,
+        dto: {
+          ...editForm,
+          eventDate: editForm.eventDate?.trim() || '',
+          eventStartTime: editForm.eventStartTime?.trim() || '',
+          eventEndTime: editForm.eventEndTime?.trim() || '',
+          eventLocation: editForm.eventLocation?.trim() || '',
+          actionButtons: actionButtonsForApi(editActionButtons),
+        },
+      },
       {
         onError: () => {},
       },
@@ -159,18 +195,13 @@ export const CategoryAdminPendingApprovals = () => {
     const images = parseImageUrls(row.imageUrls);
     return (
       <tr key={`${row.id}-detail`} style={{ backgroundColor: '#f8f9fa', borderBottom: '1px solid #dee2e6' }}>
-        <td colSpan={6} style={{ padding: '1rem 1rem 1.5rem', verticalAlign: 'top' }}>
+        <td colSpan={7} style={{ padding: '1rem 1rem 1.5rem', verticalAlign: 'top' }}>
           <div style={{ maxWidth: '100%' }}>
             <h6 style={{ color: '#1a1f2e', marginBottom: '0.75rem', fontWeight: '600' }}>Event details</h6>
             {row.description && (
               <p style={{ marginBottom: '0.75rem', color: '#1a1f2e' }}>{row.description}</p>
             )}
-            {row.externalLink && (
-              <p className="mb-1">
-                <strong>Link:</strong>{' '}
-                <a href={row.externalLink} target="_blank" rel="noopener noreferrer">{row.externalLink}</a>
-              </p>
-            )}
+            <EventPostReviewSummary event={row} className="mb-3" />
             <p className="mb-1"><strong>Subcategory:</strong> {row.subCategory?.name ?? '—'}</p>
             <p className="mb-1"><strong>Submitted by:</strong> {row.subCategoryAdmin?.name ?? '—'} ({row.subCategoryAdmin?.email ?? '—'})</p>
             <p className="mb-1"><strong>Requested publish:</strong> {formatPublishAt(row.publishAt)}</p>
@@ -341,9 +372,11 @@ export const CategoryAdminPendingApprovals = () => {
                 <button type="button" className="btn-close" onClick={() => setEditEvent(null)} aria-label="Close" />
               </div>
               <div className="modal-body">
-                {updateMutation.isError && (
+                {(editFieldError || updateMutation.isError) && (
                   <div className="alert alert-danger" style={{ borderRadius: '0px' }}>
-                    {(updateMutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to update event.'}
+                    {editFieldError ??
+                      ((updateMutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+                        'Failed to update event.')}
                   </div>
                 )}
                 <div className="mb-3">
@@ -374,6 +407,19 @@ export const CategoryAdminPendingApprovals = () => {
                     style={{ borderRadius: '0px' }}
                     value={editForm.externalLink ?? ''}
                     onChange={(e) => setEditForm((f) => ({ ...f, externalLink: e.target.value }))}
+                  />
+                </div>
+                <div className="row g-3 mb-3">
+                  <EventPostDetailFields
+                    details={{
+                      eventDate: editForm.eventDate ?? '',
+                      eventStartTime: editForm.eventStartTime ?? '',
+                      eventEndTime: editForm.eventEndTime ?? '',
+                      eventLocation: editForm.eventLocation ?? '',
+                    }}
+                    onDetailsChange={(patch) => setEditForm((f) => ({ ...f, ...patch }))}
+                    actionButtons={editActionButtons}
+                    onActionButtonsChange={setEditActionButtons}
                   />
                 </div>
                 <div className="mb-0">
@@ -464,6 +510,17 @@ export const CategoryAdminPendingApprovals = () => {
                     {(approveMutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to approve event.'}
                   </div>
                 )}
+                <p className="fw-semibold mb-2" style={{ color: '#1a1f2e' }}>
+                  {approveEvent.title}
+                </p>
+                {approveEvent.description ? (
+                  <p className="small text-muted mb-2">{approveEvent.description}</p>
+                ) : null}
+                {hasEventPostReviewContent(approveEvent) ? (
+                  <div className="mb-3 p-2" style={{ backgroundColor: '#f8f9fa' }}>
+                    <EventPostReviewSummary event={approveEvent} />
+                  </div>
+                ) : null}
                 {approveEvent.status === 'schedule_missed' ? (
                   <>
                     <p className="mb-2">

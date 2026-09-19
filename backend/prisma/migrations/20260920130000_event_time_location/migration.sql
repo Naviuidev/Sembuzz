@@ -1,0 +1,3 @@
+ALTER TABLE `events` ADD COLUMN `eventStartTime` VARCHAR(5) NULL;
+ALTER TABLE `events` ADD COLUMN `eventEndTime` VARCHAR(5) NULL;
+ALTER TABLE `events` ADD COLUMN `eventLocation` VARCHAR(500) NULL;

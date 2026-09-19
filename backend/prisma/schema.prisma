@@ -642,6 +642,11 @@ model Event {
   title              String
   description        String?  @db.Text
   externalLink       String?  @db.VarChar(500)
+  eventDate          DateTime? @db.Date // when the event happens (not publish date)
+  eventStartTime     String?  @db.VarChar(5) // HH:mm (24h)
+  eventEndTime       String?  @db.VarChar(5)
+  eventLocation      String?  @db.VarChar(500)
+  actionButtons      String?  @db.Text // JSON [{ label, url }]
   commentsEnabled    Boolean  @default(true)
   imageUrls          String?  @db.Text // JSON array of image URLs
   status             String   @default("pending") // draft | pending | scheduled | published | reverted | rejected | schedule_missed | cancelled | superseded

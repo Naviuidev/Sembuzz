@@ -3,6 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ApprovedEventPublic, SponsoredAdPublic, BannerAdPublic } from '../services/public-events.service';
 import { assignBannersToEventSlides, type PublicFeedItem } from '../utils/publicFeed';
 import { imageSrc } from '../utils/image';
+import { EventPostPublicMeta, EventPostPublicActionButtons } from './EventPostPublicExtras';
+import { EventPostPublicDescriptionRow } from './EventPostPublicDescriptionRow';
+import { eventPostHasScheduleMeta } from '../utils/eventPostPublic';
 import { userEventsService, type EventCommentResponse } from '../services/user-events.service';
 
 function formatRelativeTime(iso: string): string {
@@ -167,6 +170,7 @@ function EventSlideWithEngagement({
   const [commentText, setCommentText] = useState('');
   const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
   const [authHintVisible, setAuthHintVisible] = useState(false);
+  const [descExpanded, setDescExpanded] = useState(false);
   const authHintTimerRef = useRef<number | null>(null);
 
   const imgs = parseImages(event.imageUrls);
@@ -278,20 +282,20 @@ function EventSlideWithEngagement({
           <span className="inshorts-source">{event.school?.name ?? 'School'}</span>
         </div>
         <div className="inshorts-body inshorts-body--grow">
-          <div className="inshorts-title-row">
-            <h2 className="inshorts-title">{event.title}</h2>
-            {event.externalLink ? (
-              <a
-                href={event.externalLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-dark btn-sm rounded-pill inshorts-inline-link"
-              >
-                Know more
-              </a>
-            ) : null}
-          </div>
-          {event.description ? <p className="inshorts-summary">{truncateWords(event.description, 25)}</p> : null}
+          <h2 className="inshorts-title">{event.title}</h2>
+          {eventPostHasScheduleMeta(event) ? (
+            <div className="inshorts-event-meta px-0">
+              <EventPostPublicMeta event={event} compact />
+            </div>
+          ) : null}
+          <EventPostPublicDescriptionRow
+            event={event}
+            description={event.description ?? ''}
+            expanded={descExpanded}
+            onExpand={() => setDescExpanded(true)}
+            compact
+          />
+          <EventPostPublicActionButtons event={event} compact />
           <p className="inshorts-time">{formatRelativeTime(event.updatedAt || event.createdAt)}</p>
           {banner ? (
             <button

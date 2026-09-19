@@ -4,6 +4,7 @@ import { CategoryAdminNavbar } from '../components/CategoryAdminNavbar';
 import { CategoryAdminSidebar } from '../components/CategoryAdminSidebar';
 import { StatusPopup } from '../components/StatusPopup';
 import { categoryAdminEventsService } from '../services/category-admin-events.service';
+import { EventPostReviewSummary } from '../components/EventPostReviewSummary';
 
 function formatDate(iso: string) {
   try {
@@ -268,14 +269,7 @@ export const CategoryAdminApprovedPosts = () => {
                   {selectedPost.description && (
                     <p style={{ color: '#1a1f2e', marginBottom: '1rem' }}>{selectedPost.description}</p>
                   )}
-                  {selectedPost.externalLink && (
-                    <p className="mb-2">
-                      <strong>Link:</strong>{' '}
-                      <a href={selectedPost.externalLink} target="_blank" rel="noopener noreferrer">
-                        {selectedPost.externalLink}
-                      </a>
-                    </p>
-                  )}
+                  <EventPostReviewSummary event={selectedPost} className="mb-3" />
                   <p className="mb-1"><strong>Subcategory:</strong> {selectedPost.subCategory?.name ?? '—'}</p>
                   <p className="mb-1"><strong>Submitted by:</strong> {selectedPost.subCategoryAdmin?.name ?? '—'} ({selectedPost.subCategoryAdmin?.email ?? '—'})</p>
                   <p className="mb-1"><strong>Posted date:</strong> {formatDate(selectedPost.updatedAt)}</p>

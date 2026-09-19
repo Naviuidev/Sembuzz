@@ -41,7 +41,11 @@ import {
 } from '../services/user-direct-chats.service';
 import { USER_STUDENT_CHAT_GROUPS_UNREAD_QUERY_KEY, userStudentChatGroupsService } from '../services/user-student-chat-groups.service';
 import { UserForgotPasswordPanel } from '../components/UserForgotPasswordPanel';
-const DESCRIPTION_PREVIEW_LENGTH = 400;
+import {
+  EventPostPublicMeta,
+  EventPostPublicActionButtons,
+} from '../components/EventPostPublicExtras';
+import { EventPostPublicDescriptionRow } from '../components/EventPostPublicDescriptionRow';
 
 const PLATFORM_COLORS: Record<string, string> = {
   facebook: '#1877F2',
@@ -139,6 +143,7 @@ type LikedEventItem = import('../services/user-events.service').LikedEventItem;
 /** Full post detail for a liked item (same as Saved screen). */
 function LikedEventDetailView({ event, onBack }: { event: LikedEventItem; onBack: () => void }) {
   const [slideIndex, setSlideIndex] = useState(0);
+  const [descExpanded, setDescExpanded] = useState(false);
   const images = parseImageUrls(event.imageUrls);
   const schoolName = event.school?.name ?? 'School';
   const schoolLogo = event.school?.image ?? null;
@@ -182,9 +187,18 @@ function LikedEventDetailView({ event, onBack }: { event: LikedEventItem; onBack
           <div style={{ minHeight: '200px', background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8e8e8e' }}><i className="bi bi-image" style={{ fontSize: '3rem' }} /></div>
         )}
         <div className="px-3 py-3">
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 600, color: '#1a1f2e', marginBottom: '0.5rem' }}>{event.title}</h2>
-          {event.description && <p className="text-muted mb-2 small" style={{ lineHeight: 1.5 }}>{event.description}</p>}
-          {event.externalLink && <a href={event.externalLink} target="_blank" rel="noopener noreferrer" className="btn btn-dark  rounded-pill small">View link</a>}
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#1a1f2e', marginBottom: '0.35rem', lineHeight: 1.35 }}>
+            {event.title}
+          </h2>
+          <EventPostPublicMeta event={event} compact />
+          <EventPostPublicDescriptionRow
+            event={event}
+            description={event.description ?? ''}
+            expanded={descExpanded}
+            onExpand={() => setDescExpanded(true)}
+            compact
+          />
+          <EventPostPublicActionButtons event={event} compact />
         </div>
       </article>
     </>
@@ -499,9 +513,6 @@ function EventPostCard({
     },
   });
 
-  const displayDesc = expandedDesc ? description : description.slice(0, DESCRIPTION_PREVIEW_LENGTH);
-  const hasMoreDesc = description.length > DESCRIPTION_PREVIEW_LENGTH && !expandedDesc;
-
   return (
     <article
       className="card border-0 shadow-sm mb-4"
@@ -712,45 +723,22 @@ function EventPostCard({
               style={{
                 fontWeight: 700,
                 color: '#1a1f2e',
-                fontSize: '1.25rem',
-                lineHeight: 1.3,
-                marginBottom: '0.5rem',
+                fontSize: '1.35rem',
+                lineHeight: 1.35,
+                marginBottom: '0.35rem',
               }}
             >
               {event.title}
             </h2>
-            {description && (
-              <div
-                style={{
-                  fontSize: '0.95rem',
-                  color: '#495057',
-                  lineHeight: 1.5,
-                  whiteSpace: 'pre-wrap',
-                }}
-              >
-                {displayDesc}
-                {hasMoreDesc && (
-                  <button
-                    type="button"
-                    className="btn btn-link p-0 ms-1 small text-muted"
-                    onClick={() => setExpandedDesc(true)}
-                  >
-                    more
-                  </button>
-                )}
-              </div>
-            )}
-            {event.externalLink && (
-              <a
-                href={event.externalLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-sm btn-dark rounded-pill mt-1 small"
-              >
-                View More
-              </a>
-            )}
-            <div className="small text-muted mt-1">{formatDate(event.updatedAt)}</div>
+            <EventPostPublicMeta event={event} />
+            <EventPostPublicDescriptionRow
+              event={event}
+              description={description}
+              expanded={expandedDesc}
+              onExpand={() => setExpandedDesc(true)}
+            />
+            <EventPostPublicActionButtons event={event} />
+            <div className="small text-muted mt-2">{formatDate(event.updatedAt)}</div>
           </div>
 
           {/* Comments list when open */}

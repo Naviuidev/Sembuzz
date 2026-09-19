@@ -9,6 +9,12 @@ import {
   EVENT_APPROVED_LIST_STATUSES,
   parsePublishAt,
 } from '../../events/event-publishing.constants';
+import {
+  parseEventDateYmd,
+  parseEventTimeHm,
+  normalizeEventLocation,
+  serializeActionButtons,
+} from '../../events/event-post-fields.util';
 
 export interface AnalyzeBannerResult {
   title: string;
@@ -61,6 +67,11 @@ export class EventsService {
     if (dto.publishAt && !publishAt) {
       throw new BadRequestException('publishAt must be a valid ISO 8601 datetime.');
     }
+    const eventDate = parseEventDateYmd(dto.eventDate);
+    const eventStartTime = parseEventTimeHm(dto.eventStartTime);
+    const eventEndTime = parseEventTimeHm(dto.eventEndTime);
+    const eventLocation = normalizeEventLocation(dto.eventLocation);
+    const actionButtons = serializeActionButtons(dto.actionButtons);
     try {
       return await this.prisma.event.create({
         data: {
@@ -71,6 +82,11 @@ export class EventsService {
           title: dto.title.trim(),
           description: dto.description ?? null,
           externalLink: dto.externalLink ?? null,
+          eventDate,
+          eventStartTime,
+          eventEndTime,
+          eventLocation,
+          actionButtons,
           commentsEnabled: dto.commentsEnabled ?? true,
           imageUrls: imageUrlsJson,
           status: EVENT_STATUS.PENDING,

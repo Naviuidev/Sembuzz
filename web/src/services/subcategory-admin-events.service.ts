@@ -10,6 +10,11 @@ export interface CreateEventDto {
   title: string;
   description?: string;
   externalLink?: string;
+  eventDate?: string;
+  eventStartTime?: string;
+  eventEndTime?: string;
+  eventLocation?: string;
+  actionButtons?: { label: string; url: string }[];
   commentsEnabled?: boolean;
   subCategoryId: string;
   imageUrls?: string[];
@@ -22,6 +27,11 @@ export interface PendingEvent {
   title: string;
   description: string | null;
   externalLink: string | null;
+  eventDate?: string | null;
+  eventStartTime?: string | null;
+  eventEndTime?: string | null;
+  eventLocation?: string | null;
+  actionButtons?: string | null;
   commentsEnabled: boolean;
   imageUrls: string | null;
   status: string;

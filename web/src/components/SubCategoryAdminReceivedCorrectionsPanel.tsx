@@ -4,6 +4,7 @@ import {
   subcategoryAdminEventsService,
   type RevertedEvent,
 } from '../services/subcategory-admin-events.service';
+import { EventPostReviewSummary } from './EventPostReviewSummary';
 
 function formatDate(iso: string) {
   try {
@@ -211,14 +212,7 @@ export function SubCategoryAdminReceivedCorrectionsPanel({
               {selectedEvent.description && (
                 <p style={{ color: '#1a1f2e', marginBottom: '1rem' }}>{selectedEvent.description}</p>
               )}
-              {selectedEvent.externalLink && (
-                <p className="mb-2">
-                  <strong>Link:</strong>{' '}
-                  <a href={selectedEvent.externalLink} target="_blank" rel="noopener noreferrer">
-                    {selectedEvent.externalLink}
-                  </a>
-                </p>
-              )}
+              <EventPostReviewSummary event={selectedEvent} className="mb-3" />
               <p className="mb-1">
                 <strong>Subcategory:</strong> {selectedEvent.subCategory?.name ?? '—'}
               </p>

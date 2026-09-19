@@ -11,6 +11,12 @@ import {
   parsePublishAt,
   resolveCategoryAdminApproveStatus,
 } from '../../events/event-publishing.constants';
+import {
+  parseEventDateYmd,
+  parseEventTimeHm,
+  normalizeEventLocation,
+  serializeActionButtons,
+} from '../../events/event-post-fields.util';
 
 @Injectable()
 export class CategoryAdminEventsService {
@@ -104,12 +110,28 @@ export class CategoryAdminEventsService {
     if (!event || !(EVENT_PENDING_APPROVAL_STATUSES as readonly string[]).includes(event.status)) {
       throw new ForbiddenException('Only pending events can be edited');
     }
+    const eventDate =
+      dto.eventDate !== undefined ? parseEventDateYmd(dto.eventDate) : undefined;
+    const eventStartTime =
+      dto.eventStartTime !== undefined ? parseEventTimeHm(dto.eventStartTime) : undefined;
+    const eventEndTime =
+      dto.eventEndTime !== undefined ? parseEventTimeHm(dto.eventEndTime) : undefined;
+    const eventLocation =
+      dto.eventLocation !== undefined ? normalizeEventLocation(dto.eventLocation) : undefined;
+    const actionButtons =
+      dto.actionButtons !== undefined ? serializeActionButtons(dto.actionButtons) : undefined;
+
     return this.prisma.event.update({
       where: { id: eventId },
       data: {
         ...(dto.title !== undefined && { title: dto.title }),
         ...(dto.description !== undefined && { description: dto.description }),
         ...(dto.externalLink !== undefined && { externalLink: dto.externalLink }),
+        ...(eventDate !== undefined && { eventDate }),
+        ...(eventStartTime !== undefined && { eventStartTime }),
+        ...(eventEndTime !== undefined && { eventEndTime }),
+        ...(eventLocation !== undefined && { eventLocation }),
+        ...(actionButtons !== undefined && { actionButtons }),
         ...(dto.commentsEnabled !== undefined && { commentsEnabled: dto.commentsEnabled }),
       },
       include: {

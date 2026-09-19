@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { subcategoryAdminEventsService, type PendingEvent } from '../services/subcategory-admin-events.service';
+import { EventPostReviewSummary } from './EventPostReviewSummary';
 
 function formatDate(iso: string) {
   try {
@@ -46,14 +47,7 @@ export function SubCategoryAdminApprovalsPendingPanel() {
             {row.description && (
               <p style={{ marginBottom: '0.75rem', color: '#1a1f2e' }}>{row.description}</p>
             )}
-            {row.externalLink && (
-              <p className="mb-1">
-                <strong>Link:</strong>{' '}
-                <a href={row.externalLink} target="_blank" rel="noopener noreferrer">
-                  {row.externalLink}
-                </a>
-              </p>
-            )}
+            <EventPostReviewSummary event={row} className="mb-2" />
             <p className="mb-1">
               <strong>Subcategory:</strong> {row.subCategory?.name ?? '—'}
             </p>
