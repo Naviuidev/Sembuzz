@@ -685,10 +685,6 @@ export const PublicUniversityEvents = () => {
   const notifUnreadCount = unreadNotifData?.unreadCount ?? 0;
 
   const handleTabSelect = (tab: EventsBottomNavTab) => {
-    if (tab === 'universities') {
-      navigate('/universities');
-      return;
-    }
     if (tab === 'chat') {
       navigate('/messages');
       return;
@@ -1017,7 +1013,7 @@ export const PublicUniversityEvents = () => {
       `}</style>
 
       <EventsBottomNav
-        activeTab="universities"
+        activeTab="home"
         onSelectTab={handleTabSelect}
         notifUnreadCount={notifUnreadCount}
       />

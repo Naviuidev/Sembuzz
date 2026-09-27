@@ -1685,10 +1685,6 @@ export const PublicEvents = () => {
       else setShowSettingsLoginPopup(true);
       return;
     }
-    if (tab === 'universities') {
-      navigate('/universities');
-      return;
-    }
     setSelectedSettingsEvent(null);
     if (tab === 'search') setBottomNavActive('search');
     else if (tab === 'home') setBottomNavActive('home');
@@ -3661,6 +3657,22 @@ export const PublicEvents = () => {
                         Clear
                       </button>
                     )}
+                    <button
+                      type="button"
+                      className={`btn btn-sm rounded-pill flex-shrink-0 text-nowrap ${feedSort === 'latest' ? 'btn-dark' : 'btn-outline-dark'}`}
+                      style={{ fontWeight: feedSort === 'latest' ? 600 : 400, padding: '0.35rem 0.75rem', fontSize: '0.875rem' }}
+                      onClick={() => setFeedSort('latest')}
+                    >
+                      Latest
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn-sm rounded-pill flex-shrink-0 text-nowrap ${feedSort === 'popular' ? 'btn-dark' : 'btn-outline-dark'}`}
+                      style={{ fontWeight: feedSort === 'popular' ? 600 : 400, padding: '0.35rem 0.75rem', fontSize: '0.875rem' }}
+                      onClick={() => setFeedSort('popular')}
+                    >
+                      Popular
+                    </button>
                   </>
                 ) : null
               ) : (
@@ -3719,6 +3731,7 @@ export const PublicEvents = () => {
                 style={{
                   backgroundColor:
                     filterDropdownOpen ||
+                    calendarFilterOpen ||
                     feedSort !== 'latest' ||
                     (!user && !!schoolId) ||
                     !!upcomingDateFilter ||
@@ -3728,6 +3741,7 @@ export const PublicEvents = () => {
                       : 'transparent',
                   color:
                     filterDropdownOpen ||
+                    calendarFilterOpen ||
                     (!user && !!schoolId) ||
                     !!upcomingDateFilter ||
                     !!loggedInFeedDateFilter ||
@@ -3735,14 +3749,20 @@ export const PublicEvents = () => {
                       ? '#087990'
                       : '#6c757d',
                 }}
-                onClick={() => setFilterDropdownOpen((o) => !o)}
-                title="Filter: Latest, Popular"
-                aria-label="Filter"
-                aria-expanded={filterDropdownOpen}
+                onClick={() => {
+                  if (!user) {
+                    openCalendarFilter();
+                    return;
+                  }
+                  setFilterDropdownOpen((o) => !o);
+                }}
+                title={user ? 'Calendar filter and sort' : 'Filter news by date'}
+                aria-label={user ? 'Calendar filter and sort' : 'Calendar'}
+                aria-expanded={user ? filterDropdownOpen : calendarFilterOpen}
               >
-                <i className="bi bi-funnel" style={{ fontSize: '1.1rem' }} />
+                <i className="bi bi-calendar3" style={{ fontSize: '1.1rem' }} />
               </button>
-              {filterDropdownOpen && (
+              {user && filterDropdownOpen && (
                 <>
                   <div
                     ref={calendarDropdownRef}
@@ -3870,18 +3890,7 @@ export const PublicEvents = () => {
                           </p>
                         )}
                       </div>
-                    ) : (
-                      <div className="px-3 pt-1 pb-2">
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline-dark rounded-pill d-inline-flex align-items-center gap-2"
-                          onClick={openCalendarFilter}
-                        >
-                          <i className="bi bi-calendar3" aria-hidden />
-                          Calendar
-                        </button>
-                      </div>
-                    )}
+                    ) : null}
                   </div>
                 </>
               )}
@@ -5163,7 +5172,7 @@ export const PublicEvents = () => {
         onRequireLogin={() => setShowSettingsLoginPopup(true)}
       />
 
-      {/* Bottom nav — matches mobile: 5 icons, no labels, profile + badge on account */}
+      {/* Bottom nav — Search, Home, Account, Apps, Chat (universities calendar tab removed; use top calendar when Filters enabled) */}
       <EventsBottomNav
         activeTab={eventsBottomNavActiveTab}
         onSelectTab={handleEventsBottomNavSelect}

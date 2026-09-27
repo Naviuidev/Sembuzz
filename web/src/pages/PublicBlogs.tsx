@@ -581,10 +581,6 @@ export const PublicBlogs = () => {
             navigate('/messages');
             return;
           }
-          if (tab === 'universities') {
-            navigate('/universities');
-            return;
-          }
           navigate('/events', { state: { bottomNav: tab } });
         }}
         notifUnreadCount={notifUnreadCount}
