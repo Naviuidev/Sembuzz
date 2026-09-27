@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   RefreshControl,
   Image,
-  Linking,
   useWindowDimensions,
   Modal,
   ScrollView,
@@ -28,6 +27,11 @@ import {
   CategoryPublic,
 } from '../services/events';
 import { getSchools, SchoolOption } from '../services/userAuth';
+import {
+  EventPostPublicActionButtons,
+  EventPostPublicDescriptionRow,
+  EventPostPublicMeta,
+} from '../components/EventPostPublicContent';
 import { useAuth } from '../contexts/AuthContext';
 
 const FILTER_ICON_SIZE = 20;
@@ -293,19 +297,9 @@ export default function SearchScreen() {
         ) : null}
         <View style={styles.cardBody}>
           <Text style={styles.title}>{item.title}</Text>
-          {item.description ? (
-            <Text style={styles.description} numberOfLines={10}>
-              {item.description}
-            </Text>
-          ) : null}
-          {item.externalLink ? (
-            <TouchableOpacity
-              style={styles.linkButton}
-              onPress={() => item.externalLink && Linking.openURL(item.externalLink).catch(() => {})}
-            >
-              <Text style={styles.linkButtonText}>View link</Text>
-            </TouchableOpacity>
-          ) : null}
+          <EventPostPublicMeta event={item} compact />
+          <EventPostPublicDescriptionRow event={item} compact />
+          <EventPostPublicActionButtons event={item} compact />
           <Text style={styles.date}>{formatDate(item.updatedAt)}</Text>
         </View>
       </View>

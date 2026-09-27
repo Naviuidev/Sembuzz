@@ -93,6 +93,7 @@ export class FeaturesService {
       { code: 'EMERGENCY', name: 'Emergency Notifications' },
       { code: 'GROUP_MESSAGING', name: 'Group messages' },
       { code: 'INDIVIDUAL_MESSAGING', name: 'Individual messages' },
+      { code: 'FILTERS', name: 'Filters' },
     ];
 
     for (const feature of features) {

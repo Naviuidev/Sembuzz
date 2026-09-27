@@ -19,7 +19,11 @@ import {
   type SponsoredAdPublic,
 } from '../services/public-events.service';
 import { buildPublicFeedItems } from '../utils/publicFeed';
-import { eventMatchesCalendarDateYmd } from '../utils/eventFeedDate';
+import {
+  eventMatchesCalendarDateYmd,
+  filterEventsByViewByDate,
+  getFeedDateFilterTzOffsetMinutes,
+} from '../utils/eventFeedDate';
 import { InshortsHomeFeed } from '../components/InshortsHomeFeed';
 import {
   userEventsService,
@@ -46,6 +50,7 @@ import {
   EventPostPublicActionButtons,
 } from '../components/EventPostPublicExtras';
 import { EventPostPublicDescriptionRow } from '../components/EventPostPublicDescriptionRow';
+import { shouldShowSchoolFilterUi } from '../constants/messagingFeatures';
 
 const PLATFORM_COLORS: Record<string, string> = {
   facebook: '#1877F2',
@@ -1142,6 +1147,11 @@ export const PublicEvents = () => {
   const [appsScreenKey, setAppsScreenKey] = useState(0);
   const [feedSort, setFeedSort] = useState<'latest' | 'popular'>('latest');
   const [showAllSchoolsFeed, setShowAllSchoolsFeed] = useState(false);
+  /** Logged-in home feed: filter by event date or posted date (YYYY-MM-DD). */
+  const [loggedInFeedDateFilter, setLoggedInFeedDateFilter] = useState<string | null>(null);
+  const [loggedInFeedPostTypeFilter, setLoggedInFeedPostTypeFilter] = useState<'event' | 'posted' | null>(
+    null,
+  );
 
   useEffect(() => {
     if (user && showAllSchoolsFeed) setFilterDropdownOpen(false);
@@ -1150,6 +1160,20 @@ export const PublicEvents = () => {
   const contentCategoriesRef = useRef<HTMLDivElement | null>(null);
   const selectedSubCategoryIds = eventsFilter?.selectedSubCategoryIds ?? [];
   const queryClient = useQueryClient();
+
+  /** School whose FILTERS feature + visibility govern the home feed filter UI. */
+  const filterSettingsSchoolId = user?.schoolId ?? searchParams.get('schoolId');
+  const { data: schoolFilterSettings } = useQuery({
+    queryKey: ['public', 'school-filter-settings', filterSettingsSchoolId ?? 'guest'],
+    queryFn: () =>
+      publicEventsService.getSchoolFilterSettings(filterSettingsSchoolId ?? ''),
+    enabled: bottomNavActive === 'home' && (!!filterSettingsSchoolId || !user),
+  });
+  const showSchoolFilterUi = shouldShowSchoolFilterUi(
+    schoolFilterSettings?.filtersEnabled ?? false,
+    schoolFilterSettings?.filtersVisibility ?? null,
+    !!user,
+  );
 
   // When user returns from Google OAuth: read success/error from URL and show result
   useEffect(() => {
@@ -1212,18 +1236,43 @@ export const PublicEvents = () => {
         : schoolId;
   /** Match mobile EventsScreen: subcategories only when logged-in + My school + user picked subs (not for guests / all-schools). */
   const effectiveSubCategoryIds =
-    user && isLoggedInHome && !showAllSchoolsFeed && selectedSubCategoryIds.length > 0
+    showSchoolFilterUi &&
+    user &&
+    isLoggedInHome &&
+    !showAllSchoolsFeed &&
+    selectedSubCategoryIds.length > 0
       ? selectedSubCategoryIds
       : undefined;
 
+  const loggedInPostTypeDateFilterActive =
+    !!user &&
+    isLoggedInHome &&
+    !upcomingDateFilter &&
+    !!loggedInFeedDateFilter &&
+    !!loggedInFeedPostTypeFilter;
+
+  const effectiveFeedDateFilter = loggedInPostTypeDateFilterActive ? loggedInFeedDateFilter : null;
+  const effectiveFeedDateMode = loggedInPostTypeDateFilterActive ? loggedInFeedPostTypeFilter : null;
+
   const { data: events = [], isLoading: eventsLoading, isFetching: eventsFetching, error } = useQuery({
-    queryKey: ['public', 'events', 'approved', effectiveSchoolId ?? 'all', effectiveSubCategoryIds ?? []],
+    queryKey: [
+      'public',
+      'events',
+      'approved',
+      effectiveSchoolId ?? 'all',
+      effectiveSubCategoryIds ?? [],
+      effectiveFeedDateFilter ?? '',
+      effectiveFeedDateMode ?? '',
+    ],
     queryFn: () =>
       publicEventsService.getApproved(
         effectiveSchoolId ?? undefined,
         effectiveSubCategoryIds?.length ? effectiveSubCategoryIds : undefined,
+        effectiveFeedDateFilter ?? undefined,
+        effectiveFeedDateFilter ? getFeedDateFilterTzOffsetMinutes() : undefined,
+        effectiveFeedDateMode ?? undefined,
       ),
-    enabled: true,
+    enabled: !upcomingDateFilter,
   });
 
   /** Same as mobile EventsScreen tab: prefer logo from feed, else user.schoolImage. */
@@ -1284,8 +1333,13 @@ export const PublicEvents = () => {
   const { data: calendarApprovedEvents = [], isLoading: calendarApprovedLoading } = useQuery({
     queryKey: ['public', 'events', 'approved', 'calendar', calendarFilterSchoolId ?? '', upcomingDateFilter ?? ''],
     queryFn: async () => {
-      const all = await publicEventsService.getApproved(calendarFilterSchoolId!);
-      return all.filter((e) => eventMatchesCalendarDateYmd(e, upcomingDateFilter!));
+      const list = await publicEventsService.getApproved(
+        calendarFilterSchoolId!,
+        undefined,
+        upcomingDateFilter!,
+        getFeedDateFilterTzOffsetMinutes(),
+      );
+      return filterEventsByViewByDate(list, upcomingDateFilter!);
     },
     enabled: calendarFilterActive,
   });
@@ -1327,7 +1381,7 @@ export const PublicEvents = () => {
   const { data: homeCategories = [] } = useQuery({
     queryKey: ['public', 'events', 'categories', 'content', user?.schoolId ?? ''],
     queryFn: () => publicEventsService.getCategoriesBySchool(user!.schoolId),
-    enabled: bottomNavActive === 'home' && !!user?.schoolId,
+    enabled: bottomNavActive === 'home' && !!user?.schoolId && showSchoolFilterUi,
   });
   const userSavedSubIds = user?.id ? getUserSubCategoryIds(user.id) : [];
   const homeContentCategories =
@@ -1370,6 +1424,13 @@ export const PublicEvents = () => {
     eventsFilter?.setSelectedCategory(null, null);
     eventsFilter?.setSelectedSubCategories([], []);
   };
+
+  useEffect(() => {
+    if (!showSchoolFilterUi) {
+      clearContentCategoryFilter();
+      setFilterDropdownOpen(false);
+    }
+  }, [showSchoolFilterUi]);
 
   const toggleCategorySelectionSub = (subId: string) => {
     setCategorySelectionSelectedIds((prev) =>
@@ -1927,7 +1988,13 @@ export const PublicEvents = () => {
    * Search query still applies elsewhere (e.g. filter popup flows) when not on Home.
    */
   const filteredEvents = useMemo(() => {
-    if (bottomNavActive === 'home') return events;
+    if (bottomNavActive === 'home') {
+      return filterEventsByViewByDate(
+        events,
+        effectiveFeedDateFilter,
+        effectiveFeedDateMode ?? 'combined',
+      );
+    }
     if (!eventsFilter?.searchQuery?.trim()) return events;
     const q = eventsFilter.searchQuery.trim().toLowerCase();
     return events.filter(
@@ -1936,7 +2003,7 @@ export const PublicEvents = () => {
         (e.description?.toLowerCase().includes(q) ?? false) ||
         (e.subCategory?.name?.toLowerCase().includes(q) ?? false),
     );
-  }, [events, eventsFilter?.searchQuery, bottomNavActive]);
+  }, [events, eventsFilter?.searchQuery, bottomNavActive, effectiveFeedDateFilter, effectiveFeedDateMode]);
 
   const sortedEvents = useMemo(() => {
     const list = [...filteredEvents];
@@ -3532,25 +3599,29 @@ export const PublicEvents = () => {
             >
               {user && showAllSchoolsFeed ? (
                 <>
-                  <button
-                    type="button"
-                    className={`btn btn-sm rounded-pill flex-shrink-0 text-nowrap d-inline-flex align-items-center gap-2 ${allSchoolsFilterSchoolId ? 'btn-dark' : 'btn-outline-dark'}`}
-                    style={{ fontWeight: allSchoolsFilterSchoolId ? 600 : 500, padding: '0.35rem 0.85rem', fontSize: '0.875rem' }}
-                    onClick={() => openSchoolPicker('allSchools')}
-                  >
-                    <i className="bi bi-building" aria-hidden />
-                    {selectedAllSchoolsFilterName ?? 'Select school'}
-                    <i className="bi bi-chevron-down" style={{ fontSize: '0.75rem' }} aria-hidden />
-                  </button>
-                  {allSchoolsFilterSchoolId && (
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-link flex-shrink-0 text-nowrap text-decoration-none px-1"
-                      onClick={() => setAllSchoolsFilterSchoolId(null)}
-                    >
-                      Clear
-                    </button>
-                  )}
+                  {showSchoolFilterUi ? (
+                    <>
+                      <button
+                        type="button"
+                        className={`btn btn-sm rounded-pill flex-shrink-0 text-nowrap d-inline-flex align-items-center gap-2 ${allSchoolsFilterSchoolId ? 'btn-dark' : 'btn-outline-dark'}`}
+                        style={{ fontWeight: allSchoolsFilterSchoolId ? 600 : 500, padding: '0.35rem 0.85rem', fontSize: '0.875rem' }}
+                        onClick={() => openSchoolPicker('allSchools')}
+                      >
+                        <i className="bi bi-building" aria-hidden />
+                        {selectedAllSchoolsFilterName ?? 'Select school'}
+                        <i className="bi bi-chevron-down" style={{ fontSize: '0.75rem' }} aria-hidden />
+                      </button>
+                      {allSchoolsFilterSchoolId && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-link flex-shrink-0 text-nowrap text-decoration-none px-1"
+                          onClick={() => setAllSchoolsFilterSchoolId(null)}
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </>
+                  ) : null}
                   <button
                     type="button"
                     className={`btn btn-sm rounded-pill flex-shrink-0 text-nowrap ${feedSort === 'latest' ? 'btn-dark' : 'btn-outline-dark'}`}
@@ -3569,30 +3640,32 @@ export const PublicEvents = () => {
                   </button>
                 </>
               ) : !user ? (
-                <>
-                  <button
-                    type="button"
-                    className={`btn btn-sm rounded-pill flex-shrink-0 text-nowrap d-inline-flex align-items-center gap-2 ${schoolId ? 'btn-dark' : 'btn-outline-dark'}`}
-                    style={{ fontWeight: schoolId ? 600 : 500, padding: '0.35rem 0.85rem', fontSize: '0.875rem' }}
-                    onClick={() => openSchoolPicker('guest')}
-                  >
-                    <i className="bi bi-building" aria-hidden />
-                    {selectedGuestSchoolName ?? 'Select school'}
-                    <i className="bi bi-chevron-down" style={{ fontSize: '0.75rem' }} aria-hidden />
-                  </button>
-                  {schoolId && (
+                showSchoolFilterUi ? (
+                  <>
                     <button
                       type="button"
-                      className="btn btn-sm btn-link flex-shrink-0 text-nowrap text-decoration-none px-1"
-                      onClick={() => applyGuestSchoolFilter(null)}
+                      className={`btn btn-sm rounded-pill flex-shrink-0 text-nowrap d-inline-flex align-items-center gap-2 ${schoolId ? 'btn-dark' : 'btn-outline-dark'}`}
+                      style={{ fontWeight: schoolId ? 600 : 500, padding: '0.35rem 0.85rem', fontSize: '0.875rem' }}
+                      onClick={() => openSchoolPicker('guest')}
                     >
-                      Clear
+                      <i className="bi bi-building" aria-hidden />
+                      {selectedGuestSchoolName ?? 'Select school'}
+                      <i className="bi bi-chevron-down" style={{ fontSize: '0.75rem' }} aria-hidden />
                     </button>
-                  )}
-                </>
+                    {schoolId && (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-link flex-shrink-0 text-nowrap text-decoration-none px-1"
+                        onClick={() => applyGuestSchoolFilter(null)}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </>
+                ) : null
               ) : (
                 <>
-                  {user && !showAllSchoolsFeed && homeContentCategories.length > 0 && (
+                  {user && !showAllSchoolsFeed && showSchoolFilterUi && homeContentCategories.length > 0 && (
                     <>
                       {selectedSubCategoryIds.length > 0 && (
                         <button
@@ -3638,16 +3711,29 @@ export const PublicEvents = () => {
                 </>
               )}
             </div>
-            {!(user && showAllSchoolsFeed) && (
+            {showSchoolFilterUi && (
             <div className="d-flex align-items-center gap-2 small flex-shrink-0 position-relative">
               <button
                 type="button"
                 className="btn border-0 py-1 px-2 rounded d-flex align-items-center"
                 style={{
-                  backgroundColor: filterDropdownOpen || feedSort !== 'latest' || (!user && !!schoolId) || !!upcomingDateFilter
-                    ? 'rgba(13, 202, 240, 0.15)'
-                    : 'transparent',
-                  color: filterDropdownOpen || (!user && !!schoolId) || !!upcomingDateFilter ? '#087990' : '#6c757d',
+                  backgroundColor:
+                    filterDropdownOpen ||
+                    feedSort !== 'latest' ||
+                    (!user && !!schoolId) ||
+                    !!upcomingDateFilter ||
+                    !!loggedInFeedDateFilter ||
+                    !!loggedInFeedPostTypeFilter
+                      ? 'rgba(13, 202, 240, 0.15)'
+                      : 'transparent',
+                  color:
+                    filterDropdownOpen ||
+                    (!user && !!schoolId) ||
+                    !!upcomingDateFilter ||
+                    !!loggedInFeedDateFilter ||
+                    !!loggedInFeedPostTypeFilter
+                      ? '#087990'
+                      : '#6c757d',
                 }}
                 onClick={() => setFilterDropdownOpen((o) => !o)}
                 title="Filter: Latest, Popular"
@@ -3706,17 +3792,96 @@ export const PublicEvents = () => {
                         Popular
                       </button>
                     </div>
-                    <div className="px-3 py-1 small text-muted border-top mt-1 pt-2">View by date</div>
-                    <div className="px-3 pt-1 pb-2">
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-outline-dark rounded-pill d-inline-flex align-items-center gap-2"
-                        onClick={openCalendarFilter}
-                      >
-                        <i className="bi bi-calendar3" aria-hidden />
-                        Calendar
-                      </button>
-                    </div>
+                    <div className="px-3 py-1 small text-muted border-top mt-1 pt-2">View by post type</div>
+                    {user ? (
+                      <div className="px-3 pt-1 pb-2">
+                        <div className="d-flex flex-column gap-2 mb-2">
+                          <button
+                            type="button"
+                            className={`btn btn-sm rounded-pill text-start ${
+                              loggedInFeedPostTypeFilter === 'event' ? 'btn-dark' : 'btn-outline-dark'
+                            }`}
+                            onClick={() =>
+                              setLoggedInFeedPostTypeFilter((m) => (m === 'event' ? null : 'event'))
+                            }
+                          >
+                            Filter by event date details
+                          </button>
+                          <button
+                            type="button"
+                            className={`btn btn-sm rounded-pill text-start ${
+                              loggedInFeedPostTypeFilter === 'posted' ? 'btn-dark' : 'btn-outline-dark'
+                            }`}
+                            onClick={() =>
+                              setLoggedInFeedPostTypeFilter((m) => (m === 'posted' ? null : 'posted'))
+                            }
+                          >
+                            Filter by post date
+                          </button>
+                        </div>
+                        {loggedInFeedPostTypeFilter ? (
+                          <>
+                            <label htmlFor="logged-in-feed-date" className="form-label small fw-semibold mb-1">
+                              Date
+                            </label>
+                            <input
+                              id="logged-in-feed-date"
+                              type="date"
+                              className="form-control form-control-sm mb-2"
+                              value={loggedInFeedDateFilter ?? ''}
+                              onChange={(e) => setLoggedInFeedDateFilter(e.target.value.trim() || null)}
+                            />
+                            <div className="d-flex gap-2 flex-wrap align-items-center">
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-dark rounded-pill"
+                                onClick={() => setLoggedInFeedDateFilter(toYmd(new Date()))}
+                              >
+                                Today
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-dark rounded-pill"
+                                onClick={() => {
+                                  const d = new Date();
+                                  d.setDate(d.getDate() + 1);
+                                  setLoggedInFeedDateFilter(toYmd(d));
+                                }}
+                              >
+                                Tomorrow
+                              </button>
+                              {loggedInFeedDateFilter || loggedInFeedPostTypeFilter ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-link text-decoration-none px-1"
+                                  onClick={() => {
+                                    setLoggedInFeedDateFilter(null);
+                                    setLoggedInFeedPostTypeFilter(null);
+                                  }}
+                                >
+                                  Clear
+                                </button>
+                              ) : null}
+                            </div>
+                          </>
+                        ) : (
+                          <p className="small text-muted mb-0">
+                            Choose a post type, then pick a date.
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="px-3 pt-1 pb-2">
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-dark rounded-pill d-inline-flex align-items-center gap-2"
+                          onClick={openCalendarFilter}
+                        >
+                          <i className="bi bi-calendar3" aria-hidden />
+                          Calendar
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -3724,7 +3889,27 @@ export const PublicEvents = () => {
             )}
           </div>
 
-          {user && !showAllSchoolsFeed && selectedSubCategoryMeta.length > 0 && (
+          {user && isLoggedInHome && loggedInPostTypeDateFilterActive ? (
+            <div className="d-flex align-items-center justify-content-between gap-2 px-2 py-2 small">
+              <span className="text-muted">
+                Showing news by{' '}
+                {loggedInFeedPostTypeFilter === 'event' ? 'event date' : 'post date'} for{' '}
+                {formatYmdLabel(loggedInFeedDateFilter!)}
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-link text-decoration-none p-0"
+                onClick={() => {
+                  setLoggedInFeedDateFilter(null);
+                  setLoggedInFeedPostTypeFilter(null);
+                }}
+              >
+                Clear
+              </button>
+            </div>
+          ) : null}
+
+          {user && !showAllSchoolsFeed && showSchoolFilterUi && selectedSubCategoryMeta.length > 0 && (
             <div
               className="d-flex flex-wrap gap-2 px-2 py-2"
               style={{
@@ -3769,7 +3954,7 @@ export const PublicEvents = () => {
           )}
 
         {/* Subcategory picker — glass modal (matches mobile EventsScreen) */}
-        {contentExpandedCategoryId &&
+        {showSchoolFilterUi && contentExpandedCategoryId &&
           (() => {
             const cat = homeCategories.find((c: CategoryPublic) => c.id === contentExpandedCategoryId);
             if (!cat) return null;
@@ -3978,7 +4163,9 @@ export const PublicEvents = () => {
               </div>
               {calendarFilterStep === 'date' ? (
                 <div className="p-3">
-                  <p className="small text-muted mb-3">Choose a date to see events scheduled for that day (the date set when the post was created).</p>
+                  <p className="small text-muted mb-3">
+                    Choose a date to see news for that day — event date when set on the post, otherwise the published date.
+                  </p>
                   <label htmlFor="calendar-filter-date" className="form-label small fw-semibold">Date</label>
                   <input
                     id="calendar-filter-date"

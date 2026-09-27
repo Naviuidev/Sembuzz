@@ -8,6 +8,11 @@ export interface ApprovedEventPublic {
   title: string;
   description: string | null;
   externalLink: string | null;
+  eventDate?: string | null;
+  eventStartTime?: string | null;
+  eventEndTime?: string | null;
+  eventLocation?: string | null;
+  actionButtons?: string | null;
   commentsEnabled: boolean;
   imageUrls: string | null;
   status: string;
@@ -115,11 +120,21 @@ export async function getApprovedEvents(
   schoolId?: string | null,
   subCategoryIds?: string[],
   date?: string | null,
+  tzOffsetMinutes?: number,
+  dateMode?: 'event' | 'posted' | 'combined' | null,
 ): Promise<ApprovedEventPublic[]> {
   const params: Record<string, string> = {};
   if (schoolId != null && String(schoolId).trim()) params.schoolId = String(schoolId).trim();
   if (subCategoryIds?.length) params.subCategoryIds = subCategoryIds.join(',');
-  if (date != null && String(date).trim()) params.date = String(date).trim();
+  if (date != null && String(date).trim()) {
+    params.date = String(date).trim();
+    if (tzOffsetMinutes != null && Number.isFinite(tzOffsetMinutes)) {
+      params.tzOffset = String(Math.trunc(tzOffsetMinutes));
+    }
+    if (dateMode === 'event' || dateMode === 'posted') {
+      params.dateMode = dateMode;
+    }
+  }
   const response = await api.get<ApprovedEventPublic[] | { data?: ApprovedEventPublic[] }>('/events/approved', {
     params,
   });
@@ -137,6 +152,21 @@ export async function getCategoriesBySchool(schoolId: string): Promise<CategoryP
   if (!sid) return [];
   const response = await api.get<CategoryPublic[]>('/events/categories', { params: { schoolId: sid } });
   return Array.isArray(response.data) ? response.data : [];
+}
+
+export type FiltersVisibility = 'BEFORE_LOGIN' | 'AFTER_LOGIN' | 'BOTH';
+
+export type SchoolFilterSettings = {
+  filtersEnabled: boolean;
+  filtersVisibility: FiltersVisibility | null;
+};
+
+export async function getSchoolFilterSettings(schoolId?: string | null): Promise<SchoolFilterSettings> {
+  const params: Record<string, string> = {};
+  const sid = String(schoolId ?? '').trim();
+  if (sid) params.schoolId = sid;
+  const response = await api.get<SchoolFilterSettings>('/events/school-filter-settings', { params });
+  return response.data ?? { filtersEnabled: false, filtersVisibility: null };
 }
 
 export async function getScheduledEvents(schoolId: string): Promise<ApprovedEventPublic[]> {

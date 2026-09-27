@@ -89,6 +89,11 @@ export class SchoolAdminPostsController {
       title: body.title,
       description: body.description,
       externalLink: body.externalLink,
+      eventDate: body.eventDate,
+      eventStartTime: body.eventStartTime,
+      eventEndTime: body.eventEndTime,
+      eventLocation: body.eventLocation,
+      actionButtons: body.actionButtons,
       commentsEnabled: body.commentsEnabled,
       imageUrls: body.imageUrls,
     });

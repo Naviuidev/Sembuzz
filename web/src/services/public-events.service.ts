@@ -73,11 +73,21 @@ export const publicEventsService = {
     schoolId?: string | null,
     subCategoryIds?: string[],
     date?: string | null,
+    tzOffsetMinutes?: number,
+    dateMode?: 'event' | 'posted' | 'combined' | null,
   ): Promise<ApprovedEventPublic[]> => {
     const params: Record<string, string> = {};
     if (schoolId != null && String(schoolId).trim()) params.schoolId = String(schoolId).trim();
     if (subCategoryIds?.length) params.subCategoryIds = subCategoryIds.join(',');
-    if (date != null && String(date).trim()) params.date = String(date).trim();
+    if (date != null && String(date).trim()) {
+      params.date = String(date).trim();
+      if (tzOffsetMinutes != null && Number.isFinite(tzOffsetMinutes)) {
+        params.tzOffset = String(Math.trunc(tzOffsetMinutes));
+      }
+      if (dateMode === 'event' || dateMode === 'posted') {
+        params.dateMode = dateMode;
+      }
+    }
     const response = await api.get<ApprovedEventPublic[] | { data?: ApprovedEventPublic[] }>('/events/approved', {
       params,
     });
@@ -159,6 +169,21 @@ export const publicEventsService = {
   recordSponsoredAdClick: async (sponsoredAdId: string): Promise<{ ok: boolean; redirectUrl?: string | null }> => {
     const response = await api.post<{ ok: boolean; redirectUrl?: string | null }>(`/events/sponsored-ads/${sponsoredAdId}/click`);
     return response.data;
+  },
+
+  getSchoolFilterSettings: async (
+    schoolId?: string | null,
+  ): Promise<{ filtersEnabled: boolean; filtersVisibility: 'BEFORE_LOGIN' | 'AFTER_LOGIN' | 'BOTH' | null }> => {
+    const params: Record<string, string> = {};
+    const sid = String(schoolId ?? '').trim();
+    if (sid) params.schoolId = sid;
+    const response = await api.get<{
+      filtersEnabled: boolean;
+      filtersVisibility: 'BEFORE_LOGIN' | 'AFTER_LOGIN' | 'BOTH' | null;
+    }>('/events/school-filter-settings', { params });
+    return (
+      response.data ?? { filtersEnabled: false, filtersVisibility: null }
+    );
   },
 };
 

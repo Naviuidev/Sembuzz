@@ -6,7 +6,6 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
-  Linking,
   Modal,
   Pressable,
   useWindowDimensions,
@@ -16,6 +15,11 @@ import { imageSrc } from '../utils/image';
 import { SchoolLogo } from './SchoolLogo';
 import type { LikedEventItem, SavedEventItem } from '../services/userEvents';
 import type { ApprovedEventPublic } from '../services/events';
+import {
+  EventPostPublicActionButtons,
+  EventPostPublicDescriptionRow,
+  EventPostPublicMeta,
+} from './EventPostPublicContent';
 
 type BookmarkedEvent = LikedEventItem | SavedEventItem | ApprovedEventPublic;
 
@@ -94,15 +98,9 @@ export function UserBookmarkedEventDetailModal({ visible, event, onClose }: Prop
             )}
 
             <Text style={styles.title}>{event.title}</Text>
-            {event.description ? <Text style={styles.desc}>{event.description}</Text> : null}
-            {event.externalLink ? (
-              <TouchableOpacity
-                style={styles.linkBtn}
-                onPress={() => Linking.openURL(event.externalLink!).catch(() => {})}
-              >
-                <Text style={styles.linkBtnText}>Know more</Text>
-              </TouchableOpacity>
-            ) : null}
+            <EventPostPublicMeta event={event} />
+            <EventPostPublicDescriptionRow event={event} />
+            <EventPostPublicActionButtons event={event} />
           </ScrollView>
         </View>
       </View>

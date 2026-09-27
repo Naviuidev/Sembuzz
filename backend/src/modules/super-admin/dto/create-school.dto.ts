@@ -1,4 +1,17 @@
-import { IsString, IsEmail, IsArray, IsNotEmpty, ArrayMinSize, IsOptional, IsInt, Min, Matches, ValidateIf } from 'class-validator';
+import {
+  IsString,
+  IsEmail,
+  IsArray,
+  IsNotEmpty,
+  ArrayMinSize,
+  IsOptional,
+  IsInt,
+  Min,
+  Matches,
+  ValidateIf,
+  IsEnum,
+} from 'class-validator';
+import { FiltersVisibility } from '@prisma/client';
 
 export class CreateSchoolDto {
   @IsString()
@@ -47,4 +60,9 @@ export class CreateSchoolDto {
   @Min(1)
   @IsOptional()
   tenure?: number; // Tenure in months
+
+  /** Required when "FILTERS" is in selectedFeatures. */
+  @ValidateIf((o) => Array.isArray(o.selectedFeatures) && o.selectedFeatures.includes('FILTERS'))
+  @IsEnum(FiltersVisibility)
+  filtersVisibility?: FiltersVisibility;
 }

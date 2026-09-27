@@ -1,4 +1,5 @@
-import { IsOptional, IsBoolean, IsArray, IsString, IsEmail, IsInt, Min } from 'class-validator';
+import { IsOptional, IsBoolean, IsArray, IsString, IsEmail, IsInt, Min, IsEnum } from 'class-validator';
+import { FiltersVisibility } from '@prisma/client';
 
 export class UpdateSchoolDto {
   @IsOptional()
@@ -38,4 +39,8 @@ export class UpdateSchoolDto {
   @IsOptional()
   @IsBoolean()
   resetAdminPassword?: boolean;
+
+  @IsOptional()
+  @IsEnum(FiltersVisibility)
+  filtersVisibility?: FiltersVisibility | null;
 }

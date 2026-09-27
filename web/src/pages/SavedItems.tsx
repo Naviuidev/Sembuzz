@@ -7,6 +7,8 @@ import { useUserAuth } from '../contexts/UserAuthContext';
 import { userEventsService, type SavedEventItem } from '../services/user-events.service';
 import { userNotificationsService, USER_NOTIFICATIONS_UNREAD_QUERY_KEY } from '../services/user-notifications.service';
 import { imageSrc } from '../utils/image';
+import { EventPostPublicMeta, EventPostPublicActionButtons } from '../components/EventPostPublicExtras';
+import { EventPostPublicDescriptionRow } from '../components/EventPostPublicDescriptionRow';
 
 function parseImageUrls(imageUrls: string | null): string[] {
   if (!imageUrls) return [];
@@ -21,6 +23,7 @@ function parseImageUrls(imageUrls: string | null): string[] {
 /** Full post detail view (stays on saved screen). */
 function SavedEventDetail({ event, onBack }: { event: SavedEventItem; onBack: () => void }) {
   const [slideIndex, setSlideIndex] = useState(0);
+  const [descExpanded, setDescExpanded] = useState(false);
   const images = parseImageUrls(event.imageUrls);
   const schoolName = event.school?.name ?? 'School';
   const schoolLogo = event.school?.image ?? null;
@@ -87,11 +90,18 @@ function SavedEventDetail({ event, onBack }: { event: SavedEventItem; onBack: ()
           </div>
         )}
         <div className="px-3 py-3">
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 600, color: '#1a1f2e', marginBottom: '0.5rem' }}>{event.title}</h2>
-          {event.description && <p className="text-muted mb-2 small" style={{ lineHeight: 1.5 }}>{event.description}</p>}
-          {event.externalLink && (
-            <a href={event.externalLink} target="_blank" rel="noopener noreferrer" className="small">Link</a>
-          )}
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#1a1f2e', marginBottom: '0.35rem', lineHeight: 1.35 }}>
+            {event.title}
+          </h2>
+          <EventPostPublicMeta event={event} compact />
+          <EventPostPublicDescriptionRow
+            event={event}
+            description={event.description ?? ''}
+            expanded={descExpanded}
+            onExpand={() => setDescExpanded(true)}
+            compact
+          />
+          <EventPostPublicActionButtons event={event} compact />
         </div>
       </article>
     </div>

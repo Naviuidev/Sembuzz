@@ -56,6 +56,12 @@ model SuperAdmin {
 // SCHOOL MANAGEMENT
 // ============================================
 
+enum FiltersVisibility {
+  BEFORE_LOGIN
+  AFTER_LOGIN
+  BOTH
+}
+
 model School {
   id        String   @id @default(uuid())
   refNum    String   @unique // unique, immutable reference number
@@ -67,6 +73,8 @@ model School {
   image     String? // URL or path to school image
   tenure    Int? // Tenure in months
   isActive  Boolean  @default(true)
+  // When FILTERS feature is enabled: when to show filter UI on web/mobile.
+  filtersVisibility FiltersVisibility?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -176,7 +184,7 @@ model AdsAdminPasswordResetOtp {
 
 model Feature {
   id        String   @id @default(uuid())
-  code      String   @unique // NEWS, EVENTS, ADS, INSTAGRAM, ANALYTICS, EMERGENCY, GROUP_MESSAGING, INDIVIDUAL_MESSAGING
+  code      String   @unique // NEWS, EVENTS, ADS, INSTAGRAM, ANALYTICS, EMERGENCY, GROUP_MESSAGING, INDIVIDUAL_MESSAGING, FILTERS
   name      String
   createdAt DateTime @default(now())
 

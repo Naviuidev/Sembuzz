@@ -64,9 +64,31 @@ export class SchoolsService {
   }
 
   private async createInternal(createSchoolDto: CreateSchoolDto) {
-    const { schoolName, country, state, city, domain, image, selectedFeatures, adminEmail, adsAdminEmail, tenure } = createSchoolDto;
+    const {
+      schoolName,
+      country,
+      state,
+      city,
+      domain,
+      image,
+      selectedFeatures,
+      adminEmail,
+      adsAdminEmail,
+      tenure,
+      filtersVisibility,
+    } = createSchoolDto;
 
     const hasAdsFeature = selectedFeatures.includes('ADS');
+    const hasFiltersFeature = selectedFeatures.includes('FILTERS');
+
+    if (hasFiltersFeature && !filtersVisibility) {
+      throw new BadRequestException(
+        'Filters visibility is required when the Filters feature is selected (before login, after login, or both).',
+      );
+    }
+    if (!hasFiltersFeature && filtersVisibility) {
+      throw new BadRequestException('Filters visibility can only be set when the Filters feature is selected.');
+    }
 
     // When Ads feature is selected, Ads Admin email is required
     if (hasAdsFeature && (!adsAdminEmail || !adsAdminEmail.trim())) {
@@ -166,6 +188,7 @@ export class SchoolsService {
           city,
           tenure,
           isActive: true,
+          filtersVisibility: hasFiltersFeature ? filtersVisibility : null,
         };
 
         if (domain) {
@@ -460,6 +483,7 @@ export class SchoolsService {
           city: true,
           tenure: true,
           isActive: true,
+          filtersVisibility: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -524,6 +548,7 @@ export class SchoolsService {
         city: school.city,
         tenure: school.tenure,
         isActive: school.isActive,
+        filtersVisibility: school.filtersVisibility,
         enabledFeatures,
         admin,
         adsAdmin,
@@ -550,17 +575,47 @@ export class SchoolsService {
       throw new NotFoundException(`School with ID ${id} not found`);
     }
 
-    const { 
-      schoolName, 
-      country, 
-      state, 
-      city, 
-      tenure, 
-      selectedFeatures, 
-      adminEmail, 
-      isActive, 
-      resetAdminPassword 
+    const {
+      schoolName,
+      country,
+      state,
+      city,
+      tenure,
+      selectedFeatures,
+      adminEmail,
+      isActive,
+      resetAdminPassword,
+      filtersVisibility,
     } = updateSchoolDto;
+
+    if (filtersVisibility !== undefined && selectedFeatures === undefined) {
+      const enabled = await this.prisma.schoolFeature.findMany({
+        where: { schoolId: id, isEnabled: true },
+        include: { feature: { select: { code: true } } },
+      });
+      const hasFilters = enabled.some((sf) => sf.feature.code === 'FILTERS');
+      if (filtersVisibility && !hasFilters) {
+        throw new BadRequestException('Filters visibility can only be set when the Filters feature is enabled.');
+      }
+    }
+
+    if (selectedFeatures !== undefined) {
+      const willHaveFilters = selectedFeatures.includes('FILTERS');
+      if (willHaveFilters && filtersVisibility === undefined) {
+        const existing = await this.prisma.school.findUnique({
+          where: { id },
+          select: { filtersVisibility: true },
+        });
+        if (!existing?.filtersVisibility) {
+          throw new BadRequestException(
+            'Filters visibility is required when enabling the Filters feature.',
+          );
+        }
+      }
+      if (!willHaveFilters && filtersVisibility === undefined) {
+        // filtersVisibility cleared in transaction when FILTERS disabled
+      }
+    }
 
     await this.prisma.$transaction(async (tx) => {
       // Update school basic information
@@ -571,6 +626,7 @@ export class SchoolsService {
       if (city !== undefined) schoolUpdateData.city = city;
       if (tenure !== undefined) schoolUpdateData.tenure = tenure;
       if (isActive !== undefined) schoolUpdateData.isActive = isActive;
+      if (filtersVisibility !== undefined) schoolUpdateData.filtersVisibility = filtersVisibility;
 
       if (Object.keys(schoolUpdateData).length > 0) {
         await tx.school.update({
@@ -648,6 +704,29 @@ export class SchoolsService {
               data: { isEnabled: false },
             });
             removedFeatureNames.push(schoolFeature.feature.name);
+          }
+        }
+
+        const filtersStillEnabled = selectedFeatures.includes('FILTERS');
+        if (!filtersStillEnabled) {
+          await tx.school.update({
+            where: { id },
+            data: { filtersVisibility: null },
+          });
+        } else if (filtersVisibility !== undefined) {
+          await tx.school.update({
+            where: { id },
+            data: { filtersVisibility },
+          });
+        } else if (selectedFeatures.includes('FILTERS')) {
+          const current = await tx.school.findUnique({
+            where: { id },
+            select: { filtersVisibility: true },
+          });
+          if (!current?.filtersVisibility) {
+            throw new BadRequestException(
+              'Filters visibility is required when the Filters feature is selected.',
+            );
           }
         }
 

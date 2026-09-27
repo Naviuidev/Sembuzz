@@ -8,6 +8,12 @@ import {
   resolveSchoolAdminCreateStatus,
 } from '../../events/event-publishing.constants';
 import { PushNotificationService } from '../../push/push-notification.service';
+import {
+  normalizeEventLocation,
+  parseEventDateYmd,
+  parseEventTimeHm,
+  serializeActionButtons,
+} from '../../events/event-post-fields.util';
 
 @Injectable()
 export class SchoolAdminPostsService {
@@ -25,6 +31,11 @@ export class SchoolAdminPostsService {
     const now = new Date();
     const { status, publishedAt } = resolveSchoolAdminCreateStatus(publishAt, now);
     const imageUrlsJson = dto.imageUrls?.length ? JSON.stringify(dto.imageUrls) : null;
+    const eventDate = parseEventDateYmd(dto.eventDate);
+    const eventStartTime = parseEventTimeHm(dto.eventStartTime);
+    const eventEndTime = parseEventTimeHm(dto.eventEndTime);
+    const eventLocation = normalizeEventLocation(dto.eventLocation);
+    const actionButtons = serializeActionButtons(dto.actionButtons);
 
     try {
       const created = await this.prisma.event.create({
@@ -36,7 +47,12 @@ export class SchoolAdminPostsService {
           title: dto.title.trim(),
           description: dto.description ?? null,
           externalLink: dto.externalLink ?? null,
-          commentsEnabled: dto.commentsEnabled ?? true,
+          eventDate,
+          eventStartTime,
+          eventEndTime,
+          eventLocation,
+          actionButtons,
+          commentsEnabled: dto.commentsEnabled ?? false,
           imageUrls: imageUrlsJson,
           status,
           publishAt,
@@ -151,6 +167,11 @@ export class SchoolAdminPostsService {
       title?: string;
       description?: string;
       externalLink?: string;
+      eventDate?: string;
+      eventStartTime?: string;
+      eventEndTime?: string;
+      eventLocation?: string;
+      actionButtons?: { label: string; url: string }[];
       commentsEnabled?: boolean;
       imageUrls?: string[];
       publishAt?: string;
@@ -173,6 +194,11 @@ export class SchoolAdminPostsService {
       title?: string;
       description?: string;
       externalLink?: string | null;
+      eventDate?: Date | null;
+      eventStartTime?: string | null;
+      eventEndTime?: string | null;
+      eventLocation?: string | null;
+      actionButtons?: string | null;
       commentsEnabled?: boolean;
       imageUrls?: string | null;
       publishAt?: Date;
@@ -180,6 +206,21 @@ export class SchoolAdminPostsService {
     if (data.title !== undefined) updateData.title = data.title;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.externalLink !== undefined) updateData.externalLink = data.externalLink || null;
+    if (data.eventDate !== undefined) {
+      updateData.eventDate = data.eventDate ? parseEventDateYmd(data.eventDate) : null;
+    }
+    if (data.eventStartTime !== undefined) {
+      updateData.eventStartTime = data.eventStartTime ? parseEventTimeHm(data.eventStartTime) : null;
+    }
+    if (data.eventEndTime !== undefined) {
+      updateData.eventEndTime = data.eventEndTime ? parseEventTimeHm(data.eventEndTime) : null;
+    }
+    if (data.eventLocation !== undefined) {
+      updateData.eventLocation = normalizeEventLocation(data.eventLocation);
+    }
+    if (data.actionButtons !== undefined) {
+      updateData.actionButtons = serializeActionButtons(data.actionButtons);
+    }
     if (data.commentsEnabled !== undefined) updateData.commentsEnabled = data.commentsEnabled;
     if (data.imageUrls !== undefined) {
       const arr = Array.isArray(data.imageUrls) ? data.imageUrls.filter((u) => typeof u === 'string' && u.trim()) : [];

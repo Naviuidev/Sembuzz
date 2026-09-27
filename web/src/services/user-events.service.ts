@@ -89,6 +89,11 @@ export interface SavedEventItem {
   title: string;
   description: string | null;
   externalLink: string | null;
+  eventDate?: string | null;
+  eventStartTime?: string | null;
+  eventEndTime?: string | null;
+  eventLocation?: string | null;
+  actionButtons?: string | null;
   imageUrls: string | null;
   school?: { name: string; image: string | null; city?: string } | null;
   subCategory: { id: string; name: string };

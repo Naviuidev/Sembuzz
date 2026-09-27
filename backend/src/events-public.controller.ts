@@ -13,6 +13,12 @@ import {
   EVENT_PUBLIC_STATUSES,
   EVENT_SCHEDULED_STATUSES,
 } from './modules/events/event-publishing.constants';
+import { FILTERS_FEATURE_CODE } from './modules/schools/filters-visibility.util';
+import {
+  buildPublicFeedDateWhere,
+  parseFeedDateTzOffsetMinutes,
+  parsePublicFeedDateFilterMode,
+} from './modules/events/event-feed-date-filter.util';
 
 @Controller('events')
 export class EventsPublicController {
@@ -40,6 +46,8 @@ export class EventsPublicController {
     @Query('schoolId') schoolId?: string,
     @Query('subCategoryIds') subCategoryIdsStr?: string,
     @Query('date') dateStr?: string,
+    @Query('tzOffset') tzOffsetStr?: string,
+    @Query('dateMode') dateModeStr?: string,
   ) {
     const subCategoryIds =
       subCategoryIdsStr && subCategoryIdsStr.trim()
@@ -47,25 +55,16 @@ export class EventsPublicController {
         : undefined;
     const sid = typeof schoolId === 'string' ? schoolId.trim() : '';
     const date = typeof dateStr === 'string' ? dateStr.trim() : '';
-    let publishedOnDay: { OR: Record<string, unknown>[] } | undefined;
-    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      const dayStart = new Date(`${date}T00:00:00.000Z`);
-      const dayEnd = new Date(`${date}T23:59:59.999Z`);
-      publishedOnDay = {
-        OR: [
-          { publishedAt: { gte: dayStart, lte: dayEnd } },
-          { createdAt: { gte: dayStart, lte: dayEnd } },
-          { updatedAt: { gte: dayStart, lte: dayEnd } },
-        ],
-      };
-    }
+    const tzOffset = parseFeedDateTzOffsetMinutes(tzOffsetStr);
+    const dateMode = parsePublicFeedDateFilterMode(dateModeStr);
+    const feedDateWhere = buildPublicFeedDateWhere(date, tzOffset, dateMode);
     const where = {
       status: { in: [...EVENT_PUBLIC_STATUSES] },
       ...(sid ? { schoolId: sid } : {}),
       ...(subCategoryIds?.length
         ? { subCategoryId: { in: subCategoryIds } }
         : {}),
-      ...(publishedOnDay ?? {}),
+      ...(feedDateWhere ?? {}),
     };
 
     try {
@@ -371,5 +370,48 @@ export class EventsPublicController {
   @Get('blog/:id')
   blogById(@Param('id') id: string) {
     return this.publishedBlogs.getPublishedBlogById(id);
+  }
+
+  /** Public: whether filter UI should show for a school (clients also pass login state). */
+  @Get('school-filter-settings')
+  async getSchoolFilterSettings(@Query('schoolId') schoolId?: string) {
+    const sid = typeof schoolId === 'string' ? schoolId.trim() : '';
+    if (!sid) {
+      const guestFilterSchool = await this.prisma.schoolFeature.findFirst({
+        where: {
+          isEnabled: true,
+          feature: { code: FILTERS_FEATURE_CODE },
+          school: {
+            isActive: true,
+            filtersVisibility: { in: ['BEFORE_LOGIN', 'BOTH'] },
+          },
+        },
+        select: { schoolId: true },
+      });
+      return {
+        filtersEnabled: !!guestFilterSchool,
+        filtersVisibility: guestFilterSchool ? ('BEFORE_LOGIN' as const) : null,
+      };
+    }
+    const school = await this.prisma.school.findUnique({
+      where: { id: sid },
+      select: {
+        filtersVisibility: true,
+        features: {
+          where: { isEnabled: true },
+          select: { feature: { select: { code: true } } },
+        },
+      },
+    });
+    if (!school) {
+      return { filtersEnabled: false, filtersVisibility: null };
+    }
+    const filtersEnabled = school.features.some(
+      (sf) => sf.feature.code === FILTERS_FEATURE_CODE,
+    );
+    return {
+      filtersEnabled,
+      filtersVisibility: filtersEnabled ? school.filtersVisibility : null,
+    };
   }
 }

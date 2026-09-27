@@ -33,6 +33,7 @@ export interface School {
   } | null;
   createdAt: string;
   updatedAt?: string;
+  filtersVisibility?: 'BEFORE_LOGIN' | 'AFTER_LOGIN' | 'BOTH' | null;
 }
 
 export interface CreateSchoolDto {
@@ -47,6 +48,7 @@ export interface CreateSchoolDto {
   /** Required when "Ads" feature is selected. Email for the Ads Admin. */
   adsAdminEmail?: string;
   tenure?: number;
+  filtersVisibility?: 'BEFORE_LOGIN' | 'AFTER_LOGIN' | 'BOTH';
 }
 
 export interface UpdateSchoolDto {
@@ -59,6 +61,7 @@ export interface UpdateSchoolDto {
   adminEmail?: string;
   isActive?: boolean;
   resetAdminPassword?: boolean;
+  filtersVisibility?: 'BEFORE_LOGIN' | 'AFTER_LOGIN' | 'BOTH' | null;
 }
 
 export const schoolsService = {

@@ -25,6 +25,11 @@ import {
   recordSponsoredAdClick,
 } from '../services/events';
 import { userEventsService, type EventCommentResponse } from '../services/userEvents';
+import {
+  EventPostPublicActionButtons,
+  EventPostPublicDescriptionRow,
+  EventPostPublicMeta,
+} from './EventPostPublicContent';
 import HeartIcon from 'react-native-bootstrap-icons/icons/heart';
 import HeartFillIcon from 'react-native-bootstrap-icons/icons/heart-fill';
 import BookmarkIcon from 'react-native-bootstrap-icons/icons/bookmark';
@@ -107,10 +112,6 @@ function InshortsEventPage({
   const [deleteId, setDeleteId] = React.useState<string | null>(null);
   const [authHintVisible, setAuthHintVisible] = React.useState(false);
   const authHintTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const openLink = () => {
-    if (event.externalLink) Linking.openURL(event.externalLink).catch(() => {});
-  };
 
   React.useEffect(() => {
     if (banner?.id) recordBannerAdView(banner.id).catch(() => {});
@@ -237,21 +238,12 @@ function InshortsEventPage({
           </Text>
         </View>
         <View style={styles.textBlock}>
-          <View style={styles.titleRow}>
-            <Text style={[styles.headline, styles.titleInRow]} numberOfLines={4}>
-              {event.title}
-            </Text>
-            {event.externalLink ? (
-              <TouchableOpacity style={styles.knowMorePill} onPress={openLink} activeOpacity={0.85}>
-                <Text style={styles.knowMorePillText}>Know more</Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-          {event.description ? (
-            <Text style={styles.summary} numberOfLines={8}>
-              {truncateWords(event.description, 50)}
-            </Text>
-          ) : null}
+          <Text style={styles.headline} numberOfLines={4}>
+            {event.title}
+          </Text>
+          <EventPostPublicMeta event={event} compact />
+          <EventPostPublicDescriptionRow event={event} compact />
+          <EventPostPublicActionButtons event={event} compact />
           <Text style={styles.timeAgo}>{formatRelativeTime(event.updatedAt || event.createdAt)}</Text>
           {banner ? (
             <TouchableOpacity

@@ -7,9 +7,13 @@ import { SuperAdminNavbar } from '../components/SuperAdminNavbar';
 import { SuperAdminSidebar } from '../components/SuperAdminSidebar';
 import { US_STATES, US_CITIES_BY_STATE } from '../data/countries-states';
 import {
+  FILTERS_CODE,
+  FILTERS_VISIBILITY_OPTIONS,
   GROUP_MESSAGING_CODE,
   INDIVIDUAL_MESSAGING_CODE,
   MESSAGING_FEATURE_CODES,
+  type MessagingFeatureCode,
+  type FiltersVisibility,
 } from '../constants/messagingFeatures';
 import type { Feature } from '../services/schools.service';
 import { StatusPopup } from '../components/StatusPopup';
@@ -27,6 +31,7 @@ export const EditSchool = () => {
     selectedFeatures: [],
     adminEmail: '',
     tenure: undefined,
+    filtersVisibility: undefined,
   });
   const [popupShow, setPopupShow] = useState<boolean>(false);
   const [popupType, setPopupType] = useState<'success' | 'error'>('success');
@@ -72,6 +77,7 @@ export const EditSchool = () => {
         selectedFeatures: school.enabledFeatures.map((f) => f.code),
         adminEmail: school.admin?.email || '',
         tenure: school.tenure,
+        filtersVisibility: school.filtersVisibility ?? undefined,
       });
     }
   }, [school]);
@@ -89,12 +95,20 @@ export const EditSchool = () => {
     : [];
 
   const handleFeatureToggle = (featureCode: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      selectedFeatures: prev.selectedFeatures?.includes(featureCode)
-        ? prev.selectedFeatures.filter((f) => f !== featureCode)
-        : [...(prev.selectedFeatures || []), featureCode],
-    }));
+    setFormData((prev) => {
+      const list = prev.selectedFeatures ?? [];
+      const removing = list.includes(featureCode);
+      const selectedFeatures = removing ? list.filter((f) => f !== featureCode) : [...list, featureCode];
+      const next = { ...prev, selectedFeatures };
+      if (featureCode === FILTERS_CODE) {
+        if (removing) {
+          next.filtersVisibility = null;
+        } else if (!next.filtersVisibility) {
+          next.filtersVisibility = 'BOTH';
+        }
+      }
+      return next;
+    });
   };
 
   const platformFeatures =
@@ -102,14 +116,19 @@ export const EditSchool = () => {
       (f) => !MESSAGING_FEATURE_CODES.includes(f.code as (typeof MESSAGING_FEATURE_CODES)[number]),
     ) ?? [];
   const messagingFeatures =
-    features?.filter((f) =>
-      MESSAGING_FEATURE_CODES.includes(f.code as (typeof MESSAGING_FEATURE_CODES)[number]),
-    ) ?? [];
+    features
+      ?.filter((f) => MESSAGING_FEATURE_CODES.includes(f.code as MessagingFeatureCode))
+      .sort(
+        (a, b) =>
+          MESSAGING_FEATURE_CODES.indexOf(a.code as MessagingFeatureCode) -
+          MESSAGING_FEATURE_CODES.indexOf(b.code as MessagingFeatureCode),
+      ) ?? [];
 
   const hasGroupMessaging = formData.selectedFeatures?.includes(GROUP_MESSAGING_CODE) ?? false;
   const hasIndividualMessaging =
     formData.selectedFeatures?.includes(INDIVIDUAL_MESSAGING_CODE) ?? false;
-  const hasAnyMessaging = hasGroupMessaging || hasIndividualMessaging;
+  const hasFilters = formData.selectedFeatures?.includes(FILTERS_CODE) ?? false;
+  const hasAnyMessaging = hasGroupMessaging || hasIndividualMessaging || hasFilters;
 
   const renderFeatureCard = (feature: Feature) => (
     <div key={feature.id} className="col-md-4 col-sm-6">
@@ -203,7 +222,17 @@ export const EditSchool = () => {
       alert('Please select a city');
       return;
     }
-    updateMutation.mutate(formData);
+    if (formData.selectedFeatures?.includes(FILTERS_CODE) && !formData.filtersVisibility) {
+      alert('Please choose when filter options should appear (before login, after login, or both).');
+      return;
+    }
+    const payload: UpdateSchoolDto = {
+      ...formData,
+      filtersVisibility: formData.selectedFeatures?.includes(FILTERS_CODE)
+        ? formData.filtersVisibility ?? 'BOTH'
+        : null,
+    };
+    updateMutation.mutate(payload);
   };
 
   const handleDelete = () => {
@@ -518,7 +547,43 @@ export const EditSchool = () => {
                                   student chats.
                                 </li>
                               ) : null}
+                              {hasFilters ? (
+                                <li>
+                                  <strong>Filters</strong> — Shows category and feed filter controls on web
+                                  and mobile based on the visibility option below.
+                                </li>
+                              ) : null}
                             </ul>
+                          </div>
+                        ) : null}
+                        {hasFilters ? (
+                          <div className="mt-3 pt-3 border-top">
+                            <p className="text-muted mb-2" style={{ fontSize: '0.875rem' }}>
+                              When should filter options appear?
+                            </p>
+                            <div className="d-flex flex-column gap-2">
+                              {FILTERS_VISIBILITY_OPTIONS.map((opt) => (
+                                <label
+                                  key={opt.value}
+                                  className="d-flex align-items-start gap-2 mb-0"
+                                  style={{ cursor: 'pointer', fontSize: '0.875rem' }}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="filtersVisibilityEdit"
+                                    className="form-check-input mt-1"
+                                    checked={formData.filtersVisibility === opt.value}
+                                    onChange={() =>
+                                      setFormData((prev) => ({
+                                        ...prev,
+                                        filtersVisibility: opt.value as FiltersVisibility,
+                                      }))
+                                    }
+                                  />
+                                  <span>{opt.label}</span>
+                                </label>
+                              ))}
+                            </div>
                           </div>
                         ) : null}
                         {formData.selectedFeatures?.length === 0 && (

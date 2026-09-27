@@ -65,6 +65,7 @@ export default defineConfig({
       '/user/event-comment': { target: 'http://localhost:3000', changeOrigin: true },
       '/events/categories': { target: 'http://localhost:3000', changeOrigin: true },
       '/events/approved': { target: 'http://localhost:3000', changeOrigin: true },
+      '/events/school-filter-settings': { target: 'http://localhost:3000', changeOrigin: true },
       '/events/blogs': { target: 'http://localhost:3000', changeOrigin: true },
       '/events/published-blogs': { target: 'http://localhost:3000', changeOrigin: true },
       '^/events/blog/': { target: 'http://localhost:3000', changeOrigin: true },

@@ -7,9 +7,13 @@ import { SuperAdminNavbar } from '../components/SuperAdminNavbar';
 import { SuperAdminSidebar } from '../components/SuperAdminSidebar';
 import { US_STATES, US_CITIES_BY_STATE } from '../data/countries-states';
 import {
+  FILTERS_CODE,
+  FILTERS_VISIBILITY_OPTIONS,
   GROUP_MESSAGING_CODE,
   INDIVIDUAL_MESSAGING_CODE,
   MESSAGING_FEATURE_CODES,
+  type MessagingFeatureCode,
+  type FiltersVisibility,
 } from '../constants/messagingFeatures';
 import type { Feature } from '../services/schools.service';
 
@@ -27,6 +31,7 @@ export const CreateSchool = () => {
     adminEmail: '',
     adsAdminEmail: '',
     tenure: undefined,
+    filtersVisibility: 'BOTH',
   });
   const [errorModal, setErrorModal] = useState<{ isOpen: boolean; message: string }>({
     isOpen: false,
@@ -89,12 +94,21 @@ export const CreateSchool = () => {
   });
 
   const handleFeatureToggle = (featureCode: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      selectedFeatures: prev.selectedFeatures.includes(featureCode)
+    setFormData((prev) => {
+      const removing = prev.selectedFeatures.includes(featureCode);
+      const selectedFeatures = removing
         ? prev.selectedFeatures.filter((f) => f !== featureCode)
-        : [...prev.selectedFeatures, featureCode],
-    }));
+        : [...prev.selectedFeatures, featureCode];
+      const next = { ...prev, selectedFeatures };
+      if (featureCode === FILTERS_CODE) {
+        if (removing) {
+          next.filtersVisibility = undefined;
+        } else if (!next.filtersVisibility) {
+          next.filtersVisibility = 'BOTH';
+        }
+      }
+      return next;
+    });
   };
 
   const platformFeatures =
@@ -102,13 +116,18 @@ export const CreateSchool = () => {
       (f) => !MESSAGING_FEATURE_CODES.includes(f.code as (typeof MESSAGING_FEATURE_CODES)[number]),
     ) ?? [];
   const messagingFeatures =
-    features?.filter((f) =>
-      MESSAGING_FEATURE_CODES.includes(f.code as (typeof MESSAGING_FEATURE_CODES)[number]),
-    ) ?? [];
+    features
+      ?.filter((f) => MESSAGING_FEATURE_CODES.includes(f.code as MessagingFeatureCode))
+      .sort(
+        (a, b) =>
+          MESSAGING_FEATURE_CODES.indexOf(a.code as MessagingFeatureCode) -
+          MESSAGING_FEATURE_CODES.indexOf(b.code as MessagingFeatureCode),
+      ) ?? [];
 
   const hasGroupMessaging = formData.selectedFeatures.includes(GROUP_MESSAGING_CODE);
   const hasIndividualMessaging = formData.selectedFeatures.includes(INDIVIDUAL_MESSAGING_CODE);
-  const hasAnyMessaging = hasGroupMessaging || hasIndividualMessaging;
+  const hasFilters = formData.selectedFeatures.includes(FILTERS_CODE);
+  const hasAnyMessaging = hasGroupMessaging || hasIndividualMessaging || hasFilters;
 
   const renderFeatureCard = (feature: Feature) => (
     <div key={feature.id} className="col-md-4 col-sm-6">
@@ -216,6 +235,13 @@ export const CreateSchool = () => {
       setErrorModal({ isOpen: true, message: 'Please enter Ads Admin email when Ads feature is selected.' });
       return;
     }
+    if (formData.selectedFeatures.includes(FILTERS_CODE) && !formData.filtersVisibility) {
+      setErrorModal({
+        isOpen: true,
+        message: 'Please choose when filter options should appear (before login, after login, or both).',
+      });
+      return;
+    }
     // Validate domain match
     if (!validateDomainMatch()) {
       const emailDomain = formData.adminEmail.split('@')[1] || 'invalid';
@@ -229,6 +255,9 @@ export const CreateSchool = () => {
     const payload: CreateSchoolDto = {
       ...formData,
       adsAdminEmail: formData.selectedFeatures.includes('ADS') ? (formData.adsAdminEmail?.trim() || undefined) : undefined,
+      filtersVisibility: formData.selectedFeatures.includes(FILTERS_CODE)
+        ? formData.filtersVisibility
+        : undefined,
     };
     createMutation.mutate(payload);
   };
@@ -763,7 +792,44 @@ export const CreateSchool = () => {
                             student chats.
                           </li>
                         ) : null}
+                        {hasFilters ? (
+                          <li>
+                            <strong>Filters</strong> — Shows category and feed filter controls on web and
+                            mobile based on the visibility option below.
+                          </li>
+                        ) : null}
                       </ul>
+                    </div>
+                  ) : null}
+
+                  {hasFilters ? (
+                    <div className="mt-3 pt-3 border-top">
+                      <p className="text-muted mb-2" style={{ fontSize: '0.875rem' }}>
+                        When should filter options appear?
+                      </p>
+                      <div className="d-flex flex-column gap-2">
+                        {FILTERS_VISIBILITY_OPTIONS.map((opt) => (
+                          <label
+                            key={opt.value}
+                            className="d-flex align-items-start gap-2 mb-0"
+                            style={{ cursor: 'pointer', fontSize: '0.875rem' }}
+                          >
+                            <input
+                              type="radio"
+                              name="filtersVisibility"
+                              className="form-check-input mt-1"
+                              checked={formData.filtersVisibility === opt.value}
+                              onChange={() =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  filtersVisibility: opt.value as FiltersVisibility,
+                                }))
+                              }
+                            />
+                            <span>{opt.label}</span>
+                          </label>
+                        ))}
+                      </div>
                     </div>
                   ) : null}
 

@@ -6,6 +6,12 @@ import { publicEventsService, type CategoryPublic } from '../services/public-eve
 import { schoolAdminPostsService } from '../services/school-admin-posts.service';
 import { PublishScheduleFields } from '../components/PublishScheduleFields';
 import { dateTimeLocalToIso, defaultFutureDateTimeLocal } from '../utils/eventPublishing';
+import {
+  EventPostDetailFields,
+  actionButtonsForApi,
+  validateActionButtons,
+} from '../components/EventPostDetailFields';
+import type { EventActionButton } from '../types/event-post';
 
 const MAX_IMAGES = 4;
 
@@ -14,6 +20,13 @@ export const SchoolAdminCreatePost = () => {
   const [categories, setCategories] = useState<CategoryPublic[]>([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [externalLink, setExternalLink] = useState('');
+  const [eventDate, setEventDate] = useState('');
+  const [eventStartTime, setEventStartTime] = useState('');
+  const [eventEndTime, setEventEndTime] = useState('');
+  const [eventLocation, setEventLocation] = useState('');
+  const [actionButtons, setActionButtons] = useState<EventActionButton[]>([]);
+  const [commentsEnabled, setCommentsEnabled] = useState(false);
   const [categoryId, setCategoryId] = useState('');
   const [subCategoryId, setSubCategoryId] = useState('');
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -57,9 +70,29 @@ export const SchoolAdminCreatePost = () => {
     }
   };
 
+  const resetForm = () => {
+    setTitle('');
+    setDescription('');
+    setExternalLink('');
+    setEventDate('');
+    setEventStartTime('');
+    setEventEndTime('');
+    setEventLocation('');
+    setActionButtons([]);
+    setCommentsEnabled(false);
+    setImageUrls([]);
+    setPublishMode('now');
+    setScheduledAt(defaultFutureDateTimeLocal());
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !categoryId || !subCategoryId) return;
+    const actionBtnError = validateActionButtons(actionButtons);
+    if (actionBtnError) {
+      setError(actionBtnError);
+      return;
+    }
     setPosting(true);
     setError(null);
     setSuccess(null);
@@ -67,6 +100,13 @@ export const SchoolAdminCreatePost = () => {
       const created = await schoolAdminPostsService.createPost({
         title: title.trim(),
         description: description.trim() || undefined,
+        externalLink: externalLink.trim() || undefined,
+        eventDate: eventDate.trim() || undefined,
+        eventStartTime: eventStartTime.trim() || undefined,
+        eventEndTime: eventEndTime.trim() || undefined,
+        eventLocation: eventLocation.trim() || undefined,
+        actionButtons: actionButtonsForApi(actionButtons),
+        commentsEnabled,
         categoryId,
         subCategoryId,
         imageUrls: imageUrls.length ? imageUrls : undefined,
@@ -80,11 +120,7 @@ export const SchoolAdminCreatePost = () => {
           ? 'Post scheduled successfully. It will publish automatically at the selected time.'
           : 'Post published successfully.',
       );
-      setTitle('');
-      setDescription('');
-      setImageUrls([]);
-      setPublishMode('now');
-      setScheduledAt(defaultFutureDateTimeLocal());
+      resetForm();
     } catch (err) {
       const msg =
         err && typeof err === 'object' && 'response' in err
@@ -155,6 +191,34 @@ export const SchoolAdminCreatePost = () => {
                     <textarea className="form-control" rows={4} value={description} onChange={(e) => setDescription(e.target.value)} />
                   </div>
                   <div className="col-12">
+                    <label className="form-label">External link (optional)</label>
+                    <input
+                      type="url"
+                      className="form-control"
+                      placeholder="https://"
+                      value={externalLink}
+                      onChange={(e) => setExternalLink(e.target.value)}
+                    />
+                  </div>
+
+                  <EventPostDetailFields
+                    details={{
+                      eventDate,
+                      eventStartTime,
+                      eventEndTime,
+                      eventLocation,
+                    }}
+                    onDetailsChange={(patch) => {
+                      if (patch.eventDate !== undefined) setEventDate(patch.eventDate);
+                      if (patch.eventStartTime !== undefined) setEventStartTime(patch.eventStartTime);
+                      if (patch.eventEndTime !== undefined) setEventEndTime(patch.eventEndTime);
+                      if (patch.eventLocation !== undefined) setEventLocation(patch.eventLocation);
+                    }}
+                    actionButtons={actionButtons}
+                    onActionButtonsChange={setActionButtons}
+                  />
+
+                  <div className="col-12">
                     <label className="form-label">Images (optional, up to {MAX_IMAGES})</label>
                     <input type="file" accept="image/*" multiple onChange={handleImageUpload} disabled={uploadingImage || imageUrls.length >= MAX_IMAGES} />
                     {imageUrls.length > 0 && (
@@ -169,6 +233,20 @@ export const SchoolAdminCreatePost = () => {
                       onScheduledAtChange={setScheduledAt}
                       helperText="No approval is required. Scheduled posts enter the queue and publish automatically."
                     />
+                  </div>
+                  <div className="col-12">
+                    <div className="form-check form-switch">
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        id="schoolAdminCommentsEnabled"
+                        checked={commentsEnabled}
+                        onChange={(e) => setCommentsEnabled(e.target.checked)}
+                      />
+                      <label className="form-check-label" htmlFor="schoolAdminCommentsEnabled">
+                        Allow users to comment
+                      </label>
+                    </div>
                   </div>
                   <div className="col-12">
                     <button type="submit" className="btn btn-dark" disabled={posting}>

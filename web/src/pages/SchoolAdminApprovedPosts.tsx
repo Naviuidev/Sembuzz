@@ -5,6 +5,16 @@ import {
   schoolAdminPostsService,
   type SchoolAdminPost,
 } from '../services/school-admin-posts.service';
+import { EventPostReviewSummary } from '../components/EventPostReviewSummary';
+import {
+  EventPostDetailFields,
+  actionButtonsForApi,
+  eventDateToInputValue,
+  eventTimeToInputValue,
+  parseStoredActionButtons,
+  validateActionButtons,
+} from '../components/EventPostDetailFields';
+import type { EventActionButton } from '../types/event-post';
 
 function formatDate(iso: string) {
   try {
@@ -40,12 +50,28 @@ export const SchoolAdminApprovedPosts = () => {
   const [error, setError] = useState<string | null>(null);
   const [viewPost, setViewPost] = useState<SchoolAdminPost | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [editActionButtons, setEditActionButtons] = useState<EventActionButton[]>([]);
   const [editForm, setEditForm] = useState<{
     title: string;
     description: string;
     externalLink: string;
+    eventDate: string;
+    eventStartTime: string;
+    eventEndTime: string;
+    eventLocation: string;
+    commentsEnabled: boolean;
     imageUrls: string[];
-  }>({ title: '', description: '', externalLink: '', imageUrls: [] });
+  }>({
+    title: '',
+    description: '',
+    externalLink: '',
+    eventDate: '',
+    eventStartTime: '',
+    eventEndTime: '',
+    eventLocation: '',
+    commentsEnabled: false,
+    imageUrls: [],
+  });
   const [saving, setSaving] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -84,8 +110,14 @@ export const SchoolAdminApprovedPosts = () => {
       title: post.title,
       description: post.description ?? '',
       externalLink: post.externalLink ?? '',
+      eventDate: eventDateToInputValue(post.eventDate ?? null),
+      eventStartTime: eventTimeToInputValue(post.eventStartTime ?? null),
+      eventEndTime: eventTimeToInputValue(post.eventEndTime ?? null),
+      eventLocation: post.eventLocation?.trim() ?? '',
+      commentsEnabled: post.commentsEnabled ?? false,
       imageUrls: parseImageUrls(post.imageUrls),
     });
+    setEditActionButtons(parseStoredActionButtons(post.actionButtons));
   };
 
   const handleEditClick = () => setIsEditing(true);
@@ -94,6 +126,11 @@ export const SchoolAdminApprovedPosts = () => {
 
   const handleEditSave = async () => {
     if (!viewPost) return;
+    const actionBtnError = validateActionButtons(editActionButtons);
+    if (actionBtnError) {
+      setError(actionBtnError);
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -102,6 +139,12 @@ export const SchoolAdminApprovedPosts = () => {
         title: editForm.title.trim() || undefined,
         description: editForm.description.trim() || undefined,
         externalLink: editForm.externalLink.trim() || undefined,
+        eventDate: editForm.eventDate.trim() || '',
+        eventStartTime: editForm.eventStartTime.trim() || '',
+        eventEndTime: editForm.eventEndTime.trim() || '',
+        eventLocation: editForm.eventLocation.trim() || '',
+        actionButtons: actionButtonsForApi(editActionButtons),
+        commentsEnabled: editForm.commentsEnabled,
         imageUrls: imageUrlsFiltered.length > 0 ? imageUrlsFiltered : [],
       });
       setPosts((prev) => prev.map((p) => (p.id === viewPost.id ? updated : p)));
@@ -323,6 +366,31 @@ export const SchoolAdminApprovedPosts = () => {
                       style={{ borderRadius: '0px' }}
                     />
                   </div>
+                  <EventPostDetailFields
+                    details={{
+                      eventDate: editForm.eventDate,
+                      eventStartTime: editForm.eventStartTime,
+                      eventEndTime: editForm.eventEndTime,
+                      eventLocation: editForm.eventLocation,
+                    }}
+                    onDetailsChange={(patch) => setEditForm((f) => ({ ...f, ...patch }))}
+                    actionButtons={editActionButtons}
+                    onActionButtonsChange={setEditActionButtons}
+                  />
+                  <div className="mb-3">
+                    <div className="form-check form-switch">
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        id="editCommentsEnabled"
+                        checked={editForm.commentsEnabled}
+                        onChange={(e) => setEditForm((f) => ({ ...f, commentsEnabled: e.target.checked }))}
+                      />
+                      <label className="form-check-label" htmlFor="editCommentsEnabled">
+                        Allow users to comment
+                      </label>
+                    </div>
+                  </div>
                   <div className="mb-3">
                     <label className="form-label small fw-500" style={{ color: '#1a1f2e' }}>
                       Images
@@ -424,11 +492,15 @@ export const SchoolAdminApprovedPosts = () => {
                   <p className="text-muted small mb-2">
                     {viewPost.subCategory?.category?.name} / {viewPost.subCategory?.name}
                   </p>
+                  <EventPostReviewSummary event={viewPost} className="mb-3" />
                   {viewPost.description && (
                     <p className="mb-3" style={{ whiteSpace: 'pre-wrap', color: '#6c757d' }}>
                       {viewPost.description}
                     </p>
                   )}
+                  <p className="mb-2 small">
+                    <strong>Comments:</strong> {viewPost.commentsEnabled ? 'Enabled' : 'Disabled'}
+                  </p>
                   {parseImageUrls(viewPost.imageUrls).length > 0 && (
                     <div className="mb-3">
                       <div className="d-flex flex-wrap gap-2">
@@ -443,13 +515,6 @@ export const SchoolAdminApprovedPosts = () => {
                         ))}
                       </div>
                     </div>
-                  )}
-                  {viewPost.externalLink && (
-                    <p className="mb-2">
-                      <a href={viewPost.externalLink} target="_blank" rel="noopener noreferrer">
-                        External link
-                      </a>
-                    </p>
                   )}
                   <p className="text-muted small mb-3">
                     Posted by {viewPost.subCategoryAdmin?.name ?? viewPost.subCategoryAdmin?.email} ·{' '}
