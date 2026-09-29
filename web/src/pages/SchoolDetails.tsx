@@ -13,7 +13,7 @@ import {
 } from '../constants/messagingFeatures';
 import { getApiErrorMessage } from '../utils/apiError';
 
-export const SchoolDetails = () => {
+export const SchoolDetails = () => { 
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
