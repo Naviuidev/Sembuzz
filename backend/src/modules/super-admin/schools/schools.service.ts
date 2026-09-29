@@ -599,21 +599,17 @@ export class SchoolsService {
       }
     }
 
+    let resolvedFiltersVisibility = filtersVisibility;
     if (selectedFeatures !== undefined) {
       const willHaveFilters = selectedFeatures.includes('FILTERS');
-      if (willHaveFilters && filtersVisibility === undefined) {
+      if (!willHaveFilters) {
+        resolvedFiltersVisibility = null;
+      } else if (resolvedFiltersVisibility === undefined) {
         const existing = await this.prisma.school.findUnique({
           where: { id },
           select: { filtersVisibility: true },
         });
-        if (!existing?.filtersVisibility) {
-          throw new BadRequestException(
-            'Filters visibility is required when enabling the Filters feature.',
-          );
-        }
-      }
-      if (!willHaveFilters && filtersVisibility === undefined) {
-        // filtersVisibility cleared in transaction when FILTERS disabled
+        resolvedFiltersVisibility = existing?.filtersVisibility ?? 'BOTH';
       }
     }
 
@@ -626,7 +622,9 @@ export class SchoolsService {
       if (city !== undefined) schoolUpdateData.city = city;
       if (tenure !== undefined) schoolUpdateData.tenure = tenure;
       if (isActive !== undefined) schoolUpdateData.isActive = isActive;
-      if (filtersVisibility !== undefined) schoolUpdateData.filtersVisibility = filtersVisibility;
+      if (resolvedFiltersVisibility !== undefined) {
+        schoolUpdateData.filtersVisibility = resolvedFiltersVisibility;
+      }
 
       if (Object.keys(schoolUpdateData).length > 0) {
         await tx.school.update({
@@ -662,7 +660,11 @@ export class SchoolsService {
         // Process each requested feature - enable it
         for (const featureCode of selectedFeatures) {
           const feature = featureMap.get(featureCode);
-          if (!feature) continue;
+          if (!feature) {
+            throw new BadRequestException(
+              `Feature "${featureCode}" is not available. Run database migrations and feature seed on the server.`,
+            );
+          }
 
           const existingFeature = currentSchoolFeatures.find(
             (sf) => sf.feature.code === featureCode
@@ -713,21 +715,11 @@ export class SchoolsService {
             where: { id },
             data: { filtersVisibility: null },
           });
-        } else if (filtersVisibility !== undefined) {
+        } else if (resolvedFiltersVisibility) {
           await tx.school.update({
             where: { id },
-            data: { filtersVisibility },
+            data: { filtersVisibility: resolvedFiltersVisibility },
           });
-        } else if (selectedFeatures.includes('FILTERS')) {
-          const current = await tx.school.findUnique({
-            where: { id },
-            select: { filtersVisibility: true },
-          });
-          if (!current?.filtersVisibility) {
-            throw new BadRequestException(
-              'Filters visibility is required when the Filters feature is selected.',
-            );
-          }
         }
 
         // Send email notification if features were changed

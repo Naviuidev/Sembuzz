@@ -6,6 +6,12 @@ import type { UpdateSchoolDto } from '../services/schools.service';
 import { SuperAdminNavbar } from '../components/SuperAdminNavbar';
 import { SuperAdminSidebar } from '../components/SuperAdminSidebar';
 import { StatusPopup } from '../components/StatusPopup';
+import {
+  FILTERS_CODE,
+  FILTERS_VISIBILITY_OPTIONS,
+  type FiltersVisibility,
+} from '../constants/messagingFeatures';
+import { getApiErrorMessage } from '../utils/apiError';
 
 export const SchoolDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -62,10 +68,10 @@ export const SchoolDetails = () => {
       
       // The useEffect will automatically update selectedFeatures when school data changes
     },
-    onError: () => {
+    onError: (error) => {
       setPopupShow(true);
       setPopupType('error');
-      setPopupMessage('Failed to update features. Please try again.');
+      setPopupMessage(getApiErrorMessage(error, 'Failed to update features. Please try again.'));
     },
   });
 
@@ -92,6 +98,7 @@ export const SchoolDetails = () => {
   });
 
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
+  const [filtersVisibility, setFiltersVisibility] = useState<FiltersVisibility | null>(null);
   const [currentStatus, setCurrentStatus] = useState<boolean>(true);
   const [statusChanged, setStatusChanged] = useState<boolean>(false);
   const [popupShow, setPopupShow] = useState<boolean>(false);
@@ -104,6 +111,7 @@ export const SchoolDetails = () => {
       const features = school.enabledFeatures.map((f) => f.code);
       setSelectedFeatures(features);
       setOriginalFeatures(features);
+      setFiltersVisibility(school.filtersVisibility ?? null);
       setFeaturesChanged(false);
       setCurrentStatus(school.isActive);
       setStatusChanged(false);
@@ -127,17 +135,36 @@ export const SchoolDetails = () => {
   }, [selectedFeatures, originalFeatures, school]);
 
   const handleFeatureToggle = (featureCode: string) => {
-    console.log('[SchoolDetails] Toggling feature:', featureCode);
-    console.log('[SchoolDetails] Current selectedFeatures:', selectedFeatures);
-    const newFeatures = selectedFeatures.includes(featureCode)
+    const removing = selectedFeatures.includes(featureCode);
+    const newFeatures = removing
       ? selectedFeatures.filter((f) => f !== featureCode)
       : [...selectedFeatures, featureCode];
-    console.log('[SchoolDetails] New selectedFeatures:', newFeatures);
     setSelectedFeatures(newFeatures);
+    if (featureCode === FILTERS_CODE) {
+      if (removing) {
+        setFiltersVisibility(null);
+      } else if (!filtersVisibility) {
+        setFiltersVisibility('BOTH');
+      }
+    }
   };
 
+  const hasFiltersSelected = selectedFeatures.includes(FILTERS_CODE);
+
   const handleUpdateFeatures = () => {
-    updateFeaturesMutation.mutate({ selectedFeatures });
+    if (hasFiltersSelected && !filtersVisibility) {
+      setPopupShow(true);
+      setPopupType('error');
+      setPopupMessage(
+        'Please choose when filter options should appear (before login, after login, or both).',
+      );
+      return;
+    }
+    const payload: UpdateSchoolDto = {
+      selectedFeatures,
+      filtersVisibility: hasFiltersSelected ? filtersVisibility ?? 'BOTH' : null,
+    };
+    updateFeaturesMutation.mutate(payload);
   };
 
   const handleStatusToggle = () => {
@@ -356,6 +383,30 @@ export const SchoolDetails = () => {
                   </div>
                 )}
               </div>
+              {hasFiltersSelected ? (
+                <div className="mb-4 p-3" style={{ border: '1px solid #dee2e6', borderRadius: 0 }}>
+                  <p className="small text-muted mb-2 mb-md-3">
+                    When should calendar / filter options appear on the public feed?
+                  </p>
+                  <div className="d-flex flex-column gap-2">
+                    {FILTERS_VISIBILITY_OPTIONS.map((opt) => (
+                      <label
+                        key={opt.value}
+                        className="d-flex align-items-center gap-2 mb-0"
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <input
+                          type="radio"
+                          name="filtersVisibilitySchoolDetails"
+                          checked={filtersVisibility === opt.value}
+                          onChange={() => setFiltersVisibility(opt.value)}
+                        />
+                        <span style={{ fontSize: '0.9rem', color: '#1a1f2e' }}>{opt.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               {featuresChanged && (
                 <div className="d-flex justify-content-end mt-4">
                   <button
