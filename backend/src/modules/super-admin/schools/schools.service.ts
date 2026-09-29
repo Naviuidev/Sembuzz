@@ -648,7 +648,27 @@ export class SchoolsService {
       }
     }
 
-    await this.prisma.$transaction(async (tx) => {
+    let featureMap: Map<string, { id: string; code: string; name: string }> | null = null;
+    if (selectedFeatures !== undefined) {
+      const allFeatures = await this.prisma.feature.findMany();
+      featureMap = new Map(allFeatures.map((f) => [f.code, f]));
+      for (const featureCode of selectedFeatures) {
+        if (!featureMap.has(featureCode)) {
+          throw new BadRequestException(
+            `Feature "${featureCode}" is not available. Run database migrations and feature seed on the server.`,
+          );
+        }
+      }
+    }
+
+    type FeatureChangeEmail = {
+      addedFeatureNames: string[];
+      removedFeatureNames: string[];
+    };
+    let featureChangeEmail: FeatureChangeEmail | null = null;
+
+    await this.prisma.$transaction(
+      async (tx) => {
       // Update school basic information
       const schoolUpdateData: any = {};
       if (schoolName !== undefined) schoolUpdateData.name = schoolName;
@@ -669,13 +689,7 @@ export class SchoolsService {
       }
 
       // Update features if provided
-      if (selectedFeatures) {
-        // Get all features
-        const allFeatures = await tx.feature.findMany();
-        const featureMap = new Map<string, { id: string; code: string; name: string }>(
-          allFeatures.map((f) => [f.code, f])
-        );
-
+      if (selectedFeatures !== undefined && featureMap) {
         // Get current school features to track changes (tx client types may not infer include; assert result shape)
         type SchoolFeatureWithFeature = { featureId: string; isEnabled: boolean; feature: { code: string; name: string } };
         const currentSchoolFeatures = (await (tx as any).schoolFeature.findMany({
@@ -694,12 +708,7 @@ export class SchoolsService {
 
         // Process each requested feature - enable it
         for (const featureCode of selectedFeatures) {
-          const feature = featureMap.get(featureCode);
-          if (!feature) {
-            throw new BadRequestException(
-              `Feature "${featureCode}" is not available. Run database migrations and feature seed on the server.`,
-            );
-          }
+          const feature = featureMap.get(featureCode)!;
 
           const existingFeature = currentSchoolFeatures.find(
             (sf) => sf.feature.code === featureCode
@@ -757,26 +766,8 @@ export class SchoolsService {
           });
         }
 
-        // Send email notification if features were changed
         if (addedFeatureNames.length > 0 || removedFeatureNames.length > 0) {
-          const admin = await (tx as any).schoolAdmin.findFirst({
-            where: { schoolId: id },
-          });
-
-          if (admin) {
-            // Send email asynchronously (don't wait for it)
-            this.emailService
-              .sendFeatureUpdateEmail(
-                admin.email,
-                school.name,
-                school.refNum,
-                addedFeatureNames,
-                removedFeatureNames,
-              )
-              .catch((error) => {
-                console.error('[SchoolsService] Failed to send feature update email:', error);
-              });
-          }
+          featureChangeEmail = { addedFeatureNames, removedFeatureNames };
         }
       }
 
@@ -814,7 +805,29 @@ export class SchoolsService {
           // await this.sendPasswordResetEmail(admin, tempPassword);
         }
       }
-    });
+    },
+      { maxWait: 10_000, timeout: 60_000 },
+    );
+
+    if (featureChangeEmail) {
+      const admin = await this.prisma.schoolAdmin.findFirst({
+        where: { schoolId: id },
+      });
+      if (admin) {
+        const { addedFeatureNames, removedFeatureNames } = featureChangeEmail;
+        this.emailService
+          .sendFeatureUpdateEmail(
+            admin.email,
+            school.name,
+            school.refNum,
+            addedFeatureNames,
+            removedFeatureNames,
+          )
+          .catch((error) => {
+            console.error('[SchoolsService] Failed to send feature update email:', error);
+          });
+      }
+    }
 
     // Return updated school data after transaction completes
     return this.findOne(id);
