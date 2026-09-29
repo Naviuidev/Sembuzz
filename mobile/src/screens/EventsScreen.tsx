@@ -1592,7 +1592,7 @@ export default function EventsScreen() {
         </ScrollView>
       ) : null}
 
-      {CALENDAR_FILTER_ENABLED && selectedUpcomingPost ? (
+      {selectedUpcomingPost ? (
         <ScrollView style={styles.upcomingDetailScroll} contentContainerStyle={styles.upcomingDetailContent}>
           <View style={styles.upcomingDetailHeader}>
             <View style={styles.upcomingDetailSchoolRow}>
@@ -1633,7 +1633,7 @@ export default function EventsScreen() {
             <Text style={styles.addToCalBtnText}>Add to Google Calendar</Text>
           </TouchableOpacity>
         </ScrollView>
-      ) : CALENDAR_FILTER_ENABLED && upcomingDateFilter ? (
+      ) : upcomingDateFilter ? (
         calendarHasPosted ? (
           <View style={styles.calendarPostedHost}>
             <View style={styles.calendarPostedHeaderWrap}>
@@ -1715,7 +1715,7 @@ export default function EventsScreen() {
         </View>
       ) : null}
 
-      {!(CALENDAR_FILTER_ENABLED && upcomingDateFilter) && !selectedUpcomingPost && (loading ? (
+      {!upcomingDateFilter && !selectedUpcomingPost && (loading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#1a1f2e" />
         </View>
@@ -1787,7 +1787,7 @@ export default function EventsScreen() {
         </View>
       ))}
 
-      {CALENDAR_FILTER_ENABLED && calendarExtrasModalVisible ? (
+      {calendarExtrasModalVisible ? (
         <Modal
           visible
           animationType="slide"
