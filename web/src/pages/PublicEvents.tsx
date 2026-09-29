@@ -3724,46 +3724,38 @@ export const PublicEvents = () => {
               )}
             </div>
             {showSchoolFilterUi && (
-            <div className="d-flex align-items-center gap-2 small flex-shrink-0 position-relative">
-              <button
-                type="button"
-                className="btn border-0 py-1 px-2 rounded d-flex align-items-center"
-                style={{
-                  backgroundColor:
-                    filterDropdownOpen ||
-                    calendarFilterOpen ||
-                    feedSort !== 'latest' ||
-                    (!user && !!schoolId) ||
-                    !!upcomingDateFilter ||
-                    !!loggedInFeedDateFilter ||
-                    !!loggedInFeedPostTypeFilter
-                      ? 'rgba(13, 202, 240, 0.15)'
-                      : 'transparent',
-                  color:
-                    filterDropdownOpen ||
-                    calendarFilterOpen ||
-                    (!user && !!schoolId) ||
-                    !!upcomingDateFilter ||
-                    !!loggedInFeedDateFilter ||
-                    !!loggedInFeedPostTypeFilter
-                      ? '#087990'
-                      : '#6c757d',
-                }}
-                onClick={() => {
-                  if (!user) {
-                    openCalendarFilter();
-                    return;
-                  }
-                  setFilterDropdownOpen((o) => !o);
-                }}
-                title={user ? 'Calendar filter and sort' : 'Filter news by date'}
-                aria-label={user ? 'Calendar filter and sort' : 'Calendar'}
-                aria-expanded={user ? filterDropdownOpen : calendarFilterOpen}
-              >
-                <i className="bi bi-calendar3" style={{ fontSize: '1.1rem' }} />
-              </button>
-              {user && filterDropdownOpen && (
-                <>
+            <div className="d-flex align-items-center gap-1 small flex-shrink-0">
+              <div className="position-relative flex-shrink-0">
+                <button
+                  type="button"
+                  className="btn border-0 py-1 px-2 rounded d-flex align-items-center"
+                  style={{
+                    backgroundColor:
+                      filterDropdownOpen ||
+                      feedSort !== 'latest' ||
+                      (!user && !!schoolId) ||
+                      !!loggedInFeedDateFilter ||
+                      !!loggedInFeedPostTypeFilter ||
+                      !!(user && showAllSchoolsFeed && allSchoolsFilterSchoolId)
+                        ? 'rgba(13, 202, 240, 0.15)'
+                        : 'transparent',
+                    color:
+                      filterDropdownOpen ||
+                      (!user && !!schoolId) ||
+                      !!loggedInFeedDateFilter ||
+                      !!loggedInFeedPostTypeFilter ||
+                      !!(user && showAllSchoolsFeed && allSchoolsFilterSchoolId)
+                        ? '#087990'
+                        : '#6c757d',
+                  }}
+                  onClick={() => setFilterDropdownOpen((o) => !o)}
+                  title="Filter and sort"
+                  aria-label="Filter"
+                  aria-expanded={filterDropdownOpen}
+                >
+                  <i className="bi bi-funnel" style={{ fontSize: '1.1rem' }} />
+                </button>
+                {filterDropdownOpen && (
                   <div
                     ref={calendarDropdownRef}
                     className="shadow-sm border bg-white rounded py-2"
@@ -3789,31 +3781,36 @@ export const PublicEvents = () => {
                         <i className="bi bi-x-lg" style={{ fontSize: '1rem' }} />
                       </button>
                     </div>
-                    <div className="px-3 py-1 small text-muted">Sort</div>
-                    <div className="px-3 pt-1 pb-2 d-flex align-items-center gap-2">
-                      <button
-                        type="button"
-                        className={`btn btn-sm rounded-pill ${feedSort === 'latest' ? 'btn-dark' : 'btn-outline-dark'}`}
-                        onClick={() => {
-                          setFeedSort('latest');
-                          setFilterDropdownOpen(false);
-                        }}
-                      >
-                        Latest
-                      </button>
-                      <button
-                        type="button"
-                        className={`btn btn-sm rounded-pill ${feedSort === 'popular' ? 'btn-dark' : 'btn-outline-dark'}`}
-                        onClick={() => {
-                          setFeedSort('popular');
-                          setFilterDropdownOpen(false);
-                        }}
-                      >
-                        Popular
-                      </button>
-                    </div>
-                    <div className="px-3 py-1 small text-muted border-top mt-1 pt-2">View by post type</div>
+                    {!(user && showAllSchoolsFeed) ? (
+                      <>
+                        <div className="px-3 py-1 small text-muted">Sort</div>
+                        <div className="px-3 pt-1 pb-2 d-flex align-items-center gap-2">
+                          <button
+                            type="button"
+                            className={`btn btn-sm rounded-pill ${feedSort === 'latest' ? 'btn-dark' : 'btn-outline-dark'}`}
+                            onClick={() => {
+                              setFeedSort('latest');
+                              setFilterDropdownOpen(false);
+                            }}
+                          >
+                            Latest
+                          </button>
+                          <button
+                            type="button"
+                            className={`btn btn-sm rounded-pill ${feedSort === 'popular' ? 'btn-dark' : 'btn-outline-dark'}`}
+                            onClick={() => {
+                              setFeedSort('popular');
+                              setFilterDropdownOpen(false);
+                            }}
+                          >
+                            Popular
+                          </button>
+                        </div>
+                      </>
+                    ) : null}
                     {user ? (
+                      <>
+                    <div className="px-3 py-1 small text-muted border-top mt-1 pt-2">View by post type</div>
                       <div className="px-3 pt-1 pb-2">
                         <div className="d-flex flex-column gap-2 mb-2">
                           <button
@@ -3890,10 +3887,28 @@ export const PublicEvents = () => {
                           </p>
                         )}
                       </div>
+                      </>
                     ) : null}
                   </div>
-                </>
-              )}
+                )}
+              </div>
+              <button
+                type="button"
+                className="btn border-0 py-1 px-2 rounded d-flex align-items-center flex-shrink-0"
+                style={{
+                  backgroundColor:
+                    calendarFilterOpen || !!upcomingDateFilter
+                      ? 'rgba(13, 202, 240, 0.15)'
+                      : 'transparent',
+                  color: calendarFilterOpen || !!upcomingDateFilter ? '#087990' : '#6c757d',
+                }}
+                onClick={openCalendarFilter}
+                title="Filter news by date"
+                aria-label="Calendar"
+                aria-expanded={calendarFilterOpen}
+              >
+                <i className="bi bi-calendar3" style={{ fontSize: '1.1rem' }} />
+              </button>
             </div>
             )}
           </div>

@@ -84,9 +84,6 @@ function formatUpcomingHeader(dateYmd: string): string {
   });
 }
 
-/** Calendar filter (icon + funnel). Hidden on mobile for now; set true to re-enable. */
-const CALENDAR_FILTER_ENABLED = false;
-
 export default function EventsScreen() {
   const navigation = useNavigation();
   const route = useRoute<EventsRoute>();
@@ -1217,23 +1214,7 @@ export default function EventsScreen() {
           )}
         </ScrollView>
         {showSchoolFilterUi ? (
-          <>
-            {!user && CALENDAR_FILTER_ENABLED ? (
-              <TouchableOpacity
-                style={[
-                  styles.calendarIconOnlyBtn,
-                  (showCalendarModal || upcomingDateFilter) && styles.calendarIconBtnActive,
-                ]}
-                onPress={openCalendarFilter}
-                accessibilityLabel="Upcoming news by date"
-              >
-                <Ionicons
-                  name="calendar-outline"
-                  size={20}
-                  color={upcomingDateFilter ? '#087990' : '#6c757d'}
-                />
-              </TouchableOpacity>
-            ) : null}
+          <View style={styles.homeFilterActions}>
             <View style={styles.filterFunnelWrap}>
             <TouchableOpacity
               style={[
@@ -1430,24 +1411,26 @@ export default function EventsScreen() {
                       <Text style={styles.sortDropdownHint}>Choose a post type, then pick a date.</Text>
                     )}
                   </>
-                ) : !user && showSchoolFilterUi ? (
-                  <>
-                    <Text style={[styles.sortDropdownSubLabel, styles.sortDropdownSchoolLabel]}>View by date</Text>
-                    <TouchableOpacity
-                      style={styles.guestSchoolFilterBtn}
-                      onPress={openCalendarFilter}
-                      activeOpacity={0.85}
-                    >
-                      <Ionicons name="calendar-outline" size={16} color="#1a1f2e" />
-                      <Text style={styles.guestSchoolFilterBtnText}>Calendar</Text>
-                    </TouchableOpacity>
-                  </>
                 ) : null}
               </View>
               </ScrollView>
             ) : null}
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.homeFilterBtn,
+                (showCalendarModal || !!upcomingDateFilter) && styles.homeFilterBtnActive,
+              ]}
+              onPress={openCalendarFilter}
+              accessibilityLabel="Upcoming news by date"
+            >
+              <Ionicons
+                name="calendar-outline"
+                size={22}
+                color={showCalendarModal || upcomingDateFilter ? '#087990' : '#6c757d'}
+              />
+            </TouchableOpacity>
           </View>
-          </>
         ) : null}
     </View>
   );
@@ -1886,7 +1869,7 @@ export default function EventsScreen() {
         </Modal>
       ) : null}
 
-      {CALENDAR_FILTER_ENABLED && showCalendarModal ? (
+      {showCalendarModal ? (
         <Modal
           visible
           transparent
@@ -2307,6 +2290,11 @@ const styles = StyleSheet.create({
     paddingRight: 8,
     paddingLeft: 4,
     zIndex: 20,
+  },
+  homeFilterActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 0,
   },
   filterFunnelWrap: {
     position: 'relative',
