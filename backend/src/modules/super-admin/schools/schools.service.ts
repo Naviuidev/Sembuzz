@@ -8,6 +8,11 @@ import { PlatformUserService } from '../../platform-user/platform-user.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
+function isFiltersSchemaDbError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /filtersVisibility|Unknown column 'filtersVisibility'/i.test(message);
+}
+
 @Injectable()
 export class SchoolsService {
   constructor(
@@ -557,6 +562,11 @@ export class SchoolsService {
       };
     } catch (err) {
       if (err instanceof NotFoundException) throw err;
+      if (isFiltersSchemaDbError(err)) {
+        throw new BadRequestException(
+          'Database is missing the Filters column. Run: npx prisma migrate deploy (in backend), then restart the API.',
+        );
+      }
       const message = err instanceof Error ? err.message : String(err);
       console.error('[SuperAdmin Schools] findOne error:', message, err);
       throw new HttpException(
@@ -567,6 +577,31 @@ export class SchoolsService {
   }
 
   async update(id: string, updateSchoolDto: UpdateSchoolDto) {
+    try {
+      return await this.updateSchool(id, updateSchoolDto);
+    } catch (err) {
+      if (
+        err instanceof NotFoundException ||
+        err instanceof BadRequestException ||
+        err instanceof HttpException
+      ) {
+        throw err;
+      }
+      if (isFiltersSchemaDbError(err)) {
+        throw new BadRequestException(
+          'Database is missing the Filters column. Run: npx prisma migrate deploy (in backend), then restart the API.',
+        );
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[SuperAdmin Schools] update error:', message, err);
+      throw new HttpException(
+        { statusCode: 500, message: 'Failed to update school', error: message },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  private async updateSchool(id: string, updateSchoolDto: UpdateSchoolDto) {
     const school = await this.prisma.school.findUnique({
       where: { id },
     });
