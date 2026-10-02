@@ -11,7 +11,13 @@ const TEXT_DARK = '#1a1f2e';
 
 export type { AdminActionItem, AdminActionItemsResponse, AdminActionItemsRole } from '../services/admin-action-items.service';
 
-export function AdminActionNotificationsBell({ role }: { role: AdminActionItemsRole }) {
+export function AdminActionNotificationsBell({
+  role,
+  tone = 'dark',
+}: {
+  role: AdminActionItemsRole;
+  tone?: 'dark' | 'light';
+}) {
   const [open, setOpen] = useState(false);
   const [justCleared, setJustCleared] = useState(false);
   const [justResolved, setJustResolved] = useState(false);
@@ -66,22 +72,28 @@ export function AdminActionNotificationsBell({ role }: { role: AdminActionItemsR
     <div className="position-relative" ref={rootRef}>
       <button
         type="button"
-        className="btn d-flex align-items-center justify-content-center position-relative"
+        className={`btn d-flex align-items-center justify-content-center position-relative${
+          tone === 'light' ? ' admin-nav-bell' : ''
+        }`}
         aria-label={total > 0 ? `${total} pending actions` : 'No pending actions'}
         title="Pending actions"
         onClick={() => {
           setOpen((v) => !v);
           void refetch();
         }}
-        style={{
-          width: 42,
-          height: 42,
-          borderRadius: '50%',
-          backgroundColor: 'white',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
-          color: TEXT_DARK,
-          marginRight: '0.75rem',
-        }}
+        style={
+          tone === 'light'
+            ? undefined
+            : {
+                width: 42,
+                height: 42,
+                borderRadius: '50%',
+                backgroundColor: 'white',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                color: TEXT_DARK,
+                marginRight: '0.75rem',
+              }
+        }
       >
         <i className="bi bi-bell" style={{ fontSize: '1.1rem' }} aria-hidden />
         {total > 0 ? (

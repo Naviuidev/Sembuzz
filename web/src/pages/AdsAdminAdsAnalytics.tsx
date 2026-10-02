@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AdsAdminNavbar } from '../components/AdsAdminNavbar';
-import { AdsAdminSidebar } from '../components/AdsAdminSidebar';
+import { AdsAdminLayout } from '../components/AdsAdminLayout';
 import { adsAdminBannerAdsService } from '../services/ads-admin-banner-ads.service';
 import { adsAdminSponsoredAdsService } from '../services/ads-admin-sponsored-ads.service';
 import { imageSrc } from '../utils/image';
@@ -278,11 +277,7 @@ export const AdsAdminAdsAnalytics = () => {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#eef1f5' }}>
-      <AdsAdminNavbar />
-      <div className="admin-shell-body">
-        <AdsAdminSidebar />
-        <div className="admin-main">
+    <AdsAdminLayout>
           <div className="mb-4">
             <h1 className="h4 mb-1" style={{ color: '#1a1f2e', fontWeight: 600 }}>
               Ads Analytics
@@ -978,8 +973,6 @@ export const AdsAdminAdsAnalytics = () => {
               </div>
             </div>
           )}
-        </div>
-      </div>
-    </div>
+    </AdsAdminLayout>
   );
 };

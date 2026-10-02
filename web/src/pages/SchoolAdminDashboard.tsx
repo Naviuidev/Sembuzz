@@ -1,167 +1,137 @@
-import { useState, useEffect } from 'react';
+import type { CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
-import { SchoolAdminNavbar } from '../components/SchoolAdminNavbar';
-import { SchoolAdminSidebar } from '../components/SchoolAdminSidebar';
+import { useQuery } from '@tanstack/react-query';
+import { SchoolAdminLayout } from '../components/SchoolAdminLayout';
 import { useSchoolAdminAuth } from '../contexts/SchoolAdminAuthContext';
+import { ADMIN_PORTAL_ACCENTS } from '../constants/adminPortalTheme';
 import { schoolAdminStudentsService } from '../services/school-admin-students.service';
+import { schoolAdminPendingUsersService } from '../services/school-admin-pending-users.service';
+
+const QUICK_LINKS = [
+  {
+    to: '/school-admin/user-requests',
+    icon: 'bi-person-plus',
+    title: 'User requests',
+    meta: (pending: number | undefined) =>
+      pending === undefined ? 'Loading…' : `${pending} pending · Approve or deny signups`,
+  },
+  {
+    to: '/school-admin/approved-users',
+    icon: 'bi-person-check',
+    title: 'Approved users',
+    meta: (approved: number | undefined) =>
+      approved === undefined ? 'Loading…' : `${approved} user${approved === 1 ? '' : 's'} · View & manage`,
+  },
+  {
+    to: '/school-admin/analytics',
+    icon: 'bi-graph-up-arrow',
+    title: 'Analytics',
+    meta: () => 'Post views, engagement, and trends',
+  },
+  {
+    to: '/school-admin/create-post',
+    icon: 'bi-plus-circle',
+    title: 'Create post',
+    meta: () => 'Publish content for your school',
+  },
+] as const;
 
 export const SchoolAdminDashboard = () => {
   const { user } = useSchoolAdminAuth();
-  const [approvedCount, setApprovedCount] = useState<number | null>(null);
+  const panelStyle = { '--admin-accent': ADMIN_PORTAL_ACCENTS.school } as CSSProperties;
 
-  useEffect(() => {
-    schoolAdminStudentsService
-      .getApproved()
-      .then((list) => setApprovedCount(list.length))
-      .catch(() => setApprovedCount(0));
-  }, []);
+  const { data: approvedUsers, isLoading: approvedLoading } = useQuery({
+    queryKey: ['school-admin', 'students', 'approved'],
+    queryFn: () => schoolAdminStudentsService.getApproved(),
+  });
+
+  const { data: pendingUsers, isLoading: pendingLoading } = useQuery({
+    queryKey: ['school-admin', 'pending-users'],
+    queryFn: () => schoolAdminPendingUsersService.getPendingUsers(),
+  });
+
+  const approvedCount = approvedLoading ? undefined : (approvedUsers?.length ?? 0);
+  const pendingCount = pendingLoading ? undefined : (pendingUsers?.length ?? 0);
+
+  const metaForLink = (index: number) => {
+    if (index === 0) return QUICK_LINKS[0].meta(pendingCount);
+    if (index === 1) return QUICK_LINKS[1].meta(approvedCount);
+    return QUICK_LINKS[index].meta(undefined);
+  };
 
   return (
-    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
-      <SchoolAdminNavbar />
-      <div className="admin-shell-body">
-        <SchoolAdminSidebar />
-        <div className="admin-main">
-          <div className="mb-4">
-            <h1 style={{
-              fontSize: '2rem',
-              fontWeight: 'normal',
-              color: '#1a1f2e',
-              marginBottom: '0.5rem'
-            }}>
-              Welcome back, {user?.name}
-            </h1>
-            <p style={{
-              color: '#6c757d',
-              fontSize: '1rem',
-              marginBottom: 0
-            }}>
-              View and manage your school information
-            </p>
+    <SchoolAdminLayout>
+      <header className="admin-page-header" style={panelStyle}>
+        <h1 className="admin-page-title">Welcome back, {user?.name ?? 'School Admin'}</h1>
+        <p className="admin-page-subtitle">View your school profile and jump to common tasks.</p>
+      </header>
+
+      <div className="admin-dashboard-columns">
+        <section className="admin-panel" style={panelStyle}>
+          <div className="admin-panel__header">
+            <h2 className="admin-panel__title">School details</h2>
+            {user?.schoolDomain ? (
+              <span className="admin-pill admin-pill--neutral">{user.schoolDomain}</span>
+            ) : null}
           </div>
-
-          {user?.isFirstLogin && (
-            <div className="alert alert-warning mb-4" style={{ borderRadius: '0px' }}>
-              <strong>First Login Required:</strong> Please change your password to continue using the portal.
-            </div>
-          )}
-
-          {/* School Details Card */}
-          <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '0px' }}>
-            <div className="card-body p-4">
-              <h2 style={{
-                fontSize: '1.5rem',
-                fontWeight: 'normal',
-                color: '#1a1f2e',
-                marginBottom: '1.5rem'
-              }}>
-                School Details
-              </h2>
-              <div className="row g-3">
-                <div className="col-md-6">
-                  <label style={{ fontSize: '0.875rem', color: '#6c757d', fontWeight: '500', marginBottom: '0.5rem', display: 'block' }}>
-                    School Name
-                  </label>
-                  <div style={{ fontSize: '1rem', color: '#1a1f2e', fontWeight: '500' }}>
-                    {user?.schoolName || 'N/A'}
+          <div className="admin-panel__body">
+            <div className="admin-detail-grid">
+              <div>
+                <span className="admin-detail-label">School name</span>
+                <p className="admin-detail-value mb-0">{user?.schoolName ?? '—'}</p>
+              </div>
+              <div>
+                <span className="admin-detail-label">Reference number</span>
+                <p className="admin-detail-value admin-detail-value--mono mb-0">{user?.refNum ?? '—'}</p>
+              </div>
+              <div>
+                <span className="admin-detail-label">Admin name</span>
+                <p className="admin-detail-value mb-0">{user?.name ?? '—'}</p>
+              </div>
+              <div>
+                <span className="admin-detail-label">Admin email</span>
+                <p className="admin-detail-value mb-0">{user?.email ?? '—'}</p>
+              </div>
+              <div className="admin-detail-grid--full">
+                <span className="admin-detail-label">Enabled features</span>
+                {user?.features && user.features.length > 0 ? (
+                  <div className="admin-pill-row">
+                    {user.features.map((feature) => (
+                      <span key={feature.code} className="admin-pill admin-pill--feature">
+                        {feature.name}
+                      </span>
+                    ))}
                   </div>
-                </div>
-                <div className="col-md-6">
-                  <label style={{ fontSize: '0.875rem', color: '#6c757d', fontWeight: '500', marginBottom: '0.5rem', display: 'block' }}>
-                    Reference Number
-                  </label>
-                  <div style={{ 
-                    fontSize: '1rem', 
-                    color: '#1a1f2e', 
-                    fontFamily: 'monospace',
-                    fontWeight: '500'
-                  }}>
-                    {user?.refNum || 'N/A'}
-                  </div>
-                </div>
-                <div className="col-md-6">
-                  <label style={{ fontSize: '0.875rem', color: '#6c757d', fontWeight: '500', marginBottom: '0.5rem', display: 'block' }}>
-                    Admin Name
-                  </label>
-                  <div style={{ fontSize: '1rem', color: '#1a1f2e' }}>
-                    {user?.name || 'N/A'}
-                  </div>
-                </div>
-                <div className="col-md-12">
-                  <label style={{ fontSize: '0.875rem', color: '#6c757d', fontWeight: '500', marginBottom: '0.5rem', display: 'block' }}>
-                    Enabled Features
-                  </label>
-                  <div className="d-flex flex-wrap gap-2">
-                    {user?.features && user.features.length > 0 ? (
-                      user.features.map((feature) => (
-                        <span
-                          key={feature.code}
-                          style={{
-                            padding: '0.25rem 0.75rem',
-                            backgroundColor: '#e7f3ff',
-                            color: '#1a1f2e',
-                            fontSize: '0.875rem',
-                            borderRadius: '50px',
-                            border: '1px solid #dee2e6'
-                          }}
-                        >
-                          {feature.name}
-                        </span>
-                      ))
-                    ) : (
-                      <span style={{ color: '#6c757d', fontSize: '0.875rem' }}>No features enabled</span>
-                    )}
-                  </div>
-                </div>
+                ) : (
+                  <p className="admin-form-hint mb-0">No features enabled for this school.</p>
+                )}
               </div>
             </div>
           </div>
+        </section>
 
-          {/* Quick links: Approved users & User requests */}
-          <div className="row g-3 mb-4">
-            <div className="col-md-6">
-              <Link
-                to="/school-admin/approved-users"
-                className="card border-0 shadow-sm text-decoration-none"
-                style={{ borderRadius: '0px', color: 'inherit' }}
-              >
-                <div className="card-body p-4 d-flex align-items-center">
-                  <i className="bi bi-person-check me-3" style={{ fontSize: '2rem', color: '#1a1f2e' }} />
-                  <div>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1a1f2e', marginBottom: '0.25rem' }}>
-                      Approved users
-                    </h3>
-                    <p className="text-muted small mb-0">
-                      {approvedCount === null ? '…' : `${approvedCount} user${approvedCount !== 1 ? 's' : ''}`} · View & manage
-                    </p>
-                  </div>
-                  <i className="bi bi-chevron-right ms-auto text-muted" />
-                </div>
-              </Link>
-            </div>
-            <div className="col-md-6">
-              <Link
-                to="/school-admin/user-requests"
-                className="card border-0 shadow-sm text-decoration-none"
-                style={{ borderRadius: '0px', color: 'inherit' }}
-              >
-                <div className="card-body p-4 d-flex align-items-center">
-                  <i className="bi bi-person-plus me-3" style={{ fontSize: '2rem', color: '#1a1f2e' }} />
-                  <div>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1a1f2e', marginBottom: '0.25rem' }}>
-                      User requests
-                    </h3>
-                    <p className="text-muted small mb-0">
-                      Approve or deny Gmail signups
-                    </p>
-                  </div>
-                  <i className="bi bi-chevron-right ms-auto text-muted" />
-                </div>
-              </Link>
+        <section className="admin-panel" style={panelStyle}>
+          <div className="admin-panel__header">
+            <h2 className="admin-panel__title">Quick links</h2>
+          </div>
+          <div className="admin-panel__body">
+            <div className="admin-quick-links">
+              {QUICK_LINKS.map((link, index) => (
+                <Link key={link.to} to={link.to} className="admin-quick-link">
+                  <span className="admin-quick-link__icon" aria-hidden>
+                    <i className={`bi ${link.icon}`} />
+                  </span>
+                  <span className="admin-quick-link__body">
+                    <p className="admin-quick-link__title">{link.title}</p>
+                    <p className="admin-quick-link__meta">{metaForLink(index)}</p>
+                  </span>
+                  <i className="bi bi-chevron-right admin-quick-link__chevron" aria-hidden />
+                </Link>
+              ))}
             </div>
           </div>
-        </div>
+        </section>
       </div>
-    </div>
+    </SchoolAdminLayout>
   );
 };

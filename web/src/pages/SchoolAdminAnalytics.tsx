@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { SchoolAdminNavbar } from '../components/SchoolAdminNavbar';
-import { SchoolAdminSidebar } from '../components/SchoolAdminSidebar';
+import { SchoolAdminLayout } from '../components/SchoolAdminLayout';
 import { useSchoolAdminAuth } from '../contexts/SchoolAdminAuthContext';
 import { publicEventsService, type CategoryPublic } from '../services/public-events.service';
 import { schoolAdminPostsService, type SchoolAdminPost } from '../services/school-admin-posts.service';
@@ -130,11 +129,7 @@ export const SchoolAdminAnalytics = () => {
         : 'All news';
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#eef1f5' }}>
-      <SchoolAdminNavbar />
-      <div className="admin-shell-body">
-        <SchoolAdminSidebar />
-        <div className="admin-main">
+    <SchoolAdminLayout>
           {/* Top bar: title + date range */}
           <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
             <div className="d-flex align-items-center gap-2">
@@ -740,8 +735,6 @@ export const SchoolAdminAnalytics = () => {
               </table>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
+    </SchoolAdminLayout>
   );
 };

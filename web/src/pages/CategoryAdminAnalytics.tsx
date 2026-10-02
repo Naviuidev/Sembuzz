@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CategoryAdminNavbar } from '../components/CategoryAdminNavbar';
-import { CategoryAdminSidebar } from '../components/CategoryAdminSidebar';
+import { CategoryAdminLayout } from '../components/CategoryAdminLayout';
 import { categoryAdminCategoriesService, type CategoryWithSubcategories } from '../services/category-admin-categories.service';
 import { categoryAdminEventsService, type ApprovedEventForCategoryAdmin } from '../services/category-admin-events.service';
 import { publicEventsService } from '../services/public-events.service';
@@ -135,11 +134,7 @@ export const CategoryAdminAnalytics = () => {
         : 'All news (your categories)';
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#eef1f5' }}>
-      <CategoryAdminNavbar />
-      <div className="admin-shell-body">
-        <CategoryAdminSidebar />
-        <div className="admin-main">
+    <CategoryAdminLayout>
           <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
             <div className="d-flex align-items-center gap-2">
               <div
@@ -531,8 +526,6 @@ export const CategoryAdminAnalytics = () => {
               </table>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
+    </CategoryAdminLayout>
   );
 };

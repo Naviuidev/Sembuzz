@@ -1,9 +1,11 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AdminActionNotificationsBell,
   type AdminActionItemsRole,
 } from './AdminActionNotificationsBell';
+
+export type AdminNavbarTone = 'pill-dark' | 'light';
 
 const logoutBtnStyle = {
   backgroundColor: 'white',
@@ -20,16 +22,23 @@ export function AdminNavbarActions({
   onLogout,
   logoutLabel = 'Logout',
   compactLogout = false,
+  tone = 'light',
 }: {
   role: AdminActionItemsRole;
   onLogout: () => void;
   logoutLabel?: string;
   compactLogout?: boolean;
+  tone?: AdminNavbarTone;
 }) {
   return (
-    <div className="d-flex align-items-center">
-      <AdminActionNotificationsBell role={role} />
-      <LogoutButton onClick={onLogout} label={logoutLabel} compact={compactLogout} />
+    <div className={`d-flex align-items-center${tone === 'light' ? ' admin-navbar-actions' : ''}`}>
+      <AdminActionNotificationsBell role={role} tone={tone === 'light' ? 'light' : 'dark'} />
+      <LogoutButton
+        onClick={onLogout}
+        label={logoutLabel}
+        compact={compactLogout}
+        tone={tone}
+      />
     </div>
   );
 }
@@ -38,11 +47,21 @@ function LogoutButton({
   onClick,
   label,
   compact,
+  tone,
 }: {
   onClick: () => void;
   label: string;
   compact?: boolean;
+  tone: AdminNavbarTone;
 }) {
+  if (tone === 'light') {
+    return (
+      <button type="button" onClick={onClick} className="admin-nav-logout">
+        {label}
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -72,11 +91,35 @@ export function AdminNavbarShell({
   homePath,
   brandExtra,
   children,
+  tone = 'light',
+  portalLabel,
+  accentColor = '#3468f9',
 }: {
   homePath: string;
   brandExtra?: ReactNode;
   children: ReactNode;
+  tone?: AdminNavbarTone;
+  portalLabel?: string;
+  accentColor?: string;
 }) {
+  if (tone === 'light') {
+    return (
+      <nav
+        className="admin-navbar admin-navbar--light sticky-top"
+        style={{ '--admin-accent': accentColor } as CSSProperties}
+      >
+        <div className="admin-navbar-inner">
+          <Link className="admin-navbar-brand" to={homePath}>
+            <span className="admin-navbar-brand-text">SemBuzz</span>
+            {portalLabel ? <span className="admin-navbar-portal-badge">{portalLabel}</span> : null}
+            {brandExtra}
+          </Link>
+          {children}
+        </div>
+      </nav>
+    );
+  }
+
   return (
     <nav
       className="navbar sticky-top navbar-expand-lg"

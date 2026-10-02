@@ -1,29 +1,58 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type CSSProperties, type ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { SuperAdminNavbar } from '../components/SuperAdminNavbar';
-import { SuperAdminSidebar } from '../components/SuperAdminSidebar';
+import { SuperAdminLayout } from '../components/SuperAdminLayout';
+import { ADMIN_PORTAL_ACCENTS } from '../constants/adminPortalTheme';
 import { StatusPopup } from '../components/StatusPopup';
 import { supportService, type SuperAdminQuery } from '../services/support.service';
 import { schoolsService, type School } from '../services/schools.service';
 import { invalidateAdminActionItems } from '../services/admin-action-items.service';
 
-const cardStyle = {
-  border: '1px solid rgb(26, 31, 46)',
-  borderRadius: '4px',
-  padding: '1.5rem',
-  backgroundColor: 'white',
-  cursor: 'pointer',
-  transition: '0.3s',
-  textAlign: 'center' as const,
-  minHeight: '100px',
-  display: 'flex',
-  flexDirection: 'column' as const,
-  alignItems: 'center' as const,
-  justifyContent: 'center' as const,
-  color: '#1a1f2e',
-};
-
 type QuerySource = 'school' | 'category' | 'subcategory' | 'super_admin';
+
+function AdminSearchField({
+  value,
+  onChange,
+  placeholder,
+  wide,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  wide?: boolean;
+}) {
+  return (
+    <div className={`admin-search-wrap${wide ? ' admin-search-wrap--wide' : ''}`}>
+      <i className="bi bi-search admin-search-icon" aria-hidden />
+      <input
+        type="search"
+        className="form-control admin-search-input"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  );
+}
+
+function QueryPickerCard({ onClick, title, meta }: { onClick: () => void; title: string; meta?: ReactNode }) {
+  return (
+    <button type="button" className="admin-picker-card" onClick={onClick}>
+      <p className="admin-picker-card__title">{title}</p>
+      {meta ? <p className="admin-picker-card__meta">{meta}</p> : null}
+    </button>
+  );
+}
+
+function StepHeader({ title, onBack }: { title: string; onBack: () => void }) {
+  return (
+    <div className="admin-step-header">
+      <h2 className="admin-panel__title">{title}</h2>
+      <button type="button" className="admin-btn-secondary" onClick={onBack}>
+        Back
+      </button>
+    </div>
+  );
+}
 
 interface QueryRow {
   id: string;
@@ -212,27 +241,14 @@ export const Queries = () => {
   };
 
   const getStatusBadge = (status: string) => {
-    const colors: Record<string, { bg: string; text: string; border: string }> = {
-      pending: { bg: '#fff3cd', text: '#856404', border: '#ffc107' },
-      in_progress: { bg: '#cfe2ff', text: '#084298', border: '#0d6efd' },
-      resolved: { bg: '#d1e7dd', text: '#0f5132', border: '#198754' },
-      responded: { bg: '#d1e7dd', text: '#0f5132', border: '#198754' },
+    const pillClass: Record<string, string> = {
+      pending: 'admin-pill--status-pending',
+      in_progress: 'admin-pill--status-progress',
+      resolved: 'admin-pill--status-done',
+      responded: 'admin-pill--status-done',
     };
-    const c = colors[status] || colors.pending;
-    return (
-      <span
-        style={{
-          padding: '0.25rem 0.75rem',
-          fontSize: '0.75rem',
-          borderRadius: '50px',
-          backgroundColor: c.bg,
-          color: c.text,
-          border: `1px solid ${c.border}`,
-        }}
-      >
-        {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
-      </span>
-    );
+    const label = status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
+    return <span className={`admin-pill ${pillClass[status] ?? 'admin-pill--status-pending'}`}>{label}</span>;
   };
 
   const handleDeleteClick = (query: QueryRow, currentSource: QuerySource) => {
@@ -273,93 +289,74 @@ export const Queries = () => {
   };
 
   const renderQueriesTable = (queries: QueryRow[], showReply: boolean, currentSource: QuerySource) => (
-    <div className="card border-0 shadow-sm mt-4" style={{ borderRadius: '0px' }}>
-      <div className="card-body p-0">
-        <div className="table-responsive">
-          <table className="table table-hover mb-0">
+    <section className="admin-panel mt-3" style={{ '--admin-accent': ADMIN_PORTAL_ACCENTS.super } as CSSProperties}>
+      <div className="admin-panel__body admin-panel__body--flush-top p-0">
+        <div className="admin-table-wrap">
+          <table className="admin-table">
             <thead>
-              <tr style={{ borderBottom: '2px solid #dee2e6' }}>
-                <th style={{ fontWeight: '500', color: '#1a1f2e', padding: '1rem', borderBottom: 'none' }}>
-                  Received from
-                </th>
-                <th style={{ fontWeight: '500', color: '#1a1f2e', padding: '1rem', borderBottom: 'none' }}>
-                  Type
-                </th>
-                <th style={{ fontWeight: '500', color: '#1a1f2e', padding: '1rem', borderBottom: 'none' }}>
-                  Details
-                </th>
-                <th style={{ fontWeight: '500', color: '#1a1f2e', padding: '1rem', borderBottom: 'none' }}>
-                  Status
-                </th>
-                <th style={{ fontWeight: '500', color: '#1a1f2e', padding: '1rem', borderBottom: 'none' }}>
-                  Date
-                </th>
-                <th style={{ fontWeight: '500', color: '#1a1f2e', padding: '1rem', borderBottom: 'none', width: '140px' }}>
-                  Actions
-                </th>
+              <tr>
+                <th scope="col">Received from</th>
+                <th scope="col">Type</th>
+                <th scope="col">Details</th>
+                <th scope="col">Status</th>
+                <th scope="col">Date</th>
+                <th scope="col">Actions</th>
               </tr>
             </thead>
             <tbody>
               {queries.map((query) => (
-                <tr key={query.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={{ padding: '1rem', fontWeight: '500', color: '#1a1f2e', whiteSpace: 'nowrap' }}>
+                <tr key={query.id}>
+                  <td className="admin-table__strong text-nowrap">
                     {currentSource === 'school' && 'School Admin'}
                     {currentSource === 'category' && 'Category Admin'}
                     {currentSource === 'subcategory' && 'Subcategory Admin'}
-                    {currentSource === 'super_admin' && 'Super Admin (to Developer)'}
+                    {currentSource === 'super_admin' && 'Super Admin → Developer'}
                   </td>
-                  <td style={{ padding: '1rem', color: '#1a1f2e' }}>{getTypeLabel(query.type)}</td>
-                  <td style={{ padding: '1rem' }}>
+                  <td>{getTypeLabel(query.type)}</td>
+                  <td>
                     {query.type === 'schedule_meeting' ? (
-                      <div style={{ fontSize: '0.875rem' }}>
+                      <div className="admin-table__details">
                         <div>
                           <strong>Meeting:</strong>{' '}
                           {query.meetingType === 'google_meet' ? 'Google Meet' : 'Zoom'}
                         </div>
-                        {query.timeZone && (
+                        {query.timeZone ? (
                           <div>
                             <strong>Timezone:</strong> {query.timeZone}
                           </div>
-                        )}
-                        {query.timeSlot && (
+                        ) : null}
+                        {query.timeSlot ? (
                           <div>
                             <strong>Time:</strong> {query.timeSlot}
                           </div>
-                        )}
-                        {query.meetingDate && (
+                        ) : null}
+                        {query.meetingDate ? (
                           <div>
-                            <strong>Date:</strong>{' '}
-                            {new Date(query.meetingDate).toLocaleDateString()}
+                            <strong>Date:</strong> {new Date(query.meetingDate).toLocaleDateString()}
                           </div>
-                        )}
-                        {query.description && (
-                          <div className="mt-2" style={{ color: '#6c757d' }}>
-                            {query.description}
-                          </div>
-                        )}
+                        ) : null}
+                        {query.description ? <div className="mt-1">{query.description}</div> : null}
                       </div>
                     ) : (
-                      <div style={{ fontSize: '0.875rem', color: '#6c757d' }}>
+                      <div className="admin-table__details">
                         {query.description || query.customMessage || 'No description'}
                       </div>
                     )}
                   </td>
-                  <td style={{ padding: '1rem' }}>{getStatusBadge(query.status)}</td>
-                  <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#6c757d' }}>
-                    {new Date(query.createdAt).toLocaleDateString()}
-                  </td>
-                  <td style={{ padding: '1rem' }}>
-                    <div className="d-flex gap-2 align-items-center">
+                  <td>{getStatusBadge(query.status)}</td>
+                  <td>{new Date(query.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    <div className="admin-table-actions">
                       <button
                         type="button"
                         onClick={() => setViewQuery(query)}
-                        className="btn btn-sm btn-outline-primary"
-                        style={{ borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
-                        title="View"
+                        className="admin-icon-btn admin-icon-btn--edit"
+                        title="View details"
+                        aria-label="View details"
                       >
-                        <i className="bi bi-eye" />
+                        <i className="bi bi-eye" aria-hidden />
                       </button>
-                      {showReply && query.status !== 'responded' && (
+                      {showReply && query.status !== 'responded' ? (
                         <button
                           type="button"
                           onClick={() => {
@@ -368,29 +365,19 @@ export const Queries = () => {
                             setShowReplyPopup(true);
                             setReplyMessage('');
                           }}
-                          className="btn btn-sm"
-                          style={{
-                            backgroundColor: '#1a1f2e',
-                            border: 'none',
-                            borderRadius: '50px',
-                            padding: '0.375rem 1rem',
-                            color: '#fff',
-                            fontWeight: '500',
-                            fontSize: '0.875rem',
-                            cursor: 'pointer',
-                          }}
+                          className="admin-btn-primary admin-btn-sm"
                         >
                           Reply
                         </button>
-                      )}
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => handleDeleteClick(query, currentSource)}
-                        className="btn btn-sm btn-outline-danger"
-                        style={{ borderRadius: '6px' }}
+                        className="admin-icon-btn admin-icon-btn--danger"
                         title="Delete"
+                        aria-label="Delete query"
                       >
-                        <i className="bi bi-trash" />
+                        <i className="bi bi-trash" aria-hidden />
                       </button>
                     </div>
                   </td>
@@ -400,7 +387,7 @@ export const Queries = () => {
           </table>
         </div>
       </div>
-    </div>
+    </section>
   );
 
   const selectedSchool = useMemo(
@@ -413,408 +400,212 @@ export const Queries = () => {
     (source === 'category' && loadingCategory) ||
     (source === 'subcategory' && loadingSubcategory);
 
-  return (
-    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
-      <SuperAdminNavbar />
-      <div className="admin-shell-body">
-        <SuperAdminSidebar />
-        <div className="admin-main">
-          <h1 style={{ fontSize: '2rem', fontWeight: 'normal', color: '#1a1f2e', marginBottom: '0.5rem' }}>
-            Queries & Help Requests
-          </h1>
-          <p style={{ color: '#6c757d', fontSize: '1rem', marginBottom: '1.5rem' }}>
-            Select a school to view queries from admins, or view Super Admin to Developer queries (all).
-          </p>
+  const panelStyle = { '--admin-accent': ADMIN_PORTAL_ACCENTS.super } as CSSProperties;
 
-          {/* Step 1: Search bar + School cards + Super Admin to Developer */}
+  return (
+    <SuperAdminLayout>
+      <header className="admin-page-header">
+        <h1 className="admin-page-title">Queries & help requests</h1>
+        <p className="admin-page-subtitle">
+          Pick a school to browse admin queries, or open Super Admin → Developer (all schools).
+        </p>
+      </header>
+
+      <section className="admin-panel" style={panelStyle}>
+        <div className="admin-panel__body">
           {selectedSchoolId === null && source === null && selectedDate === null && (
             <>
               <div className="mb-4">
-                <div className="position-relative" style={{ maxWidth: '400px' }}>
-                  <i
-                    className="bi bi-search position-absolute"
-                    style={{
-                      left: '1rem',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      color: '#6c757d',
-                    }}
-                  />
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Search schools by name, ref number, or city..."
-                    value={schoolSearchQuery}
-                    onChange={(e) => setSchoolSearchQuery(e.target.value)}
-                    style={{
-                      borderRadius: '50px',
-                      padding: '0.75rem 1rem 0.75rem 3rem',
-                      fontSize: '1rem',
-                      border: '1px solid #dee2e6',
-                    }}
-                  />
-                </div>
+                <AdminSearchField
+                  value={schoolSearchQuery}
+                  onChange={setSchoolSearchQuery}
+                  placeholder="Search schools by name, ref, or city…"
+                />
               </div>
               {loadingSchools ? (
-                <div className="text-center py-5">
-                  <p style={{ color: '#6c757d' }}>Loading schools...</p>
-                </div>
+                <div className="admin-loading-state">Loading schools…</div>
               ) : filteredSchools.length > 0 ? (
                 <>
                   <div className="row g-3">
                     {filteredSchools.map((school) => (
                       <div key={school.id} className="col-12 col-sm-6 col-md-4 col-lg-3">
-                        <div
+                        <QueryPickerCard
+                          title={school.name}
+                          meta={
+                            <>
+                              {school.refNum ? `Ref: ${school.refNum}` : null}
+                              {school.refNum && school.city ? ' · ' : null}
+                              {school.city ?? null}
+                            </>
+                          }
                           onClick={() => {
                             setSelectedSchoolId(school.id);
                             setSource(null);
                             setSelectedDate(null);
                             setDateSearchQuery('');
                           }}
-                          style={cardStyle}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = 'rgb(26 31 46 / 5%)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'white';
-                          }}
-                        >
-                          <h6
-                            style={{
-                              fontSize: '1rem',
-                              fontWeight: '600',
-                              color: '#1a1f2e',
-                              margin: 0,
-                            }}
-                          >
-                            {school.name}
-                          </h6>
-                          {school.refNum && (
-                            <p style={{ color: '#6c757d', fontSize: '0.875rem', marginTop: '0.25rem', margin: 0 }}>
-                              Ref: {school.refNum}
-                            </p>
-                          )}
-                          {school.city && (
-                            <p style={{ color: '#6c757d', fontSize: '0.8rem', margin: 0 }}>{school.city}</p>
-                          )}
-                        </div>
+                        />
                       </div>
                     ))}
                   </div>
-                  <div className="mt-4 pt-3" style={{ borderTop: '1px solid #dee2e6' }}>
-                    <p className="text-muted small mb-2">Or view queries not tied to a school:</p>
-                    <div className="col-12 col-sm-6 col-md-4 col-lg-3" style={{ maxWidth: '320px' }}>
-                      <div
-                        onClick={() => {
-                          setSource('super_admin');
-                          setSelectedDate('');
-                        }}
-                        style={cardStyle}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'rgb(26 31 46 / 5%)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'white';
-                        }}
-                      >
-                        <h6 style={{ fontSize: '0.9rem', fontWeight: '600', color: '#1a1f2e', margin: 0 }}>
-                          Super Admin to Developer
-                        </h6>
-                        <p style={{ color: '#6c757d', fontSize: '0.75rem', marginTop: '0.25rem', margin: 0 }}>
-                          (all queries — not tied to any school)
-                        </p>
-                        {isLoadingRaised ? (
-                          <p style={{ color: '#6c757d', marginTop: '0.5rem', margin: 0 }}>Loading...</p>
-                        ) : (
-                          <p style={{ color: '#6c757d', marginTop: '0.5rem', margin: 0 }}>
-                            {raisedQueries?.length ?? 0} queries
-                          </p>
-                        )}
+                  <div className="admin-queries-divider">
+                    <p className="admin-form-section-lead mb-3">Not tied to a school</p>
+                    <div className="row g-3">
+                      <div className="col-12 col-sm-6 col-md-4 col-lg-3">
+                        <QueryPickerCard
+                          title="Super Admin → Developer"
+                          meta={
+                            isLoadingRaised
+                              ? 'Loading…'
+                              : `${raisedQueries?.length ?? 0} queries (all schools)`
+                          }
+                          onClick={() => {
+                            setSource('super_admin');
+                            setSelectedDate('');
+                          }}
+                        />
                       </div>
                     </div>
                   </div>
                 </>
               ) : (
-                <div className="card border-0 shadow-sm p-5 text-center" style={{ borderRadius: '0px' }}>
-                  <p className="text-muted mb-0">
-                    {schoolSearchQuery ? 'No schools match your search.' : 'No schools found.'}
-                  </p>
+                <div className="admin-empty-state">
+                  <p>{schoolSearchQuery ? 'No schools match your search.' : 'No schools found.'}</p>
                 </div>
               )}
             </>
           )}
 
-          {/* Step 2: Source cards (after school selected) */}
           {selectedSchoolId !== null && source === null && selectedDate === null && (
             <div>
-              {(bySchool.school.length === 0 && bySchool.category.length === 0 && bySchool.subcategory.length === 0 && !loadingSchool && !loadingCategory && !loadingSubcategory) && (
-                <div className="alert alert-info mb-4" style={{ borderRadius: '0px' }} role="alert">
-                  <strong>No queries from any admin for this school yet.</strong> The counts below are for this school only.
+              {bySchool.school.length === 0 &&
+              bySchool.category.length === 0 &&
+              bySchool.subcategory.length === 0 &&
+              !loadingSchool &&
+              !loadingCategory &&
+              !loadingSubcategory ? (
+                <div className="admin-notice admin-notice--info" style={panelStyle} role="status">
+                  <strong>No queries for this school yet.</strong> Counts below are scoped to this school only.
                 </div>
-              )}
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 'normal', color: '#1a1f2e', margin: 0 }}>
-                  {selectedSchool?.name ?? 'School'} — Query sources
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedSchoolId(null);
-                    setSchoolSearchQuery('');
-                  }}
-                  className="btn"
-                  style={{
-                    backgroundColor: 'transparent',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '50px',
-                    padding: '0.5rem 1rem',
-                    color: '#1a1f2e',
-                    fontWeight: '500',
-                  }}
-                >
-                  Back
-                </button>
-              </div>
-              <div className="row g-4">
-                <div className="col-12 col-md-6 col-lg-3">
-                  <div
+              ) : null}
+              <StepHeader
+                title={`${selectedSchool?.name ?? 'School'} — sources`}
+                onBack={() => {
+                  setSelectedSchoolId(null);
+                  setSchoolSearchQuery('');
+                }}
+              />
+              <div className="row g-3">
+                <div className="col-12 col-md-6 col-lg-4">
+                  <QueryPickerCard
+                    title="School admins"
+                    meta={loadingSchool ? 'Loading…' : `${bySchool.school.length} queries`}
                     onClick={() => {
                       setSource('school');
                       setSelectedDate('');
                     }}
-                    style={cardStyle}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgb(26 31 46 / 5%)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    <h6 style={{ fontSize: '0.9rem', fontWeight: '600', color: '#1a1f2e', margin: 0 }}>
-                      From School Admins
-                    </h6>
-                    {loadingSchool ? (
-                      <p style={{ color: '#6c757d', marginTop: '0.75rem', margin: 0 }}>Loading...</p>
-                    ) : (
-                      <p style={{ color: '#6c757d', marginTop: '0.75rem', margin: 0 }}>
-                        {bySchool.school.length} queries
-                      </p>
-                    )}
-                  </div>
+                  />
                 </div>
-                <div className="col-12 col-md-6 col-lg-3">
-                  <div
+                <div className="col-12 col-md-6 col-lg-4">
+                  <QueryPickerCard
+                    title="Category admins"
+                    meta={loadingCategory ? 'Loading…' : `${bySchool.category.length} queries`}
                     onClick={() => {
                       setSource('category');
                       setSelectedDate('');
                     }}
-                    style={cardStyle}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgb(26 31 46 / 5%)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    <h6 style={{ fontSize: '0.9rem', fontWeight: '600', color: '#1a1f2e', margin: 0 }}>
-                      From Category Admins
-                    </h6>
-                    {loadingCategory ? (
-                      <p style={{ color: '#6c757d', marginTop: '0.75rem', margin: 0 }}>Loading...</p>
-                    ) : (
-                      <p style={{ color: '#6c757d', marginTop: '0.75rem', margin: 0 }}>
-                        {bySchool.category.length} queries
-                      </p>
-                    )}
-                  </div>
+                  />
                 </div>
-                <div className="col-12 col-md-6 col-lg-3">
-                  <div
+                <div className="col-12 col-md-6 col-lg-4">
+                  <QueryPickerCard
+                    title="Subcategory admins"
+                    meta={loadingSubcategory ? 'Loading…' : `${bySchool.subcategory.length} queries`}
                     onClick={() => {
                       setSource('subcategory');
                       setSelectedDate('');
                     }}
-                    style={cardStyle}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgb(26 31 46 / 5%)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    <h6 style={{ fontSize: '0.9rem', fontWeight: '600', color: '#1a1f2e', margin: 0 }}>
-                      From Subcategory Admins
-                    </h6>
-                    {loadingSubcategory ? (
-                      <p style={{ color: '#6c757d', marginTop: '0.75rem', margin: 0 }}>Loading...</p>
-                    ) : (
-                      <p style={{ color: '#6c757d', marginTop: '0.75rem', margin: 0 }}>
-                        {bySchool.subcategory.length} queries
-                      </p>
-                    )}
-                  </div>
+                  />
                 </div>
               </div>
             </div>
           )}
 
-          {/* Step 3: Date cards (when a school is selected, or when Super Admin to Developer chosen from step 1) */}
-          {((selectedSchoolId !== null && source !== null) || (source === 'super_admin' && selectedSchoolId === null)) && selectedDate === '' && (
-            <div>
-              {source === 'super_admin' && (
-                <div className="alert alert-secondary mb-3" style={{ borderRadius: '0px' }} role="alert">
-                  {selectedSchool ? `Showing all Super Admin to Developer queries (not filtered by ${selectedSchool.name}).` : 'Showing all Super Admin to Developer queries.'}
-                </div>
-              )}
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 'normal', color: '#1a1f2e', margin: 0 }}>
-                  {source === 'school' && 'Queries from School Admins'}
-                  {source === 'category' && 'Queries from Category Admins'}
-                  {source === 'subcategory' && 'Queries from Subcategory Admins'}
-                  {source === 'super_admin' && 'Queries Raised by Super Admin to Developer'}
-                  {selectedSchool && source !== 'super_admin' && ` — ${selectedSchool.name}`}
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => {
+          {((selectedSchoolId !== null && source !== null) ||
+            (source === 'super_admin' && selectedSchoolId === null)) &&
+            selectedDate === '' && (
+              <div>
+                {source === 'super_admin' ? (
+                  <div className="admin-notice admin-notice--muted" role="status">
+                    {selectedSchool
+                      ? `All Super Admin → Developer queries (not filtered by ${selectedSchool.name}).`
+                      : 'All Super Admin → Developer queries.'}
+                  </div>
+                ) : null}
+                <StepHeader
+                  title={
+                    source === 'school'
+                      ? `School admins${selectedSchool ? ` · ${selectedSchool.name}` : ''}`
+                      : source === 'category'
+                        ? `Category admins${selectedSchool ? ` · ${selectedSchool.name}` : ''}`
+                        : source === 'subcategory'
+                          ? `Subcategory admins${selectedSchool ? ` · ${selectedSchool.name}` : ''}`
+                          : 'Super Admin → Developer'
+                  }
+                  onBack={() => {
                     setSource(null);
                     setSelectedDate(null);
                     setDateSearchQuery('');
                   }}
-                  className="btn"
-                  style={{
-                    backgroundColor: 'transparent',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '50px',
-                    padding: '0.5rem 1rem',
-                    color: '#1a1f2e',
-                    fontWeight: '500',
-                  }}
-                >
-                  Back
-                </button>
-              </div>
-              <div className="mb-4">
-                <div className="position-relative">
-                  <i
-                    className="bi bi-search position-absolute"
-                    style={{
-                      left: '1rem',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      color: '#6c757d',
-                    }}
-                  />
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Search dates..."
+                />
+                <div className="mb-4">
+                  <AdminSearchField
+                    wide
                     value={dateSearchQuery}
-                    onChange={(e) => setDateSearchQuery(e.target.value)}
-                    style={{
-                      borderRadius: '50px',
-                      padding: '0.75rem 1rem 0.75rem 3rem',
-                      fontSize: '1rem',
-                      border: '1px solid #dee2e6',
-                    }}
+                    onChange={setDateSearchQuery}
+                    placeholder="Search dates…"
                   />
                 </div>
-              </div>
-              {loading ? (
-                <div className="text-center py-5">
-                  <p style={{ color: '#6c757d' }}>Loading queries...</p>
-                </div>
-              ) : filteredDates.length > 0 ? (
-                <div className="row g-3">
-                  {filteredDates.map((dateStr) => (
-                    <div key={dateStr} className="col-12 col-sm-6 col-md-4 col-lg-3">
-                      <div
-                        onClick={() => setSelectedDate(dateStr)}
-                        style={cardStyle}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'rgb(26 31 46 / 5%)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'white';
-                        }}
-                      >
-                        <span style={{ color: '#1a1f2e', fontWeight: '500', fontSize: '1rem' }}>
-                          {dateStr}
-                        </span>
-                        <span style={{ color: '#6c757d', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-                          {currentByDate[dateStr]?.length ?? 0} queries
-                        </span>
+                {loading ? (
+                  <div className="admin-loading-state">Loading queries…</div>
+                ) : filteredDates.length > 0 ? (
+                  <div className="row g-3">
+                    {filteredDates.map((dateStr) => (
+                      <div key={dateStr} className="col-12 col-sm-6 col-md-4 col-lg-3">
+                        <QueryPickerCard
+                          title={dateStr}
+                          meta={`${currentByDate[dateStr]?.length ?? 0} queries`}
+                          onClick={() => setSelectedDate(dateStr)}
+                        />
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="card border-0 shadow-sm p-5 text-center" style={{ borderRadius: '0px' }}>
-                  <p className="text-muted mb-0">No queries found.</p>
-                </div>
-              )}
-            </div>
-          )}
+                    ))}
+                  </div>
+                ) : (
+                  <div className="admin-empty-state">
+                    <p>No queries found.</p>
+                  </div>
+                )}
+              </div>
+            )}
 
-          {/* Step 4: Table view */}
           {source !== null && selectedDate !== null && selectedDate !== '' && (
             <div>
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 'normal', color: '#1a1f2e', margin: 0 }}>
-                  Queries — {selectedDate}
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setSelectedDate('')}
-                  className="btn"
-                  style={{
-                    backgroundColor: 'transparent',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '50px',
-                    padding: '0.5rem 1rem',
-                    color: '#1a1f2e',
-                    fontWeight: '500',
-                  }}
-                >
-                  Back
-                </button>
-              </div>
-              {renderQueriesTable(
-                currentByDate[selectedDate] ?? [],
-                true,
-                source ?? 'super_admin',
-              )}
+              <StepHeader title={`Queries · ${selectedDate}`} onBack={() => setSelectedDate('')} />
+              {renderQueriesTable(currentByDate[selectedDate] ?? [], true, source ?? 'super_admin')}
             </div>
           )}
+        </div>
+      </section>
 
-          {/* View Query Popup */}
-          {viewQuery && (
-            <div
-              style={{
-                position: 'fixed',
-                inset: 0,
-                backgroundColor: 'rgba(0,0,0,0.5)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1050,
-              }}
-              onClick={() => setViewQuery(null)}
-            >
-              <div
-                className="card border-0 shadow-lg"
-                style={{
-                  borderRadius: '0px',
-                  minWidth: '400px',
-                  maxWidth: '560px',
-                  width: '90%',
-                  maxHeight: '90vh',
-                  overflow: 'auto',
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="card-body p-4">
-                  <h3 style={{ fontSize: '1.5rem', fontWeight: 'normal', color: '#1a1f2e', marginBottom: '1rem' }}>
+      {viewQuery ? (
+        <div className="admin-modal-overlay" onClick={() => setViewQuery(null)} role="presentation">
+          <div
+            className="admin-modal admin-modal--wide"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="admin-modal__body">
+              <h3 className="admin-modal__title mb-2">
                     {viewQuery.superAdmin
                       ? 'Query to Developer'
                       : viewQuery.schoolAdmin
@@ -824,7 +615,7 @@ export const Queries = () => {
                           : viewQuery.subCategoryAdmin
                             ? 'Query from Subcategory Admin'
                             : 'Query details'}
-                  </h3>
+              </h3>
                   {(viewQuery.schoolAdmin || viewQuery.categoryAdmin || viewQuery.subCategoryAdmin || viewQuery.superAdmin) && (
                     <p className="text-muted small mb-2">
                       {viewQuery.superAdmin && (
@@ -874,262 +665,122 @@ export const Queries = () => {
                       </a>
                     </p>
                   )}
-                  <p className="text-muted small mb-3">{new Date(viewQuery.createdAt).toLocaleString()}</p>
-                  <div className="d-flex justify-content-end">
-                    <button
-                      type="button"
-                      className="btn"
-                      style={{
-                        backgroundColor: 'transparent',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '50px',
-                        padding: '0.5rem 1.5rem',
-                        color: '#1a1f2e',
-                        fontWeight: '500',
-                      }}
-                      onClick={() => setViewQuery(null)}
-                    >
-                      Close
-                    </button>
-                  </div>
-                </div>
+              <p className="admin-form-hint mb-3">{new Date(viewQuery.createdAt).toLocaleString()}</p>
+              <div className="admin-modal__footer">
+                <button type="button" className="admin-btn-secondary" onClick={() => setViewQuery(null)}>
+                  Close
+                </button>
               </div>
             </div>
-          )}
-
-          {/* Reply Popup */}
-          {showReplyPopup && selectedQueryForReply && (
-            <div
-              style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1050,
-              }}
-              onClick={() => {
-                setShowReplyPopup(false);
-                setSelectedQueryForReply(null);
-                setReplySource(null);
-                setReplyMessage('');
-              }}
-            >
-              <div
-                style={{
-                  backgroundColor: 'white',
-                  borderRadius: '8px',
-                  padding: '2rem',
-                  maxWidth: '500px',
-                  width: '90%',
-                  maxHeight: '80vh',
-                  overflowY: 'auto',
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 'normal', color: '#1a1f2e', margin: 0 }}>
-                    Send Reply
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowReplyPopup(false);
-                      setSelectedQueryForReply(null);
-                      setReplySource(null);
-                      setReplyMessage('');
-                    }}
-                    className="btn-close"
-                  />
-                </div>
-                <div className="mb-3">
-                  <label className="form-label" style={{ fontWeight: '500', color: '#1a1f2e' }}>
-                    Reply Message
-                  </label>
-                  <textarea
-                    className="form-control"
-                    rows={6}
-                    value={replyMessage}
-                    onChange={(e) => setReplyMessage(e.target.value)}
-                    placeholder="Enter your reply..."
-                    style={{
-                      borderRadius: '0px',
-                      padding: '0.75rem',
-                      fontSize: '1rem',
-                      border: '1px solid #dee2e6',
-                      resize: 'vertical',
-                    }}
-                  />
-                </div>
-                <div className="d-flex justify-content-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowReplyPopup(false);
-                      setSelectedQueryForReply(null);
-                      setReplySource(null);
-                      setReplyMessage('');
-                    }}
-                    className="btn"
-                    style={{
-                      backgroundColor: 'transparent',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '50px',
-                      padding: '0.5rem 1.5rem',
-                      color: '#1a1f2e',
-                      fontWeight: '500',
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!selectedQueryForReply || !replyMessage.trim() || !replySource) return;
-                      replyMutation.mutate({
-                        queryId: selectedQueryForReply.id,
-                        message: replyMessage.trim(),
-                        replySource,
-                      });
-                    }}
-                    disabled={!replyMessage.trim() || !replySource || replyMutation.isPending}
-                    className="btn"
-                    style={{
-                      backgroundColor: '#1a1f2e',
-                      border: 'none',
-                      borderRadius: '50px',
-                      padding: '0.5rem 1.5rem',
-                      color: '#fff',
-                      fontWeight: '500',
-                      opacity: !replyMessage.trim() || !replySource || replyMutation.isPending ? 0.7 : 1,
-                      cursor: !replyMessage.trim() || !replySource || replyMutation.isPending ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    {replyMutation.isPending ? 'Sending...' : 'Send Reply'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {pendingDeletePopup && (
-            <div
-              style={{
-                position: 'fixed',
-                inset: 0,
-                backgroundColor: 'rgba(0,0,0,0.5)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1060,
-              }}
-              onClick={() => setPendingDeletePopup(false)}
-            >
-              <div
-                className="card border-0 shadow-lg"
-                style={{ borderRadius: '0px', minWidth: '360px', maxWidth: '440px', width: '90%' }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="card-body p-4">
-                  <p className="mb-0" style={{ color: '#1a1f2e' }}>
-                    Respond to the query in order to delete it. Only replied queries can be deleted.
-                  </p>
-                  <div className="d-flex justify-content-end mt-3">
-                    <button
-                      type="button"
-                      className="btn"
-                      style={{
-                        backgroundColor: '#1a1f2e',
-                        border: 'none',
-                        borderRadius: '50px',
-                        padding: '0.5rem 1.25rem',
-                        color: '#fff',
-                        fontWeight: '500',
-                      }}
-                      onClick={() => setPendingDeletePopup(false)}
-                    >
-                      OK
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {deleteConfirmQuery && (
-            <div
-              style={{
-                position: 'fixed',
-                inset: 0,
-                backgroundColor: 'rgba(0,0,0,0.5)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1060,
-              }}
-              onClick={() => !deleting && (setDeleteConfirmQuery(null), setDeleteSource(null))}
-            >
-              <div
-                className="card border-0 shadow-lg"
-                style={{ borderRadius: '0px', minWidth: '360px', maxWidth: '440px', width: '90%' }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="card-body p-4">
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1a1f2e', marginBottom: '0.5rem' }}>
-                    Delete query?
-                  </h3>
-                  <p className="text-muted small mb-3">This cannot be undone.</p>
-                  <div className="d-flex justify-content-end gap-2">
-                    <button
-                      type="button"
-                      className="btn"
-                      style={{
-                        backgroundColor: 'transparent',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '50px',
-                        padding: '0.5rem 1.25rem',
-                        color: '#1a1f2e',
-                        fontWeight: '500',
-                      }}
-                      disabled={deleting}
-                      onClick={() => (setDeleteConfirmQuery(null), setDeleteSource(null))}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-danger"
-                      style={{ borderRadius: '50px', padding: '0.5rem 1.25rem', fontWeight: '500' }}
-                      disabled={deleting}
-                      onClick={handleDeleteConfirm}
-                    >
-                      {deleting ? (
-                        <>
-                          <span className="spinner-border spinner-border-sm me-1" />
-                          Deleting…
-                        </>
-                      ) : (
-                        'Delete'
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <StatusPopup
-            show={popupShow}
-            type={popupType}
-            message={popupMessage}
-            onClose={() => setPopupShow(false)}
-          />
+          </div>
         </div>
-      </div>
-    </div>
+      ) : null}
+
+      {showReplyPopup && selectedQueryForReply ? (
+        <div
+          className="admin-modal-overlay"
+          onClick={() => {
+            setShowReplyPopup(false);
+            setSelectedQueryForReply(null);
+            setReplySource(null);
+            setReplyMessage('');
+          }}
+          role="presentation"
+        >
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <div className="admin-modal__body">
+              <h3 className="admin-modal__title mb-3">Send reply</h3>
+              <label className="admin-form-label" htmlFor="query-reply-message">
+                Message
+              </label>
+              <textarea
+                id="query-reply-message"
+                className="form-control"
+                rows={6}
+                value={replyMessage}
+                onChange={(e) => setReplyMessage(e.target.value)}
+                placeholder="Enter your reply…"
+              />
+              <div className="admin-modal__footer mt-3">
+                <button
+                  type="button"
+                  className="admin-btn-secondary"
+                  onClick={() => {
+                    setShowReplyPopup(false);
+                    setSelectedQueryForReply(null);
+                    setReplySource(null);
+                    setReplyMessage('');
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="admin-btn-primary"
+                  onClick={() => {
+                    if (!selectedQueryForReply || !replyMessage.trim() || !replySource) return;
+                    replyMutation.mutate({
+                      queryId: selectedQueryForReply.id,
+                      message: replyMessage.trim(),
+                      replySource,
+                    });
+                  }}
+                  disabled={!replyMessage.trim() || !replySource || replyMutation.isPending}
+                >
+                  {replyMutation.isPending ? 'Sending…' : 'Send reply'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {pendingDeletePopup ? (
+        <div className="admin-modal-overlay" onClick={() => setPendingDeletePopup(false)} role="presentation">
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()} role="alertdialog" aria-modal="true">
+            <div className="admin-modal__body">
+              <p className="admin-modal__text mb-0">
+                Respond to the query before deleting. Only replied queries can be removed.
+              </p>
+              <div className="admin-modal__footer">
+                <button type="button" className="admin-btn-primary" onClick={() => setPendingDeletePopup(false)}>
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteConfirmQuery ? (
+        <div
+          className="admin-modal-overlay"
+          onClick={() => !deleting && (setDeleteConfirmQuery(null), setDeleteSource(null))}
+          role="presentation"
+        >
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()} role="alertdialog" aria-modal="true">
+            <div className="admin-modal__body">
+              <h3 className="admin-modal__title">Delete query?</h3>
+              <p className="admin-modal__text">This cannot be undone.</p>
+              <div className="admin-modal__footer">
+                <button
+                  type="button"
+                  className="admin-btn-secondary"
+                  disabled={deleting}
+                  onClick={() => (setDeleteConfirmQuery(null), setDeleteSource(null))}
+                >
+                  Cancel
+                </button>
+                <button type="button" className="admin-btn-danger" disabled={deleting} onClick={handleDeleteConfirm}>
+                  {deleting ? 'Deleting…' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <StatusPopup show={popupShow} type={popupType} message={popupMessage} onClose={() => setPopupShow(false)} />
+    </SuperAdminLayout>
   );
 };

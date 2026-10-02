@@ -1,6 +1,5 @@
 import { useState, useRef } from 'react';
-import { CategoryAdminNavbar } from '../components/CategoryAdminNavbar';
-import { CategoryAdminSidebar } from '../components/CategoryAdminSidebar';
+import { CategoryAdminLayout } from '../components/CategoryAdminLayout';
 import { categoryAdminBannerAdsService } from '../services/category-admin-banner-ads.service';
 import { categoryAdminSponsoredAdsService } from '../services/category-admin-sponsored-ads.service';
 import { cstDatetimeLocalStringToUTC } from '../utils/cst-date';
@@ -218,11 +217,7 @@ export const CategoryAdminAds = () => {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#eef1f5' }}>
-      <CategoryAdminNavbar />
-      <div className="admin-shell-body">
-        <CategoryAdminSidebar />
-        <div className="admin-main">
+    <CategoryAdminLayout>
           <div className="mb-4">
             <h1 className="h4 mb-1" style={{ color: '#1a1f2e', fontWeight: 600 }}>
               Ads
@@ -406,8 +401,6 @@ export const CategoryAdminAds = () => {
               </button>
             </div>
           )}
-        </div>
-      </div>
-    </div>
+    </CategoryAdminLayout>
   );
 };

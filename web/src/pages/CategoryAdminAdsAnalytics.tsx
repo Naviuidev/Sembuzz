@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CategoryAdminNavbar } from '../components/CategoryAdminNavbar';
-import { CategoryAdminSidebar } from '../components/CategoryAdminSidebar';
+import { CategoryAdminLayout } from '../components/CategoryAdminLayout';
 import { categoryAdminBannerAdsService } from '../services/category-admin-banner-ads.service';
 import { categoryAdminSponsoredAdsService } from '../services/category-admin-sponsored-ads.service';
 import { imageSrc } from '../utils/image';
@@ -239,11 +238,7 @@ export const CategoryAdminAdsAnalytics = () => {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#eef1f5' }}>
-      <CategoryAdminNavbar />
-      <div className="admin-shell-body">
-        <CategoryAdminSidebar />
-        <div className="admin-main">
+    <CategoryAdminLayout>
           <div className="mb-4">
             <h1 className="h4 mb-1" style={{ color: '#1a1f2e', fontWeight: 600 }}>
               Ads Analytics
@@ -936,8 +931,6 @@ export const CategoryAdminAdsAnalytics = () => {
               </div>
             </div>
           )}
-        </div>
-      </div>
-    </div>
+    </CategoryAdminLayout>
   );
 };

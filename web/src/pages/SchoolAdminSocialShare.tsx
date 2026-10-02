@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
-import { SchoolAdminNavbar } from '../components/SchoolAdminNavbar';
-import { SchoolAdminSidebar } from '../components/SchoolAdminSidebar';
-import { useSchoolAdminAuth } from '../contexts/SchoolAdminAuthContext';
+import { useState, useEffect, type CSSProperties } from 'react';
+import { SchoolAdminLayout } from '../components/SchoolAdminLayout';
+import { ADMIN_PORTAL_ACCENTS } from '../constants/adminPortalTheme';
 import { schoolAdminSocialAccountsService } from '../services/school-admin-social-accounts.service';
 import { getApiErrorMessage } from '../utils/apiError';
 import { imageSrc, isImageIconValue } from '../utils/image';
@@ -67,47 +66,33 @@ function AddingPopup({ onComplete, durationMs = 2000 }: { onComplete: () => void
   }, [onComplete, durationMs]);
 
   return (
-    <div className="d-flex align-items-start gap-3" style={{ minHeight: '120px' }}>
-      <div
-        style={{
-          width: '48px',
-          height: '48px',
-          borderRadius: '50%',
-          backgroundColor: '#e7f1ff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-        }}
-      >
-        <i
-          className="bi bi-hourglass-split"
-          style={{ fontSize: '1.5rem', color: '#0d6efd' }}
-          aria-hidden
-        />
+    <div className="admin-social-adding">
+      <div className="admin-social-adding__icon" aria-hidden>
+        <i className="bi bi-hourglass-split" />
       </div>
-      <div style={{ flex: 1 }}>
-        <h3
-          style={{
-            fontSize: '1.25rem',
-            fontWeight: 600,
-            color: '#1a1f2e',
-            marginBottom: '0.5rem',
-            marginTop: 0,
-          }}
-        >
-          Adding
-        </h3>
-        <p style={{ fontSize: '1rem', color: '#6c757d', marginBottom: 0 }}>
-          Please wait…
-        </p>
+      <div>
+        <h3 className="admin-panel__title mb-2">Adding</h3>
+        <p className="admin-form-hint mb-0">Please wait…</p>
       </div>
     </div>
   );
 }
 
+function ClubIconMark({ icon, size = 44 }: { icon: string; size?: number }) {
+  return (
+    <span className="admin-social-club-icon" style={{ width: size, height: size }}>
+      {isImageIconValue(icon) ? (
+        <img src={imageSrc(icon)} alt="" />
+      ) : icon.startsWith('fa-') ? (
+        <i className={icon} style={{ fontSize: '1.25rem', color: '#0f172a' }} aria-hidden />
+      ) : (
+        <i className={`bi ${icon}`} style={{ fontSize: '1.25rem', color: '#0f172a' }} aria-hidden />
+      )}
+    </span>
+  );
+}
+
 export const SchoolAdminSocialShare = () => {
-  const { user: _user } = useSchoolAdminAuth();
   const [savedAccounts, setSavedAccounts] = useState<SavedSocialAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [popupOpen, setPopupOpen] = useState(false);
@@ -391,260 +376,185 @@ export const SchoolAdminSocialShare = () => {
   };
 
   const selectedPlatforms = ALL_PLATFORMS.filter((p) => selectedIds.has(p.id));
+  const panelStyle = { '--admin-accent': ADMIN_PORTAL_ACCENTS.school } as CSSProperties;
+
+  const startAddSocialAccount = () => {
+    setView('main');
+    setPopupOpen(true);
+    setPopupMode('add');
+    setEditingId(null);
+    setStep('club-info');
+    setClubName('');
+    setClubIconUrl('');
+    setSelectedIds(new Set());
+    setSearchQuery('');
+    setFormData({});
+    setUpdatedRows(new Set());
+    setApiError(null);
+  };
+
+  const clubGroups = savedAccounts.reduce<
+    { key: string; icon: string; pageName: string; accounts: SavedSocialAccount[] }[]
+  >((acc, account) => {
+    const key = `${account.pageName}|${account.icon}`;
+    const existing = acc.find((g) => g.key === key);
+    if (existing) existing.accounts.push(account);
+    else acc.push({ key, icon: account.icon, pageName: account.pageName, accounts: [account] });
+    return acc;
+  }, []);
 
   return (
-    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
-      <SchoolAdminNavbar />
-      <div className="admin-shell-body">
-        <SchoolAdminSidebar />
-        <div className="admin-main">
-          <div className="mb-4">
-            <h1 style={{ fontSize: '2rem', fontWeight: 'normal', color: '#1a1f2e', marginBottom: '0.5rem' }}>
-              Social Share
-            </h1>
-            <p style={{ color: '#6c757d', fontSize: '1rem', marginBottom: 0 }}>
-              Add and manage your school&apos;s social media links.{' '}
-              <a href="https://fontawesome.com/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--bs-primary)' }}>
-                Font Awesome
-              </a>
-              {' '}— find icons for your clubs here.
-            </p>
+    <SchoolAdminLayout>
+      <header className="admin-page-header" style={panelStyle}>
+        <h1 className="admin-page-title">Social share</h1>
+        <p className="admin-page-subtitle">
+          Add and manage your school&apos;s social media links. Find club icons on{' '}
+          <a href="https://fontawesome.com/" target="_blank" rel="noopener noreferrer">
+            Font Awesome
+          </a>
+          .
+        </p>
+      </header>
+
+      {apiError ? (
+        <div className="admin-notice d-flex justify-content-between align-items-start gap-2 mb-4">
+          <p className="admin-form-hint admin-form-hint--error mb-0">{apiError}</p>
+          <button type="button" className="admin-modal__close" aria-label="Dismiss" onClick={() => setApiError(null)}>
+            <i className="bi bi-x-lg" aria-hidden />
+          </button>
+        </div>
+      ) : null}
+
+      {!loading && view === 'main' && savedAccounts.length === 0 ? (
+        <section className="admin-panel" style={panelStyle}>
+          <div className="admin-panel__body admin-social-empty">
+            <p className="admin-form-hint mb-4">Add your school&apos;s social media accounts to share with users.</p>
+            <button type="button" className="admin-btn-primary" onClick={startAddSocialAccount}>
+              <i className="bi bi-plus-circle me-2" aria-hidden />
+              Add social account
+            </button>
           </div>
+        </section>
+      ) : null}
 
-          {view === 'main' && savedAccounts.length === 0 && (
-            <div className="card border-0 shadow-lg" style={{ borderRadius: '0px', maxWidth: '480px' }}>
-              <div className="card-body p-4 text-center">
-                <p className="text-muted mb-4">Add your school&apos;s social media accounts to share with users.</p>
-                <button
-                  type="button"
-                  className="btn btn-primary rounded-pill social-share-add-btn-hover"
-                  style={{ backgroundColor: 'var(--bs-primary)', color: '#fff' }}
-                onClick={() => {
-                  setView('main');
-                  setPopupOpen(true);
-                  setPopupMode('add');
-                  setEditingId(null);
-                  setStep('club-info');
-                  setClubName('');
-                  setClubIconUrl('');
-                  setSelectedIds(new Set());
-                  setSearchQuery('');
-                  setFormData({});
-                  setUpdatedRows(new Set());
-                  setApiError(null);
-                }}
-                >
-                  <i className="bi bi-plus-circle me-2" />
-                  Add social account
-                </button>
-              </div>
-            </div>
-          )}
-
-          {apiError && (
-            <div className="alert alert-danger alert-dismissible fade show mb-4" style={{ borderRadius: '0px' }} role="alert">
-              {apiError}
-              <button type="button" className="btn-close" aria-label="Close" onClick={() => setApiError(null)} />
-            </div>
-          )}
-
-          {(view === 'saved-list' || savedAccounts.length > 0) && (
-            <>
-              <div className="card border-0 shadow-none mb-4 social-share-card" style={{ borderRadius: 0, backgroundColor: 'transparent' }}>
-                <div className="card-body p-0" style={{ backgroundColor: 'transparent' }}>
-                  {loading ? (
-                    <p className="text-muted mb-0">Loading…</p>
-                  ) : (
-                    (() => {
-                      const groups = savedAccounts.reduce<{ key: string; icon: string; pageName: string; accounts: SavedSocialAccount[] }[]>((acc, account) => {
-                        const key = `${account.pageName}|${account.icon}`;
-                        const existing = acc.find((g) => g.key === key);
-                        if (existing) existing.accounts.push(account);
-                        else acc.push({ key, icon: account.icon, pageName: account.pageName, accounts: [account] });
-                        return acc;
-                      }, []);
-                      return (
-                        <div className="d-flex flex-wrap social-share-gap-4">
-                          {groups.map((group) => (
-                            <div
-                              key={group.key}
-                              className="rounded-3 club-card social-share-club-card shadow-sm"
-                              style={{ borderColor: '#eee', backgroundColor: 'transparent', minWidth: '280px', flex: '1 1 280px', maxWidth: '400px', paddingTop: '1rem', paddingBottom: '1rem', paddingLeft: 0, paddingRight: 0 }}
+      {(view === 'saved-list' || savedAccounts.length > 0) && (
+        <section className="admin-panel" style={panelStyle}>
+          <div className="admin-panel__header">
+            <h2 className="admin-panel__title">Clubs &amp; links</h2>
+            <button type="button" className="admin-btn-primary" onClick={startAddSocialAccount}>
+              <i className="bi bi-plus-circle me-2" aria-hidden />
+              Add social account
+            </button>
+          </div>
+          <div className="admin-panel__body">
+            {loading ? (
+              <div className="admin-loading-state">Loading…</div>
+            ) : (
+              <div className="admin-social-clubs">
+                {clubGroups.map((group) => (
+                  <article key={group.key} className="admin-social-club-card">
+                    <div className="admin-social-club-card__head">
+                      <div className="admin-social-club-card__identity">
+                        <ClubIconMark icon={group.icon} />
+                        <h3 className="admin-social-club-card__title">{group.pageName || 'Club'}</h3>
+                      </div>
+                      <div className="admin-social-club-card__actions">
+                        <button
+                          type="button"
+                          className="admin-icon-btn admin-icon-btn--edit"
+                          title="Edit club (name & icon)"
+                          aria-label="Edit club"
+                          onClick={() => openEditClub(group)}
+                        >
+                          <i className="bi bi-pencil" aria-hidden />
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-icon-btn admin-icon-btn--danger"
+                          title="Delete club and all its links"
+                          aria-label="Delete club"
+                          onClick={() => setDeleteClubGroupKey(group.key)}
+                        >
+                          <i className="bi bi-trash" aria-hidden />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="admin-social-links-row">
+                      {group.accounts.map((acc) => {
+                        const iconColor = PLATFORM_COLORS[acc.platformId] ?? '#0f172a';
+                        return (
+                          <div key={acc.id} className="admin-social-link-chip">
+                            <a
+                              href={acc.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="admin-social-link-chip__platform"
+                              style={{ backgroundColor: `${iconColor}18`, color: iconColor }}
+                              title={acc.platformName}
                             >
-                              <div className="d-flex align-items-center p-2 justify-content-between gap-2 mb-3">
-                                <div className="d-flex align-items-center gap-2 flex-grow-1 min-w-0">
-                                  <span
-                                    className="d-flex align-items-center justify-content-center rounded-2 flex-shrink-0 overflow-hidden"
-                                    style={{ width: 44, height: 44, backgroundColor: '#fff' }}
-                                  >
-                                    {isImageIconValue(group.icon) ? (
-                                      <img src={imageSrc(group.icon)} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                                    ) : group.icon.startsWith('fa-') ? (
-                                      <i className={group.icon} style={{ fontSize: '1.25rem', color: '#1a1f2e' }} />
-                                    ) : (
-                                      <i className={`bi ${group.icon}`} style={{ fontSize: '1.25rem', color: '#1a1f2e' }} />
-                                    )}
-                                  </span>
-                                  <span style={{ fontWeight: 600, color: '#1a1f2e', fontSize: '1.1rem' }}>
-                                    {group.pageName || 'Club'}
-                                  </span>
-                                </div>
-                                <div className="d-flex align-items-center gap-1 flex-shrink-0 club-actions">
-                                  <button
-                                    type="button"
-                                    className="btn btn-link btn-sm p-1 text-secondary"
-                                    style={{ minWidth: 32, minHeight: 32 }}
-                                    title="Edit club (name & icon)"
-                                    onClick={() => openEditClub(group)}
-                                  >
-                                    <i className="bi bi-pencil" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="btn btn-link btn-sm p-1 text-danger"
-                                    style={{ minWidth: 32, minHeight: 32 }}
-                                    title="Delete club and all its links"
-                                    onClick={() => setDeleteClubGroupKey(group.key)}
-                                  >
-                                    <i className="bi bi-trash" />
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="d-flex flex-wrap p-2 gap-2">
-                                {group.accounts.map((acc) => {
-                                  const iconColor = PLATFORM_COLORS[acc.platformId] ?? '#1a1f2e';
-                                  return (
-                                    <div
-                                      key={acc.id}
-                                      className="social-account-card d-flex align-items-center gap-2 rounded-3 position-relative"
-                                      style={{
-                                        padding: '0.35rem 0.5rem',
-                                        minWidth: 'auto',
-                                        borderColor: 'rgb(238, 238, 238)',
-                                        backgroundColor: 'rgb(255, 255, 255)',
-                                        transition: 'box-shadow 0.2s, border-color 0.2s',
-                                        boxShadow: 'none',
-                                      }}
-                                    >
-                                      <a
-                                        href={acc.link}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="d-flex align-items-center justify-content-center rounded-2 text-decoration-none flex-shrink-0"
-                                        style={{ width: 36, height: 36, backgroundColor: `${iconColor}18`, color: iconColor }}
-                                        title={acc.platformName}
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        <i className={`bi ${ALL_PLATFORMS.find((p) => p.id === acc.platformId)?.icon ?? 'bi-link'}`} style={{ fontSize: '1.1rem' }} />
-                                      </a>
-                                      <div className="social-account-actions d-flex align-items-center gap-1 flex-shrink-0">
-                                        <button
-                                          type="button"
-                                          className="btn btn-link btn-sm p-1 text-secondary"
-                                          style={{ minWidth: 28, minHeight: 28 }}
-                                          title="Edit"
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            openEditPopup(acc);
-                                          }}
-                                        >
-                                          <i className="bi bi-pencil" />
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className="btn btn-link btn-sm p-1 text-danger"
-                                          style={{ minWidth: 28, minHeight: 28 }}
-                                          title="Delete"
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            handleDelete(acc.id);
-                                          }}
-                                        >
-                                          <i className="bi bi-trash" />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              <div className="mt-2 p-2">
-                                <button
-                                  type="button"
-                                  className="btn rounded-pill social-share-add-btn-hover"
-                                  style={{ backgroundColor: '#28a745', color: '#fff', border: 'none' }}
-                                  onClick={() => openAddToClub(group)}
-                                  title="Add another social link to this club"
-                                >
-                                  <i className="bi bi-plus-lg me-2" />
-                                  Add More social links
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })()
-                  )}
-                  <style>{`
-                    .social-share-card .social-share-gap-4 { gap: 0.5rem !important; padding-left: 0 !important; }
-                    .social-share-card .social-share-club-card { padding-left: 0 !important; padding-right: 0 !important; }
-                    .social-account-card .social-account-actions { opacity: 1; }
-                    .club-card .club-actions { opacity: 1; }
-                    .social-share-add-btn-hover { transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, border-width 0.2s ease; border: 1px solid transparent !important; }
-                    .social-share-add-btn-hover:hover { background-color: #fff !important; color: #000 !important; border-color: #dee2e6 !important; }
-                  `}</style>
-                </div>
+                              <i
+                                className={`bi ${ALL_PLATFORMS.find((p) => p.id === acc.platformId)?.icon ?? 'bi-link'}`}
+                                aria-hidden
+                              />
+                            </a>
+                            <button
+                              type="button"
+                              className="admin-icon-btn admin-icon-btn--edit"
+                              title="Edit link"
+                              aria-label="Edit link"
+                              onClick={() => openEditPopup(acc)}
+                            >
+                              <i className="bi bi-pencil" aria-hidden />
+                            </button>
+                            <button
+                              type="button"
+                              className="admin-icon-btn admin-icon-btn--danger"
+                              title="Delete link"
+                              aria-label="Delete link"
+                              onClick={() => handleDelete(acc.id)}
+                            >
+                              <i className="bi bi-trash" aria-hidden />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="admin-social-club-card__add">
+                      <button
+                        type="button"
+                        className="admin-btn-secondary"
+                        onClick={() => openAddToClub(group)}
+                        title="Add another social link to this club"
+                      >
+                        <i className="bi bi-plus-lg me-2" aria-hidden />
+                        Add more links
+                      </button>
+                    </div>
+                  </article>
+                ))}
               </div>
-              <button
-                type="button"
-                className="btn btn-primary rounded-pill social-share-add-btn-hover"
-                style={{ backgroundColor: 'var(--bs-primary)', color: '#fff' }}
-                onClick={() => {
-                  setPopupOpen(true);
-                  setPopupMode('add');
-                  setEditingId(null);
-                  setStep('club-info');
-                  setClubName('');
-                  setClubIconUrl('');
-                  setSelectedIds(new Set());
-                  setSearchQuery('');
-                  setFormData({});
-                  setUpdatedRows(new Set());
-                  setApiError(null);
-                }}
-              >
-                <i className="bi bi-plus-circle me-2" />
-                Add social account
-              </button>
-            </>
-          )}
+            )}
+          </div>
+        </section>
+      )}
 
-          {/* Popup: Select platforms */}
-          {popupOpen && (
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="social-share-title"
-              style={{
-                position: 'fixed',
-                inset: 0,
-                zIndex: 1050,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: 'rgba(0,0,0,0.4)',
-                padding: '1rem',
-              }}
-              onClick={() => {
-                if (step === 'select' || step === 'club-info') setPopupOpen(false);
-              }}
-            >
-              <div
-                className="card border-0 shadow"
-                style={{ maxWidth: '520px', width: '100%', maxHeight: '90vh', overflow: 'hidden', borderRadius: '12px' }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="card-body p-4">
+      {popupOpen ? (
+        <div
+          className="admin-modal-overlay"
+          role="presentation"
+          onClick={() => {
+            if (step === 'select' || step === 'club-info') setPopupOpen(false);
+          }}
+        >
+          <div
+            className="admin-modal admin-form"
+            style={panelStyle}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="social-share-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="admin-modal__body">
                   {step === 'animating' && (
                     <AddingPopup onComplete={handleAnimatingDone} durationMs={2000} />
                   )}
@@ -653,31 +563,32 @@ export const SchoolAdminSocialShare = () => {
                   )}
                   {step === 'club-info' && (
                     <>
-                      <h2 id="social-share-title" className="mb-3" style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1a1f2e' }}>
+                      <h2 id="social-share-title" className="admin-modal__title mb-2">
                         Add social account
                       </h2>
-                      <p className="text-muted small mb-3">
+                      <p className="admin-form-hint mb-3">
                         Enter the club name and upload an icon. Download the icon from{' '}
                         <a href="https://fontawesome.com/" target="_blank" rel="noopener noreferrer">Font Awesome</a> and upload it here.
                       </p>
                       <div className="mb-3">
-                        <label className="form-label" style={{ fontWeight: 500, color: '#1a1f2e' }}>
+                        <label className="admin-form-label" htmlFor="social-club-name">
                           Name of the club
                         </label>
                         <input
+                          id="social-club-name"
                           type="text"
                           className="form-control"
                           placeholder="e.g. Sports Club, Chess Club"
                           value={clubName}
                           onChange={(e) => setClubName(e.target.value)}
-                          style={{ borderRadius: '8px' }}
                         />
                       </div>
                       <div className="mb-4">
-                        <label className="form-label" style={{ fontWeight: 500, color: '#1a1f2e' }}>
+                        <label className="admin-form-label" htmlFor="social-club-icon">
                           Club icon (download from <a href="https://fontawesome.com/" target="_blank" rel="noopener noreferrer">Font Awesome</a> and upload)
                         </label>
                         <input
+                          id="social-club-icon"
                           type="file"
                           className="form-control"
                           accept="image/*"
@@ -696,9 +607,8 @@ export const SchoolAdminSocialShare = () => {
                               e.target.value = '';
                             }
                           }}
-                          style={{ borderRadius: '8px' }}
                         />
-                        {clubIconUploading && <small className="text-muted">Uploading…</small>}
+                        {clubIconUploading ? <span className="admin-form-hint">Uploading…</span> : null}
                         {clubIconUrl && !clubIconUploading && (
                           <div className="mt-2 d-flex align-items-center gap-2">
                             <span className="text-muted small">Preview:</span>
@@ -710,13 +620,13 @@ export const SchoolAdminSocialShare = () => {
                           </div>
                         )}
                       </div>
-                      <div className="d-flex justify-content-end gap-2">
-                        <button type="button" className="btn btn-outline-secondary" onClick={() => setPopupOpen(false)}>
+                      <div className="admin-modal__footer">
+                        <button type="button" className="admin-btn-secondary" onClick={() => setPopupOpen(false)}>
                           Cancel
                         </button>
                         <button
                           type="button"
-                          className="btn btn-primary"
+                          className="admin-btn-primary"
                           disabled={!clubName.trim() || !clubIconUrl}
                           onClick={handleNextFromClubInfo}
                         >
@@ -727,62 +637,45 @@ export const SchoolAdminSocialShare = () => {
                   )}
                   {step === 'select' && (
                     <>
-                      <h2 id="social-share-title" className="mb-3" style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1a1f2e' }}>
+                      <h2 id="social-share-title" className="admin-modal__title mb-2">
                         Add social account
                       </h2>
-                      {popupMode === 'add' && clubName.trim() && (
-                        <div className="d-flex align-items-center gap-2 mb-3 p-2 rounded-2" style={{ backgroundColor: '#f8f9fa' }}>
-                          <span
-                            className="d-flex align-items-center justify-content-center rounded-2 flex-shrink-0 overflow-hidden"
-                            style={{ width: 40, height: 40, backgroundColor: '#fff', color: '#1a1f2e' }}
-                          >
-                            {isImageIconValue(clubIconUrl) ? (
-                              <img src={imageSrc(clubIconUrl)} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                            ) : clubIconUrl?.startsWith('fa-') ? (
-                              <i className={clubIconUrl} style={{ fontSize: '1.25rem' }} />
-                            ) : clubIconUrl ? (
-                              <i className={`bi ${clubIconUrl}`} style={{ fontSize: '1.25rem' }} />
-                            ) : (
-                              <i className="bi bi-image" style={{ fontSize: '1.25rem' }} />
-                            )}
-                          </span>
-                          <span style={{ fontWeight: 500, color: '#1a1f2e' }}>{clubName.trim()}</span>
+                      {popupMode === 'add' && clubName.trim() ? (
+                        <div className="admin-social-club-preview">
+                          <ClubIconMark icon={clubIconUrl || 'bi-image'} size={40} />
+                          <span className="admin-detail-value">{clubName.trim()}</span>
                         </div>
-                      )}
-                      <input
-                        type="search"
-                        className="form-control mb-3"
-                        placeholder="Search social networks…"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        style={{ borderRadius: '8px' }}
-                      />
-                      <div className="d-flex flex-wrap gap-2 mb-4" style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                      ) : null}
+                      <div className="admin-search-wrap mb-3">
+                        <i className="bi bi-search admin-search-icon" aria-hidden />
+                        <input
+                          type="search"
+                          className="form-control admin-search-input"
+                          placeholder="Search social networks…"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                      </div>
+                      <div className="admin-social-platform-grid">
                         {filteredPlatforms.map((p) => (
                           <button
                             key={p.id}
                             type="button"
-                            className="d-flex align-items-center gap-2 rounded-3 border text-decoration-none"
-                            style={{
-                              padding: '0.5rem 0.75rem',
-                              borderColor: selectedIds.has(p.id) ? 'var(--bs-success)' : '#dee2e6',
-                              backgroundColor: selectedIds.has(p.id) ? 'var(--bs-success)' : '#fff',
-                              color: selectedIds.has(p.id) ? '#fff' : '#1a1f2e',
-                            }}
+                            className={`admin-social-platform-btn${selectedIds.has(p.id) ? ' is-selected' : ''}`}
                             onClick={() => togglePlatform(p.id)}
                           >
-                            <i className={`bi ${p.icon}`} style={{ fontSize: '1.25rem' }} />
-                            <span style={{ fontSize: '0.9rem' }}>{p.name}</span>
+                            <i className={`bi ${p.icon}`} aria-hidden />
+                            <span>{p.name}</span>
                           </button>
                         ))}
                       </div>
-                      <div className="d-flex justify-content-end gap-2">
-                        <button type="button" className="btn btn-outline-secondary" onClick={() => setPopupOpen(false)}>
+                      <div className="admin-modal__footer">
+                        <button type="button" className="admin-btn-secondary" onClick={() => setPopupOpen(false)}>
                           Cancel
                         </button>
                         <button
                           type="button"
-                          className="btn btn-primary"
+                          className="admin-btn-primary"
                           disabled={selectedIds.size === 0}
                           onClick={handleNextFromSelect}
                         >
@@ -793,29 +686,16 @@ export const SchoolAdminSocialShare = () => {
                   )}
                   {step === 'form' && (
                     <>
-                      <h2 className="mb-3" style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1a1f2e' }}>
+                      <h2 className="admin-modal__title mb-2">
                         {popupMode === 'edit' ? 'Edit page name & link' : 'Add links for each platform'}
                       </h2>
-                      {popupMode === 'add' && (
-                        <div className="d-flex align-items-center gap-2 mb-3 p-2 rounded-2" style={{ backgroundColor: '#f8f9fa' }}>
-                          <span
-                            className="d-flex align-items-center justify-content-center rounded-2 flex-shrink-0 overflow-hidden"
-                            style={{ width: 40, height: 40, backgroundColor: '#fff', color: '#1a1f2e' }}
-                          >
-                            {isImageIconValue(clubIconUrl) ? (
-                              <img src={imageSrc(clubIconUrl)} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                            ) : clubIconUrl?.startsWith('fa-') ? (
-                              <i className={clubIconUrl} style={{ fontSize: '1.25rem' }} />
-                            ) : clubIconUrl ? (
-                              <i className={`bi ${clubIconUrl}`} style={{ fontSize: '1.25rem' }} />
-                            ) : (
-                              <i className="bi bi-image" style={{ fontSize: '1.25rem' }} />
-                            )}
-                          </span>
-                          <span style={{ fontWeight: 500, color: '#1a1f2e' }}>{clubName.trim()}</span>
+                      {popupMode === 'add' && clubName.trim() ? (
+                        <div className="admin-social-club-preview">
+                          <ClubIconMark icon={clubIconUrl || 'bi-image'} size={40} />
+                          <span className="admin-detail-value">{clubName.trim()}</span>
                         </div>
-                      )}
-                      <p className="text-muted small mb-3">
+                      ) : null}
+                      <p className="admin-form-hint mb-3">
                         {popupMode === 'edit'
                           ? 'Update the club/page name and link, then Save.'
                           : 'Enter the link for each selected platform. Click Update for each row, then Save.'}
@@ -824,17 +704,18 @@ export const SchoolAdminSocialShare = () => {
                         {selectedPlatforms.map((p) => {
                           const data = formData[p.id] ?? { pageName: '', link: '' };
                           const isUpdated = updatedRows.has(p.id);
-                          const canUpdate = popupMode === 'add' ? !!data.link.trim() : !!data.pageName.trim() && !!data.link.trim();
-                          const iconColor = PLATFORM_COLORS[p.id] ?? '#1a1f2e';
+                          const canUpdate =
+                            popupMode === 'add' ? !!data.link.trim() : !!data.pageName.trim() && !!data.link.trim();
+                          const iconColor = PLATFORM_COLORS[p.id] ?? '#0f172a';
                           return (
-                            <div key={p.id} className="d-flex flex-wrap align-items-center gap-2">
+                            <div key={p.id} className="admin-social-form-row">
                               <div
-                                className="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0"
+                                className="admin-social-link-chip__platform flex-shrink-0"
                                 style={{ width: 44, height: 44, backgroundColor: `${iconColor}18`, color: iconColor }}
                               >
-                                <i className={`bi ${p.icon}`} style={{ fontSize: '1.25rem' }} />
+                                <i className={`bi ${p.icon}`} aria-hidden />
                               </div>
-                              {popupMode === 'edit' && (
+                              {popupMode === 'edit' ? (
                                 <input
                                   type="text"
                                   className="form-control"
@@ -846,13 +727,12 @@ export const SchoolAdminSocialShare = () => {
                                       [p.id]: { ...(prev[p.id] ?? { pageName: '', link: '' }), pageName: e.target.value },
                                     }))
                                   }
-                                  style={{ flex: '1 1 140px', minWidth: '140px', borderRadius: '8px' }}
                                 />
-                              )}
+                              ) : null}
                               <input
                                 type="url"
                                 className="form-control"
-                                placeholder={popupMode === 'add' ? `${p.name} link` : `${p.name} link`}
+                                placeholder={`${p.name} link`}
                                 value={data.link}
                                 onChange={(e) =>
                                   setFormData((prev) => ({
@@ -860,33 +740,28 @@ export const SchoolAdminSocialShare = () => {
                                     [p.id]: { ...(prev[p.id] ?? { pageName: clubName, link: '' }), link: e.target.value },
                                   }))
                                 }
-                                style={{ flex: '1 1 160px', minWidth: '160px', borderRadius: '8px' }}
                               />
-                              {popupMode === 'add' && (
+                              {popupMode === 'add' ? (
                                 <button
                                   type="button"
-                                  className="btn btn-outline-success btn-sm flex-shrink-0"
+                                  className="admin-btn-secondary flex-shrink-0"
                                   disabled={!canUpdate}
                                   onClick={() => handleUpdateRow(p.id)}
                                   title={isUpdated ? 'Updated' : 'Update this row'}
                                 >
-                                  {isUpdated ? (
-                                    <i className="bi bi-check-circle-fill text-success" />
-                                  ) : (
-                                    'Update'
-                                  )}
+                                  {isUpdated ? <i className="bi bi-check-circle-fill text-success" aria-hidden /> : 'Update'}
                                 </button>
-                              )}
+                              ) : null}
                             </div>
                           );
                         })}
                       </div>
-                      <div className="d-flex justify-content-end gap-2">
+                      <div className="admin-modal__footer">
                         {popupMode === 'edit' ? (
                           <>
                             <button
                               type="button"
-                              className="btn btn-outline-secondary"
+                              className="admin-btn-secondary"
                               onClick={() => {
                                 setPopupOpen(false);
                                 setEditingId(null);
@@ -897,12 +772,7 @@ export const SchoolAdminSocialShare = () => {
                             >
                               Cancel
                             </button>
-                            <button
-                              type="button"
-                              className="btn btn-primary"
-                              disabled={!canSave}
-                              onClick={handleSaveEdit}
-                            >
+                            <button type="button" className="admin-btn-primary" disabled={!canSave} onClick={handleSaveEdit}>
                               Save
                             </button>
                           </>
@@ -910,7 +780,7 @@ export const SchoolAdminSocialShare = () => {
                           <>
                             <button
                               type="button"
-                              className="btn btn-outline-secondary"
+                              className="admin-btn-secondary"
                               onClick={() => {
                                 setStep('select');
                                 setFormData({});
@@ -919,12 +789,7 @@ export const SchoolAdminSocialShare = () => {
                             >
                               Back
                             </button>
-                            <button
-                              type="button"
-                              className="btn btn-primary"
-                              disabled={!canSave}
-                              onClick={handleSaveFromForm}
-                            >
+                            <button type="button" className="admin-btn-primary" disabled={!canSave} onClick={handleSaveFromForm}>
                               Save
                             </button>
                           </>
@@ -932,59 +797,45 @@ export const SchoolAdminSocialShare = () => {
                       </div>
                     </>
                   )}
-                </div>
-              </div>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      ) : null}
 
-      {/* Edit club modal — change club name and icon */}
-      {editingClubKey && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="edit-club-title"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 1055,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: 'rgba(0,0,0,0.4)',
-            padding: '1rem',
-          }}
-          onClick={() => setEditingClubKey(null)}
-        >
+      {editingClubKey ? (
+        <div className="admin-modal-overlay" role="presentation" onClick={() => setEditingClubKey(null)}>
           <div
-            className="card border-0 shadow"
-            style={{ maxWidth: '420px', width: '100%', borderRadius: '12px' }}
+            className="admin-modal admin-form"
+            style={panelStyle}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-club-title"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="card-body p-4">
-              <h2 id="edit-club-title" className="mb-3" style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1a1f2e' }}>
+            <div className="admin-modal__body">
+              <h2 id="edit-club-title" className="admin-modal__title mb-2">
                 Edit club
               </h2>
-              <p className="text-muted small mb-3">Change the club name or upload a new icon.</p>
+              <p className="admin-form-hint mb-3">Change the club name or upload a new icon.</p>
               <div className="mb-3">
-                <label className="form-label" style={{ fontWeight: 500, color: '#1a1f2e' }}>
+                <label className="admin-form-label" htmlFor="edit-club-name">
                   Club name
                 </label>
                 <input
+                  id="edit-club-name"
                   type="text"
                   className="form-control"
                   placeholder="e.g. Chess Club"
                   value={editingClubName}
                   onChange={(e) => setEditingClubName(e.target.value)}
-                  style={{ borderRadius: '8px' }}
                 />
               </div>
               <div className="mb-4">
-                <label className="form-label" style={{ fontWeight: 500, color: '#1a1f2e' }}>
+                <label className="admin-form-label" htmlFor="edit-club-icon-file">
                   Club icon
                 </label>
                 <input
+                  id="edit-club-icon-file"
                   type="file"
                   className="form-control"
                   accept="image/*"
@@ -1003,37 +854,19 @@ export const SchoolAdminSocialShare = () => {
                       e.target.value = '';
                     }
                   }}
-                  style={{ borderRadius: '8px' }}
                 />
-                {editingClubIconUploading && <small className="text-muted">Uploading…</small>}
-                {editingClubIcon.trim() && (
+                {editingClubIconUploading ? <span className="admin-form-hint">Uploading…</span> : null}
+                {editingClubIcon.trim() ? (
                   <div className="mt-2 d-flex align-items-center gap-2 flex-wrap">
-                    <span className="text-muted small">Preview:</span>
-                    {isImageIconValue(editingClubIcon) ? (
-                      <img
-                        src={imageSrc(editingClubIcon)}
-                        alt=""
-                        style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: '8px', border: '1px solid #dee2e6' }}
-                      />
-                    ) : (
-                      <span
-                        className="d-flex align-items-center justify-content-center rounded-2 overflow-hidden"
-                        style={{ width: 40, height: 40, backgroundColor: '#fff' }}
-                      >
-                        {editingClubIcon.startsWith('fa-') ? (
-                          <i className={editingClubIcon} style={{ fontSize: '1.25rem', color: '#1a1f2e' }} />
-                        ) : (
-                          <i className={`bi ${editingClubIcon}`} style={{ fontSize: '1.25rem', color: '#1a1f2e' }} />
-                        )}
-                      </span>
-                    )}
+                    <span className="admin-form-hint mb-0">Preview:</span>
+                    <ClubIconMark icon={editingClubIcon} size={40} />
                   </div>
-                )}
+                ) : null}
               </div>
-              <div className="d-flex justify-content-end gap-2">
+              <div className="admin-modal__footer">
                 <button
                   type="button"
-                  className="btn btn-outline-secondary"
+                  className="admin-btn-secondary"
                   onClick={() => {
                     setEditingClubKey(null);
                     setEditingClubName('');
@@ -1044,7 +877,7 @@ export const SchoolAdminSocialShare = () => {
                 </button>
                 <button
                   type="button"
-                  className="btn btn-primary"
+                  className="admin-btn-primary"
                   disabled={!editingClubName.trim()}
                   onClick={saveEditClub}
                 >
@@ -1054,99 +887,63 @@ export const SchoolAdminSocialShare = () => {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Delete club confirmation */}
-      {deleteClubGroupKey && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-club-title"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 1060,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: 'rgba(0,0,0,0.4)',
-            padding: '1rem',
-          }}
-          onClick={() => setDeleteClubGroupKey(null)}
-        >
+      {deleteClubGroupKey ? (
+        <div className="admin-modal-overlay" role="presentation" onClick={() => setDeleteClubGroupKey(null)}>
           <div
-            className="card border-0 shadow"
-            style={{ maxWidth: '400px', width: '100%', borderRadius: '12px' }}
+            className="admin-modal"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-club-title"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="card-body p-4">
-              <h2 id="delete-club-title" className="mb-3" style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1a1f2e' }}>
+            <div className="admin-modal__body">
+              <h2 id="delete-club-title" className="admin-modal__title mb-2">
                 Delete this club?
               </h2>
-              <p className="text-muted small mb-4">
+              <p className="admin-modal__text mb-4">
                 This will remove the club and all its social media links. This action cannot be undone.
               </p>
-              <div className="d-flex justify-content-end gap-2">
-                <button type="button" className="btn btn-outline-secondary" onClick={() => setDeleteClubGroupKey(null)}>
+              <div className="admin-modal__footer">
+                <button type="button" className="admin-btn-secondary" onClick={() => setDeleteClubGroupKey(null)}>
                   Cancel
                 </button>
-                <button type="button" className="btn btn-danger" onClick={confirmDeleteClub}>
+                <button type="button" className="admin-btn-danger" onClick={confirmDeleteClub}>
                   Delete club
                 </button>
               </div>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Delete confirmation — custom popup (same white card style as add/edit popup) */}
-      {deleteConfirmId && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-confirm-title"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 1060,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: 'rgba(0,0,0,0.4)',
-            padding: '1rem',
-          }}
-          onClick={() => setDeleteConfirmId(null)}
-        >
+      {deleteConfirmId ? (
+        <div className="admin-modal-overlay" role="presentation" onClick={() => setDeleteConfirmId(null)}>
           <div
-            className="card border-0 shadow"
-            style={{ maxWidth: '400px', width: '100%', borderRadius: '12px' }}
+            className="admin-modal"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-confirm-title"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="card-body p-4">
-              <h2 id="delete-confirm-title" className="mb-3" style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1a1f2e' }}>
+            <div className="admin-modal__body">
+              <h2 id="delete-confirm-title" className="admin-modal__title mb-2">
                 Remove this social account?
               </h2>
-              <p className="text-muted small mb-4">This action cannot be undone.</p>
-              <div className="d-flex justify-content-end gap-2">
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary"
-                  onClick={() => setDeleteConfirmId(null)}
-                >
+              <p className="admin-modal__text mb-4">This action cannot be undone.</p>
+              <div className="admin-modal__footer">
+                <button type="button" className="admin-btn-secondary" onClick={() => setDeleteConfirmId(null)}>
                   Cancel
                 </button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={confirmDelete}
-                >
-                  OK
+                <button type="button" className="admin-btn-danger" onClick={confirmDelete}>
+                  Remove
                 </button>
               </div>
             </div>
           </div>
         </div>
-      )}
-    </div>
+      ) : null}
+    </SchoolAdminLayout>
   );
 };

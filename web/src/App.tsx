@@ -18,8 +18,6 @@ import { SuperAdminLogin } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { CreateSchool } from './pages/CreateSchool';
 import { SchoolDetails } from './pages/SchoolDetails';
-import { EditSchool } from './pages/EditSchool';
-import { SchoolInfo } from './pages/SchoolInfo';
 import { RaiseRequest } from './pages/RaiseRequest';
 import { Queries } from './pages/Queries';
 import { Features } from './pages/Features';
@@ -146,22 +144,8 @@ const SuperAdminRoutes = () => {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="schools/edit"
-        element={
-          <ProtectedRoute>
-            <EditSchool />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="schools/info"
-        element={
-          <ProtectedRoute>
-            <SchoolInfo />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="schools/edit" element={<Navigate to="/super-admin/dashboard?tab=edit" replace />} />
+      <Route path="schools/info" element={<Navigate to="/super-admin/dashboard?tab=info" replace />} />
       <Route
         path="raise-request"
         element={

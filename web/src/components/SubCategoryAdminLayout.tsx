@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { AdminPortalLayout } from './AdminPortalLayout';
 import { SubCategoryAdminNavbar } from './SubCategoryAdminNavbar';
 import { SubCategoryAdminSidebar } from './SubCategoryAdminSidebar';
 
@@ -8,12 +9,8 @@ interface SubCategoryAdminLayoutProps {
 
 export const SubCategoryAdminLayout = ({ children }: SubCategoryAdminLayoutProps) => {
   return (
-    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
-      <SubCategoryAdminNavbar />
-      <div className="admin-shell-body">
-        <SubCategoryAdminSidebar />
-        <main className="admin-main">{children}</main>
-      </div>
-    </div>
+    <AdminPortalLayout navbar={<SubCategoryAdminNavbar />} sidebar={<SubCategoryAdminSidebar />}>
+      {children}
+    </AdminPortalLayout>
   );
 };

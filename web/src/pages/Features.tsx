@@ -1,14 +1,25 @@
-import { useState } from 'react';
+import { useState, type CSSProperties, type FormEvent } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { SuperAdminNavbar } from '../components/SuperAdminNavbar';
-import { SuperAdminSidebar } from '../components/SuperAdminSidebar';
+import { SuperAdminLayout } from '../components/SuperAdminLayout';
+import { ADMIN_PORTAL_ACCENTS } from '../constants/adminPortalTheme';
 import { featuresService, type CreateFeatureDto, type UpdateFeatureDto } from '../services/features.service';
 import type { Feature } from '../services/schools.service';
 
+function getMutationMessage(error: unknown, fallback: string): string {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const msg = (error as { response?: { data?: { message?: string } } }).response?.data?.message;
+    if (typeof msg === 'string') return msg;
+  }
+  return fallback;
+}
+
 export const Features = () => {
   const queryClient = useQueryClient();
+  const panelStyle = { '--admin-accent': ADMIN_PORTAL_ACCENTS.super } as CSSProperties;
+
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; feature: Feature | null }>({
     isOpen: false,
     feature: null,
@@ -32,6 +43,10 @@ export const Features = () => {
       queryClient.invalidateQueries({ queryKey: ['features'] });
       setIsCreating(false);
       setFormData({ code: '', name: '' });
+      setCreateError(null);
+    },
+    onError: (error) => {
+      setCreateError(getMutationMessage(error, 'Failed to create feature. Please try again.'));
     },
   });
 
@@ -53,12 +68,13 @@ export const Features = () => {
     },
   });
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = (e: FormEvent) => {
     e.preventDefault();
     if (!formData.code.trim() || !formData.name.trim()) {
-      alert('Please fill in all fields');
+      setCreateError('Please fill in all fields.');
       return;
     }
+    setCreateError(null);
     createMutation.mutate(formData);
   };
 
@@ -69,7 +85,6 @@ export const Features = () => {
 
   const handleUpdate = (id: string) => {
     if (!editFormData.name.trim()) {
-      alert('Please enter a feature name');
       return;
     }
     updateMutation.mutate({ id, data: editFormData });
@@ -85,8 +100,10 @@ export const Features = () => {
     }
   };
 
-  const handleDeleteCancel = () => {
-    setDeleteModal({ isOpen: false, feature: null });
+  const closeCreate = () => {
+    setIsCreating(false);
+    setFormData({ code: '', name: '' });
+    setCreateError(null);
   };
 
   const cancelEdit = () => {
@@ -95,469 +112,221 @@ export const Features = () => {
   };
 
   return (
-    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
-      <SuperAdminNavbar />
-      <div className="admin-shell-body">
-        <SuperAdminSidebar />
-        <div className="admin-main">
-          {/* Delete Confirmation Modal */}
-          {deleteModal.isOpen && deleteModal.feature && (
-            <div
-              style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1050,
-              }}
-              onClick={handleDeleteCancel}
-            >
-              <div
-                className="card border-0 shadow-lg"
-                style={{
-                  borderRadius: '0px',
-                  minWidth: '400px',
-                  maxWidth: '500px',
-                  width: '90%',
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="card-body p-4">
-                  <h3
-                    style={{
-                      fontSize: '1.5rem',
-                      fontWeight: 'normal',
-                      color: '#1a1f2e',
-                      marginBottom: '1rem',
-                    }}
-                  >
-                    Confirm Delete
-                  </h3>
-                  <p style={{ color: '#6c757d', marginBottom: '1.5rem' }}>
-                    Are you sure you want to delete <strong>"{deleteModal.feature.name}"</strong>? This action
-                    cannot be undone.
-                  </p>
-                  <div className="d-flex justify-content-end gap-3">
-                    <button
-                      onClick={handleDeleteCancel}
-                      className="btn"
-                      style={{
-                        backgroundColor: 'transparent',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '50px',
-                        padding: '0.5rem 1.5rem',
-                        color: '#1a1f2e',
-                        fontWeight: '500',
-                        transition: 'all 0.3s',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#f8f9fa';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleDeleteConfirm}
-                      disabled={deleteMutation.isPending}
-                      className="btn"
-                      style={{
-                        backgroundColor: '#dc3545',
-                        border: 'none',
-                        borderRadius: '50px',
-                        padding: '0.5rem 1.5rem',
-                        color: '#fff',
-                        fontWeight: '500',
-                        transition: 'all 0.3s',
-                        opacity: deleteMutation.isPending ? 0.7 : 1,
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!deleteMutation.isPending) {
-                          e.currentTarget.style.backgroundColor = '#c82333';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!deleteMutation.isPending) {
-                          e.currentTarget.style.backgroundColor = '#dc3545';
-                        }
-                      }}
-                    >
-                      {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
-                    </button>
-                  </div>
-                  {deleteMutation.isError && (
-                    <div className="alert alert-danger mt-3" style={{ borderRadius: '0px', marginBottom: 0 }}>
-                      {(deleteMutation.error as any)?.response?.data?.message ||
-                        'Failed to delete feature. Please try again.'}
-                    </div>
-                  )}
-                </div>
+    <SuperAdminLayout>
+      {deleteModal.isOpen && deleteModal.feature ? (
+        <div className="admin-modal-overlay" onClick={() => setDeleteModal({ isOpen: false, feature: null })} role="presentation">
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()} role="alertdialog" aria-modal="true">
+            <div className="admin-modal__body">
+              <div className="admin-modal__head">
+                <i className="bi bi-trash admin-modal__icon admin-modal__icon--error" aria-hidden />
+                <h3 className="admin-modal__title">Delete feature?</h3>
               </div>
-            </div>
-          )}
-          <div className="d-flex justify-content-between align-items-center mb-4">
-            <h1
-              style={{
-                fontSize: '2rem',
-                fontWeight: 'normal',
-                color: '#1a1f2e',
-                margin: 0,
-              }}
-            >
-              Features Management
-            </h1>
-            <button
-              onClick={() => setIsCreating(true)}
-              className="btn"
-              style={{
-                backgroundColor: '#1a1f2e',
-                border: 'none',
-                borderRadius: '50px',
-                padding: '0.5rem 1.5rem',
-                color: '#fff',
-                fontWeight: '500',
-                transition: 'all 0.3s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#fff';
-                e.currentTarget.style.color = '#1a1f2e';
-                e.currentTarget.style.border = '1px solid #1a1f2e';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#1a1f2e';
-                e.currentTarget.style.color = '#fff';
-                e.currentTarget.style.border = 'none';
-              }}
-            >
-              + Add Feature
-            </button>
-          </div>
-
-          {/* Create Form */}
-          {isCreating && (
-            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '0px' }}>
-              <div className="card-body p-4">
-                <h2
-                  style={{
-                    fontSize: '1.25rem',
-                    fontWeight: 'normal',
-                    color: '#1a1f2e',
-                    marginBottom: '1.5rem',
-                  }}
+              <p className="admin-modal__text">
+                Are you sure you want to delete <strong>{deleteModal.feature.name}</strong>? This cannot be
+                undone.
+              </p>
+              {deleteMutation.isError ? (
+                <div className="alert alert-danger rounded-3 mb-3">
+                  {getMutationMessage(deleteMutation.error, 'Failed to delete feature. Please try again.')}
+                </div>
+              ) : null}
+              <div className="admin-modal__footer">
+                <button
+                  type="button"
+                  className="admin-btn-secondary"
+                  onClick={() => setDeleteModal({ isOpen: false, feature: null })}
                 >
-                  Create New Feature
-                </h2>
-                <form onSubmit={handleCreate}>
-                  <div className="row g-3">
-                    <div className="col-md-6">
-                      <label className="form-label" style={{ fontWeight: '500', color: '#1a1f2e' }}>
-                        Feature Code *
-                      </label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        required
-                        value={formData.code}
-                        onChange={(e) =>
-                          setFormData({ ...formData, code: e.target.value.toUpperCase().replace(/[^A-Z_]/g, '') })
-                        }
-                        placeholder="e.g., NEWS, EVENTS"
-                        style={{ borderRadius: '0px', padding: '0.75rem 1rem' }}
-                        pattern="[A-Z_]+"
-                        title="Code must contain only uppercase letters and underscores"
-                      />
-                      <small className="text-muted" style={{ fontSize: '0.75rem' }}>
-                        Uppercase letters and underscores only (e.g., NEWS, EVENTS, INSTAGRAM)
-                      </small>
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label" style={{ fontWeight: '500', color: '#1a1f2e' }}>
-                        Feature Name *
-                      </label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        required
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="e.g., News, Events"
-                        style={{ borderRadius: '0px', padding: '0.75rem 1rem' }}
-                      />
-                    </div>
-                  </div>
-                  <div className="d-flex justify-content-end gap-3 mt-4">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsCreating(false);
-                        setFormData({ code: '', name: '' });
-                      }}
-                      className="btn"
-                      style={{
-                        backgroundColor: 'transparent',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '50px',
-                        padding: '0.5rem 1.5rem',
-                        color: '#1a1f2e',
-                        fontWeight: '500',
-                      }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={createMutation.isPending}
-                      className="btn"
-                      style={{
-                        backgroundColor: '#1a1f2e',
-                        border: 'none',
-                        borderRadius: '50px',
-                        padding: '0.5rem 1.5rem',
-                        color: '#fff',
-                        fontWeight: '500',
-                        opacity: createMutation.isPending ? 0.7 : 1,
-                      }}
-                    >
-                      {createMutation.isPending ? 'Creating...' : 'Create'}
-                    </button>
-                  </div>
-                </form>
-                {createMutation.isError && (
-                  <div className="alert alert-danger mt-3" style={{ borderRadius: '0px' }}>
-                    {(createMutation.error as any)?.response?.data?.message ||
-                      'Failed to create feature. Please try again.'}
-                  </div>
-                )}
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="admin-btn-danger"
+                  onClick={handleDeleteConfirm}
+                  disabled={deleteMutation.isPending}
+                >
+                  {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
+                </button>
               </div>
-            </div>
-          )}
-
-          {/* Features List */}
-          <div className="card border-0 shadow-sm" style={{ borderRadius: '0px' }}>
-            <div className="card-body p-4">
-              {isLoading ? (
-                <div className="text-center py-5">
-                  <p style={{ color: '#6c757d' }}>Loading features...</p>
-                </div>
-              ) : features && features.length > 0 ? (
-                <div className="table-responsive">
-                  <table className="table table-hover mb-0">
-                    <thead>
-                      <tr style={{ borderBottom: '2px solid #dee2e6' }}>
-                        <th
-                          style={{
-                            fontWeight: '500',
-                            color: '#1a1f2e',
-                            padding: '1rem',
-                            borderBottom: 'none',
-                          }}
-                        >
-                          Code
-                        </th>
-                        <th
-                          style={{
-                            fontWeight: '500',
-                            color: '#1a1f2e',
-                            padding: '1rem',
-                            borderBottom: 'none',
-                          }}
-                        >
-                          Name
-                        </th>
-                        <th
-                          style={{
-                            fontWeight: '500',
-                            color: '#1a1f2e',
-                            padding: '1rem',
-                            borderBottom: 'none',
-                          }}
-                        >
-                          Created At
-                        </th>
-                        <th
-                          style={{
-                            fontWeight: '500',
-                            color: '#1a1f2e',
-                            padding: '1rem',
-                            borderBottom: 'none',
-                            width: '200px',
-                          }}
-                        >
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {features.map((feature) => (
-                        <tr key={feature.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                          <td
-                            style={{
-                              padding: '1rem',
-                              color: '#1a1f2e',
-                              fontFamily: 'monospace',
-                              fontSize: '0.9rem',
-                              fontWeight: '500',
-                            }}
-                          >
-                            {feature.code}
-                          </td>
-                          <td style={{ padding: '1rem' }}>
-                            {editingId === feature.id ? (
-                              <input
-                                type="text"
-                                className="form-control"
-                                value={editFormData.name}
-                                onChange={(e) => setEditFormData({ name: e.target.value })}
-                                style={{ borderRadius: '0px', padding: '0.5rem 0.75rem' }}
-                                autoFocus
-                              />
-                            ) : (
-                              <span style={{ color: '#1a1f2e' }}>{feature.name}</span>
-                            )}
-                          </td>
-                          <td style={{ padding: '1rem', color: '#6c757d', fontSize: '0.9rem' }}>
-                            {new Date(feature.createdAt).toLocaleDateString()}
-                          </td>
-                          <td style={{ padding: '1rem' }}>
-                            {editingId === feature.id ? (
-                              <div className="d-flex gap-2">
-                                <button
-                                  onClick={() => handleUpdate(feature.id)}
-                                  disabled={updateMutation.isPending}
-                                  className="btn btn-sm"
-                                  style={{
-                                    backgroundColor: '#1a1f2e',
-                                    border: 'none',
-                                    borderRadius: '0px',
-                                    color: '#fff',
-                                    padding: '0.25rem 0.75rem',
-                                    fontSize: '0.875rem',
-                                    opacity: updateMutation.isPending ? 0.7 : 1,
-                                  }}
-                                >
-                                  {updateMutation.isPending ? 'Saving...' : 'Save'}
-                                </button>
-                                <button
-                                  onClick={cancelEdit}
-                                  className="btn btn-sm"
-                                  style={{
-                                    backgroundColor: 'transparent',
-                                    border: '1px solid #dee2e6',
-                                    borderRadius: '0px',
-                                    color: '#1a1f2e',
-                                    padding: '0.25rem 0.75rem',
-                                    fontSize: '0.875rem',
-                                  }}
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="d-flex gap-2">
-                                <button
-                                  onClick={() => handleEdit(feature)}
-                                  className="btn btn-sm"
-                                  style={{
-                                    backgroundColor: 'transparent',
-                                    border: '1px solid #1a1f2e',
-                                    borderRadius: '0px',
-                                    color: '#1a1f2e',
-                                    padding: '0.5rem',
-                                    width: '36px',
-                                    height: '36px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    transition: 'all 0.3s',
-                                  }}
-                                  title="Edit"
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#1a1f2e';
-                                    e.currentTarget.style.color = '#fff';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'transparent';
-                                    e.currentTarget.style.color = '#1a1f2e';
-                                  }}
-                                >
-                                  <i className="bi bi-pencil" style={{ fontSize: '1rem' }}></i>
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteClick(feature)}
-                                  disabled={deleteMutation.isPending}
-                                  className="btn btn-sm"
-                                  style={{
-                                    backgroundColor: '#dc3545',
-                                    border: 'none',
-                                    borderRadius: '0px',
-                                    color: '#fff',
-                                    padding: '0.5rem',
-                                    width: '36px',
-                                    height: '36px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    opacity: deleteMutation.isPending ? 0.7 : 1,
-                                    transition: 'all 0.3s',
-                                  }}
-                                  title="Delete"
-                                  onMouseEnter={(e) => {
-                                    if (!deleteMutation.isPending) {
-                                      e.currentTarget.style.backgroundColor = '#c82333';
-                                    }
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    if (!deleteMutation.isPending) {
-                                      e.currentTarget.style.backgroundColor = '#dc3545';
-                                    }
-                                  }}
-                                >
-                                  <i className="bi bi-trash" style={{ fontSize: '1rem' }}></i>
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-center py-5">
-                  <p style={{ color: '#6c757d', marginBottom: '1rem' }}>No features found.</p>
-                  <button
-                    onClick={() => setIsCreating(true)}
-                    className="btn"
-                    style={{
-                      backgroundColor: '#1a1f2e',
-                      border: 'none',
-                      borderRadius: '50px',
-                      padding: '0.5rem 1.5rem',
-                      color: '#fff',
-                      fontWeight: '500',
-                    }}
-                  >
-                    Create Your First Feature
-                  </button>
-                </div>
-              )}
-              {updateMutation.isError && (
-                <div className="alert alert-danger mt-3" style={{ borderRadius: '0px' }}>
-                  {(updateMutation.error as any)?.response?.data?.message ||
-                    'Failed to update feature. Please try again.'}
-                </div>
-              )}
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      ) : null}
+
+      <header className="admin-page-header">
+        <h1 className="admin-page-title">Features</h1>
+        <p className="admin-page-subtitle">
+          Manage platform features available when creating or editing schools.
+        </p>
+      </header>
+
+      {isCreating ? (
+        <section className="admin-panel admin-panel--nested" style={panelStyle}>
+          <div className="admin-panel__header">
+            <h2 className="admin-panel__title">New feature</h2>
+          </div>
+          <div className="admin-panel__body">
+            <form className="admin-form" onSubmit={handleCreate}>
+              <div className="row g-3">
+                <div className="col-md-6">
+                  <label className="admin-form-label" htmlFor="feature-code">
+                    Feature code *
+                  </label>
+                  <input
+                    id="feature-code"
+                    type="text"
+                    className="form-control"
+                    required
+                    value={formData.code}
+                    onChange={(e) =>
+                      setFormData({ ...formData, code: e.target.value.toUpperCase().replace(/[^A-Z_]/g, '') })
+                    }
+                    placeholder="e.g., NEWS, EVENTS"
+                    pattern="[A-Z_]+"
+                    title="Code must contain only uppercase letters and underscores"
+                  />
+                  <small className="admin-form-hint">Uppercase letters and underscores only.</small>
+                </div>
+                <div className="col-md-6">
+                  <label className="admin-form-label" htmlFor="feature-name">
+                    Feature name *
+                  </label>
+                  <input
+                    id="feature-name"
+                    type="text"
+                    className="form-control"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g., News, Events"
+                  />
+                </div>
+              </div>
+              {createError ? (
+                <p className="admin-form-hint admin-form-hint--error mt-3 mb-0">{createError}</p>
+              ) : null}
+              {createMutation.isError && !createError ? (
+                <p className="admin-form-hint admin-form-hint--error mt-3 mb-0">
+                  {getMutationMessage(createMutation.error, 'Failed to create feature. Please try again.')}
+                </p>
+              ) : null}
+              <div className="admin-form-actions">
+                <button type="button" className="admin-btn-secondary" onClick={closeCreate}>
+                  Cancel
+                </button>
+                <button type="submit" className="admin-btn-primary" disabled={createMutation.isPending}>
+                  {createMutation.isPending ? 'Creating…' : 'Create feature'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="admin-panel" style={panelStyle}>
+        <div className="admin-panel__header">
+          <h2 className="admin-panel__title">All features</h2>
+          {!isCreating ? (
+            <button type="button" className="admin-btn-primary" onClick={() => setIsCreating(true)}>
+              + Add feature
+            </button>
+          ) : null}
+        </div>
+        <div className="admin-panel__body admin-panel__body--flush-top">
+          {isLoading ? (
+            <div className="admin-loading-state">
+              <span className="spinner-border spinner-border-sm text-secondary me-2" role="status" />
+              Loading features…
+            </div>
+          ) : features && features.length > 0 ? (
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Code</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Created</th>
+                    <th scope="col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {features.map((feature) => (
+                    <tr key={feature.id}>
+                      <td>
+                        <span className="admin-pill admin-pill--feature admin-table__mono">{feature.code}</span>
+                      </td>
+                      <td>
+                        {editingId === feature.id ? (
+                          <input
+                            type="text"
+                            className="form-control form-control-sm"
+                            value={editFormData.name}
+                            onChange={(e) => setEditFormData({ name: e.target.value })}
+                            autoFocus
+                          />
+                        ) : (
+                          <span className="admin-table__strong">{feature.name}</span>
+                        )}
+                      </td>
+                      <td>{new Date(feature.createdAt).toLocaleDateString()}</td>
+                      <td>
+                        {editingId === feature.id ? (
+                          <div className="admin-table-actions">
+                            <button
+                              type="button"
+                              className="admin-btn-primary admin-btn-sm"
+                              onClick={() => handleUpdate(feature.id)}
+                              disabled={updateMutation.isPending || !editFormData.name.trim()}
+                            >
+                              {updateMutation.isPending ? 'Saving…' : 'Save'}
+                            </button>
+                            <button type="button" className="admin-btn-secondary admin-btn-sm" onClick={cancelEdit}>
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="admin-table-actions">
+                            <button
+                              type="button"
+                              className="admin-icon-btn admin-icon-btn--edit"
+                              onClick={() => handleEdit(feature)}
+                              title="Edit name"
+                              aria-label={`Edit ${feature.name}`}
+                            >
+                              <i className="bi bi-pencil" aria-hidden />
+                            </button>
+                            <button
+                              type="button"
+                              className="admin-icon-btn admin-icon-btn--danger"
+                              onClick={() => handleDeleteClick(feature)}
+                              disabled={deleteMutation.isPending}
+                              title="Delete"
+                              aria-label={`Delete ${feature.name}`}
+                            >
+                              <i className="bi bi-trash" aria-hidden />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="admin-empty-state">
+              <p>No features yet.</p>
+              <button type="button" className="admin-btn-primary" onClick={() => setIsCreating(true)}>
+                Create your first feature
+              </button>
+            </div>
+          )}
+          {updateMutation.isError ? (
+            <div className="alert alert-danger rounded-3 mt-3 mb-0">
+              {getMutationMessage(updateMutation.error, 'Failed to update feature. Please try again.')}
+            </div>
+          ) : null}
+        </div>
+      </section>
+    </SuperAdminLayout>
   );
 };

@@ -1,23 +1,67 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { SuperAdminNavbar } from '../components/SuperAdminNavbar';
-import { SuperAdminSidebar } from '../components/SuperAdminSidebar';
+import { SuperAdminLayout } from '../components/SuperAdminLayout';
 import { StatusPopup } from '../components/StatusPopup';
+import { ADMIN_PORTAL_ACCENTS } from '../constants/adminPortalTheme';
 import { supportService, SupportRequestType, MeetingType, TimeZone } from '../services/support.service';
 import type { SupportRequestDto } from '../services/support.service';
 
+const SUPPORT_HERO_IMAGE =
+  'https://media.istockphoto.com/id/1469792786/vector/customer-support-3d-illustration-personal-assistant-service-person-advisor-and-helpful.jpg?s=612x612&w=0&k=20&c=1pq_S8sYDPF6bFz2H74QCuKRzsNfR7wcAFKJ4yQ06Y0=';
+
+const TIME_SLOTS = [
+  '9:00 AM - 10:00 AM',
+  '10:00 AM - 11:00 AM',
+  '11:00 AM - 12:00 PM',
+  '12:00 PM - 1:00 PM',
+  '1:00 PM - 2:00 PM',
+  '2:00 PM - 3:00 PM',
+  '3:00 PM - 4:00 PM',
+  '4:00 PM - 5:00 PM',
+];
+
+const REQUEST_OPTIONS: { type: SupportRequestType; label: string }[] = [
+  { type: SupportRequestType.RAISE_ISSUE, label: 'Raise an Issue with the Software' },
+  { type: SupportRequestType.INTEGRATE_FEATURE, label: 'Needs to Integrate New Feature' },
+  { type: SupportRequestType.UI_CHANGE, label: 'UI Change Request' },
+  { type: SupportRequestType.UPSCALE_PLATFORM, label: 'Upscale the Platform' },
+  { type: SupportRequestType.CUSTOM_MESSAGE, label: 'Custom Message' },
+  { type: SupportRequestType.SCHEDULE_MEETING, label: 'Schedule Meeting' },
+];
+
+function supportTypeLabel(type: SupportRequestType): string {
+  return REQUEST_OPTIONS.find((o) => o.type === type)?.label ?? 'Support request';
+}
+
 export const RaiseRequest = () => {
-  const [showChatbot, setShowChatbot] = useState<boolean>(false);
+  const [showChatbot, setShowChatbot] = useState(false);
   const [selectedType, setSelectedType] = useState<SupportRequestType | null>(null);
-  const [description, setDescription] = useState<string>('');
-  const [customMessage, setCustomMessage] = useState<string>('');
+  const [description, setDescription] = useState('');
+  const [customMessage, setCustomMessage] = useState('');
   const [meetingType, setMeetingType] = useState<MeetingType | null>(null);
-  const [meetingDate, setMeetingDate] = useState<string>('');
+  const [meetingDate, setMeetingDate] = useState('');
   const [timeZone, setTimeZone] = useState<TimeZone | null>(null);
-  const [timeSlot, setTimeSlot] = useState<string>('');
-  const [popupShow, setPopupShow] = useState<boolean>(false);
+  const [timeSlot, setTimeSlot] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [popupShow, setPopupShow] = useState(false);
   const [popupType, setPopupType] = useState<'success' | 'error'>('success');
-  const [popupMessage, setPopupMessage] = useState<string>('');
+  const [popupMessage, setPopupMessage] = useState('');
+
+  const resetFlow = () => {
+    setSelectedType(null);
+    setDescription('');
+    setCustomMessage('');
+    setMeetingType(null);
+    setMeetingDate('');
+    setTimeZone(null);
+    setTimeSlot('');
+    setFormError(null);
+  };
+
+  const closePanel = () => {
+    setShowChatbot(false);
+    resetFlow();
+  };
 
   const sendRequestMutation = useMutation({
     mutationFn: (data: SupportRequestDto) => supportService.sendRequest(data),
@@ -28,28 +72,30 @@ export const RaiseRequest = () => {
         : 'Support request sent successfully! Developer will get in touch with you shortly.';
       setPopupMessage(msg);
       setPopupShow(true);
-      setShowChatbot(false);
-      setSelectedType(null);
-      setDescription('');
-      setCustomMessage('');
-      setMeetingType(null);
-      setMeetingDate('');
-      setTimeZone(null);
-      setTimeSlot('');
+      closePanel();
     },
-    onError: (error: any) => {
+    onError: (error: { response?: { data?: { message?: string } } }) => {
       setPopupType('error');
       setPopupMessage(error.response?.data?.message || 'Failed to send support request');
       setPopupShow(true);
     },
   });
 
+  const isSubmitDisabled =
+    sendRequestMutation.isPending ||
+    !selectedType ||
+    (selectedType === SupportRequestType.RAISE_ISSUE && !description) ||
+    (selectedType === SupportRequestType.UI_CHANGE && !description) ||
+    (selectedType === SupportRequestType.UPSCALE_PLATFORM && !description) ||
+    (selectedType === SupportRequestType.CUSTOM_MESSAGE && !customMessage) ||
+    (selectedType === SupportRequestType.SCHEDULE_MEETING &&
+      (!meetingType || !meetingDate || !timeZone || !timeSlot));
+
   const handleSubmit = () => {
     if (!selectedType) return;
+    setFormError(null);
 
-    const requestData: SupportRequestDto = {
-      type: selectedType,
-    };
+    const requestData: SupportRequestDto = { type: selectedType };
 
     if (selectedType === SupportRequestType.RAISE_ISSUE && description) {
       requestData.description = description;
@@ -61,7 +107,7 @@ export const RaiseRequest = () => {
       requestData.customMessage = customMessage;
     } else if (selectedType === SupportRequestType.SCHEDULE_MEETING) {
       if (!meetingType || !meetingDate || !timeZone || !timeSlot) {
-        alert('Please fill all meeting details including date');
+        setFormError('Please fill all meeting details including date.');
         return;
       }
       requestData.meetingType = meetingType;
@@ -75,646 +121,215 @@ export const RaiseRequest = () => {
 
   const handleTypeSelect = (type: SupportRequestType) => {
     setSelectedType(type);
-    // Reset all fields when type changes
     setDescription('');
     setCustomMessage('');
     setMeetingType(null);
     setMeetingDate('');
     setTimeZone(null);
     setTimeSlot('');
+    setFormError(null);
   };
 
-  const timeSlots = [
-    '9:00 AM - 10:00 AM',
-    '10:00 AM - 11:00 AM',
-    '11:00 AM - 12:00 PM',
-    '12:00 PM - 1:00 PM',
-    '1:00 PM - 2:00 PM',
-    '2:00 PM - 3:00 PM',
-    '3:00 PM - 4:00 PM',
-    '4:00 PM - 5:00 PM',
-  ];
+  const panelStyle = { '--admin-accent': ADMIN_PORTAL_ACCENTS.super } as CSSProperties;
+  const needsDescription =
+    selectedType === SupportRequestType.RAISE_ISSUE ||
+    selectedType === SupportRequestType.UI_CHANGE ||
+    selectedType === SupportRequestType.UPSCALE_PLATFORM;
 
   return (
-    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
-      <SuperAdminNavbar />
-      <div className="admin-shell-body">
-        <SuperAdminSidebar />
-        <div 
-          style={{ 
-            flex: 1, 
-            padding: '2rem',
-            position: 'relative',
-            overflow: 'hidden',
-          }}
-        >
-          {/* Main Content - Image and Button (Always visible in background) */}
-          <div 
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: 'calc(100vh - 200px)',
-              gap: '2rem',
-            }}
+    <SuperAdminLayout>
+      <header className="admin-page-header">
+        <h1 className="admin-page-title">Raise a request</h1>
+        <p className="admin-page-subtitle">
+          Contact the developer for bugs, features, UI changes, or schedule a meeting.
+        </p>
+      </header>
+
+      <div className="admin-raise-request">
+        <div className={`admin-raise-request__hero${showChatbot ? ' is-dimmed' : ''}`}>
+          <img src={SUPPORT_HERO_IMAGE} alt="Customer support" className="admin-raise-request__image" />
+          <button
+            type="button"
+            className="admin-btn-primary admin-raise-request__cta"
+            onClick={() => setShowChatbot(true)}
+            disabled={showChatbot}
           >
-            <img
-              src="https://media.istockphoto.com/id/1469792786/vector/customer-support-3d-illustration-personal-assistant-service-person-advisor-and-helpful.jpg?s=612x612&w=0&k=20&c=1pq_S8sYDPF6bFz2H74QCuKRzsNfR7wcAFKJ4yQ06Y0="
-              alt="Customer Support"
-              style={{
-                maxWidth: '400px',
-                width: '100%',
-                height: 'auto',
-                borderRadius: '12px',
-              }}
-            />
-            <button
-              onClick={() => setShowChatbot(true)}
-              style={{
-                backgroundColor: '#1a1f2e',
-                border: 'none',
-                borderRadius: '50px',
-                padding: '0.75rem 2rem',
-                color: '#fff',
-                fontWeight: '500',
-                fontSize: '1rem',
-                cursor: 'pointer',
-                transition: 'all 0.3s',
-                opacity: showChatbot ? 0.3 : 1,
-                pointerEvents: showChatbot ? 'none' : 'auto',
-              }}
-              onMouseEnter={(e) => {
-                if (!showChatbot) {
-                  e.currentTarget.style.backgroundColor = '#fff';
-                  e.currentTarget.style.color = '#1a1f2e';
-                  e.currentTarget.style.border = '1px solid #1a1f2e';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!showChatbot) {
-                  e.currentTarget.style.backgroundColor = '#1a1f2e';
-                  e.currentTarget.style.color = '#fff';
-                  e.currentTarget.style.border = 'none';
-                }
-              }}
-            >
-              Contact Developer
-            </button>
-          </div>
+            Contact Developer
+          </button>
+        </div>
 
-          {/* Chatbot Interface - Slides in from right */}
-          {showChatbot && (
-            <div
-              style={{
-                position: 'absolute',
-                right: '0px',
-                top: '5%',
-                width: '40%',
-                height: '80%',
-                backgroundColor: 'rgb(255, 255, 255)',
-                border: '1px solid rgb(222, 226, 230)',
-                borderRadius: '25px',
-                padding: '2rem',
-                overflowY: 'auto',
-                boxShadow: 'rgba(0, 0, 0, 0.1) -2px 0px 8px',
-                animation: 'slideInFromRight 0.5s ease-in-out',
-                transform: 'translateX(0)',
-              }}
-            >
-              <div className="d-flex justify-content-between align-items-center mb-4">
-                <h2 style={{
-                  fontSize: '1.5rem',
-                  fontWeight: 'normal',
-                  color: '#1a1f2e',
-                  margin: 0
-                }}>
-                  Support Chat
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowChatbot(false);
-                    setSelectedType(null);
-                    setDescription('');
-                    setCustomMessage('');
-                    setMeetingType(null);
-                    setMeetingDate('');
-                    setTimeZone(null);
-                    setTimeSlot('');
-                  }}
-                  className="btn-close"
-                  style={{
-                    fontSize: '1.5rem',
-                    border: 'none',
-                    background: 'transparent',
-                    cursor: 'pointer',
-                    color: '#6c757d'
-                  }}
-                >
-                  ×
-                </button>
+        {showChatbot ? (
+          <section className="admin-panel admin-raise-request__panel" style={panelStyle} aria-label="Support chat">
+            <div className="admin-panel__header">
+              <h2 className="admin-panel__title mb-0">Support chat</h2>
+              <button type="button" className="admin-modal__close" onClick={closePanel} aria-label="Close">
+                <i className="bi bi-x-lg" aria-hidden />
+              </button>
+            </div>
+
+            <div className="admin-panel__body admin-form">
+              <div className="admin-notice admin-notice--info admin-support-greeting mb-0">
+                Hello! How can I help you today? Please select an option below.
               </div>
 
-              {/* Greeting Message */}
-              <div className="mb-4">
-                <div style={{
-                  backgroundColor: '#f8f9fa',
-                  padding: '1rem',
-                  borderRadius: '8px',
-                  marginBottom: '1rem',
-                }}>
-                  <p style={{ color: '#1a1f2e', margin: 0 }}>
-                    👋 Hello! How can I help you today? Please select an option below:
-                  </p>
-                </div>
-              </div>
-
-              {/* Request Type Options */}
               {!selectedType ? (
-                <div className="d-flex flex-column gap-2">
-                  <button
-                    onClick={() => handleTypeSelect(SupportRequestType.RAISE_ISSUE)}
-                    className="btn"
-                    style={{
-                      backgroundColor: '#fff',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '8px',
-                      padding: '1rem',
-                      textAlign: 'left',
-                      color: '#1a1f2e',
-                      fontWeight: '500',
-                      transition: 'all 0.3s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f8f9fa';
-                      e.currentTarget.style.borderColor = '#1a1f2e';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#fff';
-                      e.currentTarget.style.borderColor = '#dee2e6';
-                    }}
-                  >
-                    Raise an Issue with the Software
-                  </button>
-
-                  <button
-                    onClick={() => handleTypeSelect(SupportRequestType.INTEGRATE_FEATURE)}
-                    className="btn"
-                    style={{
-                      backgroundColor: '#fff',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '8px',
-                      padding: '1rem',
-                      textAlign: 'left',
-                      color: '#1a1f2e',
-                      fontWeight: '500',
-                      transition: 'all 0.3s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f8f9fa';
-                      e.currentTarget.style.borderColor = '#1a1f2e';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#fff';
-                      e.currentTarget.style.borderColor = '#dee2e6';
-                    }}
-                  >
-                    Needs to Integrate New Feature
-                  </button>
-
-                  <button
-                    onClick={() => handleTypeSelect(SupportRequestType.UI_CHANGE)}
-                    className="btn"
-                    style={{
-                      backgroundColor: '#fff',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '8px',
-                      padding: '1rem',
-                      textAlign: 'left',
-                      color: '#1a1f2e',
-                      fontWeight: '500',
-                      transition: 'all 0.3s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f8f9fa';
-                      e.currentTarget.style.borderColor = '#1a1f2e';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#fff';
-                      e.currentTarget.style.borderColor = '#dee2e6';
-                    }}
-                  >
-                    UI Change Request
-                  </button>
-
-                  <button
-                    onClick={() => handleTypeSelect(SupportRequestType.UPSCALE_PLATFORM)}
-                    className="btn"
-                    style={{
-                      backgroundColor: '#fff',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '8px',
-                      padding: '1rem',
-                      textAlign: 'left',
-                      color: '#1a1f2e',
-                      fontWeight: '500',
-                      transition: 'all 0.3s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f8f9fa';
-                      e.currentTarget.style.borderColor = '#1a1f2e';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#fff';
-                      e.currentTarget.style.borderColor = '#dee2e6';
-                    }}
-                  >
-                    Upscale the Platform
-                  </button>
-
-                  <button
-                    onClick={() => handleTypeSelect(SupportRequestType.CUSTOM_MESSAGE)}
-                    className="btn"
-                    style={{
-                      backgroundColor: '#fff',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '8px',
-                      padding: '1rem',
-                      textAlign: 'left',
-                      color: '#1a1f2e',
-                      fontWeight: '500',
-                      transition: 'all 0.3s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f8f9fa';
-                      e.currentTarget.style.borderColor = '#1a1f2e';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#fff';
-                      e.currentTarget.style.borderColor = '#dee2e6';
-                    }}
-                  >
-                    Custom Message
-                  </button>
-
-                  <button
-                    onClick={() => handleTypeSelect(SupportRequestType.SCHEDULE_MEETING)}
-                    className="btn"
-                    style={{
-                      backgroundColor: '#fff',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '8px',
-                      padding: '1rem',
-                      textAlign: 'left',
-                      color: '#1a1f2e',
-                      fontWeight: '500',
-                      transition: 'all 0.3s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f8f9fa';
-                      e.currentTarget.style.borderColor = '#1a1f2e';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#fff';
-                      e.currentTarget.style.borderColor = '#dee2e6';
-                    }}
-                  >
-                    Schedule Meeting
-                  </button>
+                <div className="admin-support-options mt-3">
+                  {REQUEST_OPTIONS.map(({ type, label }) => (
+                    <button key={type} type="button" className="admin-support-option" onClick={() => handleTypeSelect(type)}>
+                      {label}
+                    </button>
+                  ))}
                 </div>
               ) : (
-                <div>
-                  {/* Selected Type Display */}
-                  <div className="mb-3" style={{
-                    backgroundColor: '#e7f3ff',
-                    padding: '0.75rem 1rem',
-                    borderRadius: '8px',
-                    border: '1px solid #b3d9ff',
-                  }}>
-                    <p style={{ margin: 0, color: '#1a1f2e', fontWeight: '500' }}>
-                      Selected: {
-                        selectedType === SupportRequestType.RAISE_ISSUE ? 'Raise an Issue with the Software' :
-                        selectedType === SupportRequestType.INTEGRATE_FEATURE ? 'Needs to Integrate New Feature' :
-                        selectedType === SupportRequestType.UI_CHANGE ? 'UI Change Request' :
-                        selectedType === SupportRequestType.UPSCALE_PLATFORM ? 'Upscale the Platform' :
-                        selectedType === SupportRequestType.CUSTOM_MESSAGE ? 'Custom Message' :
-                        'Schedule Meeting'
-                      }
-                    </p>
+                <>
+                  <div className="admin-notice admin-notice--info admin-support-selected mt-3 mb-0">
+                    Selected: <strong>{supportTypeLabel(selectedType)}</strong>
                   </div>
 
-                  {/* Integrate Feature - Auto Message */}
-                  {selectedType === SupportRequestType.INTEGRATE_FEATURE && (
-                    <div className="mb-4" style={{
-                      backgroundColor: '#d4edda',
-                      padding: '1rem',
-                      borderRadius: '8px',
-                      border: '1px solid #c3e6cb',
-                    }}>
-                      <p style={{ margin: 0, color: '#155724', fontWeight: '500' }}>
-                        Developer will get in touch with you shortly.
-                      </p>
+                  {selectedType === SupportRequestType.INTEGRATE_FEATURE ? (
+                    <div className="admin-notice admin-notice--info mt-3 mb-0">
+                      Developer will get in touch with you shortly.
                     </div>
-                  )}
+                  ) : null}
 
-                  {/* Text Areas for Issues, UI Change, Upscale, Custom Message */}
-                  {(selectedType === SupportRequestType.RAISE_ISSUE ||
-                    selectedType === SupportRequestType.UI_CHANGE ||
-                    selectedType === SupportRequestType.UPSCALE_PLATFORM) && (
-                    <div className="mb-4">
-                      <label className="form-label" style={{ fontWeight: '500', color: '#1a1f2e', marginBottom: '0.5rem' }}>
-                        Please describe your request:
+                  {needsDescription ? (
+                    <div className="admin-form-section">
+                      <label className="admin-form-label" htmlFor="support-description">
+                        Please describe your request
                       </label>
                       <textarea
+                        id="support-description"
                         className="form-control"
                         rows={6}
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Enter your comments here..."
-                        style={{
-                          borderRadius: '0px',
-                          padding: '0.75rem',
-                          fontSize: '1rem',
-                          border: '1px solid #dee2e6',
-                          resize: 'vertical'
-                        }}
+                        placeholder="Enter your comments here…"
                       />
                     </div>
-                  )}
+                  ) : null}
 
-                  {/* Custom Message */}
-                  {selectedType === SupportRequestType.CUSTOM_MESSAGE && (
-                    <div className="mb-4">
-                      <label className="form-label" style={{ fontWeight: '500', color: '#1a1f2e', marginBottom: '0.5rem' }}>
-                        Your Message:
+                  {selectedType === SupportRequestType.CUSTOM_MESSAGE ? (
+                    <div className="admin-form-section">
+                      <label className="admin-form-label" htmlFor="support-custom-message">
+                        Your message
                       </label>
                       <textarea
+                        id="support-custom-message"
                         className="form-control"
                         rows={6}
                         value={customMessage}
                         onChange={(e) => setCustomMessage(e.target.value)}
-                        placeholder="Enter your custom message here..."
-                        style={{
-                          borderRadius: '0px',
-                          padding: '0.75rem',
-                          fontSize: '1rem',
-                          border: '1px solid #dee2e6',
-                          resize: 'vertical'
-                        }}
+                        placeholder="Enter your custom message here…"
                       />
                     </div>
-                  )}
+                  ) : null}
 
-                  {/* Schedule Meeting Options */}
-                  {selectedType === SupportRequestType.SCHEDULE_MEETING && (
+                  {selectedType === SupportRequestType.SCHEDULE_MEETING ? (
                     <>
-                      {/* Meeting Platform Selection */}
-                      <div className="mb-4">
-                        <label className="form-label" style={{ fontWeight: '500', color: '#1a1f2e', marginBottom: '0.5rem' }}>
-                          Select Meeting Platform:
-                        </label>
-                        <div className="d-flex gap-3">
+                      <div className="admin-form-section">
+                        <span className="admin-form-label">Select meeting platform</span>
+                        <div className="admin-segment-row">
                           <button
                             type="button"
+                            className={`admin-segment-btn${meetingType === MeetingType.GOOGLE_MEET ? ' is-active' : ''}`}
                             onClick={() => setMeetingType(MeetingType.GOOGLE_MEET)}
-                            className="btn"
-                            style={{
-                              flex: 1,
-                              backgroundColor: meetingType === MeetingType.GOOGLE_MEET ? '#1a1f2e' : '#fff',
-                              border: '1px solid #dee2e6',
-                              borderRadius: '8px',
-                              padding: '1rem',
-                              color: meetingType === MeetingType.GOOGLE_MEET ? '#fff' : '#1a1f2e',
-                              fontWeight: '500',
-                              transition: 'all 0.3s',
-                            }}
-                            onMouseEnter={(e) => {
-                              if (meetingType !== MeetingType.GOOGLE_MEET) {
-                                e.currentTarget.style.backgroundColor = '#f8f9fa';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (meetingType !== MeetingType.GOOGLE_MEET) {
-                                e.currentTarget.style.backgroundColor = '#fff';
-                              }
-                            }}
                           >
-                            <i className="bi bi-camera-video me-2"></i>
+                            <i className="bi bi-camera-video" aria-hidden />
                             Google Meet
                           </button>
                           <button
                             type="button"
+                            className={`admin-segment-btn${meetingType === MeetingType.ZOOM ? ' is-active' : ''}`}
                             onClick={() => setMeetingType(MeetingType.ZOOM)}
-                            className="btn"
-                            style={{
-                              flex: 1,
-                              backgroundColor: meetingType === MeetingType.ZOOM ? '#1a1f2e' : '#fff',
-                              border: '1px solid #dee2e6',
-                              borderRadius: '8px',
-                              padding: '1rem',
-                              color: meetingType === MeetingType.ZOOM ? '#fff' : '#1a1f2e',
-                              fontWeight: '500',
-                              transition: 'all 0.3s',
-                            }}
-                            onMouseEnter={(e) => {
-                              if (meetingType !== MeetingType.ZOOM) {
-                                e.currentTarget.style.backgroundColor = '#f8f9fa';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (meetingType !== MeetingType.ZOOM) {
-                                e.currentTarget.style.backgroundColor = '#fff';
-                              }
-                            }}
                           >
-                            <i className="bi bi-camera-video-fill me-2"></i>
+                            <i className="bi bi-camera-video-fill" aria-hidden />
                             Zoom
                           </button>
                         </div>
                       </div>
 
-                      {/* Meeting Date */}
-                      {meetingType && (
-                        <div className="mb-4">
-                          <label className="form-label" style={{ fontWeight: '500', color: '#1a1f2e', marginBottom: '0.5rem' }}>
-                            Meeting Date
+                      {meetingType ? (
+                        <div className="admin-form-section">
+                          <label className="admin-form-label" htmlFor="support-meeting-date">
+                            Meeting date
                           </label>
                           <input
+                            id="support-meeting-date"
                             type="date"
                             className="form-control"
                             value={meetingDate}
                             onChange={(e) => setMeetingDate(e.target.value)}
                             min={new Date().toISOString().split('T')[0]}
-                            style={{ borderRadius: '0px', padding: '0.75rem 1rem', border: '1px solid #dee2e6' }}
                           />
                         </div>
-                      )}
+                      ) : null}
 
-                      {/* Time Zone Selection */}
-                      {meetingType && (
-                        <div className="mb-4">
-                          <label className="form-label" style={{ fontWeight: '500', color: '#1a1f2e', marginBottom: '0.5rem' }}>
-                            Select Time Zone:
+                      {meetingType ? (
+                        <div className="admin-form-section">
+                          <label className="admin-form-label" htmlFor="support-timezone">
+                            Time zone
                           </label>
                           <select
+                            id="support-timezone"
                             className="form-select"
-                            value={timeZone || ''}
+                            value={timeZone ?? ''}
                             onChange={(e) => setTimeZone(e.target.value as TimeZone)}
-                            style={{
-                              borderRadius: '0px',
-                              padding: '0.75rem 1rem',
-                              fontSize: '1rem',
-                              border: '1px solid #dee2e6'
-                            }}
                           >
-                            <option value="">Select Time Zone</option>
+                            <option value="">Select time zone</option>
                             <option value={TimeZone.US}>US</option>
                             <option value={TimeZone.INDIA}>India</option>
                           </select>
                         </div>
-                      )}
+                      ) : null}
 
-                      {/* Time Slot Selection */}
-                      {timeZone && (
-                        <div className="mb-4">
-                          <label className="form-label" style={{ fontWeight: '500', color: '#1a1f2e', marginBottom: '0.5rem' }}>
-                            Select Time Slot:
+                      {timeZone ? (
+                        <div className="admin-form-section">
+                          <label className="admin-form-label" htmlFor="support-timeslot">
+                            Time slot
                           </label>
                           <select
+                            id="support-timeslot"
                             className="form-select"
                             value={timeSlot}
                             onChange={(e) => setTimeSlot(e.target.value)}
-                            style={{
-                              borderRadius: '0px',
-                              padding: '0.75rem 1rem',
-                              fontSize: '1rem',
-                              border: '1px solid #dee2e6'
-                            }}
                           >
-                            <option value="">Select Time Slot</option>
-                            {timeSlots.map((slot) => (
+                            <option value="">Select time slot</option>
+                            {TIME_SLOTS.map((slot) => (
                               <option key={slot} value={slot}>
                                 {slot}
                               </option>
                             ))}
                           </select>
                         </div>
-                      )}
+                      ) : null}
                     </>
-                  )}
+                  ) : null}
 
-                  {/* Action Buttons */}
-                  <div className="d-flex justify-content-between gap-3 mt-4">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedType(null);
-                        setDescription('');
-                        setCustomMessage('');
-                        setMeetingType(null);
-                        setMeetingDate('');
-                        setTimeZone(null);
-                        setTimeSlot('');
-                      }}
-                      className="btn"
-                      style={{
-                        backgroundColor: 'transparent',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '50px',
-                        padding: '0.5rem 1.5rem',
-                        color: '#1a1f2e',
-                        fontWeight: '500',
-                        transition: 'all 0.3s',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#f8f9fa';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }}
-                    >
+                  {formError ? (
+                    <p className="admin-form-hint admin-form-hint--error mb-0">{formError}</p>
+                  ) : null}
+
+                  <div className="admin-form-actions admin-form-actions--between">
+                    <button type="button" className="admin-btn-secondary" onClick={resetFlow}>
                       Back
                     </button>
                     <button
                       type="button"
+                      className="admin-btn-primary"
                       onClick={handleSubmit}
-                      disabled={
-                        sendRequestMutation.isPending ||
-                        (selectedType === SupportRequestType.RAISE_ISSUE && !description) ||
-                        (selectedType === SupportRequestType.UI_CHANGE && !description) ||
-                        (selectedType === SupportRequestType.UPSCALE_PLATFORM && !description) ||
-                        (selectedType === SupportRequestType.CUSTOM_MESSAGE && !customMessage) ||
-                        (selectedType === SupportRequestType.SCHEDULE_MEETING && (!meetingType || !meetingDate || !timeZone || !timeSlot))
-                      }
-                      className="btn"
-                      style={{
-                        backgroundColor: '#1a1f2e',
-                        border: 'none',
-                        borderRadius: '50px',
-                        padding: '0.5rem 1.5rem',
-                        color: '#fff',
-                        fontWeight: '500',
-                        opacity: (
-                          sendRequestMutation.isPending ||
-                          (selectedType === SupportRequestType.RAISE_ISSUE && !description) ||
-                          (selectedType === SupportRequestType.UI_CHANGE && !description) ||
-                          (selectedType === SupportRequestType.UPSCALE_PLATFORM && !description) ||
-                          (selectedType === SupportRequestType.CUSTOM_MESSAGE && !customMessage) ||
-                          (selectedType === SupportRequestType.SCHEDULE_MEETING && (!meetingType || !meetingDate || !timeZone || !timeSlot))
-                        ) ? 0.7 : 1,
-                        cursor: (
-                          sendRequestMutation.isPending ||
-                          (selectedType === SupportRequestType.RAISE_ISSUE && !description) ||
-                          (selectedType === SupportRequestType.UI_CHANGE && !description) ||
-                          (selectedType === SupportRequestType.UPSCALE_PLATFORM && !description) ||
-                          (selectedType === SupportRequestType.CUSTOM_MESSAGE && !customMessage) ||
-                          (selectedType === SupportRequestType.SCHEDULE_MEETING && (!meetingType || !meetingDate || !timeZone || !timeSlot))
-                        ) ? 'not-allowed' : 'pointer',
-                        transition: 'all 0.3s',
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!sendRequestMutation.isPending && 
-                            !((selectedType === SupportRequestType.RAISE_ISSUE && !description) ||
-                              (selectedType === SupportRequestType.UI_CHANGE && !description) ||
-                              (selectedType === SupportRequestType.UPSCALE_PLATFORM && !description) ||
-                              (selectedType === SupportRequestType.CUSTOM_MESSAGE && !customMessage) ||
-                              (selectedType === SupportRequestType.SCHEDULE_MEETING && (!meetingType || !meetingDate || !timeZone || !timeSlot)))) {
-                          e.currentTarget.style.backgroundColor = '#fff';
-                          e.currentTarget.style.color = '#1a1f2e';
-                          e.currentTarget.style.border = '1px solid #1a1f2e';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!sendRequestMutation.isPending && 
-                            !((selectedType === SupportRequestType.RAISE_ISSUE && !description) ||
-                              (selectedType === SupportRequestType.UI_CHANGE && !description) ||
-                              (selectedType === SupportRequestType.UPSCALE_PLATFORM && !description) ||
-                              (selectedType === SupportRequestType.CUSTOM_MESSAGE && !customMessage) ||
-                              (selectedType === SupportRequestType.SCHEDULE_MEETING && (!meetingType || !meetingDate || !timeZone || !timeSlot)))) {
-                          e.currentTarget.style.backgroundColor = '#1a1f2e';
-                          e.currentTarget.style.color = '#fff';
-                          e.currentTarget.style.border = 'none';
-                        }
-                      }}
+                      disabled={isSubmitDisabled}
                     >
-                      {sendRequestMutation.isPending ? 'Sending...' : 'Send Support Request'}
+                      {sendRequestMutation.isPending ? 'Sending…' : 'Send support request'}
                     </button>
                   </div>
-                </div>
+                </>
               )}
             </div>
-          )}
-        </div>
+          </section>
+        ) : null}
       </div>
 
-      {/* Status Popup */}
-      <StatusPopup
-        show={popupShow}
-        type={popupType}
-        message={popupMessage}
-        onClose={() => setPopupShow(false)}
-      />
-    </div>
+      <StatusPopup show={popupShow} type={popupType} message={popupMessage} onClose={() => setPopupShow(false)} />
+    </SuperAdminLayout>
   );
 };

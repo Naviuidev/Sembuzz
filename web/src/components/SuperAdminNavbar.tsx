@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { ADMIN_PORTAL_ACCENTS, ADMIN_PORTAL_LABELS } from '../constants/adminPortalTheme';
 import { AdminNavbarActions, AdminNavbarShell } from './AdminNavbarActions';
 
 export const SuperAdminNavbar = () => {
@@ -12,7 +13,11 @@ export const SuperAdminNavbar = () => {
   };
 
   return (
-    <AdminNavbarShell homePath="/super-admin/dashboard">
+    <AdminNavbarShell
+      homePath="/super-admin/dashboard"
+      portalLabel={ADMIN_PORTAL_LABELS.super}
+      accentColor={ADMIN_PORTAL_ACCENTS.super}
+    >
       <AdminNavbarActions role="super-admin" onLogout={handleLogout} />
     </AdminNavbarShell>
   );

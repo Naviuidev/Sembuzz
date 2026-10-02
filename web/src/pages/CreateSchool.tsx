@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { schoolsService } from '../services/schools.service';
 import type { CreateSchoolDto } from '../services/schools.service';
-import { SuperAdminNavbar } from '../components/SuperAdminNavbar';
-import { SuperAdminSidebar } from '../components/SuperAdminSidebar';
+import { SuperAdminLayout } from '../components/SuperAdminLayout';
+import { ADMIN_PORTAL_ACCENTS } from '../constants/adminPortalTheme';
 import { US_STATES, US_CITIES_BY_STATE } from '../data/countries-states';
 import {
   FILTERS_CODE,
@@ -129,36 +129,34 @@ export const CreateSchool = () => {
   const hasFilters = formData.selectedFeatures.includes(FILTERS_CODE);
   const hasAnyMessaging = hasGroupMessaging || hasIndividualMessaging || hasFilters;
 
-  const renderFeatureCard = (feature: Feature) => (
-    <div key={feature.id} className="col-md-4 col-sm-6">
-      <div
-        className="form-check p-3"
-        style={{
-          border: formData.selectedFeatures.includes(feature.code)
-            ? '2px solid #1a1f2e'
-            : '1px solid #dee2e6',
-          borderRadius: '0px',
-          cursor: 'pointer',
-          transition: 'all 0.3s',
-          backgroundColor: formData.selectedFeatures.includes(feature.code)
-            ? 'rgba(26, 31, 46, 0.05)'
-            : 'transparent',
-        }}
-        onClick={() => handleFeatureToggle(feature.code)}
-      >
-        <input
-          type="checkbox"
-          className="form-check-input"
-          checked={formData.selectedFeatures.includes(feature.code)}
-          onChange={() => handleFeatureToggle(feature.code)}
-          style={{ marginTop: '0.5rem' }}
-        />
-        <label className="form-check-label ms-2" style={{ cursor: 'pointer' }}>
-          {feature.name}
-        </label>
+  const renderFeatureCard = (feature: Feature) => {
+    const selected = formData.selectedFeatures.includes(feature.code);
+    return (
+      <div key={feature.id} className="col-md-4 col-sm-6">
+        <div
+          className={`admin-feature-card form-check${selected ? ' is-selected' : ''}`}
+          role="button"
+          tabIndex={0}
+          onClick={() => handleFeatureToggle(feature.code)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleFeatureToggle(feature.code);
+            }
+          }}
+        >
+          <input
+            type="checkbox"
+            className="form-check-input"
+            checked={selected}
+            onChange={() => handleFeatureToggle(feature.code)}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <label className="form-check-label">{feature.name}</label>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const handleStateChange = (state: string) => {
     setFormData((prev) => ({
@@ -172,7 +170,7 @@ export const CreateSchool = () => {
     ? US_CITIES_BY_STATE[formData.state] || []
     : [];
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       // Validate file type
@@ -209,7 +207,7 @@ export const CreateSchool = () => {
     return emailDomain.toLowerCase().trim() === normalizedSchoolDomain;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (formData.selectedFeatures.length === 0) {
       setErrorModal({ isOpen: true, message: 'Please select at least one feature' });
@@ -262,717 +260,430 @@ export const CreateSchool = () => {
     createMutation.mutate(payload);
   };
 
+  const panelStyle = { '--admin-accent': ADMIN_PORTAL_ACCENTS.super } as CSSProperties;
+
+  const closeSuccess = () => {
+    setSuccessModal({ isOpen: false, data: null });
+    navigate('/super-admin/dashboard');
+  };
+
   return (
-    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
-      <SuperAdminNavbar />
-      <div className="admin-shell-body">
-        <SuperAdminSidebar />
-        <div className="admin-main">
-          {/* Success Modal with Credentials */}
-          {successModal.isOpen && successModal.data && (
-            <div
-              style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1050,
-              }}
-              onClick={() => {
-                setSuccessModal({ isOpen: false, data: null });
-                navigate('/super-admin/dashboard');
-              }}
-            >
-              <div
-                className="card border-0 shadow-lg"
-                style={{
-                  borderRadius: '0px',
-                  minWidth: '500px',
-                  maxWidth: '600px',
-                  width: '90%',
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="card-body p-4">
-                  <div className="d-flex align-items-center mb-3">
-                    <i
-                      className="bi bi-check-circle-fill"
-                      style={{ fontSize: '2rem', color: '#28a745', marginRight: '1rem' }}
-                    ></i>
-                    <h3
-                      style={{
-                        fontSize: '1.5rem',
-                        fontWeight: 'normal',
-                        color: '#1a1f2e',
-                        margin: 0,
-                      }}
-                    >
-                      School Created Successfully
-                    </h3>
-                  </div>
-                  {successModal.data.message && (
-                    <p className="text-muted mb-3" style={{ fontSize: '0.95rem' }}>
-                      {successModal.data.message}
-                    </p>
-                  )}
-
-                  {!successModal.data.emailSent && (
-                    <div className="alert alert-warning mb-3" style={{ borderRadius: '0px' }}>
-                      <i className="bi bi-exclamation-triangle me-2"></i>
-                      <strong>Email not sent:</strong> {successModal.data.emailError || 'SMTP configuration issue'}
-                      <br />
-                      <small>Please save the credentials below and send them manually to the admin.</small>
-                    </div>
-                  )}
-
-                  <div className="mb-2">
-                    <strong>Reference Number:</strong>
-                    <div
-                      style={{
-                        fontFamily: 'monospace',
-                        backgroundColor: '#f8f9fa',
-                        padding: '0.5rem',
-                        borderRadius: '0px',
-                        marginTop: '0.25rem',
-                        border: '1px solid #dee2e6',
-                      }}
-                    >
-                      {successModal.data.refNum}
-                    </div>
-                  </div>
-
-                  {/* Credentials: School Admin (email then temp password); if ADS enabled, Ads Admin (email then temp password) */}
-                  {!successModal.data.adsEmailSent && successModal.data.adsEmailError && successModal.data.adsAdminEmail && (
-                    <div className="alert alert-warning mb-3" style={{ borderRadius: '0px' }}>
-                      <i className="bi bi-exclamation-triangle me-2"></i>
-                      <strong>Ads Admin email not sent:</strong> {successModal.data.adsEmailError}
-                      <br />
-                      <small>Please save the Ads Admin credentials below and send them manually.</small>
-                    </div>
-                  )}
-                  <div className={successModal.data.adsAdminEmail ? 'row g-3' : ''}>
-                    {/* School Admin: email, then temporary password shared to School Admin */}
-                    <div className={successModal.data.adsAdminEmail ? 'col-md-6' : 'col-12'}>
-                      <h4 style={{ fontSize: '1rem', fontWeight: '500', color: '#1a1f2e', marginBottom: '0.75rem', marginTop: '1rem' }}>
-                        School Admin
-                      </h4>
-                      <div
-                        style={{
-                          backgroundColor: '#f8f9fa',
-                          padding: '1rem',
-                          borderRadius: '0px',
-                          border: '1px solid #dee2e6',
-                          marginBottom: '1rem',
-                        }}
-                      >
-                        <div className="mb-2">
-                          <strong>School Admin Email:</strong>
-                          <div
-                            style={{
-                              fontFamily: 'monospace',
-                              backgroundColor: 'white',
-                              padding: '0.5rem',
-                              borderRadius: '0px',
-                              marginTop: '0.25rem',
-                              border: '1px solid #dee2e6',
-                            }}
-                          >
-                            {successModal.data.adminEmail}
-                          </div>
-                        </div>
-                        <div>
-                          <strong>Temporary password (shared to School Admin):</strong>
-                          <div
-                            style={{
-                              fontFamily: 'monospace',
-                              backgroundColor: 'white',
-                              padding: '0.5rem',
-                              borderRadius: '0px',
-                              marginTop: '0.25rem',
-                              border: '1px solid #dee2e6',
-                              color: '#dc3545',
-                              fontWeight: 'bold',
-                            }}
-                          >
-                            {successModal.data.tempPassword}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Ads Admin (when ADS enabled): email, then temporary password shared to Ads Admin */}
-                    {successModal.data.adsAdminEmail && (
-                      <div className="col-md-6">
-                        <h4 style={{ fontSize: '1rem', fontWeight: '500', color: '#1a1f2e', marginBottom: '0.75rem', marginTop: successModal.data.adsAdminEmail ? '1rem' : '0rem' }}>
-                          Ads Admin
-                        </h4>
-                        <div
-                          style={{
-                            backgroundColor: '#f8f9fa',
-                            padding: '1rem',
-                            borderRadius: '0px',
-                            border: '1px solid #dee2e6',
-                            marginBottom: '1rem',
-                          }}
-                        >
-                          <div className="mb-2">
-                            <strong>Ads Admin Email:</strong>
-                            <div style={{ fontFamily: 'monospace', backgroundColor: 'white', padding: '0.5rem', marginTop: '0.25rem', border: '1px solid #dee2e6' }}>
-                              {successModal.data.adsAdminEmail}
-                            </div>
-                          </div>
-                          <div>
-                            <strong>Temporary password (shared to Ads Admin):</strong>
-                            <div style={{ fontFamily: 'monospace', backgroundColor: 'white', padding: '0.5rem', marginTop: '0.25rem', border: '1px solid #dee2e6', color: '#dc3545', fontWeight: 'bold' }}>
-                              {successModal.data.adsTempPassword ?? '—'}
-                            </div>
-                          </div>
-                          <small className="text-muted d-block mt-2">Ads Admin can log in at /ads-admin/login to manage banner and sponsored ads.</small>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="d-flex justify-content-end">
-                    <button
-                      onClick={() => {
-                        setSuccessModal({ isOpen: false, data: null });
-                        navigate('/super-admin/dashboard');
-                      }}
-                      className="btn"
-                      style={{
-                        backgroundColor: '#1a1f2e',
-                        border: 'none',
-                        borderRadius: '50px',
-                        padding: '0.5rem 1.5rem',
-                        color: '#fff',
-                        fontWeight: '500',
-                        transition: 'all 0.3s',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#fff';
-                        e.currentTarget.style.color = '#1a1f2e';
-                        e.currentTarget.style.border = '1px solid #1a1f2e';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#1a1f2e';
-                        e.currentTarget.style.color = '#fff';
-                        e.currentTarget.style.border = 'none';
-                      }}
-                    >
-                      OK
-                    </button>
-                  </div>
-                </div>
+    <SuperAdminLayout>
+      {successModal.isOpen && successModal.data ? (
+        <div className="admin-modal-overlay" onClick={closeSuccess} role="presentation">
+          <div className="admin-modal admin-modal--wide" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <div className="admin-modal__body">
+              <div className="admin-modal__head">
+                <i className="bi bi-check-circle-fill admin-modal__icon admin-modal__icon--success" aria-hidden />
+                <h3 className="admin-modal__title">School created successfully</h3>
               </div>
-            </div>
-          )}
+              {successModal.data.message ? (
+                <p className="admin-modal__text">{successModal.data.message}</p>
+              ) : null}
 
-          {/* Error Modal */}
-          {errorModal.isOpen && (
-            <div
-              style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1050,
-              }}
-              onClick={() => setErrorModal({ isOpen: false, message: '' })}
-            >
-              <div
-                className="card border-0 shadow-lg"
-                style={{
-                  borderRadius: '0px',
-                  minWidth: '400px',
-                  maxWidth: '500px',
-                  width: '90%',
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="card-body p-4">
-                  <div className="d-flex align-items-center mb-3">
-                    <i
-                      className="bi bi-exclamation-triangle-fill"
-                      style={{ fontSize: '2rem', color: '#dc3545', marginRight: '1rem' }}
-                    ></i>
-                    <h3
-                      style={{
-                        fontSize: '1.5rem',
-                        fontWeight: 'normal',
-                        color: '#1a1f2e',
-                        margin: 0,
-                      }}
-                    >
-                      Error
-                    </h3>
-                  </div>
-                  <p style={{ color: '#6c757d', marginBottom: '1.5rem' }}>{errorModal.message}</p>
-                  <div className="d-flex justify-content-end">
-                    <button
-                      onClick={() => setErrorModal({ isOpen: false, message: '' })}
-                      className="btn"
-                      style={{
-                        backgroundColor: '#1a1f2e',
-                        border: 'none',
-                        borderRadius: '50px',
-                        padding: '0.5rem 1.5rem',
-                        color: '#fff',
-                        fontWeight: '500',
-                        transition: 'all 0.3s',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#fff';
-                        e.currentTarget.style.color = '#1a1f2e';
-                        e.currentTarget.style.border = '1px solid #1a1f2e';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#1a1f2e';
-                        e.currentTarget.style.color = '#fff';
-                        e.currentTarget.style.border = 'none';
-                      }}
-                    >
-                      OK
-                    </button>
-                  </div>
+              {!successModal.data.emailSent ? (
+                <div className="alert alert-warning mb-3 rounded-3">
+                  <i className="bi bi-exclamation-triangle me-2" aria-hidden />
+                  <strong>Email not sent:</strong> {successModal.data.emailError || 'SMTP configuration issue'}
+                  <br />
+                  <small>Save the credentials below and send them manually to the admin.</small>
                 </div>
+              ) : null}
+
+              <div className="admin-credential-field">
+                <strong>Reference number</strong>
+                <div className="admin-credential-value">{successModal.data.refNum}</div>
               </div>
-            </div>
-          )}
-          <h1 style={{
-            fontSize: '2rem',
-            fontWeight: 'normal',
-            color: '#1a1f2e',
-            marginBottom: '2rem'
-          }}>
-            Create New School
-          </h1>
 
-          <div className="card border-0 shadow-sm" style={{ borderRadius: '0px' }}>
-            <div className="card-body p-4">
-              <form onSubmit={handleSubmit}>
-                {/* School Information */}
-                <div className="mb-4">
-                  <h2 style={{
-                    fontSize: '1.25rem',
-                    fontWeight: 'normal',
-                    color: '#1a1f2e',
-                    marginBottom: '1.5rem'
-                  }}>
-                    School Information
-                  </h2>
-                  <div className="row g-3">
-                    <div className="col-md-6">
-                      <label className="form-label" style={{ fontWeight: '500', color: '#1a1f2e' }}>
-                        School Name *
-                      </label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        required
-                        value={formData.schoolName}
-                        onChange={(e) => setFormData({ ...formData, schoolName: e.target.value })}
-                        placeholder="Greenwood High School"
-                        style={{ borderRadius: '0px', padding: '0.75rem 1rem' }}
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label" style={{ fontWeight: '500', color: '#1a1f2e' }}>
-                        Country
-                      </label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        value="United States"
-                        disabled
-                        style={{ 
-                          borderRadius: '0px', 
-                          padding: '0.75rem 1rem',
-                          backgroundColor: '#f8f9fa',
-                          cursor: 'not-allowed'
-                        }}
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label" style={{ fontWeight: '500', color: '#1a1f2e' }}>
-                        State *
-                      </label>
-                      <select
-                        className="form-select"
-                        required
-                        value={formData.state}
-                        onChange={(e) => handleStateChange(e.target.value)}
-                        style={{ borderRadius: '0px', padding: '0.75rem 1rem' }}
-                      >
-                        <option value="">Select State</option>
-                        {US_STATES.map((state) => (
-                          <option key={state.code} value={state.code}>
-                            {state.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label" style={{ fontWeight: '500', color: '#1a1f2e' }}>
-                        City *
-                      </label>
-                      <select
-                        className="form-select"
-                        required
-                        value={formData.city}
-                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                        disabled={!formData.state}
-                        style={{ 
-                          borderRadius: '0px', 
-                          padding: '0.75rem 1rem',
-                          backgroundColor: !formData.state ? '#f8f9fa' : 'white',
-                          cursor: !formData.state ? 'not-allowed' : 'pointer'
-                        }}
-                      >
-                        <option value="">{formData.state ? 'Select City' : 'Select State first'}</option>
-                        {availableCities.map((city) => (
-                          <option key={city} value={city}>
-                            {city}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label" style={{ fontWeight: '500', color: '#1a1f2e' }}>
-                        Domain Name *
-                      </label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        required
-                        value={formData.domain}
-                        onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
-                        placeholder="e.g., school.edu"
-                        style={{ borderRadius: '0px', padding: '0.75rem 1rem' }}
-                      />
-                      <small className="text-muted" style={{ fontSize: '0.75rem' }}>
-                        Must match the domain of the admin email
-                      </small>
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label" style={{ fontWeight: '500', color: '#1a1f2e' }}>
-                        Tenure of Project (months)
-                      </label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        min="1"
-                        value={formData.tenure || ''}
-                        onChange={(e) => setFormData({ 
-                          ...formData, 
-                          tenure: e.target.value ? parseInt(e.target.value) : undefined 
-                        })}
-                        placeholder="e.g., 12"
-                        style={{ borderRadius: '0px', padding: '0.75rem 1rem' }}
-                      />
-                    </div>
-                    <div className="col-md-12">
-                      <label className="form-label" style={{ fontWeight: '500', color: '#1a1f2e' }}>
-                        School Image
-                      </label>
-                      <input
-                        type="file"
-                        className="form-control"
-                        accept="image/*"
-                        onChange={handleImageChange}
-                        style={{ borderRadius: '0px', padding: '0.75rem 1rem' }}
-                      />
-                      <small className="text-muted" style={{ fontSize: '0.75rem' }}>
-                        Maximum file size: 5MB. Supported formats: JPG, PNG, GIF
-                      </small>
-                      {imagePreview && (
-                        <div className="mt-3" style={{ maxWidth: '300px' }}>
-                          <img
-                            src={imagePreview}
-                            alt="School preview"
-                            style={{
-                              width: '100%',
-                              height: 'auto',
-                              borderRadius: '0px',
-                              border: '1px solid #dee2e6',
-                            }}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setImagePreview(null);
-                              setFormData({ ...formData, image: undefined });
-                            }}
-                            className="btn btn-sm mt-2"
-                            style={{
-                              backgroundColor: '#dc3545',
-                              border: 'none',
-                              borderRadius: '0px',
-                              color: '#fff',
-                              padding: '0.25rem 0.75rem',
-                            }}
-                          >
-                            Remove Image
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+              {!successModal.data.adsEmailSent && successModal.data.adsEmailError && successModal.data.adsAdminEmail ? (
+                <div className="alert alert-warning mb-3 rounded-3">
+                  <i className="bi bi-exclamation-triangle me-2" aria-hidden />
+                  <strong>Ads Admin email not sent:</strong> {successModal.data.adsEmailError}
                 </div>
+              ) : null}
 
-                {/* Features Selection */}
-                <div className="mb-4">
-                  <h2 style={{
-                    fontSize: '1.25rem',
-                    fontWeight: 'normal',
-                    color: '#1a1f2e',
-                    marginBottom: '1.5rem'
-                  }}>
-                    Select Features *
-                  </h2>
-                  {featuresLoading && (
-                    <p className="text-muted mb-2" style={{ fontSize: '0.875rem' }}>Loading features...</p>
-                  )}
-                  {featuresError && (
-                    <p className="text-danger mb-2" style={{ fontSize: '0.875rem' }}>Unable to load features. Make sure the backend is running and refresh the page.</p>
-                  )}
-                  {!featuresLoading && !featuresError && (!features || features.length === 0) && (
-                    <p className="text-muted mb-2" style={{ fontSize: '0.875rem' }}>No features available. Run the feature seed on the backend (npm run prisma:seed).</p>
-                  )}
-
-                  {platformFeatures.length > 0 ? (
-                    <>
-                      <p className="text-muted mb-2" style={{ fontSize: '0.875rem' }}>
-                        Platform features
-                      </p>
-                      <div className="row g-3 mb-4">{platformFeatures.map(renderFeatureCard)}</div>
-                    </>
-                  ) : null}
-
-                  {messagingFeatures.length > 0 ? (
-                    <>
-                      <p
-                        className="text-muted mb-2 d-flex align-items-center gap-2"
-                        style={{ fontSize: '0.875rem' }}
-                      >
-                        <i className="bi bi-chat-dots" aria-hidden />
-                        Messaging options
-                      </p>
-                      <div className="row g-3">{messagingFeatures.map(renderFeatureCard)}</div>
-                    </>
-                  ) : null}
-
-                  {hasAnyMessaging ? (
-                    <div
-                      className="alert alert-light border mt-3 mb-0 text-start"
-                      style={{ borderRadius: 0, fontSize: '0.875rem' }}
-                    >
-                      <strong className="d-block mb-2" style={{ color: '#1a1f2e' }}>
-                        Messaging pipeline for this school
-                      </strong>
-                      <ul className="mb-0 ps-3" style={{ color: '#6c757d' }}>
-                        {hasGroupMessaging ? (
-                          <li>
-                            <strong>Group messages</strong> — School Admin can create club/group chats.
-                          </li>
-                        ) : null}
-                        {hasIndividualMessaging ? (
-                          <li>
-                            <strong>Individual messages</strong> — School Admin can allow personal
-                            student chats.
-                          </li>
-                        ) : null}
-                        {hasFilters ? (
-                          <li>
-                            <strong>Filters</strong> — Shows category and feed filter controls on web and
-                            mobile based on the visibility option below.
-                          </li>
-                        ) : null}
-                      </ul>
-                    </div>
-                  ) : null}
-
-                  {hasFilters ? (
-                    <div className="mt-3 pt-3 border-top">
-                      <p className="text-muted mb-2" style={{ fontSize: '0.875rem' }}>
-                        When should filter options appear?
-                      </p>
-                      <div className="d-flex flex-column gap-2">
-                        {FILTERS_VISIBILITY_OPTIONS.map((opt) => (
-                          <label
-                            key={opt.value}
-                            className="d-flex align-items-start gap-2 mb-0"
-                            style={{ cursor: 'pointer', fontSize: '0.875rem' }}
-                          >
-                            <input
-                              type="radio"
-                              name="filtersVisibility"
-                              className="form-check-input mt-1"
-                              checked={formData.filtersVisibility === opt.value}
-                              onChange={() =>
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  filtersVisibility: opt.value as FiltersVisibility,
-                                }))
-                              }
-                            />
-                            <span>{opt.label}</span>
-                          </label>
-                        ))}
+              <div className={successModal.data.adsAdminEmail ? 'row g-3' : ''}>
+                <div className={successModal.data.adsAdminEmail ? 'col-md-6' : 'col-12'}>
+                  <div className="admin-credential-block">
+                    <h4>School Admin</h4>
+                    <div className="admin-credential-box">
+                      <div className="admin-credential-field">
+                        <strong>School Admin email</strong>
+                        <div className="admin-credential-value">{successModal.data.adminEmail}</div>
+                      </div>
+                      <div className="admin-credential-field">
+                        <strong>Temporary password</strong>
+                        <div className="admin-credential-value admin-credential-value--secret">
+                          {successModal.data.tempPassword}
+                        </div>
                       </div>
                     </div>
-                  ) : null}
-
-                  {formData.selectedFeatures.length === 0 && (
-                    <p className="text-danger mt-2" style={{ fontSize: '0.875rem' }}>
-                      Please select at least one feature
-                    </p>
-                  )}
-                </div>
-
-                {/* School Admin Information */}
-                <div className="mb-4">
-                  <h2 style={{
-                    fontSize: '1.25rem',
-                    fontWeight: 'normal',
-                    color: '#1a1f2e',
-                    marginBottom: '1.5rem'
-                  }}>
-                    School Admin Information
-                  </h2>
-                    <div className="row g-3">
-                      <div className="col-md-6">
-                        <label className="form-label" style={{ fontWeight: '500', color: '#1a1f2e' }}>
-                          School Admin Email *
-                        </label>
-                        <input
-                          type="email"
-                          className="form-control"
-                          required
-                          value={formData.adminEmail}
-                          onChange={(e) => setFormData({ ...formData, adminEmail: e.target.value })}
-                          placeholder="admin@school.edu"
-                          style={{
-                            borderRadius: '0px',
-                            padding: '0.75rem 1rem',
-                            borderColor: formData.domain && formData.adminEmail && !validateDomainMatch() ? '#dc3545' : undefined,
-                          }}
-                        />
-                      <small className="text-muted d-block mt-1" style={{ fontSize: '0.75rem' }}>
-                        Reference Number will be auto-generated. <strong>Temporary password</strong> will be shared to this email and shown after creation (under School Admin in the success message).
-                      </small>
-                      {formData.domain && formData.adminEmail && !validateDomainMatch() && (
-                        <small className="text-danger" style={{ fontSize: '0.75rem', display: 'block', marginTop: '0.25rem' }}>
-                          Email domain must match the school domain ({formData.domain})
-                        </small>
-                      )}
-                    </div>
                   </div>
                 </div>
-
-                {/* Ads Admin Information - shown when Ads feature is selected */}
-                {formData.selectedFeatures.includes('ADS') && (
-                  <div className="mb-4">
-                    <h2 style={{
-                      fontSize: '1.25rem',
-                      fontWeight: 'normal',
-                      color: '#1a1f2e',
-                      marginBottom: '1.5rem'
-                    }}>
-                      Ads Admin Information
-                    </h2>
-                    <div className="row g-3">
-                      <div className="col-md-6">
-                        <label className="form-label" style={{ fontWeight: '500', color: '#1a1f2e' }}>
-                          Ads Admin Email *
-                        </label>
-                        <input
-                          type="email"
-                          className="form-control"
-                          value={formData.adsAdminEmail ?? ''}
-                          onChange={(e) => setFormData({ ...formData, adsAdminEmail: e.target.value })}
-                          placeholder="ads@school.edu"
-                          style={{ borderRadius: '0px', padding: '0.75rem 1rem' }}
-                        />
-                        <small className="text-muted d-block mt-1" style={{ fontSize: '0.75rem' }}>
-                          This user will manage banner and sponsored ads. <strong>Temporary password</strong> will be shared to this email and shown after creation (under Ads Admin in the success message).
+                {successModal.data.adsAdminEmail ? (
+                  <div className="col-md-6">
+                    <div className="admin-credential-block">
+                      <h4>Ads Admin</h4>
+                      <div className="admin-credential-box">
+                        <div className="admin-credential-field">
+                          <strong>Ads Admin email</strong>
+                          <div className="admin-credential-value">{successModal.data.adsAdminEmail}</div>
+                        </div>
+                        <div className="admin-credential-field">
+                          <strong>Temporary password</strong>
+                          <div className="admin-credential-value admin-credential-value--secret">
+                            {successModal.data.adsTempPassword ?? '—'}
+                          </div>
+                        </div>
+                        <small className="admin-form-hint d-block mt-2">
+                          Ads Admin can log in at /ads-admin/login to manage banner and sponsored ads.
                         </small>
                       </div>
                     </div>
                   </div>
-                )}
+                ) : null}
+              </div>
 
-                {/* Actions */}
-                <div className="d-flex justify-content-end gap-3 pt-4" style={{ borderTop: '1px solid #dee2e6' }}>
-                  <button
-                    type="button"
-                    onClick={() => navigate('/super-admin/dashboard')}
-                    className="btn"
-                    style={{
-                      backgroundColor: 'transparent',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '50px',
-                      padding: '0.5rem 1.5rem',
-                      color: '#1a1f2e',
-                      fontWeight: '500',
-                      transition: 'all 0.3s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f8f9fa';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={createMutation.isPending}
-                    className="btn"
-                    style={{
-                      backgroundColor: '#1a1f2e',
-                      border: 'none',
-                      borderRadius: '50px',
-                      padding: '0.5rem 1.5rem',
-                      color: '#fff',
-                      fontWeight: '500',
-                      transition: 'all 0.3s',
-                      opacity: createMutation.isPending ? 0.7 : 1
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!createMutation.isPending) {
-                        e.currentTarget.style.backgroundColor = '#fff';
-                        e.currentTarget.style.color = '#1a1f2e';
-                        e.currentTarget.style.border = '1px solid #1a1f2e';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!createMutation.isPending) {
-                        e.currentTarget.style.backgroundColor = '#1a1f2e';
-                        e.currentTarget.style.color = '#fff';
-                        e.currentTarget.style.border = 'none';
-                      }
-                    }}
-                  >
-                    {createMutation.isPending ? 'Creating...' : 'Submit'}
-                  </button>
-                </div>
-              </form>
+              <div className="admin-modal__footer">
+                <button type="button" className="admin-btn-primary" onClick={closeSuccess}>
+                  Go to dashboard
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      ) : null}
+
+      {errorModal.isOpen ? (
+        <div
+          className="admin-modal-overlay"
+          onClick={() => setErrorModal({ isOpen: false, message: '' })}
+          role="presentation"
+        >
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()} role="alertdialog" aria-modal="true">
+            <div className="admin-modal__body">
+              <div className="admin-modal__head">
+                <i className="bi bi-exclamation-triangle-fill admin-modal__icon admin-modal__icon--error" aria-hidden />
+                <h3 className="admin-modal__title">Could not create school</h3>
+              </div>
+              <p className="admin-modal__text">{errorModal.message}</p>
+              <div className="admin-modal__footer">
+                <button
+                  type="button"
+                  className="admin-btn-primary"
+                  onClick={() => setErrorModal({ isOpen: false, message: '' })}
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <header className="admin-page-header">
+        <h1 className="admin-page-title">Create new school</h1>
+        <p className="admin-page-subtitle">
+          Add a school, choose features, and invite the School Admin (and Ads Admin if needed).
+        </p>
+      </header>
+
+      <section className="admin-panel" style={panelStyle}>
+        <div className="admin-panel__header">
+          <h2 className="admin-panel__title">School setup</h2>
+        </div>
+        <div className="admin-panel__body">
+          <form className="admin-form" onSubmit={handleSubmit}>
+            <div className="admin-form-section">
+              <h3 className="admin-form-section-title">School information</h3>
+              <div className="row g-3">
+                <div className="col-md-6">
+                  <label className="admin-form-label" htmlFor="create-school-name">
+                    School name *
+                  </label>
+                  <input
+                    id="create-school-name"
+                    type="text"
+                    className="form-control"
+                    required
+                    value={formData.schoolName}
+                    onChange={(e) => setFormData({ ...formData, schoolName: e.target.value })}
+                    placeholder="Greenwood High School"
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="admin-form-label" htmlFor="create-school-country">
+                    Country
+                  </label>
+                  <input
+                    id="create-school-country"
+                    type="text"
+                    className="form-control"
+                    value="United States"
+                    disabled
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="admin-form-label" htmlFor="create-school-state">
+                    State *
+                  </label>
+                  <select
+                    id="create-school-state"
+                    className="form-select"
+                    required
+                    value={formData.state}
+                    onChange={(e) => handleStateChange(e.target.value)}
+                  >
+                    <option value="">Select state</option>
+                    {US_STATES.map((state) => (
+                      <option key={state.code} value={state.code}>
+                        {state.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-md-6">
+                  <label className="admin-form-label" htmlFor="create-school-city">
+                    City *
+                  </label>
+                  <select
+                    id="create-school-city"
+                    className="form-select"
+                    required
+                    value={formData.city}
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    disabled={!formData.state}
+                  >
+                    <option value="">{formData.state ? 'Select city' : 'Select state first'}</option>
+                    {availableCities.map((city) => (
+                      <option key={city} value={city}>
+                        {city}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-md-6">
+                  <label className="admin-form-label" htmlFor="create-school-domain">
+                    Domain name *
+                  </label>
+                  <input
+                    id="create-school-domain"
+                    type="text"
+                    className="form-control"
+                    required
+                    value={formData.domain}
+                    onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
+                    placeholder="e.g., school.edu"
+                  />
+                  <small className="admin-form-hint">Must match the domain of the admin email.</small>
+                </div>
+                <div className="col-md-6">
+                  <label className="admin-form-label" htmlFor="create-school-tenure">
+                    Tenure of project (months)
+                  </label>
+                  <input
+                    id="create-school-tenure"
+                    type="number"
+                    className="form-control"
+                    min={1}
+                    value={formData.tenure ?? ''}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        tenure: e.target.value ? parseInt(e.target.value, 10) : undefined,
+                      })
+                    }
+                    placeholder="e.g., 12"
+                  />
+                </div>
+                <div className="col-12">
+                  <label className="admin-form-label" htmlFor="create-school-image">
+                    School image
+                  </label>
+                  <input
+                    id="create-school-image"
+                    type="file"
+                    className="form-control"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                  />
+                  <small className="admin-form-hint">Max 5MB. JPG, PNG, or GIF.</small>
+                  {imagePreview ? (
+                    <div className="admin-image-preview">
+                      <img src={imagePreview} alt="School preview" />
+                      <button
+                        type="button"
+                        className="admin-btn-danger-soft"
+                        onClick={() => {
+                          setImagePreview(null);
+                          setFormData({ ...formData, image: undefined });
+                        }}
+                      >
+                        Remove image
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            <div className="admin-form-section">
+              <h3 className="admin-form-section-title">Select features *</h3>
+              {featuresLoading ? (
+                <p className="admin-form-section-lead mb-0">Loading features…</p>
+              ) : null}
+              {featuresError ? (
+                <p className="admin-form-hint admin-form-hint--error">
+                  Unable to load features. Make sure the backend is running and refresh the page.
+                </p>
+              ) : null}
+              {!featuresLoading && !featuresError && (!features || features.length === 0) ? (
+                <p className="admin-form-section-lead mb-0">
+                  No features available. Run the feature seed on the backend (npm run prisma:seed).
+                </p>
+              ) : null}
+
+              {platformFeatures.length > 0 ? (
+                <>
+                  <p className="admin-form-section-lead">Platform features</p>
+                  <div className="row g-3 mb-3">{platformFeatures.map(renderFeatureCard)}</div>
+                </>
+              ) : null}
+
+              {messagingFeatures.length > 0 ? (
+                <>
+                  <p className="admin-form-section-lead d-flex align-items-center gap-2">
+                    <i className="bi bi-chat-dots" aria-hidden />
+                    Messaging options
+                  </p>
+                  <div className="row g-3">{messagingFeatures.map(renderFeatureCard)}</div>
+                </>
+              ) : null}
+
+              {hasAnyMessaging ? (
+                <div className="admin-form-callout">
+                  <strong>Messaging pipeline for this school</strong>
+                  <ul>
+                    {hasGroupMessaging ? (
+                      <li>
+                        <strong>Group messages</strong> — School Admin can create club/group chats.
+                      </li>
+                    ) : null}
+                    {hasIndividualMessaging ? (
+                      <li>
+                        <strong>Individual messages</strong> — School Admin can allow personal student
+                        chats.
+                      </li>
+                    ) : null}
+                    {hasFilters ? (
+                      <li>
+                        <strong>Filters</strong> — Category and feed filter controls on web and mobile based
+                        on the visibility option below.
+                      </li>
+                    ) : null}
+                  </ul>
+                </div>
+              ) : null}
+
+              {hasFilters ? (
+                <div className="mt-3 pt-3 border-top border-light-subtle">
+                  <p className="admin-form-section-lead">When should filter options appear?</p>
+                  <div className="admin-form-radio-group">
+                    {FILTERS_VISIBILITY_OPTIONS.map((opt) => (
+                      <label key={opt.value} className="admin-form-radio">
+                        <input
+                          type="radio"
+                          name="filtersVisibility"
+                          className="form-check-input mt-1"
+                          checked={formData.filtersVisibility === opt.value}
+                          onChange={() =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              filtersVisibility: opt.value as FiltersVisibility,
+                            }))
+                          }
+                        />
+                        <span>{opt.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {formData.selectedFeatures.length === 0 ? (
+                <p className="admin-form-hint admin-form-hint--error mt-2 mb-0">
+                  Please select at least one feature.
+                </p>
+              ) : null}
+            </div>
+
+            <div className="admin-form-section">
+              <h3 className="admin-form-section-title">School Admin information</h3>
+              <div className="row g-3">
+                <div className="col-md-6">
+                  <label className="admin-form-label" htmlFor="create-school-admin-email">
+                    School Admin email *
+                  </label>
+                  <input
+                    id="create-school-admin-email"
+                    type="email"
+                    className={`form-control${
+                      formData.domain && formData.adminEmail && !validateDomainMatch() ? ' is-invalid' : ''
+                    }`}
+                    required
+                    value={formData.adminEmail}
+                    onChange={(e) => setFormData({ ...formData, adminEmail: e.target.value })}
+                    placeholder="admin@school.edu"
+                  />
+                  <small className="admin-form-hint">
+                    Reference number is auto-generated. A temporary password is emailed and shown after
+                    creation.
+                  </small>
+                  {formData.domain && formData.adminEmail && !validateDomainMatch() ? (
+                    <small className="admin-form-hint admin-form-hint--error">
+                      Email domain must match the school domain ({formData.domain}).
+                    </small>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            {formData.selectedFeatures.includes('ADS') ? (
+              <div className="admin-form-section">
+                <h3 className="admin-form-section-title">Ads Admin information</h3>
+                <div className="row g-3">
+                  <div className="col-md-6">
+                    <label className="admin-form-label" htmlFor="create-ads-admin-email">
+                      Ads Admin email *
+                    </label>
+                    <input
+                      id="create-ads-admin-email"
+                      type="email"
+                      className="form-control"
+                      value={formData.adsAdminEmail ?? ''}
+                      onChange={(e) => setFormData({ ...formData, adsAdminEmail: e.target.value })}
+                      placeholder="ads@school.edu"
+                    />
+                    <small className="admin-form-hint">
+                      Manages banner and sponsored ads. Temporary password is emailed and shown after
+                      creation.
+                    </small>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="admin-form-actions">
+              <button type="button" className="admin-btn-secondary" onClick={() => navigate('/super-admin/dashboard')}>
+                Cancel
+              </button>
+              <button type="submit" className="admin-btn-primary" disabled={createMutation.isPending}>
+                {createMutation.isPending ? 'Creating…' : 'Create school'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </SuperAdminLayout>
   );
 };

@@ -1,6 +1,5 @@
 import { useState, useRef } from 'react';
-import { AdsAdminNavbar } from '../components/AdsAdminNavbar';
-import { AdsAdminSidebar } from '../components/AdsAdminSidebar';
+import { AdsAdminLayout } from '../components/AdsAdminLayout';
 import { adsAdminBannerAdsService } from '../services/ads-admin-banner-ads.service';
 import { adsAdminSponsoredAdsService } from '../services/ads-admin-sponsored-ads.service';
 import { cstDatetimeLocalStringToUTC } from '../utils/cst-date';
@@ -206,11 +205,7 @@ export const AdsAdminAds = () => {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#eef1f5' }}>
-      <AdsAdminNavbar />
-      <div className="admin-shell-body">
-        <AdsAdminSidebar />
-        <div className="admin-main">
+    <AdsAdminLayout>
           <div className="mb-4">
             <h1 className="h4 mb-1" style={{ color: '#1a1f2e', fontWeight: 600 }}>Ads</h1>
             <p className="small text-muted mb-0">Manage banner and sponsored ads for your school.</p>
@@ -342,8 +337,6 @@ export const AdsAdminAds = () => {
               </button>
             </div>
           )}
-        </div>
-      </div>
-    </div>
+    </AdsAdminLayout>
   );
 };

@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { SuperAdminNavbar } from '../components/SuperAdminNavbar';
-import { SuperAdminSidebar } from '../components/SuperAdminSidebar';
+import { SuperAdminLayout } from '../components/SuperAdminLayout';
+import { ADMIN_PORTAL_ACCENTS } from '../constants/adminPortalTheme';
 import {
   eventSyncService,
   type EventFeedSourceRow,
@@ -25,10 +25,7 @@ function SyncLogQaPanel({ details }: { details: ScrapedSyncLogDetails | null | u
   const samples = details.sampleEvents ?? [];
 
   return (
-    <div
-      className="mt-2 p-3 rounded small"
-      style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}
-    >
+    <div className="admin-form-callout mt-2 small">
       <div className="fw-semibold text-dark mb-2">QA / debug</div>
       <ul className="mb-2 ps-3 text-muted" style={{ lineHeight: 1.6 }}>
         <li>
@@ -147,17 +144,7 @@ function SyncLogQaPanel({ details }: { details: ScrapedSyncLogDetails | null | u
         <p className="text-muted mb-2 fst-italic small">{details.validationHints.note}</p>
       ) : null}
       <div className="fw-semibold text-dark mb-1">Full sync run JSON</div>
-      <pre
-        className="small mb-0 p-2 rounded border"
-        style={{
-          background: '#1e293b',
-          color: '#e2e8f0',
-          maxHeight: 320,
-          overflow: 'auto',
-        }}
-      >
-        {JSON.stringify(details, null, 2)}
-      </pre>
+      <pre className="admin-code-block admin-code-block--dark mb-0">{JSON.stringify(details, null, 2)}</pre>
     </div>
   );
 }
@@ -451,214 +438,215 @@ export const SuperAdminEventSync = () => {
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['event-sync'] }),
   });
 
+  const panelStyle = { '--admin-accent': ADMIN_PORTAL_ACCENTS.super } as CSSProperties;
+
   return (
-    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
-      <SuperAdminNavbar />
-      <div className="admin-shell-body">
-        <SuperAdminSidebar />
-        <div className="admin-main">
-          <h1 style={{ fontSize: '1.75rem', fontWeight: 600, color: '#1a1f2e' }}>
-            Fetch events from URLs
-          </h1>
-          <p style={{ color: '#6c757d', maxWidth: 720 }}>
-            Add any events/calendar URL and run Sync. Empty selectors auto-detect Localist, UWM-style
-            pages, and JSON-LD. Only events in the <strong>current calendar month</strong> (same as{' '}
-            <a href="/universities" target="_blank" rel="noreferrer">
-              /universities
-            </a>
-            ) are saved. For &quot;Load more&quot; / JS pages set <code>UNIVERSITY_PLAYWRIGHT=1</code> and{' '}
-            <code>npx playwright install chromium</code>.
-            {' '}
-            Entries labeled <strong>University feed</strong> on{' '}
-            <a href="/universities" target="_blank" rel="noreferrer">
-              /universities
-            </a>{' '}
-            are listed below too — use <strong>Delete</strong> here to remove them from the public page.
-          </p>
+    <SuperAdminLayout>
+      <header className="admin-page-header">
+        <h1 className="admin-page-title">Fetch events</h1>
+        <p className="admin-page-subtitle">
+          Add calendar URLs, run sync, and manage feeds shown on{' '}
+          <a href="/universities" target="_blank" rel="noreferrer">
+            /universities
+          </a>
+          .
+        </p>
+      </header>
 
-          <div
-            className="card border-0 shadow-sm mt-4 mb-4"
-            style={{ borderRadius: 12 }}
-          >
-            <div className="card-body p-4">
-              <h2 className="h6 mb-3">Worker status</h2>
-              {statusQuery.isLoading ? (
-                <span className="text-muted">Loading…</span>
-              ) : statusQuery.data ? (
-                <pre
-                  className="small mb-0 p-3 rounded"
-                  style={{ background: '#f1f5f9', whiteSpace: 'pre-wrap' }}
+      <div className="admin-notice admin-notice--muted mb-4" style={panelStyle}>
+        Empty selectors auto-detect Localist, UWM-style pages, and JSON-LD. Only events in the{' '}
+        <strong>current calendar month</strong> are saved. For JS / “Load more” pages set{' '}
+        <code>UNIVERSITY_PLAYWRIGHT=1</code> and run <code>npx playwright install chromium</code>.
+        <strong> University feed</strong> rows can be removed here with Delete.
+      </div>
+
+      <section className="admin-panel mb-4" style={panelStyle}>
+        <div className="admin-panel__header">
+          <h2 className="admin-panel__title">Worker status</h2>
+        </div>
+        <div className="admin-panel__body">
+          {statusQuery.isLoading ? (
+            <span className="admin-form-hint">Loading…</span>
+          ) : statusQuery.data ? (
+            <pre className="admin-code-block mb-0">{JSON.stringify(statusQuery.data, null, 2)}</pre>
+          ) : null}
+        </div>
+      </section>
+
+      <div className="row g-4">
+        <div className="col-lg-5">
+          <section className="admin-panel h-100" style={panelStyle}>
+            <div className="admin-panel__header">
+              <h2 className="admin-panel__title">Add event source</h2>
+            </div>
+            <div className="admin-panel__body">
+              <div className="admin-form">
+                <div className="mb-3">
+                  <label className="admin-form-label" htmlFor="event-sync-name">
+                    Name
+                  </label>
+                  <input
+                    id="event-sync-name"
+                    className="form-control"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. City tourism calendar"
+                  />
+                </div>
+                <div className="mb-3">
+                  <label className="admin-form-label" htmlFor="event-sync-url">
+                    Website URL
+                  </label>
+                  <input
+                    id="event-sync-url"
+                    className="form-control"
+                    value={websiteUrl}
+                    onChange={(e) => setWebsiteUrl(e.target.value)}
+                    placeholder="https://events.example.edu/"
+                  />
+                  <small className="admin-form-hint">Use the calendar page, not the main homepage.</small>
+                </div>
+                <div className="mb-3">
+                  <label className="admin-form-label" htmlFor="event-sync-selectors">
+                    Selectors JSON (optional)
+                  </label>
+                  <textarea
+                    id="event-sync-selectors"
+                    className="form-control font-monospace small"
+                    rows={6}
+                    value={selectorJson}
+                    onChange={(e) => setSelectorJson(e.target.value)}
+                    placeholder={`{\n  "titleSelector": ".event-title",\n  "dateSelector": ".event-date"\n}`}
+                  />
+                </div>
+                {createMut.isError ? (
+                  <p className="admin-form-hint admin-form-hint--error">{(createMut.error as Error).message}</p>
+                ) : null}
+                <button
+                  type="button"
+                  className="admin-btn-primary"
+                  disabled={!name.trim() || !websiteUrl.trim() || createMut.isPending}
+                  onClick={() => createMut.mutate()}
                 >
-                  {JSON.stringify(statusQuery.data, null, 2)}
-                </pre>
-              ) : null}
+                  {createMut.isPending ? 'Saving…' : 'Save source'}
+                </button>
+              </div>
             </div>
-          </div>
+          </section>
+        </div>
 
-          <div className="row g-4">
-            <div className="col-lg-5">
-              <div
-                className="card border-0 shadow-sm h-100"
-                style={{ borderRadius: 12 }}
-              >
-                <div className="card-body p-4">
-                  <h2 className="h6 mb-3">Add event source</h2>
-                  <div className="mb-3">
-                    <label className="form-label small text-muted">Name</label>
-                    <input
-                      className="form-control"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. City tourism calendar"
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label small text-muted">Website URL</label>
-                    <input
-                      className="form-control"
-                      value={websiteUrl}
-                      onChange={(e) => setWebsiteUrl(e.target.value)}
-                      placeholder="https://events.example.edu/ (calendar page, not main homepage)"
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label small text-muted">
-                      Selectors JSON (optional)
-                    </label>
-                    <textarea
-                      className="form-control font-monospace small"
-                      rows={6}
-                      value={selectorJson}
-                      onChange={(e) => setSelectorJson(e.target.value)}
-                      placeholder={`{\n  "titleSelector": ".event-title",\n  "dateSelector": ".event-date"\n}`}
-                    />
-                  </div>
-                  {createMut.isError && (
-                    <div className="alert alert-danger small py-2">
-                      {(createMut.error as Error).message}
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    className="btn btn-dark"
-                    disabled={!name.trim() || !websiteUrl.trim() || createMut.isPending}
-                    onClick={() => createMut.mutate()}
-                  >
-                    {createMut.isPending ? 'Saving…' : 'Save source'}
-                  </button>
-                </div>
-              </div>
+        <div className="col-lg-7">
+          <section className="admin-panel" style={panelStyle}>
+            <div className="admin-panel__header">
+              <h2 className="admin-panel__title">Sources</h2>
             </div>
-            <div className="col-lg-7">
-              <div
-                className="card border-0 shadow-sm"
-                style={{ borderRadius: 12 }}
-              >
-                <div className="card-body p-4">
-                  <h2 className="h6 mb-3">Sources (public /universities)</h2>
-                  {sourcesQuery.isLoading || legacySourcesQuery.isLoading ? (
-                    <p className="text-muted small mb-0">Loading…</p>
-                  ) : feedSources.length === 0 ? (
-                    <p className="text-muted small mb-0">No sources yet.</p>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-sm align-middle">
-                        <thead>
-                          <tr>
-                            <th>Feed</th>
-                            <th>Name</th>
-                            <th>URL</th>
-                            <th>Events</th>
-                            <th>Active</th>
-                            <th />
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {feedSources.map((s) => (
-                            <tr key={`${s.feedKind}-${s.id}`}>
-                              <td>
-                                <span
-                                  className="badge"
-                                  style={{
-                                    fontSize: '0.7rem',
-                                    fontWeight: 600,
-                                    background: s.feedKind === 'scraped' ? '#ECFDF5' : '#F1F5F9',
-                                    color: s.feedKind === 'scraped' ? '#047857' : '#475569',
-                                  }}
-                                >
-                                  {s.feedKind === 'scraped' ? 'URL feed' : 'University feed'}
-                                </span>
-                              </td>
-                              <td>{s.name}</td>
-                              <td>
-                                <a href={s.url} target="_blank" rel="noreferrer" className="small">
-                                  {s.url.slice(0, 40)}
-                                  {s.url.length > 40 ? '…' : ''}
-                                </a>
-                              </td>
-                              <td className="text-nowrap">
-                                <span>{s.totalEvents}</span>
-                                {s.feedKind === 'legacy' && s.legacyStatus ? (
-                                  <code className="d-block small text-muted">{s.legacyStatus}</code>
-                                ) : s.scraperType ? (
-                                  <code className="d-block small text-muted">{s.scraperType}</code>
-                                ) : null}
-                              </td>
-                              <td>{s.active ? 'Yes' : 'No'}</td>
-                              <td className="text-end text-nowrap">
-                                <button
-                                  type="button"
-                                  className="btn btn-outline-secondary btn-sm me-1"
-                                  disabled={syncMut.isPending}
-                                  onClick={() => syncMut.mutate(s)}
-                                >
-                                  Sync
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn btn-outline-danger btn-sm"
-                                  disabled={deleteMut.isPending}
-                                  onClick={() => {
-                                    const label =
-                                      s.feedKind === 'legacy'
-                                        ? `Remove "${s.name}" from /universities and delete all its events?`
-                                        : `Delete "${s.name}" and its sync logs/events?`;
-                                    if (confirm(label)) {
-                                      deleteMut.mutate(s);
-                                    }
-                                  }}
-                                >
-                                  Delete
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+            <div className="admin-panel__body admin-panel__body--flush-top">
+              {sourcesQuery.isLoading || legacySourcesQuery.isLoading ? (
+                <div className="admin-loading-state py-4">Loading…</div>
+              ) : feedSources.length === 0 ? (
+                <div className="admin-empty-state py-4">
+                  <p className="mb-0">No sources yet.</p>
                 </div>
-              </div>
+              ) : (
+                <div className="admin-table-wrap">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Feed</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">URL</th>
+                        <th scope="col">Events</th>
+                        <th scope="col">Active</th>
+                        <th scope="col" className="text-end">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {feedSources.map((s) => (
+                        <tr key={`${s.feedKind}-${s.id}`}>
+                          <td>
+                            <span
+                              className={`admin-pill ${
+                                s.feedKind === 'scraped' ? 'admin-pill--active' : 'admin-pill--neutral'
+                              }`}
+                            >
+                              {s.feedKind === 'scraped' ? 'URL feed' : 'University feed'}
+                            </span>
+                          </td>
+                          <td className="admin-table__strong">{s.name}</td>
+                          <td>
+                            <a
+                              href={s.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="admin-table__link small"
+                            >
+                              {s.url.length > 48 ? `${s.url.slice(0, 48)}…` : s.url}
+                            </a>
+                          </td>
+                          <td className="text-nowrap">
+                            <span>{s.totalEvents}</span>
+                            {s.feedKind === 'legacy' && s.legacyStatus ? (
+                              <code className="d-block small text-muted">{s.legacyStatus}</code>
+                            ) : s.scraperType ? (
+                              <code className="d-block small text-muted">{s.scraperType}</code>
+                            ) : null}
+                          </td>
+                          <td>{s.active ? 'Yes' : 'No'}</td>
+                          <td>
+                            <div className="admin-table-actions justify-content-end">
+                              <button
+                                type="button"
+                                className="admin-btn-secondary admin-btn-sm"
+                                disabled={syncMut.isPending}
+                                onClick={() => syncMut.mutate(s)}
+                              >
+                                Sync
+                              </button>
+                              <button
+                                type="button"
+                                className="admin-btn-danger admin-btn-sm"
+                                disabled={deleteMut.isPending}
+                                onClick={() => {
+                                  const label =
+                                    s.feedKind === 'legacy'
+                                      ? `Remove "${s.name}" from /universities and delete all its events?`
+                                      : `Delete "${s.name}" and its sync logs/events?`;
+                                  if (confirm(label)) {
+                                    deleteMut.mutate(s);
+                                  }
+                                }}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </section>
 
-              <div
-                className="card border-0 shadow-sm mt-4"
-                style={{ borderRadius: 12 }}
-              >
-                <div className="card-body p-4">
-                  <h2 className="h6 mb-3">Recent sync logs</h2>
-                  {logsQuery.isLoading ? (
-                    <p className="text-muted small mb-0">Loading…</p>
-                  ) : !logsQuery.data?.length ? (
-                    <p className="text-muted small mb-0">No logs yet. Run Sync on a source.</p>
-                  ) : (
-                    <SyncLogsBySchoolAccordion logs={logsQuery.data} />
-                  )}
-                </div>
-              </div>
+          <section className="admin-panel mt-4" style={panelStyle}>
+            <div className="admin-panel__header">
+              <h2 className="admin-panel__title">Recent sync logs</h2>
             </div>
-          </div>
+            <div className="admin-panel__body">
+              {logsQuery.isLoading ? (
+                <div className="admin-loading-state py-3">Loading…</div>
+              ) : !logsQuery.data?.length ? (
+                <p className="admin-form-hint mb-0">No logs yet. Run Sync on a source.</p>
+              ) : (
+                <SyncLogsBySchoolAccordion logs={logsQuery.data} />
+              )}
+            </div>
+          </section>
         </div>
       </div>
-    </div>
+    </SuperAdminLayout>
   );
 };

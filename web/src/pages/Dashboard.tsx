@@ -1,262 +1,157 @@
+import { useMemo, type CSSProperties } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { schoolsService } from '../services/schools.service';
 import type { School } from '../services/schools.service';
-import { SuperAdminNavbar } from '../components/SuperAdminNavbar';
-import { SuperAdminSidebar } from '../components/SuperAdminSidebar';
+import { SuperAdminLayout } from '../components/SuperAdminLayout';
+import { ADMIN_PORTAL_ACCENTS } from '../constants/adminPortalTheme';
+import { EditSchoolPanel } from './EditSchool';
+import { SchoolInfoPanel } from './SchoolInfo';
 
-export const Dashboard = () => {
-  const { user } = useAuth();
+type DashboardTab = 'dashboard' | 'edit' | 'info';
+
+const DASHBOARD_TABS: { id: DashboardTab; label: string }[] = [
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'edit', label: 'Edit school' },
+  { id: 'info', label: 'School info' },
+];
+
+function parseDashboardTab(raw: string | null): DashboardTab {
+  if (raw === 'edit' || raw === 'info') return raw;
+  return 'dashboard';
+}
+
+function SuperAdminSchoolsListPanel() {
   const { data: schools, isLoading } = useQuery<School[]>({
     queryKey: ['schools'],
     queryFn: schoolsService.getAll,
   });
 
+  const panelStyle = { '--admin-accent': ADMIN_PORTAL_ACCENTS.super } as CSSProperties;
+
   return (
-    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
-      {/* Top Navbar */}
-      <SuperAdminNavbar />
-
-      {/* Main Layout */}
-      <div className="admin-shell-body">
-        {/* Sidebar */}
-        <SuperAdminSidebar />
-
-        {/* Main Content */}
-        <div className="admin-main">
-          {/* Welcome Section */}
-          <div className="mb-4">
-            <h1 style={{
-              fontSize: '2rem',
-              fontWeight: 'normal',
-              color: '#1a1f2e',
-              marginBottom: '0.5rem'
-            }}>
-              Welcome back, {user?.name}
-            </h1>
-            <p style={{
-              color: '#6c757d',
-              fontSize: '1rem',
-              marginBottom: 0
-            }}>
-              Manage your schools and view important information
-            </p>
-          </div>
-
-          {/* Schools List */}
-          <div className="card border-0 shadow-sm" style={{ borderRadius: '0px' }}>
-            <div className="card-body p-4">
-              <div className="d-flex justify-content-between align-items-center mb-4">
-                <h2 style={{
-                  fontSize: '1.5rem',
-                  fontWeight: 'normal',
-                  color: '#1a1f2e',
-                  margin: 0
-                }}>
-                  Schools
-                </h2>
-                <a
-                  href="/super-admin/schools/new"
-                  className="btn"
-                  style={{
-                    backgroundColor: '#1a1f2e',
-                    border: 'none',
-                    borderRadius: '50px',
-                    padding: '0.5rem 1.5rem',
-                    color: '#fff',
-                    fontWeight: '500',
-                    textDecoration: 'none',
-                    transition: 'all 0.3s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#fff';
-                    e.currentTarget.style.color = '#1a1f2e';
-                    e.currentTarget.style.border = '1px solid #1a1f2e';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#1a1f2e';
-                    e.currentTarget.style.color = '#fff';
-                    e.currentTarget.style.border = 'none';
-                  }}
-                >
-                  + Create School
-                </a>
-              </div>
-
-              {isLoading ? (
-                <div className="text-center py-5">
-                  <p style={{ color: '#6c757d' }}>Loading schools...</p>
-                </div>
-              ) : schools && schools.length > 0 ? (
-                <div className="table-responsive">
-                  <table className="table table-hover mb-0">
-                    <thead>
-                      <tr style={{ borderBottom: '2px solid #dee2e6' }}>
-                        <th style={{
-                          fontWeight: '500',
-                          color: '#1a1f2e',
-                          padding: '1rem',
-                          borderBottom: 'none'
-                        }}>Ref Number</th>
-                        <th style={{
-                          fontWeight: '500',
-                          color: '#1a1f2e',
-                          padding: '1rem',
-                          borderBottom: 'none'
-                        }}>School Name</th>
-                        <th style={{
-                          fontWeight: '500',
-                          color: '#1a1f2e',
-                          padding: '1rem',
-                          borderBottom: 'none'
-                        }}>City</th>
-                        <th style={{
-                          fontWeight: '500',
-                          color: '#1a1f2e',
-                          padding: '1rem',
-                          borderBottom: 'none'
-                        }}>Features</th>
-                        <th style={{
-                          fontWeight: '500',
-                          color: '#1a1f2e',
-                          padding: '1rem',
-                          borderBottom: 'none'
-                        }}>Status</th>
-                        <th style={{
-                          fontWeight: '500',
-                          color: '#1a1f2e',
-                          padding: '1rem',
-                          borderBottom: 'none'
-                        }}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {schools.map((school) => (
-                        <tr key={school.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                          <td style={{
-                            padding: '1rem',
-                            color: '#6c757d',
-                            fontFamily: 'monospace',
-                            fontSize: '0.9rem'
-                          }}>
-                            {school.refNum}
-                          </td>
-                          <td style={{
-                            padding: '1rem',
-                            color: '#1a1f2e',
-                            fontWeight: '500'
-                          }}>
-                            {school.name}
-                          </td>
-                          <td style={{
-                            padding: '1rem',
-                            color: '#6c757d'
-                          }}>
-                            {school.city}
-                          </td>
-                          <td style={{ padding: '1rem' }}>
-                            <div className="d-flex flex-wrap gap-1">
-                              {school.enabledFeatures.slice(0, 3).map((f) => (
-                                <span
-                                  key={f.code}
-                                  style={{
-                                    padding: '0.25rem 0.75rem',
-                                    backgroundColor: '#e7f3ff',
-                                    color: '#1a1f2e',
-                                    fontSize: '0.75rem',
-                                    borderRadius: '50px',
-                                    border: '1px solid #dee2e6'
-                                  }}
-                                >
-                                  {f.name}
-                                </span>
-                              ))}
-                              {school.enabledFeatures.length > 3 && (
-                                <span
-                                  style={{
-                                    padding: '0.25rem 0.75rem',
-                                    backgroundColor: '#d4edda',
-                                    color: '#155724',
-                                    fontSize: '0.75rem',
-                                    borderRadius: '50px',
-                                    border: '1px solid #c3e6cb',
-                                    fontWeight: '500'
-                                  }}
-                                >
-                                  +{school.enabledFeatures.length - 3}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td style={{ padding: '1rem' }}>
-                            <span
-                              style={{
-                                padding: '0.25rem 0.75rem',
-                                fontSize: '0.75rem',
-                                borderRadius: '50px',
-                                backgroundColor: school.isActive ? '#d4edda' : '#f8d7da',
-                                color: school.isActive ? '#155724' : '#721c24',
-                                border: `1px solid ${school.isActive ? '#c3e6cb' : '#f5c6cb'}`
-                              }}
-                            >
-                              {school.isActive ? 'Active' : 'Inactive'}
-                            </span>
-                          </td>
-                          <td style={{ padding: '1rem' }}>
-                            <a
-                              href={`/super-admin/schools/${school.id}`}
-                              style={{
-                                color: '#1a1f2e',
-                                textDecoration: 'none',
-                                fontWeight: '500',
-                                transition: 'color 0.3s'
-                              }}
-                              onMouseEnter={(e) => e.currentTarget.style.color = '#4dabf7'}
-                              onMouseLeave={(e) => e.currentTarget.style.color = '#1a1f2e'}
-                            >
-                              View
-                            </a>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-center py-5">
-                  <p style={{ color: '#6c757d', marginBottom: '1rem' }}>No schools found.</p>
-                  <a
-                    href="/super-admin/schools/new"
-                    className="btn"
-                    style={{
-                      backgroundColor: '#1a1f2e',
-                      border: 'none',
-                      borderRadius: '50px',
-                      padding: '0.5rem 1.5rem',
-                      color: '#fff',
-                      fontWeight: '500',
-                      textDecoration: 'none',
-                      transition: 'all 0.3s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#fff';
-                      e.currentTarget.style.color = '#1a1f2e';
-                      e.currentTarget.style.border = '1px solid #1a1f2e';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#1a1f2e';
-                      e.currentTarget.style.color = '#fff';
-                      e.currentTarget.style.border = 'none';
-                    }}
-                  >
-                    Create Your First School
-                  </a>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+    <section className="admin-panel" style={panelStyle}>
+      <div className="admin-panel__header">
+        <h2 className="admin-panel__title">Schools</h2>
+        <Link to="/super-admin/schools/new" className="admin-btn-primary">
+          + Create School
+        </Link>
       </div>
-    </div>
+
+      <div className="admin-panel__body admin-panel__body--flush-top">
+        {isLoading ? (
+          <div className="admin-loading-state">
+            <div className="spinner-border spinner-border-sm text-secondary me-2" role="status" />
+            Loading schools…
+          </div>
+        ) : schools && schools.length > 0 ? (
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th scope="col">Ref Number</th>
+                  <th scope="col">School Name</th>
+                  <th scope="col">City</th>
+                  <th scope="col">Features</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {schools.map((school) => (
+                  <tr key={school.id}>
+                    <td className="admin-table__mono">{school.refNum}</td>
+                    <td className="admin-table__strong">{school.name}</td>
+                    <td>{school.city}</td>
+                    <td>
+                      <div className="admin-pill-row">
+                        {school.enabledFeatures.slice(0, 3).map((f) => (
+                          <span key={f.code} className="admin-pill admin-pill--feature">
+                            {f.name}
+                          </span>
+                        ))}
+                        {school.enabledFeatures.length > 3 ? (
+                          <span className="admin-pill admin-pill--more">+{school.enabledFeatures.length - 3}</span>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td>
+                      <span
+                        className={`admin-pill ${school.isActive ? 'admin-pill--active' : 'admin-pill--inactive'}`}
+                      >
+                        {school.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td>
+                      <Link to={`/super-admin/schools/${school.id}`} className="admin-table__link">
+                        View
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="admin-empty-state">
+            <p>No schools found.</p>
+            <Link to="/super-admin/schools/new" className="admin-btn-primary">
+              Create your first school
+            </Link>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+export const Dashboard = () => {
+  const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = useMemo(() => parseDashboardTab(searchParams.get('tab')), [searchParams]);
+
+  const panelStyle = { '--admin-accent': ADMIN_PORTAL_ACCENTS.super } as CSSProperties;
+
+  const setTab = (tab: DashboardTab) => {
+    if (tab === 'dashboard') {
+      setSearchParams({});
+    } else {
+      setSearchParams({ tab });
+    }
+  };
+
+  const tabSubtitle =
+    activeTab === 'edit'
+      ? 'Search and select a school to edit details, features, and admin email.'
+      : activeTab === 'info'
+        ? 'Select a school to email reference info, features, or tenure reminders to the School Admin.'
+        : 'Manage your schools and view important information';
+
+  return (
+    <SuperAdminLayout>
+      <header className="admin-page-header" style={panelStyle}>
+        <h1 className="admin-page-title">Welcome back, {user?.name ?? 'Super Admin'}</h1>
+        <p className="admin-page-subtitle">{tabSubtitle}</p>
+
+        <nav className="admin-dashboard-badges" aria-label="School management sections">
+          {DASHBOARD_TABS.map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              className={`admin-dashboard-badge${activeTab === id ? ' is-active' : ''}`}
+              aria-current={activeTab === id ? 'page' : undefined}
+              onClick={() => setTab(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      </header>
+
+      {activeTab === 'dashboard' ? <SuperAdminSchoolsListPanel /> : null}
+      {activeTab === 'edit' ? <EditSchoolPanel onCancel={() => setTab('dashboard')} /> : null}
+      {activeTab === 'info' ? <SchoolInfoPanel /> : null}
+    </SuperAdminLayout>
   );
 };

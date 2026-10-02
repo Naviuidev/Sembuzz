@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { SubCategoryAdminNavbar } from '../components/SubCategoryAdminNavbar';
-import { SubCategoryAdminSidebar } from '../components/SubCategoryAdminSidebar';
+import { SubCategoryAdminLayout } from '../components/SubCategoryAdminLayout';
 import { useSubCategoryAdminAuth } from '../contexts/SubCategoryAdminAuthContext';
 import { subcategoryAdminEventsService, type ApprovedEvent } from '../services/subcategory-admin-events.service';
 import { publicEventsService } from '../services/public-events.service';
@@ -151,11 +150,7 @@ export const SubcategoryAdminAnalytics = () => {
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#eef1f5' }}>
-      <SubCategoryAdminNavbar />
-      <div className="admin-shell-body">
-        <SubCategoryAdminSidebar />
-        <div className="admin-main">
+    <SubCategoryAdminLayout>
           <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
             <div className="d-flex align-items-center gap-2">
               <div
@@ -546,8 +541,6 @@ export const SubcategoryAdminAnalytics = () => {
               </table>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
+    </SubCategoryAdminLayout>
   );
 };

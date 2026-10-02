@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useSubCategoryAdminAuth } from '../contexts/SubCategoryAdminAuthContext';
+import { ADMIN_PORTAL_ACCENTS, ADMIN_PORTAL_LABELS } from '../constants/adminPortalTheme';
 import { AdminNavbarActions, AdminNavbarShell } from './AdminNavbarActions';
 
 export const SubCategoryAdminNavbar = () => {
@@ -12,7 +13,11 @@ export const SubCategoryAdminNavbar = () => {
   };
 
   return (
-    <AdminNavbarShell homePath="/subcategory-admin/dashboard">
+    <AdminNavbarShell
+      homePath="/subcategory-admin/dashboard"
+      portalLabel={ADMIN_PORTAL_LABELS.subcategory}
+      accentColor={ADMIN_PORTAL_ACCENTS.subcategory}
+    >
       <AdminNavbarActions role="subcategory-admin" onLogout={handleLogout} />
     </AdminNavbarShell>
   );
