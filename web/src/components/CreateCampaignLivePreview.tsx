@@ -144,6 +144,7 @@ export function CreateCampaignLivePreview({
         </section>
       )}
 
+
       {(() => {
         const showEligibility = !schoolAudience || hasText(eligibility);
         const showRegister = !schoolAudience || hasText(registrationUrl);
