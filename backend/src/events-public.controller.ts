@@ -27,6 +27,34 @@ export class EventsPublicController {
     private publishedBlogs: PublishedBlogsService,
   ) {}
 
+  @Get('external-categories')
+  async getExternalCategories() {
+    try {
+      return await (this.prisma as any).externalCategory.findMany({
+        where: { isActive: true },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+        select: { id: true, name: true, description: true, sortOrder: true },
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  /** True when the school has at least one approved external pipeline category. */
+  @Get('school-external-enabled')
+  async getSchoolExternalEnabled(@Query('schoolId') schoolId?: string) {
+    const sid = typeof schoolId === 'string' ? schoolId.trim() : '';
+    if (!sid) return { enabled: false };
+    try {
+      const count = await this.prisma.externalCategorySchoolPipelineRequest.count({
+        where: { schoolId: sid, status: 'approved' },
+      });
+      return { enabled: count > 0 };
+    } catch {
+      return { enabled: false };
+    }
+  }
+
   @Get('categories')
   async getCategoriesBySchool(@Query('schoolId') schoolId: string) {
     const sid = typeof schoolId === 'string' ? schoolId.trim() : '';

@@ -1,10 +1,11 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SchoolAdminAuthProvider, useSchoolAdminAuth } from './contexts/SchoolAdminAuthContext';
 import { CategoryAdminAuthProvider, useCategoryAdminAuth } from './contexts/CategoryAdminAuthContext';
 import { SubCategoryAdminAuthProvider, useSubCategoryAdminAuth } from './contexts/SubCategoryAdminAuthContext';
 import { AdsAdminAuthProvider, useAdsAdminAuth } from './contexts/AdsAdminAuthContext';
+import { ExternalAdminAuthProvider, useExternalAdminAuth } from './contexts/ExternalAdminAuthContext';
 import { UserAuthProvider } from './contexts/UserAuthContext';
 import { ChatPopupProvider } from './contexts/ChatPopupContext';
 import { StudentChatGroupsWidget } from './components/StudentChatGroupsWidget';
@@ -17,6 +18,8 @@ import { AdsAdminProtectedRoute } from './components/AdsAdminProtectedRoute';
 import { SuperAdminLogin } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { CreateSchool } from './pages/CreateSchool';
+import { SuperAdminExternal } from './pages/SuperAdminExternal';
+import { CreateExternalAdmin } from './pages/CreateExternalAdmin';
 import { SchoolDetails } from './pages/SchoolDetails';
 import { RaiseRequest } from './pages/RaiseRequest';
 import { Queries } from './pages/Queries';
@@ -28,16 +31,10 @@ import { SchoolAdminDashboard } from './pages/SchoolAdminDashboard';
 import { SchoolAdminCategories } from './pages/SchoolAdminCategories';
 import { SchoolAdminPrivacy } from './pages/SchoolAdminPrivacy';
 import { SchoolAdminPosts } from './pages/SchoolAdminPosts';
-import { SchoolAdminCreatePost } from './pages/SchoolAdminCreatePost';
 import { SchoolAdminQueries } from './pages/SchoolAdminQueries';
 import { SchoolAdminSettingsQueries } from './pages/SchoolAdminSettingsQueries';
 import { SchoolAdminRaiseRequest } from './pages/SchoolAdminRaiseRequest';
-import { SchoolAdminUserRequests } from './pages/SchoolAdminUserRequests';
-import { SchoolAdminUserHelp } from './pages/SchoolAdminUserHelp';
-import { SchoolAdminApprovedUsers } from './pages/SchoolAdminApprovedUsers';
-import { SchoolAdminAutomatedUsers } from './pages/SchoolAdminAutomatedUsers';
-import { SchoolAdminApprovedPosts } from './pages/SchoolAdminApprovedPosts';
-import { SchoolAdminTotalUsers } from './pages/SchoolAdminTotalUsers';
+import { SchoolAdminUsers } from './pages/SchoolAdminUsers';
 import { SchoolAdminForgotPassword } from './pages/SchoolAdminForgotPassword';
 import { SchoolAdminVerifyOtp } from './pages/SchoolAdminVerifyOtp';
 import { SchoolAdminResetPassword } from './pages/SchoolAdminResetPassword';
@@ -53,9 +50,8 @@ import { CategoryAdminDashboard } from './pages/CategoryAdminDashboard';
 import { CategoryAdminQueries } from './pages/CategoryAdminQueries';
 import { CategoryAdminRaiseRequest } from './pages/CategoryAdminRaiseRequest';
 import { CategoryAdminPrivacy } from './pages/CategoryAdminPrivacy';
-import { CategoryAdminPendingApprovals } from './pages/CategoryAdminPendingApprovals';
+import { CategoryAdminPosts } from './pages/CategoryAdminPosts';
 import { CategoryAdminBlogs } from './pages/CategoryAdminBlogs';
-import { CategoryAdminApprovedPosts } from './pages/CategoryAdminApprovedPosts';
 import { CategoryAdminAnalytics } from './pages/CategoryAdminAnalytics.tsx';
 import { CategoryAdminAds } from './pages/CategoryAdminAds.tsx';
 import { CategoryAdminAdsAnalytics } from './pages/CategoryAdminAdsAnalytics';
@@ -66,17 +62,26 @@ import { SubcategoryAdminResetPassword } from './pages/SubcategoryAdminResetPass
 import { SubCategoryAdminChangePassword } from './pages/SubCategoryAdminChangePassword';
 import { SubCategoryAdminDashboard } from './pages/SubCategoryAdminDashboard';
 import { SubCategoryAdminPostEvent } from './pages/SubCategoryAdminPostEvent';
+import { SubCategoryAdminPosts } from './pages/SubCategoryAdminPosts';
 import { SubcategoryAdminAnalytics } from './pages/SubcategoryAdminAnalytics.tsx';
 import { SubCategoryAdminRaiseRequest } from './pages/SubCategoryAdminRaiseRequest';
 import { SubCategoryAdminQueries } from './pages/SubCategoryAdminQueries';
 import { SubCategoryAdminPrivacy } from './pages/SubCategoryAdminPrivacy';
+import { SubCategoryAdminExternalConfig } from './pages/SubCategoryAdminExternalConfig';
 import { SubCategoryAdminBlogs } from './pages/SubCategoryAdminBlogs';
 import { AdsAdminLogin } from './pages/AdsAdminLogin';
 import { AdsAdminSetPassword } from './pages/AdsAdminSetPassword';
 import { AdsAdminDashboard } from './pages/AdsAdminDashboard';
 import { AdsAdminAds } from './pages/AdsAdminAds';
 import { AdsAdminAdsAnalytics } from './pages/AdsAdminAdsAnalytics';
-import { About } from './pages/About';
+import { ExternalAdminLogin } from './pages/ExternalAdminLogin';
+import { ExternalAdminSetPassword } from './pages/ExternalAdminSetPassword';
+import { ExternalAdminDashboard } from './pages/ExternalAdminDashboard';
+import { ExternalAdminProfile } from './pages/ExternalAdminProfile';
+import { ExternalAdminPrivacy } from './pages/ExternalAdminPrivacy';
+import { ExternalAdminPosts } from './pages/ExternalAdminPosts';
+import { SchoolAdminExternalConfig } from './pages/SchoolAdminExternalConfig';
+import { ExternalAdminProtectedRoute } from './components/ExternalAdminProtectedRoute';
 import { Contact } from './pages/Contact';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { TermsOfService } from './pages/TermsOfService';
@@ -141,6 +146,22 @@ const SuperAdminRoutes = () => {
         element={
           <ProtectedRoute>
             <SchoolDetails />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="external"
+        element={
+          <ProtectedRoute>
+            <SuperAdminExternal />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="external/admins/new"
+        element={
+          <ProtectedRoute>
+            <CreateExternalAdmin />
           </ProtectedRoute>
         }
       />
@@ -227,50 +248,20 @@ const SchoolAdminRoutes = () => {
         path="messages"
         element={<Navigate to="/school-admin/privacy?tab=message-config" replace />}
       />
+      <Route path="user-requests" element={<Navigate to="/school-admin/users" replace />} />
       <Route
-        path="user-requests"
+        path="users"
         element={
           <SchoolAdminProtectedRoute>
-            <SchoolAdminUserRequests />
+            <SchoolAdminUsers />
           </SchoolAdminProtectedRoute>
         }
       />
-      <Route
-        path="user-help"
-        element={<SchoolAdminUserHelp />}
-      />
-      <Route
-        path="approved-users"
-        element={
-          <SchoolAdminProtectedRoute>
-            <SchoolAdminApprovedUsers />
-          </SchoolAdminProtectedRoute>
-        }
-      />
-      <Route
-        path="automated-users"
-        element={
-          <SchoolAdminProtectedRoute>
-            <SchoolAdminAutomatedUsers />
-          </SchoolAdminProtectedRoute>
-        }
-      />
-      <Route
-        path="total-users"
-        element={
-          <SchoolAdminProtectedRoute>
-            <SchoolAdminTotalUsers />
-          </SchoolAdminProtectedRoute>
-        }
-      />
-      <Route
-        path="approved-posts"
-        element={
-          <SchoolAdminProtectedRoute>
-            <SchoolAdminApprovedPosts />
-          </SchoolAdminProtectedRoute>
-        }
-      />
+      <Route path="user-help" element={<Navigate to="/school-admin/users?tab=help" replace />} />
+      <Route path="approved-users" element={<Navigate to="/school-admin/users?tab=approved" replace />} />
+      <Route path="automated-users" element={<Navigate to="/school-admin/users?tab=automated" replace />} />
+      <Route path="total-users" element={<Navigate to="/school-admin/users?tab=total" replace />} />
+      <Route path="approved-posts" element={<Navigate to="/school-admin/posts?tab=approved" replace />} />
       <Route
         path="categories"
         element={
@@ -288,13 +279,14 @@ const SchoolAdminRoutes = () => {
         }
       />
       <Route
-        path="create-post"
+        path="external-config"
         element={
           <SchoolAdminProtectedRoute>
-            <SchoolAdminCreatePost />
+            <SchoolAdminExternalConfig />
           </SchoolAdminProtectedRoute>
         }
       />
+      <Route path="create-post" element={<Navigate to="/school-admin/posts" replace />} />
       <Route
         path="posts"
         element={
@@ -388,12 +380,16 @@ const CategoryAdminRoutes = () => {
         }
       />
       <Route
-        path="pending-approvals"
+        path="posts"
         element={
           <CategoryAdminProtectedRoute>
-            <CategoryAdminPendingApprovals />
+            <CategoryAdminPosts />
           </CategoryAdminProtectedRoute>
         }
+      />
+      <Route
+        path="pending-approvals"
+        element={<Navigate to="/category-admin/posts" replace />}
       />
       <Route
         path="blogs"
@@ -405,11 +401,7 @@ const CategoryAdminRoutes = () => {
       />
       <Route
         path="approved-posts"
-        element={
-          <CategoryAdminProtectedRoute>
-            <CategoryAdminApprovedPosts />
-          </CategoryAdminProtectedRoute>
-        }
+        element={<Navigate to="/category-admin/posts?tab=approved" replace />}
       />
       <Route
         path="analytics"
@@ -504,13 +496,22 @@ const SubCategoryAdminRoutes = () => {
         }
       />
       <Route
-        path="post-event"
+        path="posts"
         element={
           <SubCategoryAdminProtectedRoute>
-            <SubCategoryAdminPostEvent />
+            <SubCategoryAdminPosts />
           </SubCategoryAdminProtectedRoute>
         }
       />
+      <Route
+        path="external-config"
+        element={
+          <SubCategoryAdminProtectedRoute>
+            <SubCategoryAdminExternalConfig />
+          </SubCategoryAdminProtectedRoute>
+        }
+      />
+      <Route path="post-event" element={<SubCategoryAdminPostEvent />} />
       <Route
         path="blogs"
         element={
@@ -529,7 +530,7 @@ const SubCategoryAdminRoutes = () => {
       <Route path="blog-rejected" element={<Navigate to="/subcategory-admin/blogs?tab=blog-rejected" replace />} />
       <Route
         path="approvals-pending"
-        element={<Navigate to="/subcategory-admin/post-event?tab=approvals-pending" replace />}
+        element={<Navigate to="/subcategory-admin/posts?tab=pending" replace />}
       />
       <Route
         path="approvals-rejected"
@@ -537,7 +538,7 @@ const SubCategoryAdminRoutes = () => {
       />
       <Route
         path="approved"
-        element={<Navigate to="/subcategory-admin/post-event?tab=approved" replace />}
+        element={<Navigate to="/subcategory-admin/posts?tab=approved" replace />}
       />
       <Route
         path="analytics"
@@ -577,8 +578,76 @@ const SubCategoryAdminRoutes = () => {
       />
       <Route
         path="received-corrections"
-        element={<Navigate to="/subcategory-admin/post-event?tab=received-corrections" replace />}
+        element={<Navigate to="/subcategory-admin/posts?tab=corrections" replace />}
       />
+    </Routes>
+  );
+};
+
+const ExternalAdminRoutes = () => {
+  const { isAuthenticated, user, loading } = useExternalAdminAuth();
+
+  if (loading) {
+    return <div className="d-flex align-items-center justify-content-center min-h-screen">Loading...</div>;
+  }
+
+  const loginRedirect = isAuthenticated
+    ? user?.isFirstLogin
+      ? '/external-admin/set-password'
+      : '/external-admin/dashboard'
+    : null;
+
+  return (
+    <Routes>
+      <Route
+        path="login"
+        element={loginRedirect ? <Navigate to={loginRedirect} replace /> : <ExternalAdminLogin />}
+      />
+      <Route
+        path="set-password"
+        element={
+          !isAuthenticated ? (
+            <Navigate to="/external-admin/login" replace />
+          ) : user?.isFirstLogin ? (
+            <ExternalAdminSetPassword />
+          ) : (
+            <Navigate to="/external-admin/dashboard" replace />
+          )
+        }
+      />
+      <Route
+        path="dashboard"
+        element={
+          <ExternalAdminProtectedRoute>
+            <ExternalAdminDashboard />
+          </ExternalAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="profile"
+        element={
+          <ExternalAdminProtectedRoute>
+            <ExternalAdminProfile />
+          </ExternalAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="privacy"
+        element={
+          <ExternalAdminProtectedRoute>
+            <ExternalAdminPrivacy />
+          </ExternalAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="posts"
+        element={
+          <ExternalAdminProtectedRoute>
+            <ExternalAdminPosts />
+          </ExternalAdminProtectedRoute>
+        }
+      />
+      <Route path="*" element={<Navigate to="/external-admin/dashboard" replace />} />
     </Routes>
   );
 };
@@ -616,18 +685,29 @@ const AdsAdminRoutes = () => {
   );
 };
 
+function EventsLegacyRedirect() {
+  const location = useLocation();
+  return (
+    <Navigate
+      to={{ pathname: '/', search: location.search, hash: location.hash }}
+      replace
+      state={location.state}
+    />
+  );
+}
+
 const AppRoutes = () => {
   return (
     <Routes>
-      {/* Public Routes — Home is placeholder; Events at /events */}
-      <Route path="/" element={<Home />} />
-      <Route path="/events" element={<PublicEvents />} />
+      {/* Public Routes — events feed at /; marketing home at /about */}
+      <Route path="/" element={<PublicEvents />} />
+      <Route path="/events" element={<EventsLegacyRedirect />} />
       <Route path="/blogs" element={<PublicBlogs />} />
       <Route path="/blogs/:id" element={<PublicBlogDetail />} />
       <Route path="/universities" element={<PublicUniversities />} />
       <Route path="/university-events" element={<PublicAllUniversityEvents />} />
       <Route path="/universities/:id" element={<PublicUniversityEvents />} />
-      <Route path="/about" element={<About />} />
+      <Route path="/about" element={<Home />} />
       <Route path="/contact" element={<Contact />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/terms" element={<TermsOfService />} />
@@ -635,7 +715,7 @@ const AppRoutes = () => {
       <Route path="/register" element={<Register />} />
       <Route path="/update-verification-doc" element={<UpdateVerificationDoc />} />
       <Route path="/verify-approval" element={<VerifyApproval />} />
-      <Route path="/login" element={<Navigate to="/events" state={{ openAuth: 'login' }} replace />} />
+      <Route path="/login" element={<Navigate to="/" state={{ openAuth: 'login' }} replace />} />
       <Route path="/saved" element={<SavedItems />} />
       <Route path="/notifications" element={<Notifications />} />
       <Route path="/messages" element={<Messages />} />
@@ -657,6 +737,9 @@ const AppRoutes = () => {
 
       {/* Ads Admin Routes */}
       <Route path="/ads-admin/*" element={<AdsAdminRoutes />} />
+
+      {/* External Admin Routes */}
+      <Route path="/external-admin/*" element={<ExternalAdminRoutes />} />
       
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
@@ -672,6 +755,7 @@ function App() {
           <CategoryAdminAuthProvider>
             <SubCategoryAdminAuthProvider>
               <AdsAdminAuthProvider>
+              <ExternalAdminAuthProvider>
                 <UserAuthProvider>
                 <BrowserRouter>
                   <ChatPopupProvider>
@@ -682,6 +766,7 @@ function App() {
                   </ChatPopupProvider>
                 </BrowserRouter>
                 </UserAuthProvider>
+              </ExternalAdminAuthProvider>
               </AdsAdminAuthProvider>
             </SubCategoryAdminAuthProvider>
           </CategoryAdminAuthProvider>

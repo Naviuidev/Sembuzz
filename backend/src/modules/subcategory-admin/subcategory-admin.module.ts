@@ -11,6 +11,7 @@ import { SubCategoryAdminStudentChatGroupsModule } from './student-chat-groups/s
 import { SubCategoryAdminStudentChatGroupRequestsModule } from './student-chat-group-requests/subcategory-admin-student-chat-group-requests.module';
 import { SubCategoryAdminClubGroupChatDeleteRequestsModule } from './club-group-chat-delete-requests/subcategory-admin-club-group-chat-delete-requests.module';
 import { SubCategoryAdminStudentChatGroupDeleteRequestsModule } from './student-chat-group-delete-requests/subcategory-admin-student-chat-group-delete-requests.module';
+import { SubCategoryAdminExternalConfigModule } from './external-config/external-config.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { SubCategoryAdminStudentChatGroupDeleteRequestsModule } from './student-
     SubCategoryAdminStudentChatGroupRequestsModule,
     SubCategoryAdminClubGroupChatDeleteRequestsModule,
     SubCategoryAdminStudentChatGroupDeleteRequestsModule,
+    SubCategoryAdminExternalConfigModule,
   ],
   exports: [SubCategoryAdminAuthModule],
 })

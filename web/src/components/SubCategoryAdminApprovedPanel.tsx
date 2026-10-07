@@ -1,7 +1,16 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { subcategoryAdminEventsService } from '../services/subcategory-admin-events.service';
-import { EventPostReviewSummary } from './EventPostReviewSummary';
+import { subcategoryAdminEventsService, type ApprovedEvent } from '../services/subcategory-admin-events.service';
+import { CreatePostLivePreview } from './CreatePostLivePreview';
+import { ADMIN_PORTAL_ACCENTS } from '../constants/adminPortalTheme';
+import { useSubCategoryAdminAuth } from '../contexts/SubCategoryAdminAuthContext';
+import {
+  actionButtonsForApi,
+  eventDateToInputValue,
+  eventTimeToInputValue,
+  parseStoredActionButtons,
+} from './EventPostDetailFields';
+import { imageSrc } from '../utils/image';
 
 function formatDate(iso: string) {
   try {
@@ -28,168 +37,141 @@ function parseImageUrls(imageUrls: string | null): string[] {
 }
 
 export function SubCategoryAdminApprovedPanel() {
-  const [viewEventId, setViewEventId] = useState<string | null>(null);
+  const { user } = useSubCategoryAdminAuth();
+  const [previewPost, setPreviewPost] = useState<ApprovedEvent | null>(null);
+  const [previewMode, setPreviewMode] = useState<'mobile' | 'tablet' | 'web'>('mobile');
 
   const { data: approvedEvents = [], isLoading, error } = useQuery({
     queryKey: ['subcategory-admin', 'events', 'approved'],
     queryFn: () => subcategoryAdminEventsService.getApproved(),
   });
 
-  const selectedEvent = approvedEvents.find((event) => event.id === viewEventId) ?? null;
+  const openPreview = (event: ApprovedEvent) => {
+    setPreviewPost(event);
+    setPreviewMode('mobile');
+  };
+
+  if (isLoading) {
+    return <div className="admin-loading-state">Loading approved posts…</div>;
+  }
+  if (error) {
+    return <div className="admin-empty-state"><p>Failed to load approved posts.</p></div>;
+  }
+  if (approvedEvents.length === 0) {
+    return (
+      <div className="admin-empty-state">
+        <i className="bi bi-check-circle admin-category-dashboard__empty-icon" aria-hidden />
+        <p className="admin-form-hint mb-0">No approved posts yet.</p>
+      </div>
+    );
+  }
+
+  const previewImages = previewPost ? parseImageUrls(previewPost.imageUrls) : [];
 
   return (
     <>
-      <p style={{ color: '#6c757d', fontSize: '1rem', marginBottom: '1.5rem' }}>
-        Events approved by the category admin and live on the website for your school.
-      </p>
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th scope="col">Post title</th>
+              <th scope="col">Subcategory</th>
+              <th scope="col">Approved on</th>
+              <th scope="col">Status</th>
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {approvedEvents.map((event) => (
+              <tr key={event.id}>
+                <td className="admin-table__strong">{event.title}</td>
+                <td>{event.subCategory?.name ?? '—'}</td>
+                <td>{formatDate(event.updatedAt)}</td>
+                <td>
+                  <span className="admin-pill admin-pill--status-done">Live</span>
+                </td>
+                <td>
+                  <button
+                    type="button"
+                    className="admin-icon-btn admin-icon-btn--edit"
+                    title="Live preview"
+                    aria-label={`Preview ${event.title}`}
+                    onClick={() => openPreview(event)}
+                  >
+                    <i className="bi bi-eye" aria-hidden />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-      {!viewEventId && (
-        <div className="card border-0 shadow-sm" style={{ borderRadius: '0px' }}>
-          <div className="card-body p-4">
-            {isLoading ? (
-              <div className="text-center py-5">
-                <div className="spinner-border text-secondary" role="status" />
-                <p className="mt-2 mb-0" style={{ color: '#6c757d' }}>
-                  Loading…
-                </p>
+      {previewPost ? (
+        <div
+          className="admin-modal-overlay admin-modal-overlay--elevated"
+          onClick={() => setPreviewPost(null)}
+          role="presentation"
+        >
+          <div
+            className="admin-modal admin-modal--preview-post"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="sca-approved-post-preview-title"
+          >
+            <button
+              type="button"
+              className="admin-modal__close"
+              aria-label="Close preview"
+              onClick={() => setPreviewPost(null)}
+            >
+              <i className="bi bi-x-lg" aria-hidden />
+            </button>
+            <div className="admin-modal__body admin-modal__body--with-close">
+              <h3 className="admin-modal__title" id="sca-approved-post-preview-title">Post preview</h3>
+              <p className="admin-form-hint mb-3">{previewPost.title}</p>
+              <div className="admin-create-post-preview-toggle mb-3" role="tablist" aria-label="Preview device">
+                {(['mobile', 'tablet', 'web'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    role="tab"
+                    aria-selected={previewMode === mode}
+                    className={previewMode === mode ? 'is-active' : ''}
+                    onClick={() => setPreviewMode(mode)}
+                  >
+                    {mode === 'mobile' ? 'Mobile' : mode === 'tablet' ? 'Tablet' : 'Web'}
+                  </button>
+                ))}
               </div>
-            ) : error ? (
-              <div className="text-center py-5">
-                <i
-                  className="bi bi-exclamation-circle"
-                  style={{ fontSize: '3rem', color: '#dc3545', marginBottom: '1rem' }}
+              <div className="admin-approved-posts__preview-frame">
+                <CreatePostLivePreview
+                  title={previewPost.title}
+                  description={previewPost.description ?? ''}
+                  categoryName={user?.categoryName ?? ''}
+                  subCategoryName={previewPost.subCategory?.name ?? ''}
+                  schoolName={user?.schoolName || user?.schoolDomain || 'Your school'}
+                  eventDate={eventDateToInputValue(previewPost.eventDate ?? null)}
+                  eventStartTime={eventTimeToInputValue(previewPost.eventStartTime ?? null)}
+                  eventEndTime={eventTimeToInputValue(previewPost.eventEndTime ?? null)}
+                  eventLocation={previewPost.eventLocation?.trim() ?? ''}
+                  actionButtons={actionButtonsForApi(parseStoredActionButtons(previewPost.actionButtons))}
+                  coverSrc={previewImages[0] ? imageSrc(previewImages[0]) : ''}
+                  previewMode={previewMode}
+                  accentColor={ADMIN_PORTAL_ACCENTS.subcategory}
+                  commentsEnabled={previewPost.commentsEnabled}
                 />
-                <p style={{ color: '#6c757d', margin: 0 }}>Failed to load approved events</p>
               </div>
-            ) : approvedEvents.length === 0 ? (
-              <div className="text-center py-5">
-                <i
-                  className="bi bi-check-circle"
-                  style={{ fontSize: '3rem', color: '#6c757d', marginBottom: '1rem' }}
-                />
-                <p style={{ color: '#6c757d', margin: 0 }}>No approved events yet</p>
+              <div className="admin-modal__footer mt-3">
+                <button type="button" className="admin-btn-secondary" onClick={() => setPreviewPost(null)}>
+                  Close
+                </button>
               </div>
-            ) : (
-              <div className="table-responsive">
-                <table className="table table-hover align-middle mb-0">
-                  <thead>
-                    <tr style={{ borderBottom: '2px solid #dee2e6' }}>
-                      <th style={{ fontWeight: '600', color: '#1a1f2e' }}>Post title</th>
-                      <th style={{ fontWeight: '600', color: '#1a1f2e' }}>Subcategory</th>
-                      <th style={{ fontWeight: '600', color: '#1a1f2e' }}>Approved on</th>
-                      <th style={{ fontWeight: '600', color: '#1a1f2e' }}>Status</th>
-                      <th style={{ fontWeight: '600', color: '#1a1f2e', width: '100px' }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {approvedEvents.map((event) => (
-                      <tr key={event.id}>
-                        <td style={{ fontWeight: '500', color: '#1a1f2e' }}>{event.title}</td>
-                        <td style={{ color: '#6c757d' }}>{event.subCategory?.name ?? '—'}</td>
-                        <td style={{ color: '#6c757d', fontSize: '0.9rem' }}>
-                          {formatDate(event.updatedAt)}
-                        </td>
-                        <td>
-                          <span className="badge bg-success" style={{ borderRadius: '4px' }}>
-                            Live on website
-                          </span>
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            className="btn btn-sm"
-                            style={{
-                              border: '1px solid #dee2e6',
-                              borderRadius: '50px',
-                              padding: '0.35rem 0.75rem',
-                              color: '#1a1f2e',
-                              fontWeight: '500',
-                            }}
-                            onClick={() => setViewEventId(event.id)}
-                            title="View details"
-                            aria-label={`View details for ${event.title}`}
-                          >
-                            <i className="bi bi-eye" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {viewEventId && selectedEvent && (
-        <div className="card border-0 shadow-sm" style={{ borderRadius: '0px' }}>
-          <div className="card-body p-4">
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 'normal', color: '#1a1f2e', margin: 0 }}>
-                Post details
-              </h2>
-              <button
-                type="button"
-                onClick={() => setViewEventId(null)}
-                className="btn"
-                style={{
-                  backgroundColor: 'transparent',
-                  border: '1px solid #dee2e6',
-                  borderRadius: '50px',
-                  padding: '0.5rem 1rem',
-                  color: '#1a1f2e',
-                  fontWeight: '500',
-                }}
-              >
-                <i className="bi bi-arrow-left me-2" />
-                Back to list
-              </button>
             </div>
-
-            <h3 style={{ fontSize: '1.25rem', color: '#1a1f2e', marginBottom: '1rem' }}>
-              {selectedEvent.title}
-            </h3>
-            {selectedEvent.description && (
-              <p style={{ color: '#1a1f2e', marginBottom: '1rem' }}>{selectedEvent.description}</p>
-            )}
-            <EventPostReviewSummary event={selectedEvent} className="mb-3" />
-            <p className="mb-1">
-              <strong>Subcategory:</strong> {selectedEvent.subCategory?.name ?? '—'}
-            </p>
-            <p className="mb-1">
-              <strong>Approved on:</strong> {formatDate(selectedEvent.updatedAt)}
-            </p>
-            <p className="mb-2">
-              <strong>Comments:</strong> {selectedEvent.commentsEnabled ? 'Enabled' : 'Disabled'}
-            </p>
-            {parseImageUrls(selectedEvent.imageUrls).length > 0 && (
-              <div className="mb-3">
-                <strong>Images:</strong>
-                <div className="d-flex flex-wrap gap-2 mt-1">
-                  {parseImageUrls(selectedEvent.imageUrls).map((url, i) => (
-                    <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                      <img
-                        src={url}
-                        alt=""
-                        style={{
-                          maxHeight: '80px',
-                          maxWidth: '120px',
-                          objectFit: 'cover',
-                          border: '1px solid #dee2e6',
-                        }}
-                      />
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-            <span className="badge bg-success" style={{ borderRadius: '4px' }}>
-              Live on website
-            </span>
           </div>
         </div>
-      )}
+      ) : null}
     </>
   );
-}
+};

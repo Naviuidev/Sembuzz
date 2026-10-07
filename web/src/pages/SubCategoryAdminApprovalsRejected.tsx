@@ -86,7 +86,7 @@ export const SubCategoryAdminApprovalsRejected = () => {
                       <td style={{ padding: '1rem', verticalAlign: 'middle', color: '#6c757d' }}>{formatDate(event.updatedAt)}</td>
                       <td style={{ padding: '1rem', verticalAlign: 'middle' }}>
                         <a
-                          href="/subcategory-admin/post-event"
+                          href="/subcategory-admin/posts"
                           className="btn btn-sm btn-outline-primary"
                           style={{ borderRadius: '0px' }}
                         >

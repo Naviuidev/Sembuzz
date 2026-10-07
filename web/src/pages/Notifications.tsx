@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { SchoolNavbar } from '../components/SchoolNavbar';
+import { EventsStudentShell } from '../components/EventsStudentShell';
 import { useUserAuth } from '../contexts/UserAuthContext';
 import {
   userNotificationsService,
@@ -138,9 +138,7 @@ export const Notifications = () => {
   const loadError = isError ? 'Could not load notifications. Pull down to try again.' : null;
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fafafa', paddingBottom: '5rem' }}>
-      <SchoolNavbar />
-      <div className="container py-4" style={{ maxWidth: 640 }}>
+    <EventsStudentShell activeTab="settings" contentClassName="events-student-shell-page">
         <div className="d-flex align-items-center gap-2 mb-3">
           <button
             type="button"
@@ -206,7 +204,6 @@ export const Notifications = () => {
             </button>
           </div>
         )}
-      </div>
-    </div>
+    </EventsStudentShell>
   );
 };

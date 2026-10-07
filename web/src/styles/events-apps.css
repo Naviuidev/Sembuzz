@@ -1,0 +1,257 @@
+/* Student Apps tab — matches events-ui / profile */
+
+.events-apps {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0 0 2rem;
+  animation: feedTabSlide 0.35s var(--events-ease, ease) both;
+}
+
+.events-apps-hero {
+  position: relative;
+  margin-bottom: 1.35rem;
+}
+
+.events-apps-hero__glow {
+  position: absolute;
+  inset: -24px -12px auto;
+  height: 110px;
+  background: radial-gradient(ellipse 90% 100% at 30% 0%, rgba(236, 72, 153, 0.12), transparent 70%);
+  pointer-events: none;
+}
+
+.events-apps-hero__eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ec4899;
+}
+
+.events-apps-hero__title {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.5rem, 4vw, 1.85rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.15;
+}
+
+.events-apps-hero__title-text {
+  display: inline-block;
+  background: var(--events-accent-gradient, linear-gradient(135deg, #6366f1 0%, #8b5cf6 48%, #ec4899 100%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: eventsAppsTitleIn 0.5s var(--events-ease, ease) both;
+}
+
+@keyframes eventsAppsTitleIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.events-apps-hero__subtitle {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--events-ink-muted, #64748b);
+  max-width: 28rem;
+}
+
+.events-apps-section {
+  margin-bottom: 1.35rem;
+}
+
+.events-apps-section__title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.65rem;
+  padding: 0 0.1rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--events-ink, #0f172a);
+}
+
+.events-apps-section__title i {
+  color: #6366f1;
+  font-size: 1rem;
+}
+
+.events-apps-card {
+  background: var(--events-surface, #fff);
+  border: 1px solid var(--events-border, rgba(15, 23, 42, 0.08));
+  border-radius: var(--events-radius-lg, 20px);
+  padding: 1rem;
+  box-shadow: var(--events-shadow-sm);
+}
+
+.events-apps-card--messaging {
+  padding: 1rem 1rem 0.75rem;
+}
+
+.events-apps-messaging-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin-bottom: 0.25rem;
+}
+
+.events-apps-messaging-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--events-border, rgba(15, 23, 42, 0.08));
+  background: #f3f4f6;
+  color: var(--events-ink, #0f172a);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.events-apps-messaging-btn.is-active,
+.events-apps-messaging-btn:hover {
+  background: var(--events-ink, #0f172a);
+  border-color: var(--events-ink, #0f172a);
+  color: #fff;
+}
+
+.events-apps-messaging-btn.is-active i,
+.events-apps-messaging-btn:hover i {
+  color: inherit;
+}
+
+.events-apps-card__lead {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--events-ink-muted, #64748b);
+  text-align: center;
+}
+
+.events-apps-clubs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.events-apps-club-card {
+  background: var(--events-surface, #fff);
+  border: 1px solid var(--events-border);
+  border-radius: var(--events-radius-md, 14px);
+  padding: 0.85rem 1rem;
+  box-shadow: var(--events-shadow-sm);
+}
+
+.events-apps-club-card__head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.events-apps-club-card__logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  border: 1px solid var(--events-border);
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  font-size: 1.25rem;
+  color: #475569;
+}
+
+.events-apps-club-card__logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.events-apps-club-card__name {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--events-ink, #0f172a);
+}
+
+.events-apps-club-card__hint {
+  margin: 0.15rem 0 0;
+  font-size: 0.75rem;
+  color: var(--events-ink-muted, #94a3b8);
+}
+
+.events-apps-social-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.events-apps-social-row--large {
+  justify-content: center;
+}
+
+.events-apps-social-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--social-color, #6366f1) 25%, transparent);
+  background: color-mix(in srgb, var(--social-color, #6366f1) 10%, #fff);
+  color: var(--social-color, #6366f1);
+  text-decoration: none;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.events-apps-social-btn i {
+  font-size: 1.15rem;
+}
+
+.events-apps-social-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--events-shadow-sm);
+  color: var(--social-color, #6366f1);
+}
+
+.events-apps-social-btn--brand {
+  flex-direction: column;
+  min-width: 88px;
+  padding: 0.75rem 0.65rem;
+  text-align: center;
+}
+
+.events-apps-social-btn--brand i {
+  font-size: 1.5rem;
+}
+
+.events-apps-social-btn__label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  opacity: 0.9;
+}

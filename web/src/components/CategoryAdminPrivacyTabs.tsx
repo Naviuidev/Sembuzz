@@ -1,13 +1,15 @@
-const TEXT_DARK = '#1a1f2e';
+import type { CSSProperties } from 'react';
 
 export type CategoryAdminPrivacyTab = 'privacy' | 'manage-admins' | 'message-config';
 
 export function CategoryAdminPrivacyTabs({
   activeTab,
   onChange,
+  style,
 }: {
   activeTab: CategoryAdminPrivacyTab;
   onChange: (tab: CategoryAdminPrivacyTab) => void;
+  style?: CSSProperties;
 }) {
   const tabs: { id: CategoryAdminPrivacyTab; label: string }[] = [
     { id: 'privacy', label: 'Privacy' },
@@ -16,24 +18,18 @@ export function CategoryAdminPrivacyTabs({
   ];
 
   return (
-    <div className="d-flex gap-2 mb-4 flex-wrap">
+    <nav className="admin-dashboard-badges" aria-label="Privacy sections" style={style}>
       {tabs.map((tab) => (
         <button
           key={tab.id}
           type="button"
+          className={`admin-dashboard-badge${activeTab === tab.id ? ' is-active' : ''}`}
+          aria-current={activeTab === tab.id ? 'page' : undefined}
           onClick={() => onChange(tab.id)}
-          className="btn btn-sm"
-          style={{
-            borderRadius: 50,
-            padding: '0.45rem 1.1rem',
-            backgroundColor: activeTab === tab.id ? TEXT_DARK : '#fff',
-            color: activeTab === tab.id ? '#fff' : TEXT_DARK,
-            border: `1px solid ${TEXT_DARK}`,
-          }}
         >
           {tab.label}
         </button>
       ))}
-    </div>
+    </nav>
   );
 }

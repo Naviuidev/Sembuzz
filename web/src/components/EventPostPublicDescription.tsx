@@ -29,12 +29,7 @@ export function EventPostPublicDescription({ description, expanded, onExpand, co
     >
       {text}
       {truncated ? (
-        <button
-          type="button"
-          className="btn btn-link p-0 ms-1"
-          style={{ color: '#0d6efd', fontSize: 'inherit', verticalAlign: 'baseline' }}
-          onClick={onExpand}
-        >
+        <button type="button" className="event-post-detail__know-more ms-2 mt-1" onClick={onExpand}>
           Read more
         </button>
       ) : null}

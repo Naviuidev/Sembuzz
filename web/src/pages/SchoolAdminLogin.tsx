@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSchoolAdminAuth } from '../contexts/SchoolAdminAuthContext';
 import { AdminLoginShell } from '../components/AdminLoginShell';
+import { getApiErrorMessage } from '../utils/apiError';
 
 export const SchoolAdminLogin = () => {
   const [identifier, setIdentifier] = useState('');
@@ -27,8 +28,7 @@ export const SchoolAdminLogin = () => {
       await login(identifier, password);
       navigate('/school-admin/dashboard', { replace: true });
     } catch (err: unknown) {
-      const ax = err as { response?: { data?: { message?: string } }; message?: string };
-      setError(ax.response?.data?.message || ax.message || 'Login failed. Please check your credentials.');
+      setError(getApiErrorMessage(err, 'Login failed. Please check your credentials.'));
       setLoading(false);
     }
   };

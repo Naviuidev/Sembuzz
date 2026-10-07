@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   schoolAdminClubGroupChatsService,
@@ -21,7 +21,7 @@ function getQueryErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
-export function SchoolAdminClubGroupChatConfigPanel() {
+export function SchoolAdminClubGroupChatConfigPanel({ panelStyle }: { panelStyle?: CSSProperties }) {
   const queryClient = useQueryClient();
   const [configModalChat, setConfigModalChat] = useState<ClubGroupChatItem | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -47,79 +47,109 @@ export function SchoolAdminClubGroupChatConfigPanel() {
     },
   });
 
+  const chatsTable = (
+    <div className="admin-table-wrap">
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>Club group</th>
+            <th>Approved members</th>
+            <th>Who can send messages</th>
+            <th className="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {chats.map((chat) => (
+            <tr key={chat.id}>
+              <td className="admin-table__strong">{chat.pageName || 'Club'}</td>
+              <td>{chat.approvedMemberCount ?? 0}</td>
+              <td>{MESSAGE_MODE_LABELS[chat.messageMode ?? 'members']}</td>
+              <td className="text-end">
+                <button
+                  type="button"
+                  className="admin-btn-secondary admin-btn-sm"
+                  onClick={() => setConfigModalChat(chat)}
+                >
+                  Configure
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
   return (
     <>
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 0 }}>
-        <div className="card-body p-0">
-          <div className="px-4 pt-4 pb-2">
-            <h2 className="h6 mb-1" style={{ color: TEXT_DARK }}>
-              Club group chats
-            </h2>
-            <p className="small text-muted mb-0">
-              Configure who can send messages in each club group. Subcategory admins manage join
-              requests and group chat from their dashboard.
-            </p>
+      {panelStyle ? (
+        <section className="admin-panel" style={panelStyle}>
+          <div className="admin-panel__header">
+            <h2 className="admin-panel__title">Club group chats</h2>
           </div>
-          {message ? (
-            <div className="px-4 pb-2">
+          <div className="admin-panel__body">
+            {message ? (
               <div
-                className={`alert ${message.type === 'success' ? 'alert-success' : 'alert-danger'} py-2 mb-0`}
-                style={{ borderRadius: 0 }}
+                className={`admin-notice mb-3${message.type === 'success' ? ' admin-notice--info' : ''}`}
                 role="alert"
               >
-                {message.text}
+                <p className="mb-0">{message.text}</p>
               </div>
+            ) : null}
+            {isLoading ? (
+              <div className="admin-loading-state">Loading club groups…</div>
+            ) : error ? (
+              <p className="admin-form-hint admin-form-hint--error mb-0">
+                {getQueryErrorMessage(error, 'Failed to load club groups.')}
+              </p>
+            ) : chats.length === 0 ? (
+              <p className="admin-form-hint mb-0">
+                No club group chats yet. Approve a group chat request below to enable a club.
+              </p>
+            ) : (
+              <>
+                <p className="admin-form-hint mb-3">
+                  Configure who can send messages in each club group. Subcategory admins manage join
+                  requests and group chat from their dashboard.
+                </p>
+                {chatsTable}
+              </>
+            )}
+          </div>
+        </section>
+      ) : (
+        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 0 }}>
+          <div className="card-body p-0">
+            <div className="px-4 pt-4 pb-2">
+              <h2 className="h6 mb-1" style={{ color: TEXT_DARK }}>
+                Club group chats
+              </h2>
             </div>
-          ) : null}
-          {isLoading ? (
-            <div className="p-4 text-muted">Loading club groups…</div>
-          ) : error ? (
-            <div className="p-4 text-danger">
-              {getQueryErrorMessage(error, 'Failed to load club groups.')}
-            </div>
-          ) : chats.length === 0 ? (
-            <div className="p-4 text-muted">
-              No club group chats yet. Approve a group chat request below to enable a club.
-            </div>
-          ) : (
-            <div className="table-responsive">
-              <table className="table table-hover mb-0 align-middle">
-                <thead style={{ backgroundColor: '#f8f9fa' }}>
-                  <tr>
-                    <th className="small text-muted">Club group</th>
-                    <th className="small text-muted">Approved members</th>
-                    <th className="small text-muted">Who can send messages</th>
-                    <th className="small text-muted text-end">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {chats.map((chat) => (
-                    <tr key={chat.id}>
-                      <td className="fw-medium" style={{ color: TEXT_DARK }}>
-                        {chat.pageName || 'Club'}
-                      </td>
-                      <td className="small">{chat.approvedMemberCount ?? 0}</td>
-                      <td className="small">
-                        {MESSAGE_MODE_LABELS[chat.messageMode ?? 'members']}
-                      </td>
-                      <td className="text-end">
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-dark"
-                          style={{ borderRadius: 0 }}
-                          onClick={() => setConfigModalChat(chat)}
-                        >
-                          Configure
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+            {message ? (
+              <div className="px-4 pb-2">
+                <div
+                  className={`alert ${message.type === 'success' ? 'alert-success' : 'alert-danger'} py-2 mb-0`}
+                  style={{ borderRadius: 0 }}
+                  role="alert"
+                >
+                  {message.text}
+                </div>
+              </div>
+            ) : null}
+            {isLoading ? (
+              <div className="p-4 text-muted">Loading club groups…</div>
+            ) : error ? (
+              <div className="p-4 text-danger">{getQueryErrorMessage(error, 'Failed to load club groups.')}</div>
+            ) : chats.length === 0 ? (
+              <div className="p-4 text-muted">
+                No club group chats yet. Approve a group chat request below to enable a club.
+              </div>
+            ) : (
+              <div className="px-4 pb-4">{chatsTable}</div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {configModalChat ? (
         <ChatConfigModal

@@ -1,4 +1,4 @@
-import { useState, useEffect, type CSSProperties } from 'react';
+import { useState, useEffect, useMemo, type CSSProperties } from 'react';
 import { SchoolAdminLayout } from '../components/SchoolAdminLayout';
 import { ADMIN_PORTAL_ACCENTS } from '../constants/adminPortalTheme';
 import { schoolAdminSocialAccountsService } from '../services/school-admin-social-accounts.service';
@@ -78,9 +78,35 @@ function AddingPopup({ onComplete, durationMs = 2000 }: { onComplete: () => void
   );
 }
 
-function ClubIconMark({ icon, size = 44 }: { icon: string; size?: number }) {
+function platformIcon(platformId: string): string {
+  return ALL_PLATFORMS.find((p) => p.id === platformId)?.icon ?? 'bi-link';
+}
+
+function SocialAddWizardSteps({ step }: { step: Step }) {
+  const activeIndex = step === 'club-info' ? 0 : step === 'select' ? 1 : step === 'form' ? 2 : 0;
+  const labels = ['Club details', 'Platforms', 'Links'];
+
   return (
-    <span className="admin-social-club-icon" style={{ width: size, height: size }}>
+    <ol className="admin-social-wizard" aria-label="Add social account progress">
+      {labels.map((label, index) => (
+        <li
+          key={label}
+          className={`admin-social-wizard__step${index < activeIndex ? ' is-done' : ''}${index === activeIndex ? ' is-current' : ''}`}
+        >
+          <span className="admin-social-wizard__num">{index + 1}</span>
+          <span className="admin-social-wizard__label">{label}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function ClubIconMark({ icon, size = 44, large }: { icon: string; size?: number; large?: boolean }) {
+  return (
+    <span
+      className={`admin-social-club-icon${large ? ' admin-social-club-icon--lg' : ''}`}
+      style={large ? undefined : { width: size, height: size }}
+    >
       {isImageIconValue(icon) ? (
         <img src={imageSrc(icon)} alt="" />
       ) : icon.startsWith('fa-') ? (
@@ -114,6 +140,7 @@ export const SchoolAdminSocialShare = () => {
   const [editingClubIcon, setEditingClubIcon] = useState('');
   const [editingClubIconUploading, setEditingClubIconUploading] = useState(false);
   const [deleteClubGroupKey, setDeleteClubGroupKey] = useState<string | null>(null);
+  const [clubFilter, setClubFilter] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -403,12 +430,26 @@ export const SchoolAdminSocialShare = () => {
     return acc;
   }, []);
 
+  const filteredClubGroups = useMemo(() => {
+    const q = clubFilter.trim().toLowerCase();
+    if (!q) return clubGroups;
+    return clubGroups.filter(
+      (g) =>
+        g.pageName.toLowerCase().includes(q) ||
+        g.accounts.some((a) => a.platformName.toLowerCase().includes(q)),
+    );
+  }, [clubGroups, clubFilter]);
+
+  const totalLinks = savedAccounts.length;
+  const totalClubs = clubGroups.length;
+  const platformCount = useMemo(() => new Set(savedAccounts.map((a) => a.platformId)).size, [savedAccounts]);
+
   return (
     <SchoolAdminLayout>
       <header className="admin-page-header" style={panelStyle}>
         <h1 className="admin-page-title">Social share</h1>
         <p className="admin-page-subtitle">
-          Add and manage your school&apos;s social media links. Find club icons on{' '}
+          Group clubs and social links students see on your school experience. Icons from{' '}
           <a href="https://fontawesome.com/" target="_blank" rel="noopener noreferrer">
             Font Awesome
           </a>
@@ -425,14 +466,86 @@ export const SchoolAdminSocialShare = () => {
         </div>
       ) : null}
 
+      {!loading && savedAccounts.length > 0 ? (
+        <div className="admin-social-stats" style={panelStyle}>
+          <div className="admin-social-stat">
+            <span className="admin-social-stat__icon" aria-hidden>
+              <i className="bi bi-people" />
+            </span>
+            <div>
+              <p className="admin-social-stat__value">{totalClubs}</p>
+              <p className="admin-social-stat__label">Clubs</p>
+            </div>
+          </div>
+          <div className="admin-social-stat">
+            <span className="admin-social-stat__icon" aria-hidden>
+              <i className="bi bi-link-45deg" />
+            </span>
+            <div>
+              <p className="admin-social-stat__value">{totalLinks}</p>
+              <p className="admin-social-stat__label">Social links</p>
+            </div>
+          </div>
+          <div className="admin-social-stat">
+            <span className="admin-social-stat__icon" aria-hidden>
+              <i className="bi bi-grid" />
+            </span>
+            <div>
+              <p className="admin-social-stat__value">{platformCount}</p>
+              <p className="admin-social-stat__label">Platforms used</p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {!loading && view === 'main' && savedAccounts.length === 0 ? (
         <section className="admin-panel" style={panelStyle}>
-          <div className="admin-panel__body admin-social-empty">
-            <p className="admin-form-hint mb-4">Add your school&apos;s social media accounts to share with users.</p>
-            <button type="button" className="admin-btn-primary" onClick={startAddSocialAccount}>
-              <i className="bi bi-plus-circle me-2" aria-hidden />
-              Add social account
-            </button>
+          <div className="admin-panel__body">
+            <div className="admin-social-empty-hero">
+              <div className="admin-social-empty-hero__orbit" aria-hidden>
+                <span>
+                  <i className="bi bi-facebook" />
+                </span>
+                <span>
+                  <i className="bi bi-instagram" />
+                </span>
+                <span>
+                  <i className="bi bi-linkedin" />
+                </span>
+                <span className="admin-social-empty-hero__orbit-core">
+                  <i className="bi bi-share" />
+                </span>
+              </div>
+              <h2 className="admin-social-empty-hero__title">Connect your clubs to social</h2>
+              <p className="admin-form-hint mb-4">
+                Create a club (sports, arts, etc.), pick platforms, and paste profile links—students tap through from
+                the app.
+              </p>
+              <ol className="admin-social-empty-steps">
+                <li>
+                  <span className="admin-social-empty-steps__num">1</span>
+                  <span>
+                    <strong>Name &amp; icon</strong> — upload a club logo from Font Awesome.
+                  </span>
+                </li>
+                <li>
+                  <span className="admin-social-empty-steps__num">2</span>
+                  <span>
+                    <strong>Choose networks</strong> — Facebook, Instagram, LinkedIn, and more.
+                  </span>
+                </li>
+                <li>
+                  <span className="admin-social-empty-steps__num">3</span>
+                  <span>
+                    <strong>Add URLs</strong> — one link per platform, then publish.
+                  </span>
+                </li>
+              </ol>
+              <button type="button" className="admin-btn-primary" onClick={startAddSocialAccount}>
+                <i className="bi bi-plus-circle me-2" aria-hidden />
+                Create your first club
+              </button>
+            </div>
           </div>
         </section>
       ) : null}
@@ -440,99 +553,135 @@ export const SchoolAdminSocialShare = () => {
       {(view === 'saved-list' || savedAccounts.length > 0) && (
         <section className="admin-panel" style={panelStyle}>
           <div className="admin-panel__header">
-            <h2 className="admin-panel__title">Clubs &amp; links</h2>
+            <h2 className="admin-panel__title">Your clubs</h2>
             <button type="button" className="admin-btn-primary" onClick={startAddSocialAccount}>
               <i className="bi bi-plus-circle me-2" aria-hidden />
-              Add social account
+              New club
             </button>
           </div>
           <div className="admin-panel__body">
             {loading ? (
               <div className="admin-loading-state">Loading…</div>
             ) : (
-              <div className="admin-social-clubs">
-                {clubGroups.map((group) => (
-                  <article key={group.key} className="admin-social-club-card">
-                    <div className="admin-social-club-card__head">
-                      <div className="admin-social-club-card__identity">
-                        <ClubIconMark icon={group.icon} />
-                        <h3 className="admin-social-club-card__title">{group.pageName || 'Club'}</h3>
-                      </div>
-                      <div className="admin-social-club-card__actions">
-                        <button
-                          type="button"
-                          className="admin-icon-btn admin-icon-btn--edit"
-                          title="Edit club (name & icon)"
-                          aria-label="Edit club"
-                          onClick={() => openEditClub(group)}
-                        >
-                          <i className="bi bi-pencil" aria-hidden />
-                        </button>
-                        <button
-                          type="button"
-                          className="admin-icon-btn admin-icon-btn--danger"
-                          title="Delete club and all its links"
-                          aria-label="Delete club"
-                          onClick={() => setDeleteClubGroupKey(group.key)}
-                        >
-                          <i className="bi bi-trash" aria-hidden />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="admin-social-links-row">
-                      {group.accounts.map((acc) => {
-                        const iconColor = PLATFORM_COLORS[acc.platformId] ?? '#0f172a';
-                        return (
-                          <div key={acc.id} className="admin-social-link-chip">
-                            <a
-                              href={acc.link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="admin-social-link-chip__platform"
-                              style={{ backgroundColor: `${iconColor}18`, color: iconColor }}
-                              title={acc.platformName}
-                            >
-                              <i
-                                className={`bi ${ALL_PLATFORMS.find((p) => p.id === acc.platformId)?.icon ?? 'bi-link'}`}
-                                aria-hidden
-                              />
-                            </a>
+              <>
+                <div className="admin-social-toolbar">
+                  <div className="admin-search-wrap">
+                    <i className="bi bi-search admin-search-icon" aria-hidden />
+                    <input
+                      type="search"
+                      className="form-control admin-search-input"
+                      placeholder="Search clubs or platforms…"
+                      value={clubFilter}
+                      onChange={(e) => setClubFilter(e.target.value)}
+                    />
+                  </div>
+                  <span className="admin-form-hint mb-0">
+                    {filteredClubGroups.length} of {totalClubs} clubs
+                  </span>
+                </div>
+                {filteredClubGroups.length === 0 ? (
+                  <div className="admin-empty-state">
+                    <p className="mb-0">No clubs match your search.</p>
+                  </div>
+                ) : (
+                  <div className="admin-social-clubs">
+                    {filteredClubGroups.map((group) => (
+                      <article key={group.key} className="admin-social-club-card">
+                        <div className="admin-social-club-card__inner">
+                          <div className="admin-social-club-card__head">
+                            <div className="admin-social-club-card__identity">
+                              <ClubIconMark icon={group.icon} large />
+                              <div>
+                                <h3 className="admin-social-club-card__title">{group.pageName || 'Club'}</h3>
+                                <p className="admin-social-club-card__meta">
+                                  {group.accounts.length} link{group.accounts.length === 1 ? '' : 's'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="admin-social-club-card__actions">
+                              <button
+                                type="button"
+                                className="admin-icon-btn admin-icon-btn--edit"
+                                title="Edit club (name & icon)"
+                                aria-label="Edit club"
+                                onClick={() => openEditClub(group)}
+                              >
+                                <i className="bi bi-pencil" aria-hidden />
+                              </button>
+                              <button
+                                type="button"
+                                className="admin-icon-btn admin-icon-btn--danger"
+                                title="Delete club and all its links"
+                                aria-label="Delete club"
+                                onClick={() => setDeleteClubGroupKey(group.key)}
+                              >
+                                <i className="bi bi-trash" aria-hidden />
+                              </button>
+                            </div>
+                          </div>
+                          <ul className="admin-social-link-list">
+                            {group.accounts.map((acc) => {
+                              const iconColor = PLATFORM_COLORS[acc.platformId] ?? '#0f172a';
+                              return (
+                                <li key={acc.id} className="admin-social-link-item">
+                                  <a
+                                    href={acc.link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="admin-social-link-item__main"
+                                    title={`Open ${acc.platformName}`}
+                                  >
+                                    <span
+                                      className="admin-social-link-item__icon"
+                                      style={{ backgroundColor: `${iconColor}18`, color: iconColor }}
+                                    >
+                                      <i className={`bi ${platformIcon(acc.platformId)}`} aria-hidden />
+                                    </span>
+                                    <span className="admin-social-link-item__text">
+                                      <span className="admin-social-link-item__name">{acc.platformName}</span>
+                                      <span className="admin-social-link-item__url">{acc.link}</span>
+                                    </span>
+                                  </a>
+                                  <div className="admin-social-link-item__actions">
+                                    <button
+                                      type="button"
+                                      className="admin-icon-btn admin-icon-btn--edit"
+                                      title="Edit link"
+                                      aria-label="Edit link"
+                                      onClick={() => openEditPopup(acc)}
+                                    >
+                                      <i className="bi bi-pencil" aria-hidden />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="admin-icon-btn admin-icon-btn--danger"
+                                      title="Delete link"
+                                      aria-label="Delete link"
+                                      onClick={() => handleDelete(acc.id)}
+                                    >
+                                      <i className="bi bi-trash" aria-hidden />
+                                    </button>
+                                  </div>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                          <div className="admin-social-club-card__add">
                             <button
                               type="button"
-                              className="admin-icon-btn admin-icon-btn--edit"
-                              title="Edit link"
-                              aria-label="Edit link"
-                              onClick={() => openEditPopup(acc)}
+                              className="admin-btn-secondary"
+                              onClick={() => openAddToClub(group)}
                             >
-                              <i className="bi bi-pencil" aria-hidden />
-                            </button>
-                            <button
-                              type="button"
-                              className="admin-icon-btn admin-icon-btn--danger"
-                              title="Delete link"
-                              aria-label="Delete link"
-                              onClick={() => handleDelete(acc.id)}
-                            >
-                              <i className="bi bi-trash" aria-hidden />
+                              <i className="bi bi-plus-lg me-2" aria-hidden />
+                              Add platform to this club
                             </button>
                           </div>
-                        );
-                      })}
-                    </div>
-                    <div className="admin-social-club-card__add">
-                      <button
-                        type="button"
-                        className="admin-btn-secondary"
-                        onClick={() => openAddToClub(group)}
-                        title="Add another social link to this club"
-                      >
-                        <i className="bi bi-plus-lg me-2" aria-hidden />
-                        Add more links
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </section>
@@ -555,6 +704,9 @@ export const SchoolAdminSocialShare = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="admin-modal__body">
+              {popupMode === 'add' && step !== 'animating' && step !== 'animating-save' ? (
+                <SocialAddWizardSteps step={step} />
+              ) : null}
                   {step === 'animating' && (
                     <AddingPopup onComplete={handleAnimatingDone} durationMs={2000} />
                   )}
@@ -710,7 +862,7 @@ export const SchoolAdminSocialShare = () => {
                           return (
                             <div key={p.id} className="admin-social-form-row">
                               <div
-                                className="admin-social-link-chip__platform flex-shrink-0"
+                                className="admin-social-link-item__icon flex-shrink-0"
                                 style={{ width: 44, height: 44, backgroundColor: `${iconColor}18`, color: iconColor }}
                               >
                                 <i className={`bi ${p.icon}`} aria-hidden />

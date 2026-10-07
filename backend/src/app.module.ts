@@ -12,6 +12,7 @@ import { SchoolAdminModule } from './modules/school-admin/school-admin.module';
 import { CategoryAdminModule } from './modules/category-admin/category-admin.module';
 import { SubCategoryAdminModule } from './modules/subcategory-admin/subcategory-admin.module';
 import { AdsAdminModule } from './modules/ads-admin/ads-admin.module';
+import { ExternalAdminModule } from './modules/external-admin/external-admin.module';
 import { UserModule } from './modules/user/user.module';
 import { ContactModule } from './modules/contact/contact.module';
 import { AdminActionItemsModule } from './modules/admin-action-items/admin-action-items.module';
@@ -32,6 +33,7 @@ import { EventsPublishingModule } from './modules/events/events-publishing.modul
     CategoryAdminModule,
     SubCategoryAdminModule,
     AdsAdminModule,
+    ExternalAdminModule,
     UserModule,
     ContactModule,
     AdminActionItemsModule,

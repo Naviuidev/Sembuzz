@@ -53,7 +53,7 @@ export const SuperAdminLogin = () => {
       onTogglePassword={() => setShowPassword((v) => !v)}
       onSubmit={handleSubmit}
       footer={
-        <a href="/events">← Back to public site</a>
+        <a href="/">← Back to public site</a>
       }
     />
   );

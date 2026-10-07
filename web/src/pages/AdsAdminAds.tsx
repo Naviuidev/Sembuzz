@@ -1,12 +1,16 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, type CSSProperties } from 'react';
 import { AdsAdminLayout } from '../components/AdsAdminLayout';
+import { ADMIN_PORTAL_ACCENTS } from '../constants/adminPortalTheme';
 import { adsAdminBannerAdsService } from '../services/ads-admin-banner-ads.service';
 import { adsAdminSponsoredAdsService } from '../services/ads-admin-sponsored-ads.service';
 import { cstDatetimeLocalStringToUTC } from '../utils/cst-date';
 
+type AdsMode = 'hub' | 'banner' | 'sponsored';
+
 export const AdsAdminAds = () => {
-  const [showBannerForm, setShowBannerForm] = useState(false);
-  const [showSponsoredForm, setShowSponsoredForm] = useState(false);
+  const panelStyle = { '--admin-accent': ADMIN_PORTAL_ACCENTS.ads } as CSSProperties;
+  const [mode, setMode] = useState<AdsMode>('hub');
+
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [bannerPreviewUrl, setBannerPreviewUrl] = useState<string | null>(null);
   const [externalLink, setExternalLink] = useState('');
@@ -21,7 +25,12 @@ export const AdsAdminAds = () => {
   const [sponsoredTitle, setSponsoredTitle] = useState('');
   const [sponsoredDescription, setSponsoredDescription] = useState('');
   const [sponsoredImageFiles, setSponsoredImageFiles] = useState<(File | null)[]>([null, null, null, null]);
-  const [sponsoredImagePreviews, setSponsoredImagePreviews] = useState<(string | null)[]>([null, null, null, null]);
+  const [sponsoredImagePreviews, setSponsoredImagePreviews] = useState<(string | null)[]>([
+    null,
+    null,
+    null,
+    null,
+  ]);
   const [sponsoredExternalLink, setSponsoredExternalLink] = useState('');
   const [sponsoredStartAt, setSponsoredStartAt] = useState('');
   const [sponsoredEndAt, setSponsoredEndAt] = useState('');
@@ -29,10 +38,14 @@ export const AdsAdminAds = () => {
   const [sponsoredSubmitting, setSponsoredSubmitting] = useState(false);
   const sponsoredFileRefs = useRef<(HTMLInputElement | null)[]>([null, null, null, null]);
 
-  const handleBannerFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const resetMessages = () => {
     setError(null);
     setSuccess(null);
+  };
+
+  const handleBannerFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    resetMessages();
     if (bannerPreviewUrl) {
       URL.revokeObjectURL(bannerPreviewUrl);
       setBannerPreviewUrl(null);
@@ -52,8 +65,7 @@ export const AdsAdminAds = () => {
 
   const handleSubmitBanner = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setSuccess(null);
+    resetMessages();
     if (!bannerFile) {
       setError('Please add a banner image.');
       return;
@@ -83,7 +95,7 @@ export const AdsAdminAds = () => {
         startAt: start.toISOString(),
         endAt: end.toISOString(),
       });
-      setSuccess('Banner ad posted. It will appear at the bottom of the news feed until the end date/time.');
+      setSuccess('Banner ad posted. It appears at the bottom of the news feed until the end time.');
       setBannerFile(null);
       if (bannerPreviewUrl) {
         URL.revokeObjectURL(bannerPreviewUrl);
@@ -96,18 +108,22 @@ export const AdsAdminAds = () => {
     } catch (err: unknown) {
       setUploading(false);
       setSubmitting(false);
-      const msg = err && typeof err === 'object' && 'response' in err && typeof (err as { response?: { data?: { message?: string } } }).response?.data?.message === 'string'
-        ? (err as { response: { data: { message: string } } }).response.data.message
-        : 'Failed to post banner ad. Please try again.';
+      const msg =
+        err &&
+        typeof err === 'object' &&
+        'response' in err &&
+        typeof (err as { response?: { data?: { message?: string } } }).response?.data?.message === 'string'
+          ? (err as { response: { data: { message: string } } }).response.data.message
+          : 'Failed to post banner ad. Please try again.';
       setError(msg);
+      return;
     }
     setSubmitting(false);
   };
 
   const goBack = () => {
-    setShowBannerForm(false);
-    setError(null);
-    setSuccess(null);
+    setMode('hub');
+    resetMessages();
     if (bannerPreviewUrl) {
       URL.revokeObjectURL(bannerPreviewUrl);
       setBannerPreviewUrl(null);
@@ -119,8 +135,7 @@ export const AdsAdminAds = () => {
   };
 
   const handleSponsoredImageChange = (index: number, file: File | null) => {
-    setError(null);
-    setSuccess(null);
+    resetMessages();
     const next = [...sponsoredImageFiles];
     const nextPreviews = [...sponsoredImagePreviews];
     if (nextPreviews[index]) {
@@ -134,9 +149,8 @@ export const AdsAdminAds = () => {
   };
 
   const goBackSponsored = () => {
-    setShowSponsoredForm(false);
-    setError(null);
-    setSuccess(null);
+    setMode('hub');
+    resetMessages();
     sponsoredImagePreviews.forEach((url) => url && URL.revokeObjectURL(url));
     setSponsoredTitle('');
     setSponsoredDescription('');
@@ -149,8 +163,7 @@ export const AdsAdminAds = () => {
 
   const handleSubmitSponsored = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setSuccess(null);
+    resetMessages();
     if (!sponsoredStartAt.trim() || !sponsoredEndAt.trim()) {
       setError('Please set start and end date/time.');
       return;
@@ -183,160 +196,263 @@ export const AdsAdminAds = () => {
         startAt: start.toISOString(),
         endAt: end.toISOString(),
       });
-      setSuccess('Sponsored ad posted. It will appear in the feed with a light blue background and "Ad" label until the end date/time.');
-      setSponsoredTitle('');
-      setSponsoredDescription('');
-      setSponsoredImageFiles([null, null, null, null]);
-      sponsoredImagePreviews.forEach((url) => url && URL.revokeObjectURL(url));
-      setSponsoredImagePreviews([null, null, null, null]);
-      setSponsoredExternalLink('');
-      setSponsoredStartAt('');
-      setSponsoredEndAt('');
-      sponsoredFileRefs.current.forEach((ref) => { if (ref) ref.value = ''; });
+      setSuccess(
+        'Sponsored ad posted. It appears in the feed with an “Ad” label until the end date/time.',
+      );
+      goBackSponsored();
     } catch (err: unknown) {
       setSponsoredUploading(false);
       setSponsoredSubmitting(false);
-      const msg = err && typeof err === 'object' && 'response' in err && typeof (err as { response?: { data?: { message?: string } } }).response?.data?.message === 'string'
-        ? (err as { response: { data: { message: string } } }).response.data.message
-        : 'Failed to post sponsored ad. Please try again.';
+      const msg =
+        err &&
+        typeof err === 'object' &&
+        'response' in err &&
+        typeof (err as { response?: { data?: { message?: string } } }).response?.data?.message === 'string'
+          ? (err as { response: { data: { message: string } } }).response.data.message
+          : 'Failed to post sponsored ad. Please try again.';
       setError(msg);
+      return;
     }
     setSponsoredSubmitting(false);
   };
 
   return (
     <AdsAdminLayout>
-          <div className="mb-4">
-            <h1 className="h4 mb-1" style={{ color: '#1a1f2e', fontWeight: 600 }}>Ads</h1>
-            <p className="small text-muted mb-0">Manage banner and sponsored ads for your school.</p>
-          </div>
+      <header className="admin-page-header" style={panelStyle}>
+        <h1 className="admin-page-title">Ads</h1>
+        <p className="admin-page-subtitle">
+          {mode === 'hub'
+            ? 'Choose an ad type to create a new campaign for your school feed.'
+            : mode === 'banner'
+              ? 'Upload a banner image and set when it should run (CST).'
+              : 'Create a sponsored in-feed ad with optional images and schedule (CST).'}
+        </p>
+      </header>
 
-          {showSponsoredForm ? (
-            <div className="rounded-3 p-4 mb-4" style={{ backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid #e9ecef', maxWidth: 520 }}>
-              <div className="d-flex align-items-center gap-2 mb-3">
-                <button type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={goBackSponsored} aria-label="Back">
-                  <i className="bi bi-arrow-left" style={{ fontSize: '1.25rem', color: '#1a1f2e' }} />
-                </button>
-                <h2 className="h6 mb-0" style={{ color: '#1a1f2e', fontWeight: 600 }}>Post sponsored ad</h2>
+      {mode === 'hub' ? (
+        <div className="row g-3">
+          <div className="col-12 col-md-6">
+            <button type="button" className="admin-picker-card w-100 text-start" onClick={() => setMode('banner')}>
+              <p className="admin-picker-card__title">
+                <i className="bi bi-image me-2" aria-hidden />
+                Banner ads
+              </p>
+              <p className="admin-picker-card__meta">Full-width image at the bottom of the news feed</p>
+            </button>
+          </div>
+          <div className="col-12 col-md-6">
+            <button
+              type="button"
+              className="admin-picker-card w-100 text-start"
+              onClick={() => setMode('sponsored')}
+            >
+              <p className="admin-picker-card__title">
+                <i className="bi bi-badge-ad me-2" aria-hidden />
+                Sponsored ads
+              </p>
+              <p className="admin-picker-card__meta">In-feed posts with title, images, and “Ad” label</p>
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {mode === 'banner' ? (
+        <section className="admin-panel" style={panelStyle}>
+          <div className="admin-panel__body">
+            <div className="admin-step-header mb-4">
+              <h2 className="admin-panel__title">Post banner ad</h2>
+              <button type="button" className="admin-btn-secondary" onClick={goBack}>Back</button>
+            </div>
+            <form onSubmit={handleSubmitBanner} className="admin-form" style={{ maxWidth: 560 }}>
+              <div className="admin-form-section">
+                <label className="admin-form-label" htmlFor="ads-banner-image">Banner image</label>
+                <input
+                  ref={fileInputRef}
+                  id="ads-banner-image"
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  className="form-control admin-form-control"
+                  onChange={handleBannerFileChange}
+                />
               </div>
-              <form onSubmit={handleSubmitSponsored}>
-                <div className="mb-3">
-                  <label className="form-label small fw-semibold">Title (optional)</label>
-                  <input type="text" className="form-control form-control-sm" placeholder="Ad title" value={sponsoredTitle} onChange={(e) => setSponsoredTitle(e.target.value)} />
+              {bannerPreviewUrl ? (
+                <div className="admin-form-section">
+                  <span className="admin-form-label">Preview</span>
+                  <img
+                    src={bannerPreviewUrl}
+                    alt="Banner preview"
+                    className="rounded-2 border"
+                    style={{ maxWidth: '100%', height: 'auto', display: 'block' }}
+                  />
                 </div>
-                <div className="mb-3">
-                  <label className="form-label small fw-semibold">Description (optional)</label>
-                  <textarea className="form-control form-control-sm" rows={3} placeholder="Ad description" value={sponsoredDescription} onChange={(e) => setSponsoredDescription(e.target.value)} />
-                </div>
-                <div className="mb-3">
-                  <label className="form-label small fw-semibold">Images (optional, up to 4)</label>
-                  <div className="d-flex flex-wrap gap-2">
-                    {[0, 1, 2, 3].map((i) => (
-                      <div key={i} className="d-flex flex-column align-items-center">
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/gif,image/webp"
-                          className="form-control form-control-sm"
-                          style={{ width: 100 }}
-                          ref={(el) => { sponsoredFileRefs.current[i] = el; }}
-                          onChange={(e) => handleSponsoredImageChange(i, e.target.files?.[0] ?? null)}
+              ) : null}
+              <div className="admin-form-section">
+                <label className="admin-form-label" htmlFor="ads-banner-link">External link (optional)</label>
+                <input
+                  id="ads-banner-link"
+                  type="url"
+                  className="form-control admin-form-control"
+                  placeholder="https://..."
+                  value={externalLink}
+                  onChange={(e) => setExternalLink(e.target.value)}
+                />
+              </div>
+              <div className="admin-form-section">
+                <label className="admin-form-label" htmlFor="ads-banner-start">
+                  Start date & time <span className="admin-form-hint">(CST)</span>
+                </label>
+                <input
+                  id="ads-banner-start"
+                  type="datetime-local"
+                  className="form-control admin-form-control"
+                  value={startAt}
+                  onChange={(e) => setStartAt(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="admin-form-section">
+                <label className="admin-form-label" htmlFor="ads-banner-end">
+                  End date & time <span className="admin-form-hint">(CST)</span>
+                </label>
+                <input
+                  id="ads-banner-end"
+                  type="datetime-local"
+                  className="form-control admin-form-control"
+                  value={endAt}
+                  onChange={(e) => setEndAt(e.target.value)}
+                  required
+                />
+              </div>
+              {error ? <p className="admin-form-hint admin-form-hint--error">{error}</p> : null}
+              {success ? (
+                <div className="admin-notice admin-notice--info mb-3"><p className="mb-0">{success}</p></div>
+              ) : null}
+              <div className="admin-form-actions">
+                <button type="button" className="admin-btn-secondary" onClick={goBack}>Cancel</button>
+                <button
+                  type="submit"
+                  className="admin-btn-primary"
+                  disabled={uploading || submitting || !bannerFile}
+                >
+                  {uploading ? 'Uploading…' : submitting ? 'Posting…' : 'Post banner ad'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </section>
+      ) : null}
+
+      {mode === 'sponsored' ? (
+        <section className="admin-panel" style={panelStyle}>
+          <div className="admin-panel__body">
+            <div className="admin-step-header mb-4">
+              <h2 className="admin-panel__title">Post sponsored ad</h2>
+              <button type="button" className="admin-btn-secondary" onClick={goBackSponsored}>Back</button>
+            </div>
+            <form onSubmit={handleSubmitSponsored} className="admin-form" style={{ maxWidth: 640 }}>
+              <div className="admin-form-section">
+                <label className="admin-form-label" htmlFor="ads-sponsored-title">Title (optional)</label>
+                <input
+                  id="ads-sponsored-title"
+                  type="text"
+                  className="form-control admin-form-control"
+                  value={sponsoredTitle}
+                  onChange={(e) => setSponsoredTitle(e.target.value)}
+                />
+              </div>
+              <div className="admin-form-section">
+                <label className="admin-form-label" htmlFor="ads-sponsored-desc">Description (optional)</label>
+                <textarea
+                  id="ads-sponsored-desc"
+                  className="form-control admin-form-control"
+                  rows={3}
+                  value={sponsoredDescription}
+                  onChange={(e) => setSponsoredDescription(e.target.value)}
+                />
+              </div>
+              <div className="admin-form-section">
+                <span className="admin-form-label">Images (optional, up to 4)</span>
+                <div className="d-flex flex-wrap gap-3">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i}>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        className="form-control admin-form-control form-control-sm"
+                        style={{ maxWidth: 140 }}
+                        ref={(el) => {
+                          sponsoredFileRefs.current[i] = el;
+                        }}
+                        onChange={(e) => handleSponsoredImageChange(i, e.target.files?.[0] ?? null)}
+                      />
+                      {sponsoredImagePreviews[i] ? (
+                        <img
+                          src={sponsoredImagePreviews[i]!}
+                          alt=""
+                          className="mt-2 rounded border"
+                          style={{ width: 80, height: 56, objectFit: 'cover' }}
                         />
-                        {sponsoredImagePreviews[i] && (
-                          <div className="mt-1 rounded overflow-hidden border" style={{ width: 80, height: 56, backgroundColor: '#f8f9fa' }}>
-                            <img src={sponsoredImagePreviews[i]!} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="mb-3">
-                  <label className="form-label small fw-semibold">External link (optional)</label>
-                  <input type="url" className="form-control form-control-sm" placeholder="https://..." value={sponsoredExternalLink} onChange={(e) => setSponsoredExternalLink(e.target.value)} />
-                </div>
-                <div className="mb-3">
-                  <label className="form-label small fw-semibold">Start date & time <span className="text-muted fw-normal">(CST)</span></label>
-                  <input type="datetime-local" className="form-control form-control-sm" value={sponsoredStartAt} onChange={(e) => setSponsoredStartAt(e.target.value)} required />
-                </div>
-                <div className="mb-4">
-                  <label className="form-label small fw-semibold">End date & time <span className="text-muted fw-normal">(CST)</span></label>
-                  <input type="datetime-local" className="form-control form-control-sm" value={sponsoredEndAt} onChange={(e) => setSponsoredEndAt(e.target.value)} required />
-                </div>
-                {error && <div className="alert alert-danger small py-2 mb-3">{error}</div>}
-                {success && <div className="alert alert-success small py-2 mb-3">{success}</div>}
-                <div className="d-flex gap-2">
-                  <button type="button" className="btn btn-outline-secondary btn-sm" onClick={goBackSponsored}>Cancel</button>
-                  <button type="submit" className="btn btn-success btn-sm" disabled={sponsoredUploading || sponsoredSubmitting}>
-                    {sponsoredUploading ? 'Uploading…' : sponsoredSubmitting ? 'Posting…' : 'Post sponsored ad'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          ) : showBannerForm ? (
-            <div className="rounded-3 p-4 mb-4" style={{ backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid #e9ecef', maxWidth: 520 }}>
-              <div className="d-flex align-items-center gap-2 mb-3">
-                <button type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={goBack} aria-label="Back">
-                  <i className="bi bi-arrow-left" style={{ fontSize: '1.25rem', color: '#1a1f2e' }} />
-                </button>
-                <h2 className="h6 mb-0" style={{ color: '#1a1f2e', fontWeight: 600 }}>Post banner ad</h2>
-              </div>
-              <form onSubmit={handleSubmitBanner}>
-                <div className="mb-3">
-                  <label className="form-label small fw-semibold">Banner image</label>
-                  <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" className="form-control form-control-sm" onChange={handleBannerFileChange} />
-                </div>
-                {bannerPreviewUrl && (
-                  <div className="mb-3">
-                    <span className="small text-muted d-block mb-1">Preview</span>
-                    <div className="rounded-2 overflow-hidden border" style={{ maxWidth: 400, backgroundColor: '#f8f9fa' }}>
-                      <img src={bannerPreviewUrl} alt="Banner preview" style={{ width: '100%', height: 'auto', display: 'block' }} />
+                      ) : null}
                     </div>
-                  </div>
-                )}
-                <div className="mb-3">
-                  <label className="form-label small fw-semibold">External link (optional)</label>
-                  <input type="url" className="form-control form-control-sm" placeholder="https://..." value={externalLink} onChange={(e) => setExternalLink(e.target.value)} />
+                  ))}
                 </div>
-                <div className="mb-3">
-                  <label className="form-label small fw-semibold">Start date & time <span className="text-muted fw-normal">(CST)</span></label>
-                  <input type="datetime-local" className="form-control form-control-sm" value={startAt} onChange={(e) => setStartAt(e.target.value)} />
+              </div>
+              <div className="admin-form-section">
+                <label className="admin-form-label" htmlFor="ads-sponsored-link">External link (optional)</label>
+                <input
+                  id="ads-sponsored-link"
+                  type="url"
+                  className="form-control admin-form-control"
+                  value={sponsoredExternalLink}
+                  onChange={(e) => setSponsoredExternalLink(e.target.value)}
+                />
+              </div>
+              <div className="row g-3">
+                <div className="col-md-6">
+                  <label className="admin-form-label" htmlFor="ads-sponsored-start">
+                    Start <span className="admin-form-hint">(CST)</span>
+                  </label>
+                  <input
+                    id="ads-sponsored-start"
+                    type="datetime-local"
+                    className="form-control admin-form-control"
+                    value={sponsoredStartAt}
+                    onChange={(e) => setSponsoredStartAt(e.target.value)}
+                    required
+                  />
                 </div>
-                <div className="mb-4">
-                  <label className="form-label small fw-semibold">End date & time <span className="text-muted fw-normal">(CST)</span></label>
-                  <input type="datetime-local" className="form-control form-control-sm" value={endAt} onChange={(e) => setEndAt(e.target.value)} />
+                <div className="col-md-6">
+                  <label className="admin-form-label" htmlFor="ads-sponsored-end">
+                    End <span className="admin-form-hint">(CST)</span>
+                  </label>
+                  <input
+                    id="ads-sponsored-end"
+                    type="datetime-local"
+                    className="form-control admin-form-control"
+                    value={sponsoredEndAt}
+                    onChange={(e) => setSponsoredEndAt(e.target.value)}
+                    required
+                  />
                 </div>
-                {error && <div className="alert alert-danger small py-2 mb-3">{error}</div>}
-                {success && <div className="alert alert-success small py-2 mb-3">{success}</div>}
-                <div className="d-flex gap-2">
-                  <button type="button" className="btn btn-outline-secondary btn-sm" onClick={goBack}>Cancel</button>
-                  <button type="submit" className="btn btn-primary btn-sm" disabled={uploading || submitting || !bannerFile}>
-                    {uploading ? 'Uploading…' : submitting ? 'Posting…' : 'Post banner ad'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          ) : (
-            <div className="d-flex flex-wrap gap-4">
-              <button
-                type="button"
-                className="btn btn-lg rounded-3 border-0 d-flex align-items-center justify-content-center gap-3 shadow-sm"
-                style={{ minWidth: 220, minHeight: 140, backgroundColor: '#cff4fc', color: '#055160' }}
-                onClick={() => setShowBannerForm(true)}
-              >
-                <i className="bi bi-image" style={{ fontSize: '2rem' }} />
-                <span className="fw-semibold">Banner Ads</span>
-              </button>
-              <button
-                type="button"
-                className="btn btn-lg rounded-3 border-0 d-flex align-items-center justify-content-center gap-3 shadow-sm"
-                style={{ minWidth: 220, minHeight: 140, backgroundColor: '#d1e7dd', color: '#0f5132' }}
-                onClick={() => setShowSponsoredForm(true)}
-              >
-                <i className="bi bi-badge-ad" style={{ fontSize: '2rem' }} />
-                <span className="fw-semibold">Sponsored Ads</span>
-              </button>
-            </div>
-          )}
+              </div>
+              {error ? <p className="admin-form-hint admin-form-hint--error mt-3">{error}</p> : null}
+              {success ? (
+                <div className="admin-notice admin-notice--info mt-3"><p className="mb-0">{success}</p></div>
+              ) : null}
+              <div className="admin-form-actions mt-4">
+                <button type="button" className="admin-btn-secondary" onClick={goBackSponsored}>Cancel</button>
+                <button
+                  type="submit"
+                  className="admin-btn-primary"
+                  disabled={sponsoredUploading || sponsoredSubmitting}
+                >
+                  {sponsoredUploading ? 'Uploading…' : sponsoredSubmitting ? 'Posting…' : 'Post sponsored ad'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </section>
+      ) : null}
     </AdsAdminLayout>
   );
 };

@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, type CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { SchoolAdminLayout } from '../components/SchoolAdminLayout';
+import { ADMIN_PORTAL_ACCENTS } from '../constants/adminPortalTheme';
 import { useSchoolAdminAuth } from '../contexts/SchoolAdminAuthContext';
 import { publicEventsService, type CategoryPublic } from '../services/public-events.service';
 import { schoolAdminPostsService, type SchoolAdminPost } from '../services/school-admin-posts.service';
@@ -98,7 +99,7 @@ export const SchoolAdminAnalytics = () => {
     };
   }, [dateRangePreset, filterDateFrom, filterDateTo]);
 
-  const { data: engagement } = useQuery({
+  const { data: engagement, isFetching: engagementFetching } = useQuery({
     queryKey: ['school-admin', 'analytics', 'engagement', postIds.join(','), queryDateFrom ?? '', queryDateTo ?? ''],
     queryFn: () =>
       publicEventsService.getEngagementCounts(postIds, {
@@ -126,159 +127,143 @@ export const SchoolAdminAnalytics = () => {
       ? `${selectedCategory?.name ?? 'Category'} › ${subcategories.find((s) => s.id === filterSubCategoryId)?.name ?? 'Subcategory'}`
       : filterCategoryId
         ? (selectedCategory?.name ?? 'Category')
-        : 'All news';
+        : 'All school news';
+
+  const panelStyle = { '--admin-accent': ADMIN_PORTAL_ACCENTS.school } as CSSProperties;
+
+  const dateRangeLabel =
+    queryDateFrom && queryDateTo
+      ? queryDateFrom === queryDateTo
+        ? queryDateFrom
+        : `${queryDateFrom} – ${queryDateTo}`
+      : null;
+
+  const statValue = (n: number) =>
+    engagementFetching && postIds.length > 0 ? '…' : n.toLocaleString();
+
+  const graphViewButtons = (['line', 'bar', 'donut'] as const).map((view) => (
+    <button
+      key={view}
+      type="button"
+      className={`admin-dashboard-badge admin-analytics-chart-badge${graphView === view ? ' is-active' : ''}`}
+      aria-pressed={graphView === view}
+      onClick={() => setGraphView(view)}
+    >
+      {view === 'line' && <i className="bi bi-graph-up me-1" aria-hidden />}
+      {view === 'bar' && <i className="bi bi-bar-chart-fill me-1" aria-hidden />}
+      {view === 'donut' && <i className="bi bi-pie-chart-fill me-1" aria-hidden />}
+      <span className="text-capitalize">{view}</span>
+    </button>
+  ));
 
   return (
     <SchoolAdminLayout>
-          {/* Top bar: title + date range */}
-          <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-            <div className="d-flex align-items-center gap-2">
-              <div
-                className="d-flex align-items-center justify-content-center rounded-2"
-                style={{ width: 40, height: 40, backgroundColor: 'rgba(13, 202, 240, 0.2)', color: '#087990' }}
-              >
-                <i className="bi bi-bar-chart-line" style={{ fontSize: '1.25rem' }} />
-              </div>
-              <div>
-                <h1 style={{ fontSize: '1.5rem', fontWeight: 600, color: '#1a1f2e', marginBottom: 0 }}>
-                  News engagement
-                </h1>
-                <p style={{ fontSize: '0.875rem', color: '#6c757d', marginBottom: 0 }}>
-                  {scopeLabel}
-                  {queryDateFrom && queryDateTo && (
-                    <span className="ms-2">
-                      · Counts for {queryDateFrom === queryDateTo
-                        ? queryDateFrom
-                        : `${queryDateFrom} – ${queryDateTo}`}
-                    </span>
-                  )}
-                </p>
-              </div>
-            </div>
-            <div className="d-flex align-items-center gap-2 flex-wrap">
-              <select
-                className="form-select form-select-sm"
-                style={{ width: 'auto', minWidth: 140 }}
-                value={dateRangePreset}
-                onChange={(e) => setDateRangePreset(e.target.value)}
-              >
-                {DATE_RANGE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-              {dateRangePreset === 'custom' && (
+      <div className="admin-analytics-page">
+        <header className="admin-page-header admin-page-header--toolbar" style={panelStyle}>
+          <div>
+            <h1 className="admin-page-title">Analytics</h1>
+            <p className="admin-page-subtitle">
+              Likes, comments, and saves across published news. Scope: <strong>{scopeLabel}</strong>
+              {dateRangeLabel ? (
                 <>
-                  <input
-                    type="date"
-                    className="form-control form-control-sm"
-                    style={{ width: 140 }}
-                    value={filterDateFrom}
-                    onChange={(e) => setFilterDateFrom(e.target.value)}
-                  />
-                  <span className="text-muted">–</span>
-                  <input
-                    type="date"
-                    className="form-control form-control-sm"
-                    style={{ width: 140 }}
-                    value={filterDateTo}
-                    onChange={(e) => setFilterDateTo(e.target.value)}
-                  />
+                  {' '}
+                  · <span className="admin-analytics-date-pill">{dateRangeLabel}</span>
                 </>
-              )}
-            </div>
+              ) : null}
+            </p>
           </div>
-
-          {/* Summary metric cards – Instagram style */}
-          <div className="d-flex flex-wrap gap-3 mb-4">
-            <div
-              className="rounded-3 p-3 flex-grow-1"
-              style={{
-                minWidth: 140,
-                maxWidth: 220,
-                backgroundColor: '#fff',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-                border: '1px solid #e9ecef',
-              }}
+          <div className="admin-page-toolbar__actions admin-analytics-toolbar">
+            <select
+              className="form-select form-select-sm admin-form-control admin-analytics-toolbar__select"
+              aria-label="Date range"
+              value={dateRangePreset}
+              onChange={(e) => setDateRangePreset(e.target.value)}
             >
-              <div className="d-flex align-items-center justify-content-between">
-                <span className="small text-muted">Engagement</span>
-                <i className="bi bi-lightning-charge text-warning" style={{ fontSize: '1.1rem' }} />
-              </div>
-              <div className="h4 mb-0 mt-1" style={{ color: '#1a1f2e', fontWeight: 700 }}>
-                {postsToShow.length}
-              </div>
-              <div className="small text-muted">news in scope</div>
-            </div>
-            <div
-              className="rounded-3 p-3 flex-grow-1"
-              style={{
-                minWidth: 140,
-                maxWidth: 220,
-                backgroundColor: '#fff',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-                border: '1px solid #e9ecef',
-              }}
-            >
-              <div className="d-flex align-items-center justify-content-between">
-                <span className="small text-muted">Likes</span>
-                <i className="bi bi-heart-fill text-danger" style={{ fontSize: '1.1rem' }} />
-              </div>
-              <div className="h4 mb-0 mt-1" style={{ color: '#1a1f2e', fontWeight: 700 }}>
-                {totalLikes}
-              </div>
-            </div>
-            <div
-              className="rounded-3 p-3 flex-grow-1"
-              style={{
-                minWidth: 140,
-                maxWidth: 220,
-                backgroundColor: '#fff',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-                border: '1px solid #e9ecef',
-              }}
-            >
-              <div className="d-flex align-items-center justify-content-between">
-                <span className="small text-muted">Comments</span>
-                <i className="bi bi-chat-dots-fill text-primary" style={{ fontSize: '1.1rem' }} />
-              </div>
-              <div className="h4 mb-0 mt-1" style={{ color: '#1a1f2e', fontWeight: 700 }}>
-                {totalComments}
-              </div>
-            </div>
-            <div
-              className="rounded-3 p-3 flex-grow-1"
-              style={{
-                minWidth: 140,
-                maxWidth: 220,
-                backgroundColor: '#fff',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-                border: '1px solid #e9ecef',
-              }}
-            >
-              <div className="d-flex align-items-center justify-content-between">
-                <span className="small text-muted">Saved</span>
-                <i className="bi bi-bookmark-fill" style={{ fontSize: '1.1rem', color: '#087990' }} />
-              </div>
-              <div className="h4 mb-0 mt-1" style={{ color: '#1a1f2e', fontWeight: 700 }}>
-                {totalSaved}
-              </div>
-            </div>
+              {DATE_RANGE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            {dateRangePreset === 'custom' && (
+              <>
+                <input
+                  type="date"
+                  className="form-control form-control-sm admin-form-control admin-analytics-toolbar__date"
+                  aria-label="From date"
+                  value={filterDateFrom}
+                  onChange={(e) => setFilterDateFrom(e.target.value)}
+                />
+                <span className="admin-analytics-toolbar__sep" aria-hidden>–</span>
+                <input
+                  type="date"
+                  className="form-control form-control-sm admin-form-control admin-analytics-toolbar__date"
+                  aria-label="To date"
+                  value={filterDateTo}
+                  onChange={(e) => setFilterDateTo(e.target.value)}
+                />
+              </>
+            )}
           </div>
+        </header>
 
-          {/* Filters row */}
-          <div
-            className="rounded-3 p-3 mb-4"
-            style={{ backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid #e9ecef' }}
-          >
-            <div className="small text-muted mb-2">Filters</div>
+        <div className="admin-analytics-stat-grid" style={panelStyle}>
+          <div className="admin-analytics-stat admin-analytics-stat--scope">
+            <div className="admin-analytics-stat__top">
+              <span className="admin-analytics-stat__label">News in scope</span>
+              <i className="bi bi-newspaper admin-analytics-stat__icon" aria-hidden />
+            </div>
+            <p className="admin-analytics-stat__value">{postsToShow.length}</p>
+            <p className="admin-analytics-stat__hint">Matching filters below</p>
+          </div>
+          <div className="admin-analytics-stat admin-analytics-stat--likes">
+            <div className="admin-analytics-stat__top">
+              <span className="admin-analytics-stat__label">Likes</span>
+              <i className="bi bi-heart-fill admin-analytics-stat__icon" aria-hidden />
+            </div>
+            <p className="admin-analytics-stat__value">{statValue(totalLikes)}</p>
+          </div>
+          <div className="admin-analytics-stat admin-analytics-stat--comments">
+            <div className="admin-analytics-stat__top">
+              <span className="admin-analytics-stat__label">Comments</span>
+              <i className="bi bi-chat-dots-fill admin-analytics-stat__icon" aria-hidden />
+            </div>
+            <p className="admin-analytics-stat__value">{statValue(totalComments)}</p>
+          </div>
+          <div className="admin-analytics-stat admin-analytics-stat--saved">
+            <div className="admin-analytics-stat__top">
+              <span className="admin-analytics-stat__label">Saved</span>
+              <i className="bi bi-bookmark-fill admin-analytics-stat__icon" aria-hidden />
+            </div>
+            <p className="admin-analytics-stat__value">{statValue(totalSaved)}</p>
+          </div>
+        </div>
+
+        <section className="admin-panel admin-analytics-filters" style={panelStyle}>
+          <div className="admin-panel__header">
+            <h2 className="admin-panel__title">Filters</h2>
+            {filterCategoryId || filterSubCategoryId || filterPostId ? (
+              <button
+                type="button"
+                className="admin-dashboard-badge"
+                onClick={() => {
+                  setFilterCategoryId('');
+                  setFilterSubCategoryId('');
+                  setFilterPostId('');
+                }}
+              >
+                Clear filters
+              </button>
+            ) : null}
+          </div>
+          <div className="admin-panel__body">
             {loading ? (
-              <p className="text-muted small mb-0">Loading…</p>
+              <p className="admin-form-hint mb-0">Loading categories and posts…</p>
             ) : (
-              <div className="d-flex flex-wrap gap-3 align-items-end">
-                <div style={{ minWidth: 160 }}>
-                  <label className="form-label small mb-1">Category</label>
+              <div className="admin-analytics-filter-grid">
+                <div>
+                  <label className="admin-form-label" htmlFor="analytics-category">Category</label>
                   <select
-                    className="form-select form-select-sm"
+                    id="analytics-category"
+                    className="form-select admin-form-control"
                     value={filterCategoryId}
                     onChange={(e) => setFilterCategoryId(e.target.value)}
                   >
@@ -288,13 +273,14 @@ export const SchoolAdminAnalytics = () => {
                     ))}
                   </select>
                 </div>
-                <div style={{ minWidth: 160 }}>
-                  <label className="form-label small mb-1">Subcategory</label>
+                <div>
+                  <label className="admin-form-label" htmlFor="analytics-subcategory">Subcategory</label>
                   <select
-                    className="form-select form-select-sm"
+                    id="analytics-subcategory"
+                    className="form-select admin-form-control"
                     value={filterSubCategoryId}
                     onChange={(e) => setFilterSubCategoryId(e.target.value)}
-                    disabled={!subcategories.length}
+                    disabled={!filterCategoryId || !subcategories.length}
                   >
                     <option value="">All subcategories</option>
                     {subcategories.map((s) => (
@@ -302,100 +288,61 @@ export const SchoolAdminAnalytics = () => {
                     ))}
                   </select>
                 </div>
-                <div style={{ minWidth: 200 }}>
-                  <label className="form-label small mb-1">News (post)</label>
+                <div>
+                  <label className="admin-form-label" htmlFor="analytics-post">News post</label>
                   <select
-                    className="form-select form-select-sm"
+                    id="analytics-post"
+                    className="form-select admin-form-control"
                     value={filterPostId}
                     onChange={(e) => setFilterPostId(e.target.value)}
                   >
-                    <option value="">All news</option>
+                    <option value="">All news in scope</option>
                     {filteredPosts.map((p) => (
                       <option key={p.id} value={p.id}>{p.title || 'Untitled'}</option>
                     ))}
                   </select>
                 </div>
-                <div style={{ minWidth: 120 }}>
-                  <label className="form-label small mb-1">Date from</label>
-                  <input
-                    type="date"
-                    className="form-control form-control-sm"
-                    value={filterDateFrom}
-                    onChange={(e) => setFilterDateFrom(e.target.value)}
-                  />
-                </div>
-                <div style={{ minWidth: 120 }}>
-                  <label className="form-label small mb-1">Date to</label>
-                  <input
-                    type="date"
-                    className="form-control form-control-sm"
-                    value={filterDateTo}
-                    onChange={(e) => setFilterDateTo(e.target.value)}
-                  />
-                </div>
               </div>
             )}
           </div>
+        </section>
 
-          {/* Engagement graphs – above news performance table */}
-          <div
-            className="rounded-3 overflow-hidden mb-4"
-            style={{ backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid #e9ecef' }}
-          >
-            <div className="px-3 py-3 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-2" style={{ backgroundColor: '#f8f9fa' }}>
-              <div>
-                <h2 className="h6 mb-0" style={{ color: '#1a1f2e', fontWeight: 600 }}>
-                  Engagement overview
-                </h2>
-                <p className="small text-muted mb-0 mt-1">
-                  {filterPostId && postsToShow.length === 1
-                    ? <>Showing analytics for: <strong style={{ color: '#1a1f2e' }}>{postsToShow[0]?.title || 'Selected news'}</strong>. Line, bar, and donut show this post&apos;s likes, comments, and saved.</>
-                    : <>{postsToShow.length} {postsToShow.length === 1 ? 'post' : 'posts'} in scope. Choose Line, Bar, or Donut. Select a single news in the filter to see that post&apos;s analytics in the charts.</>}
-                </p>
-              </div>
-              <div className="d-flex align-items-center gap-1">
-                {(['line', 'bar', 'donut'] as const).map((view) => (
-                  <button
-                    key={view}
-                    type="button"
-                    className="btn btn-sm d-flex align-items-center gap-2 rounded-2 border-0"
-                    style={{
-                      backgroundColor: graphView === view ? 'rgba(13, 202, 240, 0.15)' : 'transparent',
-                      color: graphView === view ? '#087990' : '#6c757d',
-                      fontWeight: graphView === view ? 600 : 400,
-                    }}
-                    onClick={() => setGraphView(view)}
-                  >
-                    {view === 'line' && <i className="bi bi-graph-up" />}
-                    {view === 'bar' && <i className="bi bi-bar-chart-fill" />}
-                    {view === 'donut' && <i className="bi bi-pie-chart-fill" />}
-                    <span className="text-capitalize">{view}</span>
-                  </button>
-                ))}
-              </div>
+        <section className="admin-panel admin-analytics-charts" style={panelStyle}>
+          <div className="admin-panel__header admin-analytics-charts__header">
+            <div>
+              <h2 className="admin-panel__title">Engagement overview</h2>
+              <p className="admin-form-hint mb-0 mt-1">
+                {filterPostId && postsToShow.length === 1
+                  ? (
+                    <>
+                      Charts reflect <strong>{postsToShow[0]?.title || 'selected news'}</strong> — likes, comments, and saves.
+                    </>
+                  )
+                  : (
+                    <>
+                      {postsToShow.length} {postsToShow.length === 1 ? 'post' : 'posts'} in scope. Pick a single post in filters for post-level charts.
+                    </>
+                  )}
+              </p>
             </div>
-            <div
-              className="p-4 position-relative"
-              onMouseLeave={() => setChartTooltip(null)}
-            >
-              {chartTooltip && (
-                <div
-                  className="position-fixed px-2 py-1 small rounded shadow-sm border"
-                  style={{
-                    left: chartTooltip.x + 12,
-                    top: chartTooltip.y + 12,
-                    backgroundColor: '#1a1f2e',
-                    color: '#fff',
-                    zIndex: 9999,
-                    pointerEvents: 'none',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {chartTooltip.text}
-                </div>
-              )}
-              {postsToShow.length === 0 ? (
-                <p className="text-muted text-center py-4 mb-0 small">Select category/subcategory to see engagement graphs.</p>
+            <nav className="admin-dashboard-badges admin-analytics-chart-badges mb-0" aria-label="Chart type">
+              {graphViewButtons}
+            </nav>
+          </div>
+          <div
+            className="admin-panel__body admin-analytics-chart-stage position-relative"
+            onMouseLeave={() => setChartTooltip(null)}
+          >
+            {chartTooltip && (
+              <div
+                className="admin-analytics-chart-tooltip"
+                style={{ left: chartTooltip.x + 12, top: chartTooltip.y + 12 }}
+              >
+                {chartTooltip.text}
+              </div>
+            )}
+            {postsToShow.length === 0 ? (
+              <p className="admin-analytics-empty mb-0">No posts match your filters. Adjust category or post selection.</p>
               ) : (
                 <>
                   {graphView === 'line' && (() => {
@@ -416,18 +363,18 @@ export const SchoolAdminAnalytics = () => {
                       <div className="d-flex flex-column align-items-center">
                         <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', maxWidth: 480, height: 'auto' }} className="mb-2">
                           <defs>
-                            <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#0d6efd" stopOpacity="0.4" />
-                              <stop offset="100%" stopColor="#0d6efd" stopOpacity="0.02" />
+                            <linearGradient id="schoolAnalyticsLineGrad" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="var(--admin-accent, #3468f9)" stopOpacity="0.35" />
+                              <stop offset="100%" stopColor="var(--admin-accent, #3468f9)" stopOpacity="0.02" />
                             </linearGradient>
                           </defs>
-                          <polyline points={areaPoints} fill="url(#lineGrad)">
+                          <polyline points={areaPoints} fill="url(#schoolAnalyticsLineGrad)">
                             <title>Engagement: Likes, Comments, Saved</title>
                           </polyline>
                           <polyline
                             points={points}
                             fill="none"
-                            stroke="#0d6efd"
+                            stroke="var(--admin-accent, #3468f9)"
                             strokeWidth="2"
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -442,7 +389,7 @@ export const SchoolAdminAnalytics = () => {
                               onMouseLeave={() => setChartTooltip(null)}
                             >
                               <circle cx={x(i)} cy={y(d.value)} r="8" fill="transparent" stroke="none" />
-                              <circle cx={x(i)} cy={y(d.value)} r="4" fill="#0d6efd" />
+                              <circle cx={x(i)} cy={y(d.value)} r="4" fill="var(--admin-accent, #3468f9)" />
                             </g>
                           ))}
                           {data.map((d, i) => (
@@ -639,36 +586,33 @@ export const SchoolAdminAnalytics = () => {
                   })()}
                 </>
               )}
-            </div>
           </div>
+        </section>
 
-          {/* Content performance table – news preview + metrics */}
-          <div
-            className="rounded-3 overflow-hidden"
-            style={{ backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid #e9ecef' }}
-          >
-            <div className="px-3 py-2 border-bottom" style={{ backgroundColor: '#f8f9fa' }}>
-              <h2 className="h6 mb-0" style={{ color: '#1a1f2e', fontWeight: 600 }}>
-                News performance
-              </h2>
-              <p className="small text-muted mb-0 mt-1">
-                Preview of news matching your filters. Likes and comments update with selection.
+        <section className="admin-panel admin-analytics-table-panel" style={panelStyle}>
+          <div className="admin-panel__header">
+            <div>
+              <h2 className="admin-panel__title">News performance</h2>
+              <p className="admin-form-hint mb-0 mt-1">
+                Posts matching your filters with engagement totals for the selected date range.
               </p>
             </div>
-            <div className="table-responsive">
-              <table className="table table-hover align-middle mb-0">
-                <thead style={{ backgroundColor: '#f8f9fa', color: '#6c757d', fontSize: '0.8125rem' }}>
+          </div>
+          <div className="admin-panel__body admin-panel__body--flush-top">
+            <div className="admin-table-wrap">
+              <table className="admin-table admin-analytics-table">
+                <thead>
                   <tr>
-                    <th style={{ fontWeight: 600, width: '40%' }}>News</th>
-                    <th style={{ fontWeight: 600, width: '15%', textAlign: 'right' }}>Likes</th>
-                    <th style={{ fontWeight: 600, width: '15%', textAlign: 'right' }}>Comments</th>
-                    <th style={{ fontWeight: 600, width: '15%', textAlign: 'right' }}>Saved</th>
+                    <th>News</th>
+                    <th className="admin-analytics-table__num">Likes</th>
+                    <th className="admin-analytics-table__num">Comments</th>
+                    <th className="admin-analytics-table__num">Saved</th>
                   </tr>
                 </thead>
                 <tbody>
                   {postsToShow.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="text-center text-muted py-4">
+                      <td colSpan={4} className="admin-table-empty">
                         No news match the current filters. Try changing category or subcategory.
                       </td>
                     </tr>
@@ -681,51 +625,33 @@ export const SchoolAdminAnalytics = () => {
                       return (
                         <tr key={post.id}>
                           <td>
-                            <div className="d-flex align-items-center gap-3">
-                              <div
-                                className="rounded-2 flex-shrink-0 overflow-hidden"
-                                style={{
-                                  width: 56,
-                                  height: 56,
-                                  backgroundColor: '#e9ecef',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                }}
-                              >
+                            <div className="admin-analytics-table__news">
+                              <div className="admin-analytics-table__thumb">
                                 {thumbUrl ? (
-                                  <img
-                                    src={imageSrc(thumbUrl)}
-                                    alt=""
-                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                  />
+                                  <img src={imageSrc(thumbUrl)} alt="" />
                                 ) : (
-                                  <i className="bi bi-file-earmark-text text-muted" style={{ fontSize: '1.5rem' }} />
+                                  <i className="bi bi-file-earmark-text" aria-hidden />
                                 )}
                               </div>
-                              <div className="min-w-0">
-                                <div
-                                  className="text-dark text-truncate"
-                                  style={{ fontWeight: 500, maxWidth: 320 }}
-                                  title={post.title || 'Untitled'}
-                                >
+                              <div className="admin-analytics-table__meta">
+                                <span className="admin-analytics-table__title" title={post.title || 'Untitled'}>
                                   {post.title || 'Untitled'}
-                                </div>
-                                <div className="small text-muted">
+                                </span>
+                                <span className="admin-form-hint">
                                   {post.subCategory?.name ?? ''}
                                   {post.subCategory?.category?.name ? ` · ${post.subCategory.category.name}` : ''}
-                                </div>
+                                </span>
                               </div>
                             </div>
                           </td>
-                          <td className="text-end">
-                            <span style={{ fontWeight: 600, color: '#1a1f2e' }}>{likes}</span>
+                          <td className="admin-analytics-table__num">
+                            <strong>{likes}</strong>
                           </td>
-                          <td className="text-end">
-                            <span style={{ fontWeight: 600, color: '#1a1f2e' }}>{comments}</span>
+                          <td className="admin-analytics-table__num">
+                            <strong>{comments}</strong>
                           </td>
-                          <td className="text-end">
-                            <span style={{ fontWeight: 600, color: '#1a1f2e' }}>{saved}</span>
+                          <td className="admin-analytics-table__num">
+                            <strong>{saved}</strong>
                           </td>
                         </tr>
                       );
@@ -735,6 +661,8 @@ export const SchoolAdminAnalytics = () => {
               </table>
             </div>
           </div>
+        </section>
+      </div>
     </SchoolAdminLayout>
   );
 };

@@ -42,6 +42,12 @@
   text-align: left;
 }
 
+.inshorts-card--ig {
+  border: 1px solid var(--events-border, #efefef);
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
 .inshorts-card--ad {
   background: #f1f7ff;
 }
@@ -486,6 +492,181 @@
   font-weight: 700;
   letter-spacing: 0.01em;
   white-space: nowrap;
+}
+
+.inshorts-card--post-preview {
+  overflow: hidden;
+}
+
+.inshorts-body--post-preview {
+  padding: 8px 10px 10px;
+  min-height: 0;
+}
+
+.inshorts-body--ig {
+  padding: 0 0 10px;
+}
+
+.inshorts-time--ig {
+  padding: 0 14px;
+  margin-top: 4px;
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #a8a8a8;
+}
+
+.inshorts-post-preview-wrap {
+  position: relative;
+}
+
+.inshorts-post-preview-wrap .admin-create-post-preview-stage {
+  margin: 0;
+}
+
+.inshorts-post-preview-wrap .admin-create-post-preview-device__browser-bar {
+  display: none;
+}
+
+/* My school feed: Know more pill (not full-width like action buttons) */
+.inshorts-post-preview-wrap .event-post-detail__know-more-wrap {
+  display: flex;
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.inshorts-post-preview-wrap .event-post-detail__know-more,
+.inshorts-post-preview-wrap .event-post-detail__actions ~ .event-post-detail__know-more-wrap .event-post-detail__know-more {
+  flex: 0 0 auto;
+  width: auto;
+  max-width: max-content;
+}
+
+.inshorts-post-preview-wrap .event-post-detail__actions {
+  width: 100%;
+  align-self: stretch;
+}
+
+.inshorts-post-preview-wrap .admin-create-post-preview-device--web {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.inshorts-post-preview-wrap .admin-create-post-preview-device__body--web {
+  padding: 0;
+}
+
+/* Instagram-style feed post */
+.inshorts-post-preview-wrap--ig .event-post-detail--web-preview {
+  padding: 0 14px 4px;
+}
+
+.inshorts-post-preview-wrap--ig .event-post-detail__hero-wrap {
+  margin: 0 -14px 0;
+  border-radius: 0;
+  max-height: none;
+  aspect-ratio: 1 / 1;
+}
+
+.inshorts-post-preview-wrap--ig .event-post-detail__title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.02em;
+}
+
+.inshorts-post-preview-wrap--ig .event-post-detail__meta {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.inshorts-post-preview-wrap--ig .event-post-detail__meta li {
+  font-size: 0.75rem;
+  color: #737373;
+}
+
+.inshorts-post-preview-wrap--ig .event-post-detail__category {
+  font-size: 0.75rem;
+  margin-bottom: 0.5rem;
+  background: #f5f5f5;
+  border-color: #efefef;
+  color: #262626;
+}
+
+.inshorts-post-preview-wrap--ig .event-post-detail__teaser {
+  font-size: 0.875rem;
+  color: #262626;
+  line-height: 1.45;
+}
+
+.inshorts-post-preview-wrap--ig .event-post-detail__below-hero {
+  margin: 0 -14px;
+  padding: 0 14px;
+  border-bottom: 1px solid #efefef;
+}
+
+.inshorts-engage-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px 0 10px;
+}
+
+.inshorts-engage-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.inshorts-engage-bar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #262626;
+  padding: 2px;
+  cursor: pointer;
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.inshorts-engage-bar-btn--liked {
+  color: #ed4956;
+}
+
+.inshorts-engage-bar__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-height: 0;
+}
+
+.inshorts-engage-bar-likes,
+.inshorts-engage-bar-comments {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #262626;
+}
+
+.inshorts-engage-pill-host {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  aspect-ratio: 16 / 10;
+  max-height: 220px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.inshorts-engage-pill-host .inshorts-engage-pill {
+  pointer-events: auto;
 }
 
 .inshorts-comment-input-row {

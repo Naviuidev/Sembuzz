@@ -3,8 +3,9 @@ import { createPortal } from 'react-dom';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Navbar } from '../components/Navbar';
-import { SchoolNavbar } from '../components/SchoolNavbar';
 import { EventsBottomNav, type EventsBottomNavTab } from '../components/EventsBottomNav';
+import { EventsFeedSecondarySidebar } from '../components/EventsFeedSecondarySidebar';
+import { EventsGlobalSecondarySidebar } from '../components/EventsGlobalSecondarySidebar';
 import { ClubMessagingBadges } from '../components/ClubMessagingBadges';
 import { ClubGroupChatWidget } from '../components/ClubGroupChatWidget';
 import { useUserAuth } from '../contexts/UserAuthContext';
@@ -25,6 +26,13 @@ import {
   getFeedDateFilterTzOffsetMinutes,
 } from '../utils/eventFeedDate';
 import { InshortsHomeFeed } from '../components/InshortsHomeFeed';
+import { ExternalPublicFeedPanel } from '../components/ExternalPublicFeedPanel';
+import { EventsSearchScreen } from '../components/EventsSearchScreen';
+import { StudentProfileHub } from '../components/StudentProfileHub';
+import { EventsAppsScreen } from '../components/EventsAppsScreen';
+import { userExternalFeedService } from '../services/user-external-feed.service';
+
+type HomeFeedMode = 'mySchool' | 'external' | 'allSchools';
 import {
   userEventsService,
   type EventCommentResponse,
@@ -32,10 +40,10 @@ import {
 } from '../services/user-events.service';
 import { userAuthService } from '../services/user-auth.service';
 import { api } from '../config/api';
-import { imageSrc, isImageIconValue } from '../utils/image';
+import { imageSrc } from '../utils/image';
 import { getApiErrorMessage } from '../utils/apiError';
 import { userHelpService } from '../services/user-help.service';
-import { userSchoolSocialService, type SchoolSocialAccountPublic } from '../services/user-school-social.service';
+import { userSchoolSocialService } from '../services/user-school-social.service';
 import { getUserCategoryDone, getUserSubCategoryIds, setUserCategoryDone, setUserSubCategoryIds } from '../utils/user-category-prefs';
 import { isMobileBrowser, openSembuzzAppWithToken } from '../utils/openSembuzzApp';
 import { userNotificationsService, USER_NOTIFICATIONS_UNREAD_QUERY_KEY } from '../services/user-notifications.service';
@@ -45,46 +53,8 @@ import {
 } from '../services/user-direct-chats.service';
 import { USER_STUDENT_CHAT_GROUPS_UNREAD_QUERY_KEY, userStudentChatGroupsService } from '../services/user-student-chat-groups.service';
 import { UserForgotPasswordPanel } from '../components/UserForgotPasswordPanel';
-import {
-  EventPostPublicMeta,
-  EventPostPublicActionButtons,
-} from '../components/EventPostPublicExtras';
-import { EventPostPublicDescriptionRow } from '../components/EventPostPublicDescriptionRow';
+import { EventPostPublicContent } from '../components/EventPostPublicContent';
 import { shouldShowSchoolFilterUi } from '../constants/messagingFeatures';
-
-const PLATFORM_COLORS: Record<string, string> = {
-  facebook: '#1877F2',
-  linkedin: '#0A66C2',
-  youtube: '#FF0000',
-  google: '#4285F4',
-  instagram: '#E4405F',
-  x: '#000000',
-  tiktok: '#000000',
-  pinterest: '#BD081C',
-  whatsapp: '#25D366',
-  telegram: '#26A5E4',
-  reddit: '#FF4500',
-  snapchat: '#FFFC00',
-  linktree: '#43E660',
-  weebly: '#1cb0a1',
-};
-
-const PLATFORM_ICONS: Record<string, string> = {
-  facebook: 'bi-facebook',
-  linkedin: 'bi-linkedin',
-  youtube: 'bi-youtube',
-  google: 'bi-google',
-  instagram: 'bi-instagram',
-  x: 'bi-twitter-x',
-  tiktok: 'bi-tiktok',
-  pinterest: 'bi-pinterest',
-  whatsapp: 'bi-whatsapp',
-  telegram: 'bi-telegram',
-  reddit: 'bi-reddit',
-  snapchat: 'bi-snapchat',
-  linktree: 'bi-link-45deg',
-  weebly: 'bi-columns-gap',
-};
 
 function formatDate(iso: string) {
   try {
@@ -147,15 +117,6 @@ type LikedEventItem = import('../services/user-events.service').LikedEventItem;
 
 /** Full post detail for a liked item (same as Saved screen). */
 function LikedEventDetailView({ event, onBack }: { event: LikedEventItem; onBack: () => void }) {
-  const [slideIndex, setSlideIndex] = useState(0);
-  const [descExpanded, setDescExpanded] = useState(false);
-  const images = parseImageUrls(event.imageUrls);
-  const schoolName = event.school?.name ?? 'School';
-  const schoolLogo = event.school?.image ?? null;
-  const hasMultipleImages = images.length > 1;
-  const goPrev = () => setSlideIndex((i) => (i <= 0 ? images.length - 1 : i - 1));
-  const goNext = () => setSlideIndex((i) => (i >= images.length - 1 ? 0 : i + 1));
-
   return (
     <>
       <button type="button" className="btn btn-link p-0 text-decoration-none d-flex align-items-center gap-2 mb-3" onClick={onBack} aria-label="Back to list">
@@ -163,47 +124,8 @@ function LikedEventDetailView({ event, onBack }: { event: LikedEventItem; onBack
         <span style={{ fontWeight: 500, color: '#1a1f2e' }}>Back to list</span>
       </button>
       <article className="card border-0 shadow-sm" style={{ borderRadius: '12px', overflow: 'hidden' }}>
-        <div className="d-flex align-items-center gap-2 px-3 py-2" style={{ borderBottom: '1px solid #eee' }}>
-          {schoolLogo ? <img src={imageSrc(schoolLogo)} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} /> : <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e9ecef', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6c757d', fontWeight: 700 }}>{schoolName.charAt(0)?.toUpperCase() ?? '?'}</div>}
-          <div>
-            <div style={{ fontWeight: 600, color: '#1a1f2e', fontSize: '0.95rem' }}>{schoolName}</div>
-            <div style={{ fontSize: '0.75rem', color: '#8e8e8e' }}>{event.subCategory?.name ?? 'Post'}</div>
-          </div>
-        </div>
-        {images[0] ? (
-          <div style={{ position: 'relative', width: '100%', backgroundColor: '#fafafa' }}>
-            <div style={{ overflow: 'hidden', width: '100%' }}>
-              <div style={{ display: 'flex', transform: `translateX(-${slideIndex * 100}%)`, transition: 'transform 0.3s ease-out' }}>
-                {images.map((url, i) => (
-                  <div key={i} style={{ minWidth: '100%', flexShrink: 0, minHeight: 'min(300px, 40vh)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <img src={imageSrc(url)} alt="" style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }} />
-                  </div>
-                ))}
-              </div>
-            </div>
-            {hasMultipleImages && (
-              <>
-                <button type="button" onClick={goPrev} aria-label="Previous" style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.9)', boxShadow: '0 1px 4px rgba(0,0,0,0.2)', cursor: 'pointer' }}><i className="bi bi-chevron-left" /></button>
-                <button type="button" onClick={goNext} aria-label="Next" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.9)', boxShadow: '0 1px 4px rgba(0,0,0,0.2)', cursor: 'pointer' }}><i className="bi bi-chevron-right" /></button>
-              </>
-            )}
-          </div>
-        ) : (
-          <div style={{ minHeight: '200px', background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8e8e8e' }}><i className="bi bi-image" style={{ fontSize: '3rem' }} /></div>
-        )}
         <div className="px-3 py-3">
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#1a1f2e', marginBottom: '0.35rem', lineHeight: 1.35 }}>
-            {event.title}
-          </h2>
-          <EventPostPublicMeta event={event} compact />
-          <EventPostPublicDescriptionRow
-            event={event}
-            description={event.description ?? ''}
-            expanded={descExpanded}
-            onExpand={() => setDescExpanded(true)}
-            compact
-          />
-          <EventPostPublicActionButtons event={event} compact />
+          <EventPostPublicContent event={event} showHero />
         </div>
       </article>
     </>
@@ -452,45 +374,12 @@ function EventPostCard({
   onSave: () => void;
   onCommentAdded: () => void;
 }) {
-  const [expandedDesc, setExpandedDesc] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const [slideIndex, setSlideIndex] = useState(0);
-  const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
-  const [schoolLogoError, setSchoolLogoError] = useState(false);
   const queryClient = useQueryClient();
 
-  // Show all images in the slider; 2+ images use carousel with prev/next and dots
-  const images = useMemo(() => parseImageUrls(event.imageUrls), [event.imageUrls]);
-  const hasMultipleImages = images.length > 1;
-
-  // Keep slide index in range when images change
-  useEffect(() => {
-    setSlideIndex((i) => (i >= images.length ? Math.max(0, images.length - 1) : i));
-  }, [images.length]);
-
-  const goPrev = () => setSlideIndex((i) => (i <= 0 ? images.length - 1 : i - 1));
-  const goNext = () => setSlideIndex((i) => (i >= images.length - 1 ? 0 : i + 1));
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStartX(e.touches[0].clientX);
-  };
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartX == null || !hasMultipleImages) return;
-    const endX = e.changedTouches[0].clientX;
-    const diff = touchStartX - endX;
-    if (Math.abs(diff) > 50) {
-      if (diff > 0) goNext();
-      else goPrev();
-    }
-    setTouchStartX(null);
-  };
-  const schoolName = event.school?.name ?? 'School';
-  const schoolLogo = event.school?.image ?? null;
-  const schoolLogoUrl = schoolLogo ? imageSrc(schoolLogo) : '';
   const description = event.description ?? '';
-  useEffect(() => setSchoolLogoError(false), [schoolLogo]);
 
   const { data: comments = [], isLoading: commentsLoading } = useQuery({
     queryKey: ['user', 'events', event.id, 'comments'],
@@ -532,180 +421,7 @@ function EventPostCard({
         minHeight: 420,
       }}
     >
-      {/* Header: school logo + name + subcategory — above the image */}
-      <div
-        className="d-flex align-items-center justify-content-between px-3 py-2"
-        style={{ borderBottom: '1px solid #efefef', flexShrink: 0, backgroundColor: '#fff' }}
-      >
-        <div className="d-flex align-items-center gap-2 min-w-0">
-          {schoolLogoUrl && !schoolLogoError ? (
-            <img
-              src={schoolLogoUrl}
-              alt=""
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: '50%',
-                objectFit: 'cover',
-                flexShrink: 0,
-              }}
-              onError={() => setSchoolLogoError(true)}
-            />
-          ) : (
-            <div
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: '50%',
-                background: 'linear-gradient(63deg, rgb(39 158 247 / 35%), rgb(87 177 245 / 36%))',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#1a1f2e',
-                fontWeight: 700,
-                fontSize: '0.9rem',
-                flexShrink: 0,
-              }}
-            >
-              {schoolName.charAt(0)?.toUpperCase() ?? '?'}
-            </div>
-          )}
-          <div className="min-w-0">
-            <div style={{ fontWeight: 600, color: '#1a1f2e', fontSize: '0.95rem' }}>{schoolName}</div>
-            <div style={{ fontSize: '0.75rem', color: '#8e8e8e' }}>{event.subCategory?.name ?? 'Post'}</div>
-          </div>
-        </div>
-        <button
-          type="button"
-          className="btn btn-link p-1 text-secondary"
-          aria-label="More options"
-        >
-          <i className="bi bi-three-dots" style={{ fontSize: '1.25rem' }} />
-        </button>
-      </div>
-
-      {/* Image — same strip as blog cards: 200px tall, full width, cover */}
-      <div
-        className="position-relative w-100 flex-shrink-0 overflow-hidden bg-light"
-        style={{ touchAction: 'pan-y' }}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
-        <span
-          className="position-absolute top-0 start-0 m-2 badge rounded-pill text-white z-2"
-          style={{ backgroundColor: '#1a1f2e', fontSize: '0.7rem', fontWeight: 600 }}
-        >
-          News
-        </span>
-        {images[0] ? (
-          <div className="w-100 overflow-hidden" style={{ height: 200 }}>
-            <div
-              className="d-flex h-100"
-              style={{
-                width: '100%',
-                transform: `translateX(-${slideIndex * 100}%)`,
-                transition: 'transform 0.3s ease-out',
-              }}
-            >
-              {images.map((url, i) => (
-                <div
-                  key={i}
-                  className="flex-shrink-0 h-100"
-                  style={{ minWidth: '100%', width: '100%' }}
-                >
-                  <img
-                    src={imageSrc(url)}
-                    alt=""
-                    style={{
-                      width: '100%',
-                      height: 200,
-                      objectFit: 'cover',
-                      objectPosition: 'top',
-                      display: 'block',
-                      pointerEvents: 'none',
-                      userSelect: 'none',
-                    }}
-                    draggable={false}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div
-            className="d-flex align-items-center justify-content-center text-muted w-100"
-            style={{ height: 160, backgroundColor: '#f8f9fa' }}
-          >
-            <i className="bi bi-image" style={{ fontSize: '2.5rem' }} />
-          </div>
-        )}
-        {images[0] && hasMultipleImages && (
-          <>
-            <button
-              type="button"
-              onClick={goPrev}
-              aria-label="Previous image"
-              className="position-absolute z-2 border-0 d-flex align-items-center justify-content-center p-0"
-              style={{
-                left: 8,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                width: 32,
-                height: 32,
-                borderRadius: '50%',
-                background: 'rgba(255,255,255,0.9)',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
-                cursor: 'pointer',
-              }}
-            >
-              <i className="bi bi-chevron-left" style={{ fontSize: '1.25rem', color: '#262626' }} />
-            </button>
-            <button
-              type="button"
-              onClick={goNext}
-              aria-label="Next image"
-              className="position-absolute z-2 border-0 d-flex align-items-center justify-content-center p-0"
-              style={{
-                right: 8,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                width: 32,
-                height: 32,
-                borderRadius: '50%',
-                background: 'rgba(255,255,255,0.9)',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
-                cursor: 'pointer',
-              }}
-            >
-              <i className="bi bi-chevron-right" style={{ fontSize: '1.25rem', color: '#262626' }} />
-            </button>
-            <div
-              className="position-absolute start-0 end-0 d-flex justify-content-center gap-1 z-2"
-              style={{ bottom: 8 }}
-            >
-              {images.map((_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setSlideIndex(i)}
-                  aria-label={`Go to image ${i + 1}`}
-                  className="border-0 p-0"
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
-                    cursor: 'pointer',
-                    background: slideIndex === i ? '#1a1f2e' : 'rgba(0,0,0,0.2)',
-                    boxShadow: '0 0 2px rgba(0,0,0,0.1)',
-                  }}
-                />
-              ))}
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Content — 70%: InShorts-style (source, title, description, likes, comments) */}
+      {/* Content — scrollable post body (reference event layout) */}
       <div
         style={{
           flex: 1,
@@ -722,27 +438,8 @@ function EventPostCard({
             WebkitOverflowScrolling: 'touch',
           }}
         >
-          {/* Title + description — InShorts-style typography */}
           <div className="px-3 py-2">
-            <h2
-              style={{
-                fontWeight: 700,
-                color: '#1a1f2e',
-                fontSize: '1.35rem',
-                lineHeight: 1.35,
-                marginBottom: '0.35rem',
-              }}
-            >
-              {event.title}
-            </h2>
-            <EventPostPublicMeta event={event} />
-            <EventPostPublicDescriptionRow
-              event={event}
-              description={description}
-              expanded={expandedDesc}
-              onExpand={() => setExpandedDesc(true)}
-            />
-            <EventPostPublicActionButtons event={event} />
+            <EventPostPublicContent event={event} description={description} showHero />
             <div className="small text-muted mt-2">{formatDate(event.updatedAt)}</div>
           </div>
 
@@ -1090,7 +787,6 @@ export const PublicEvents = () => {
 
   const [filterPopupOpen, setFilterPopupOpen] = useState(false);
   const [filterMode, setFilterMode] = useState<FilterMode>('none');
-  const [categoryLoginMessage, setCategoryLoginMessage] = useState(false);
   const [showSchoolLoadingPopup, setShowSchoolLoadingPopup] = useState(false);
   const [showNoNewsPopup, setShowNoNewsPopup] = useState(false);
   const [showRefreshHint, setShowRefreshHint] = useState(false);
@@ -1111,7 +807,6 @@ export const PublicEvents = () => {
   const [deleteAccountPassword, setDeleteAccountPassword] = useState('');
   const [deleteAccountStatus, setDeleteAccountStatus] = useState<'idle' | 'loading' | 'success' | 'failure'>('idle');
   const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
-  const [searchScreenQuery, setSearchScreenQuery] = useState('');
   const [selectedSearchEvent, setSelectedSearchEvent] = useState<ApprovedEventPublic | null>(null);
   const [searchScreenSchoolId, setSearchScreenSchoolId] = useState<string | null>(null);
   const [showSearchScreenNoNewsPopup, setShowSearchScreenNoNewsPopup] = useState(false);
@@ -1142,11 +837,12 @@ export const PublicEvents = () => {
   const [googleCalReturnError, setGoogleCalReturnError] = useState<string | null>(null);
   const [googleCalDropdownPosition, setGoogleCalDropdownPosition] = useState<{ top: number; left: number } | null>(null);
   const googleCalAnchorRef = useRef<HTMLButtonElement | null>(null);
-  const calendarDropdownRef = useRef<HTMLDivElement>(null);
   const [selectedSettingsEvent, setSelectedSettingsEvent] = useState<ApprovedEventPublic | null>(null);
   const [appsScreenKey, setAppsScreenKey] = useState(0);
   const [feedSort, setFeedSort] = useState<'latest' | 'popular'>('latest');
-  const [showAllSchoolsFeed, setShowAllSchoolsFeed] = useState(false);
+  const [homeFeedMode, setHomeFeedMode] = useState<HomeFeedMode>('mySchool');
+  const showAllSchoolsFeed = homeFeedMode === 'allSchools';
+  const showExternalHomeFeed = homeFeedMode === 'external';
   /** Logged-in home feed: filter by event date or posted date (YYYY-MM-DD). */
   const [loggedInFeedDateFilter, setLoggedInFeedDateFilter] = useState<string | null>(null);
   const [loggedInFeedPostTypeFilter, setLoggedInFeedPostTypeFilter] = useState<'event' | 'posted' | null>(
@@ -1157,12 +853,24 @@ export const PublicEvents = () => {
     if (user && showAllSchoolsFeed) setFilterDropdownOpen(false);
   }, [user, showAllSchoolsFeed]);
   const [contentExpandedCategoryId, setContentExpandedCategoryId] = useState<string | null>(null);
-  const contentCategoriesRef = useRef<HTMLDivElement | null>(null);
+  const [selectedExternalCategoryId, setSelectedExternalCategoryId] = useState<string | null>(null);
   const selectedSubCategoryIds = eventsFilter?.selectedSubCategoryIds ?? [];
   const queryClient = useQueryClient();
 
   /** School whose FILTERS feature + visibility govern the home feed filter UI. */
   const filterSettingsSchoolId = user?.schoolId ?? searchParams.get('schoolId');
+  const externalSchoolContextId = user?.schoolId ?? schoolId ?? null;
+  const { data: schoolExternalEnabled = false } = useQuery({
+    queryKey: ['public', 'school-external-enabled', externalSchoolContextId ?? ''],
+    queryFn: () => publicEventsService.getSchoolExternalEnabled(externalSchoolContextId!),
+    enabled: bottomNavActive === 'home' && !!externalSchoolContextId,
+  });
+
+  useEffect(() => {
+    if (!schoolExternalEnabled && homeFeedMode === 'external') {
+      setHomeFeedMode('mySchool');
+    }
+  }, [schoolExternalEnabled, homeFeedMode]);
   const { data: schoolFilterSettings } = useQuery({
     queryKey: ['public', 'school-filter-settings', filterSettingsSchoolId ?? 'guest'],
     queryFn: () =>
@@ -1228,18 +936,24 @@ export const PublicEvents = () => {
   const homeFeedSchoolId = isLoggedInHome && user ? user.schoolId : null;
 
   // When "All schools" is on, show all schools' news unless the user picks one school to filter.
+  const guestHome = !user && bottomNavActive === 'home';
   const effectiveSchoolId =
     isLoggedInHome && showAllSchoolsFeed
       ? allSchoolsFilterSchoolId
-      : isLoggedInHome && homeFeedSchoolId
-        ? homeFeedSchoolId
-        : schoolId;
+      : isLoggedInHome && showExternalHomeFeed
+        ? null
+        : isLoggedInHome && homeFeedSchoolId
+          ? homeFeedSchoolId
+          : guestHome && showExternalHomeFeed
+            ? null
+            : schoolId;
   /** Match mobile EventsScreen: subcategories only when logged-in + My school + user picked subs (not for guests / all-schools). */
   const effectiveSubCategoryIds =
     showSchoolFilterUi &&
     user &&
     isLoggedInHome &&
     !showAllSchoolsFeed &&
+    !showExternalHomeFeed &&
     selectedSubCategoryIds.length > 0
       ? selectedSubCategoryIds
       : undefined;
@@ -1301,6 +1015,23 @@ export const PublicEvents = () => {
     queryKey: ['public', 'events', 'approved', 'search', searchScreenSchoolId ?? 'all'],
     queryFn: () => publicEventsService.getApproved(searchScreenSchoolId ?? undefined, undefined),
     enabled: bottomNavActive === 'search',
+  });
+
+  const searchExternalSchoolId = searchScreenSchoolId ?? user?.schoolId ?? schoolId ?? null;
+  const { data: searchSchoolExternalEnabled = false } = useQuery({
+    queryKey: ['public', 'school-external-enabled', 'search', searchExternalSchoolId ?? ''],
+    queryFn: () => publicEventsService.getSchoolExternalEnabled(searchExternalSchoolId!),
+    enabled: bottomNavActive === 'search' && !!searchExternalSchoolId,
+  });
+  const { data: searchExternalCategories = [] } = useQuery({
+    queryKey: ['user', 'external-feed', 'categories', 'search'],
+    queryFn: () => userExternalFeedService.getCategories(),
+    enabled: bottomNavActive === 'search' && searchSchoolExternalEnabled && !!user,
+  });
+  const { data: searchExternalPosts = [], isLoading: searchExternalPostsLoading } = useQuery({
+    queryKey: ['user', 'external-feed', 'posts', 'search', 'all'],
+    queryFn: () => userExternalFeedService.getPosts(null),
+    enabled: bottomNavActive === 'search' && searchSchoolExternalEnabled && !!user,
   });
 
   // Recent news for settings screen
@@ -1382,6 +1113,12 @@ export const PublicEvents = () => {
     queryKey: ['public', 'events', 'categories', 'content', user?.schoolId ?? ''],
     queryFn: () => publicEventsService.getCategoriesBySchool(user!.schoolId),
     enabled: bottomNavActive === 'home' && !!user?.schoolId && showSchoolFilterUi,
+  });
+
+  const { data: externalCategories = [] } = useQuery({
+    queryKey: ['public', 'events', 'external-categories'],
+    queryFn: () => publicEventsService.getExternalCategories(),
+    enabled: bottomNavActive === 'home',
   });
   const userSavedSubIds = user?.id ? getUserSubCategoryIds(user.id) : [];
   const homeContentCategories =
@@ -1467,7 +1204,7 @@ export const PublicEvents = () => {
   const handleConfirmLogout = () => {
     setShowLogoutConfirmModal(false);
     logout();
-    navigate('/events');
+    navigate('/');
   };
 
   /** Settings header avatar — user profile only (same as mobile SettingsScreen). */
@@ -1531,7 +1268,14 @@ export const PublicEvents = () => {
       subtitle: string;
       icon: string;
       badge?: number;
-    }> => [
+    }> => {
+      const items: Array<{
+        key: 'categories' | 'messages' | 'liked' | 'notifications' | 'saved' | 'help';
+        title: string;
+        subtitle: string;
+        icon: string;
+        badge?: number;
+      }> = [
       {
         key: 'categories',
         title: 'Change categories',
@@ -1570,7 +1314,9 @@ export const PublicEvents = () => {
         subtitle: 'Send feedback or ask questions directly to your school admin.',
         icon: 'bi-question-circle',
       },
-    ],
+    ];
+      return items;
+    },
     [notifUnreadCount, messagesUnreadCount],
   );
 
@@ -1622,14 +1368,14 @@ export const PublicEvents = () => {
               onClick={() => {
                 setSelectedSettingsEvent(e);
                 setBottomNavActive('home');
-                navigate('/events', { replace: true });
+                navigate('/', { replace: true });
               }}
               onKeyDown={(ev) => {
                 if (ev.key === 'Enter' || ev.key === ' ') {
                   ev.preventDefault();
                   setSelectedSettingsEvent(e);
                   setBottomNavActive('home');
-                  navigate('/events', { replace: true });
+                  navigate('/', { replace: true });
                 }
               }}
             >
@@ -1730,7 +1476,7 @@ export const PublicEvents = () => {
         setShowDeleteAccountModal(false);
         setDeleteAccountPassword('');
         setDeleteAccountStatus('idle');
-        navigate('/events', { replace: true, state: { openAuth: 'login' } });
+        navigate('/', { replace: true, state: { openAuth: 'login' } });
       }, 800);
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'response' in err
@@ -1740,18 +1486,6 @@ export const PublicEvents = () => {
       setDeleteAccountStatus('failure');
     }
   };
-
-  const searchScreenFilteredEvents = useMemo(() => {
-    if (!searchScreenQuery.trim()) return allEventsForSearch;
-    const q = searchScreenQuery.trim().toLowerCase();
-    return allEventsForSearch.filter(
-      (e) =>
-        e.title.toLowerCase().includes(q) ||
-        (e.description?.toLowerCase().includes(q) ?? false) ||
-        (e.school?.name?.toLowerCase().includes(q) ?? false) ||
-        (e.subCategory?.name?.toLowerCase().includes(q) ?? false),
-    );
-  }, [allEventsForSearch, searchScreenQuery]);
 
   // When navigating with bottomNav in state or ?tab=, switch to that tab
   useEffect(() => {
@@ -2001,6 +1735,23 @@ export const PublicEvents = () => {
     );
   }, [events, eventsFilter?.searchQuery, bottomNavActive, effectiveFeedDateFilter, effectiveFeedDateMode]);
 
+  const popularSortCounts = useMemo(() => {
+    const likes = { ...(publicEngagementCounts?.likes ?? {}) };
+    const commentCounts = { ...(publicEngagementCounts?.commentCounts ?? {}) };
+    const savedCounts = { ...(publicEngagementCounts?.savedCounts ?? {}) };
+    if (engagement?.likes) {
+      for (const [id, n] of Object.entries(engagement.likes)) {
+        likes[id] = n;
+      }
+    }
+    if (engagement?.commentCounts) {
+      for (const [id, n] of Object.entries(engagement.commentCounts)) {
+        commentCounts[id] = n;
+      }
+    }
+    return { likes, commentCounts, savedCounts };
+  }, [publicEngagementCounts, engagement]);
+
   const sortedEvents = useMemo(() => {
     const list = [...filteredEvents];
     if (feedSort === 'latest') {
@@ -2008,11 +1759,9 @@ export const PublicEvents = () => {
     } else {
       /** Match mobile EventsScreen popular: likes + comments + saves */
       const score = (id: string) =>
-        publicEngagementCounts
-          ? (publicEngagementCounts.likes[id] ?? 0) +
-            (publicEngagementCounts.commentCounts[id] ?? 0) +
-            (publicEngagementCounts.savedCounts[id] ?? 0)
-          : 0;
+        (popularSortCounts.likes[id] ?? 0) +
+        (popularSortCounts.commentCounts[id] ?? 0) +
+        (popularSortCounts.savedCounts[id] ?? 0);
       list.sort((a, b) => {
         const diff = score(b.id) - score(a.id);
         if (diff !== 0) return diff;
@@ -2020,7 +1769,7 @@ export const PublicEvents = () => {
       });
     }
     return list;
-  }, [filteredEvents, feedSort, publicEngagementCounts]);
+  }, [filteredEvents, feedSort, popularSortCounts]);
 
   const feedItems = useMemo(
     () => buildPublicFeedItems(sortedEvents, activeSponsoredAds, activeBannerAds, feedSort),
@@ -2032,10 +1781,11 @@ export const PublicEvents = () => {
     queryFn: () => userAuthService.getSchools(),
     enabled:
       filterMode === 'school'
+      || bottomNavActive === 'search'
       || guestSchoolPickerOpen
       || calendarFilterOpen
       || (!!user && showAllSchoolsFeed && bottomNavActive === 'home')
-      || (!user && bottomNavActive === 'home'),
+      || (!user && bottomNavActive === 'home' && (showExternalHomeFeed || !schoolExternalEnabled)),
   });
 
   const selectedGuestSchoolName = useMemo(() => {
@@ -2058,7 +1808,7 @@ export const PublicEvents = () => {
   }, [allSchoolsFilterSchoolId, allSchools, events]);
 
   const schoolsForFilter = useMemo(() => {
-    if (filterMode === 'school' && allSchools.length > 0) {
+    if ((filterMode === 'school' || bottomNavActive === 'search') && allSchools.length > 0) {
       return allSchools.map((s) => ({ id: s.id, name: s.name, image: s.image ?? null }));
     }
     const seen = new Set<string>();
@@ -2074,12 +1824,46 @@ export const PublicEvents = () => {
       image: e.school?.image ?? null,
     }));
     return fromEvents;
-  }, [filterMode, allSchools, events]);
+  }, [filterMode, allSchools, events, bottomNavActive]);
+
+  const searchScreenSchoolName = useMemo(() => {
+    if (!searchScreenSchoolId) return null;
+    const fromList = schoolsForFilter.find((s) => s.id === searchScreenSchoolId)?.name;
+    if (fromList) return fromList;
+    return allEventsForSearch.find((e) => e.schoolId === searchScreenSchoolId)?.school?.name ?? null;
+  }, [searchScreenSchoolId, schoolsForFilter, allEventsForSearch]);
+
+  const renderSearchEventCard = useCallback(
+    (event: ApprovedEventPublic) => (
+      <EventPostCard
+        event={event}
+        likeCount={engagement?.likes?.[event.id] ?? 0}
+        commentCount={engagement?.commentCounts?.[event.id] ?? 0}
+        isLiked={engagement?.likedByMe?.includes(event.id) ?? false}
+        isSaved={engagement?.savedByMe?.includes(event.id) ?? false}
+        currentUserId={user?.id}
+        onLike={() => likeMutation.mutate(event.id)}
+        onSave={() => saveMutation.mutate(event.id)}
+        onCommentAdded={() => queryClient.invalidateQueries({ queryKey: ['public', 'events', 'engagement'] })}
+      />
+    ),
+    [engagement, user?.id, likeMutation, saveMutation, queryClient],
+  );
 
   const openGuestLogin = useCallback(() => {
     setSettingsLoginView('login');
     setShowSettingsLoginPopup(true);
   }, []);
+
+  const handleFeedSortChange = useCallback(
+    (sort: 'latest' | 'popular') => {
+      setFeedSort(sort);
+      if (sort === 'popular') {
+        void queryClient.invalidateQueries({ queryKey: ['public', 'events', 'engagement-counts'] });
+      }
+    },
+    [queryClient],
+  );
 
   const isLoading = eventsLoading;
 
@@ -2179,7 +1963,7 @@ export const PublicEvents = () => {
       setSettingsLoginEmail('');
       setSettingsLoginPassword('');
       setBottomNavActive('home');
-      navigate('/events', { replace: true });
+      navigate('/', { replace: true });
     } catch (err: unknown) {
       const ax = err as { response?: { status?: number; data?: { message?: string | string[] } } };
       const msg = ax.response?.data?.message;
@@ -2211,8 +1995,106 @@ export const PublicEvents = () => {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fafafa' }}>
-      {user ? <SchoolNavbar chatUnreadCount={messagesUnreadCount} /> : <Navbar />}
+    <div className="min-h-screen events-app-page events-app-page--modern">
+      <Navbar />
+      <div
+        className="events-app-shell events-app-shell--with-sidebar events-app-shell--with-tools"
+      >
+      <EventsBottomNav
+        activeTab={eventsBottomNavActiveTab}
+        onSelectTab={handleEventsBottomNavSelect}
+        notifUnreadCount={notifUnreadCount}
+        chatUnreadCount={messagesUnreadCount}
+        visible={bottomNavVisible}
+        responsiveLayout
+        zIndex={
+          showSettingsLoginPopup ||
+          showSignupPopup ||
+          showFirstLoginCategories ||
+          showChangeCategoryModal ||
+          showHelpModal ||
+          showDeleteAccountModal ||
+          showLogoutConfirmModal
+            ? 1070
+            : 1030
+        }
+      />
+      {bottomNavActive === 'home' ? (
+        <EventsFeedSecondarySidebar
+          user={user}
+          showSchoolFilterUi={showSchoolFilterUi}
+          showAllSchoolsFeed={showAllSchoolsFeed}
+          schoolId={schoolId}
+          selectedGuestSchoolName={selectedGuestSchoolName}
+          allSchoolsFilterSchoolId={allSchoolsFilterSchoolId}
+          selectedAllSchoolsFilterName={selectedAllSchoolsFilterName}
+          feedSort={feedSort}
+          onFeedSortChange={handleFeedSortChange}
+          onSignIn={openGuestLogin}
+          onOpenGuestSchoolPicker={() => openSchoolPicker('guest')}
+          onClearGuestSchool={() => applyGuestSchoolFilter(null)}
+          onOpenAllSchoolsPicker={() => openSchoolPicker('allSchools')}
+          onClearAllSchoolsFilter={() => setAllSchoolsFilterSchoolId(null)}
+          filterPanelOpen={filterDropdownOpen}
+          onToggleFilterPanel={() => setFilterDropdownOpen((o) => !o)}
+          filterPanelActive={
+            filterDropdownOpen ||
+            feedSort !== 'latest' ||
+            (!user && !!schoolId) ||
+            !!loggedInFeedDateFilter ||
+            !!loggedInFeedPostTypeFilter ||
+            !!(user && showAllSchoolsFeed && allSchoolsFilterSchoolId)
+          }
+          loggedInFeedPostTypeFilter={loggedInFeedPostTypeFilter}
+          loggedInFeedDateFilter={loggedInFeedDateFilter}
+          onLoggedInFeedPostTypeFilter={setLoggedInFeedPostTypeFilter}
+          onLoggedInFeedDateFilter={setLoggedInFeedDateFilter}
+          onClearLoggedInFeedFilters={() => {
+            setLoggedInFeedDateFilter(null);
+            setLoggedInFeedPostTypeFilter(null);
+          }}
+          toYmd={toYmd}
+          calendarActive={calendarFilterOpen || !!upcomingDateFilter}
+          onOpenCalendarFilter={openCalendarFilter}
+          homeContentCategories={homeContentCategories}
+          selectedSubCategoryIds={selectedSubCategoryIds}
+          contentExpandedCategoryId={contentExpandedCategoryId}
+          onClearContentCategoryFilter={clearContentCategoryFilter}
+          onCategoryClick={(categoryId, categoryName, isOpen) => {
+            const next = isOpen ? null : categoryId;
+            setContentExpandedCategoryId(next);
+            if (next) eventsFilter?.setSelectedCategory(categoryId, categoryName);
+          }}
+          externalCategories={schoolExternalEnabled ? [] : externalCategories}
+          selectedExternalCategoryId={selectedExternalCategoryId}
+          onExternalCategoryClick={(id) =>
+            setSelectedExternalCategoryId((current) => (current === id ? null : id))
+          }
+          onClearExternalCategory={() => setSelectedExternalCategoryId(null)}
+          schoolExternalEnabled={schoolExternalEnabled}
+          allSchoolsFeedActive={showAllSchoolsFeed}
+          onOpenBookmarks={() => navigate('/saved')}
+          onActivateAllSchoolsFeed={() => {
+            setHomeFeedMode('allSchools');
+            setAllSchoolsFilterSchoolId(null);
+            setUpcomingDateFilter(null);
+            setSelectedUpcomingPost(null);
+            setBottomNavActive('home');
+          }}
+        />
+      ) : (
+        <EventsGlobalSecondarySidebar
+          schoolExternalEnabled={schoolExternalEnabled}
+          onActivateAllSchoolsFeed={() => {
+            setHomeFeedMode('allSchools');
+            setAllSchoolsFilterSchoolId(null);
+            setUpcomingDateFilter(null);
+            setSelectedUpcomingPost(null);
+            setBottomNavActive('home');
+          }}
+        />
+      )}
+      <main className="events-app-main">
       {/* Refresh hint: only when user selected a school with no news; below nav, 3s auto-close, X to close — matches screenshot */}
       {showRefreshHint && (
         <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
@@ -2252,10 +2134,8 @@ export const PublicEvents = () => {
         </div>
       )}
       <div
-        className="container py-4"
+        className={`container py-4 events-feed-container${bottomNavActive === 'home' ? ' events-feed-container--home' : ''}`}
         style={{
-          /* Home uses Inshorts snap feed inside the viewport — avoid extra gap above fixed bottom nav */
-          paddingBottom: bottomNavActive === 'home' ? 'env(safe-area-inset-bottom, 0px)' : '5rem',
           backgroundColor:
             bottomNavActive === 'search' ||
             bottomNavActive === 'settings' ||
@@ -2570,7 +2450,7 @@ export const PublicEvents = () => {
               justifyContent: 'center',
               backgroundColor: 'rgba(0,0,0,0.4)',
             }}
-            onClick={() => { setFilterPopupOpen(false); setCategoryLoginMessage(false); }}
+            onClick={() => setFilterPopupOpen(false)}
           >
             <div
               style={{
@@ -2584,679 +2464,86 @@ export const PublicEvents = () => {
               onClick={(e) => e.stopPropagation()}
             >
               <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: '#1a1f2e', marginBottom: '1rem' }}>
-                Filter events
+                Filter by school
               </h3>
+              <p className="small text-muted mb-3">Choose a school to narrow school news in the sections below.</p>
               <div className="d-flex flex-column gap-2">
                 <button
                   type="button"
-                  className="btn text-start btn btn-dark rounded-pill  d-flex align-items-center gap-3 py-1 px-3"
-                  style={{ borderRadius: '10px',  }}
-                  onClick={() => {
-                    setFilterPopupOpen(false);
-                    setFilterMode('search');
-                    eventsFilter?.setSearchQuery('');
-                  }}
-                >
-                  <i className="bi bi-search" style={{ fontSize: '1.25rem' }} />
-                  <span>Search news</span>
-                </button>
-                <button
-                  type="button"
                   className="btn btn-dark text-start border-0 d-flex align-items-center gap-3 py-1 rounded-pill px-3"
-                  style={{ borderRadius: '10px',  }}
+                  style={{ borderRadius: '10px' }}
                   onClick={() => {
                     setFilterPopupOpen(false);
                     setFilterMode('school');
                   }}
                 >
                   <i className="bi bi-building" style={{ fontSize: '1.25rem' }} />
-                  <span>Filter by school</span>
+                  <span>Pick a school</span>
                 </button>
-                <button
-                  type="button"
-                  className="btn btn-dark rounded-pill text-start  d-flex align-items-center gap-3 py-1 px-3"
-                  style={{ borderRadius: '10px',  }}
-                  onClick={() => setCategoryLoginMessage(true)}
-                >
-                  <i className="bi bi-tags" style={{ fontSize: '1.25rem' }} />
-                  <span>Filter via categories</span>
-                </button>
-                {categoryLoginMessage && (
-                  <p className="small text-muted mb-0 mt-1 px-2 py-2 rounded" style={{ backgroundColor: '#f8f9fa', fontSize: '0.875rem' }}>
-                    This feature requires login. Sign in to filter by categories and subcategories.
-                  </p>
-                )}
               </div>
             </div>
           </div>
         )}
 
         {bottomNavActive === 'search' ? (
-          /* Search screen: white bg, within news/navbar width (600px) */
-          <div style={{ maxWidth: '600px', margin: '0 auto', backgroundColor: '#fff', minHeight: '60vh' }}>
-            <div className="d-flex align-items-center gap-2 mb-3">
-              <input
-                type="search"
-                className="form-control form-control-md rounded-pill"
-                placeholder="Search news…"
-                value={searchScreenQuery}
-                onChange={(e) => setSearchScreenQuery(e.target.value)}
-                style={{ borderRadius: '12px', border: '1px solid #dee2e6', flex: 1 }}
-                aria-label="Search news"
-              />
-              <button
-                type="button"
-                className="btn border-0 bg-transparent p-2 d-flex align-items-center justify-content-center"
-                style={{ flexShrink: 0, minWidth: 44, minHeight: 44 }}
-                onClick={() => { setFilterPopupOpen(true); setCategoryLoginMessage(false); }}
-                aria-label="Filter options"
-              >
-                <i className="bi bi-funnel" style={{ fontSize: '1.1rem', color: '#1a1f2e' }} />
-              </button>
-            </div>
-
-            {filterMode === 'school' ? (
-              /* School filter UI inside search screen — uses searchScreenSchoolId only (not URL) */
-              <div className="mb-4">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <span style={{ fontWeight: 600, color: '#1a1f2e' }}>Select a school</span>
-                  <div className="d-flex gap-2">
-                    {searchScreenSchoolId && (
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-link text-decoration-none"
-                        onClick={() => { clearSearchScreenSchoolFilter(); }}
-                      >
-                        Show all
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-link text-decoration-none"
-                      onClick={() => { setFilterMode('none'); clearSearchScreenSchoolFilter(); setSelectedSearchEvent(null); }}
-                    >
-                      Close
-                    </button>
-                  </div>
-                </div>
-                <div className="row justify-content-center g-3">
-                  {schoolsLoading ? (
-                    <div className="col-12 text-center py-4">
-                      <div className="spinner-border text-secondary" role="status" />
-                      <p className="mt-2 mb-0 small text-muted">Loading schools…</p>
-                    </div>
-                  ) : schoolsForFilter.length === 0 ? (
-                    <div className="col-12 text-center py-4 text-muted small">No schools found.</div>
-                  ) : (
-                    schoolsForFilter.map((s) => {
-                      const logoUrl = s.image ? imageSrc(s.image) : '';
-                      const isSelected = searchScreenSchoolId === s.id;
-                      return (
-                        <div key={s.id} className="col-md-3 col-sm-6">
-                          <div
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => selectSchoolForSearch(s.id)}
-                            onKeyDown={(e) => e.key === 'Enter' && selectSchoolForSearch(s.id)}
-                            style={{
-                              border: isSelected ? '1px solid #dee2e6' : 'none',
-                              borderRadius: '12px',
-                              padding: '1rem',
-                              textAlign: 'center',
-                              cursor: 'pointer',
-                              backgroundColor: isSelected ? '#fff' : 'transparent',
-                              boxShadow: isSelected ? '0 1px 8px rgba(0,0,0,0.08)' : 'none',
-                            }}
-                          >
-                            {logoUrl ? (
-                              <img
-                                src={logoUrl}
-                                alt=""
-                                style={{ width: 56, height: 56, objectFit: 'contain', marginBottom: '0.5rem', borderRadius: '8px' }}
-                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                              />
-                            ) : (
-                              <div
-                                style={{
-                                  width: 56,
-                                  height: 56,
-                                  margin: '0 auto',
-                                  borderRadius: '8px',
-                                  background: 'rgb(26 31 46 / 6%)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  marginBottom: '0.5rem',
-                                }}
-                              >
-                                <i className="bi bi-building" style={{ fontSize: '1.5rem', color: '#1a1f2e' }} />
-                              </div>
-                            )}
-                            <div style={{ fontWeight: '500', fontSize: '0.95rem', color: '#1a1f2e' }}>{s.name}</div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-                {searchEventsLoading || searchEventsFetching ? (
-                  <div className="text-center py-3">
-                    <div className="spinner-border spinner-border-sm text-secondary" role="status" />
-                    <p className="mt-2 mb-0 small text-muted">Loading news…</p>
-                  </div>
-                ) : showSearchScreenNoNewsPopup && searchScreenSchoolId && allEventsForSearch.length === 0 ? (
-                  <div
-                    className="mt-3 p-3 rounded shadow-sm"
-                    style={{ backgroundColor: '#fff', border: '1px solid #dee2e6' }}
-                  >
-                    <p className="mb-2 fw-medium" style={{ color: '#1a1f2e' }}>News of this school will be coming soon.</p>
-                    <p className="small text-muted mb-2">Approved news from this school will appear here once category admins approve posts.</p>
-                    <p className="small text-muted mb-3">Sign in or register with your school to like, comment, and save.</p>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-primary"
-                      onClick={() => setShowSearchScreenNoNewsPopup(false)}
-                    >
-                      OK
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <>
-                {searchScreenSchoolId && (
-                  <div className="mb-2 d-flex align-items-center gap-2">
-                    <button
-                      type="button"
-                      className="btn btn-link btn-sm text-decoration-none p-0 text-primary"
-                      onClick={() => setFilterMode('school')}
-                    >
-                      ← Change school
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-link btn-sm text-decoration-none p-0 text-secondary"
-                      onClick={() => clearSearchScreenSchoolFilter()}
-                    >
-                      Show all
-                    </button>
-                  </div>
-                )}
-                <div className="mb-2 mt-3">
-                  <span className="badge bg-dark bg-opacity-100 text-white rounded-pill" style={{ fontSize: '0.8rem' }}>
-                    Results
-                  </span>
-                </div>
-                {selectedSearchEvent ? (
-                  <div>
-                    <button
-                      type="button"
-                      className="btn btn-link btn-sm text-decoration-none mb-2 p-0"
-                      onClick={() => setSelectedSearchEvent(null)}
-                    >
-                      ← Back to results
-                    </button>
-                    <EventPostCard
-                      event={selectedSearchEvent}
-                      likeCount={engagement?.likes?.[selectedSearchEvent.id] ?? 0}
-                      commentCount={engagement?.commentCounts?.[selectedSearchEvent.id] ?? 0}
-                      isLiked={engagement?.likedByMe?.includes(selectedSearchEvent.id) ?? false}
-                      isSaved={engagement?.savedByMe?.includes(selectedSearchEvent.id) ?? false}
-                      currentUserId={user?.id}
-                      onLike={() => likeMutation.mutate(selectedSearchEvent.id)}
-                      onSave={() => saveMutation.mutate(selectedSearchEvent.id)}
-                      onCommentAdded={() => queryClient.invalidateQueries({ queryKey: ['public', 'events', 'engagement'] })}
-                    />
-                  </div>
-                ) : searchEventsLoading || searchEventsFetching ? (
-                  <div className="text-center py-4">
-                    <div className="spinner-border text-secondary" role="status" />
-                    <p className="mt-2 mb-0 small text-muted">Loading…</p>
-                  </div>
-                ) : searchScreenFilteredEvents.length === 0 ? (
-                  <p className="text-muted small mb-0">
-                    {searchScreenQuery.trim()
-                      ? 'No news match your search.'
-                      : searchScreenSchoolId
-                        ? 'No approved news for this school yet.'
-                        : 'No approved news yet.'}
-                  </p>
-                ) : searchScreenSchoolId ? (
-                  /* School selected: show full news cards for that school */
-                  <div className="d-flex flex-column gap-3">
-                    {searchScreenFilteredEvents.map((event: ApprovedEventPublic) => (
-                      <EventPostCard
-                        key={event.id}
-                        event={event}
-                        likeCount={engagement?.likes?.[event.id] ?? 0}
-                        commentCount={engagement?.commentCounts?.[event.id] ?? 0}
-                        isLiked={engagement?.likedByMe?.includes(event.id) ?? false}
-                        isSaved={engagement?.savedByMe?.includes(event.id) ?? false}
-                        currentUserId={user?.id}
-                        onLike={() => likeMutation.mutate(event.id)}
-                        onSave={() => saveMutation.mutate(event.id)}
-                        onCommentAdded={() => queryClient.invalidateQueries({ queryKey: ['public', 'events', 'engagement'] })}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  /* Default: compact list (logo, title, school name); click title to open full article */
-                  <ul className="list-unstyled mb-0">
-                    {searchScreenFilteredEvents.map((event: ApprovedEventPublic) => {
-                      const schoolLogo = event.school?.image ?? null;
-                      const schoolLogoUrl = schoolLogo ? imageSrc(schoolLogo) : '';
-                      return (
-                        <li key={event.id} className="py-3 border-bottom d-flex align-items-center gap-3" style={{ borderColor: '#eee' }}>
-                          <div
-                            style={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: '8px',
-                              backgroundColor: 'rgb(26 31 46 / 8%)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              flexShrink: 0,
-                              overflow: 'hidden',
-                            }}
-                          >
-                            {schoolLogoUrl ? (
-                              <img
-                                src={schoolLogoUrl}
-                                alt=""
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display = 'none';
-                                  (e.target as HTMLImageElement).nextElementSibling?.classList.remove('d-none');
-                                }}
-                              />
-                            ) : null}
-                            <i className={`bi bi-building ${schoolLogoUrl ? 'd-none' : ''}`} style={{ fontSize: '1.1rem', color: '#1a1f2e' }} />
-                          </div>
-                          <div className="flex-grow-1 min-width-0">
-                            <button
-                              type="button"
-                              className="btn btn-link p-0 text-start text-decoration-none w-100 text-dark fw-medium"
-                              style={{ fontSize: '0.95rem', lineHeight: 1.3 }}
-                              onClick={() => setSelectedSearchEvent(event)}
-                            >
-                              {event.title}
-                            </button>
-                            <span className="text-muted small d-block mt-1">{event.school?.name ?? 'School'}</span>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </>
-            )}
-          </div>
+          <EventsSearchScreen
+            events={allEventsForSearch}
+            eventsLoading={searchEventsLoading || searchEventsFetching}
+            onOpenFilterMenu={() => setFilterPopupOpen(true)}
+            schoolPickerOpen={filterMode === 'school'}
+            onOpenSchoolPicker={() => setFilterMode('school')}
+            onCloseSchoolPicker={() => setFilterMode('none')}
+            onClearSchool={clearSearchScreenSchoolFilter}
+            searchScreenSchoolId={searchScreenSchoolId}
+            selectedSchoolName={searchScreenSchoolName}
+            schools={schoolsForFilter}
+            schoolsLoading={schoolsLoading}
+            onSelectSchool={selectSchoolForSearch}
+            showNoNewsNotice={showSearchScreenNoNewsPopup}
+            onDismissNoNewsNotice={() => setShowSearchScreenNoNewsPopup(false)}
+            selectedEvent={selectedSearchEvent}
+            onSelectEvent={setSelectedSearchEvent}
+            renderEventCard={renderSearchEventCard}
+            showExternalSection={searchSchoolExternalEnabled && !!searchExternalSchoolId}
+            externalSignedIn={!!user}
+            onExternalSignIn={openGuestLogin}
+            externalPosts={searchExternalPosts}
+            externalCategories={searchExternalCategories}
+            externalLoading={searchExternalPostsLoading}
+          />
         ) : bottomNavActive === 'settings' ? (
-          /* Settings screen — width matches news/navbar */
-          <div style={{ maxWidth: '600px', margin: '0 auto', backgroundColor: '#fff', minHeight: '60vh', paddingBottom: '1rem' }}>
-            {!user ? (
-              /* Guest: animation icon, login prompt, Login + Sign up buttons, recently added, footer links */
-              <>
-                <div className="d-flex align-items-start gap-3 mb-4">
-                  <div
-                    style={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: '50%',
-                      backgroundColor: 'rgb(26 31 46 / 8%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <i className="bi bi-person" style={{ fontSize: '1.75rem', color: '#1a1f2e' }} />
-                  </div>
-                  <p className="small text-muted mb-0 pt-1">
-                    To get filterised categories and subcategories news, like comment and saved options needs login.
-                  </p>
-                </div>
-                <div className="d-flex flex-wrap gap-2 mb-4">
-                  <button
-                    type="button"
-                    className="btn btn-dark rounded-pill px-3"
-                    
-                    onClick={() => {
-                      setSettingsLoginView('login');
-                      setShowSettingsLoginPopup(true);
-                    }}
-                  >
-                    Login
-                  </button>
-                  <button
-                    type="button"
-                    className="btn rounded-pill btn-outline-dark px-3 d-inline-flex align-items-center gap-2"
-                    
-                    onClick={() => setShowSignupPopup(true)}
-                  >
-                    <i className="bi bi-person-plus" />
-                    Sign up
-                  </button>
-                </div>
-                <hr className="my-4" />
-                <h6 className="fw-semibold mb-3" style={{ color: '#1a1f2e' }}>Recently added schools / news</h6>
-                {settingsRecentSorted.length === 0 ? (
-                  <p className="small text-muted">No news yet.</p>
-                ) : (
-                  <ul className="list-unstyled mb-0">
-                    {settingsRecentSorted.map((e: ApprovedEventPublic) => {
-                      const schoolLogo = e.school?.image ?? null;
-                      const schoolLogoUrl = schoolLogo ? imageSrc(schoolLogo) : '';
-                      return (
-                        <li
-                          key={e.id}
-                          role="button"
-                          tabIndex={0}
-                          className="py-2 border-bottom d-flex align-items-center gap-3"
-                          style={{ borderColor: '#eee', cursor: 'pointer' }}
-                          onClick={() => {
-                            setBottomNavActive('home');
-                            if (e.schoolId) {
-                              setSearchParams((prev) => {
-                                const next = new URLSearchParams(prev);
-                                next.set('schoolId', e.schoolId);
-                                return next;
-                              });
-                            }
-                            setSelectedSettingsEvent(e);
-                            navigate('/events', { replace: true });
-                          }}
-                          onKeyDown={(ev) => {
-                            if (ev.key === 'Enter' || ev.key === ' ') {
-                              ev.preventDefault();
-                              setBottomNavActive('home');
-                              if (e.schoolId) {
-                                setSearchParams((prev) => {
-                                  const next = new URLSearchParams(prev);
-                                  next.set('schoolId', e.schoolId);
-                                  return next;
-                                });
-                              }
-                              setSelectedSettingsEvent(e);
-                              navigate('/events', { replace: true });
-                            }
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: '8px',
-                              backgroundColor: 'rgb(26 31 46 / 8%)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              flexShrink: 0,
-                              overflow: 'hidden',
-                            }}
-                          >
-                            {schoolLogoUrl ? (
-                              <img src={schoolLogoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            ) : (
-                              <i className="bi bi-building" style={{ fontSize: '1rem', color: '#1a1f2e' }} />
-                            )}
-                          </div>
-                          <div className="min-width-0 flex-grow-1">
-                            <span className="fw-medium d-block text-truncate" style={{ fontSize: '0.95rem', color: '#1a1f2e' }}>{e.title}</span>
-                            <span className="text-muted small">{e.school?.name ?? 'School'}</span>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-                <hr className="my-4" />
-                <div className="d-flex flex-wrap gap-3 small">
-                  <a
-                    href="https://sembuzz.com/#privacy"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-secondary"
-                    style={{ textDecoration: 'underline' }}
-                  >
-                    Privacy policy
-                  </a>
-                  <a
-                    href="https://sembuzz.com/#terms-of-service"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-secondary"
-                    style={{ textDecoration: 'underline' }}
-                  >
-                    Terms and conditions
-                  </a>
-                </div>
-              </>
-            ) : (
-              /* Logged in — matches mobile SettingsScreen: profile row, action list cards, collapsible recent news */
-              <>
-                <div className="d-flex align-items-center mb-4" style={{ gap: '1rem' }}>
-                  <div className="position-relative flex-shrink-0" style={{ width: 64, height: 64 }}>
-                    <button
-                      type="button"
-                      className="border-0 bg-transparent p-0 position-relative"
-                      style={{ width: 64, height: 64, cursor: 'pointer' }}
-                      onClick={() => navigate('/profile')}
-                      aria-label="Open profile screen"
-                    >
-                      <div
-                        className="d-flex align-items-center justify-content-center"
-                        style={{
-                          width: 64,
-                          height: 64,
-                          borderRadius: '50%',
-                          border: '3px solid #0b4a99',
-                          backgroundColor: '#fff',
-                          boxSizing: 'border-box',
-                        }}
-                        aria-hidden
-                      >
-                        <div
-                          className="d-flex align-items-center justify-content-center overflow-hidden"
-                          style={{
-                            width: 52,
-                            height: 52,
-                            borderRadius: '50%',
-                            backgroundColor: '#e9ecef',
-                          }}
-                        >
-                          {settingsProfilePicUrl && !settingsAvatarFailed ? (
-                            <img
-                              key={settingsProfilePicUrl}
-                              src={settingsProfilePicUrl}
-                              alt=""
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                              onError={() => setSettingsAvatarFailed(true)}
-                            />
-                          ) : (
-                            <span style={{ fontSize: '1.35rem', fontWeight: 700, color: '#6c757d' }}>
-                              {(user.name?.trim()?.charAt(0) || '?').toUpperCase()}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <span
-                        className="position-absolute rounded-circle border border-2 border-white"
-                        style={{
-                          width: 14,
-                          height: 14,
-                          backgroundColor: '#22c55e',
-                          right: 1,
-                          bottom: 1,
-                        }}
-                        title="Online"
-                        aria-hidden
-                      />
-                    </button>
-                  </div>
-                  <div className="min-width-0 flex-grow-1">
-                    <div className="d-flex align-items-center justify-content-between gap-2">
-                      <div className="fw-bold text-truncate" style={{ fontSize: '1.125rem', color: '#1a1f2e' }}>
-                        {user.name ?? 'User'}
-                      </div>
-                      <button
-                        type="button"
-                        className="btn btn-link p-1 border-0"
-                        style={{ lineHeight: 1 }}
-                        onClick={() => setShowLogoutConfirmModal(true)}
-                        aria-label="Log out"
-                      >
-                        <i className="bi bi-box-arrow-right" style={{ fontSize: '1.35rem', color: '#1a1f2e' }} />
-                      </button>
-                    </div>
-                    <div className="small text-muted text-truncate mt-1">{user.email}</div>
-                  </div>
-                </div>
-
-                <div
-                  className="mb-2"
-                  style={{
-                    borderRadius: 14,
-                    border: '1px solid #e4e7ee',
-                    backgroundColor: '#fff',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {settingsActions.map((item, index) => (
-                    <button
-                      key={item.key}
-                      type="button"
-                      className="w-100 border-0 d-flex align-items-center justify-content-between text-start"
-                      style={{
-                        padding: '12px',
-                        backgroundColor: '#fff',
-                        borderBottom: index < settingsActions.length - 1 ? '1px solid #f0f2f6' : undefined,
-                        cursor: 'pointer',
-                      }}
-                      onClick={() => handleSettingsActionPress(item.key)}
-                    >
-                      <div className="d-flex align-items-center flex-grow-1 min-width-0 me-2">
-                        <div
-                          className="position-relative d-flex align-items-center justify-content-center flex-shrink-0"
-                          style={{
-                            width: 34,
-                            height: 34,
-                            borderRadius: 999,
-                            backgroundColor: '#eef1f6',
-                            marginRight: 10,
-                          }}
-                        >
-                          <i className={`bi ${item.icon}`} style={{ fontSize: '1.1rem', color: '#1a1f2e' }} />
-                          {item.badge != null && (item.badge ?? 0) > 0 ? (
-                            <span
-                              className="position-absolute rounded-pill text-white d-flex align-items-center justify-content-center"
-                              style={{
-                                top: -4,
-                                right: -4,
-                                minWidth: 17,
-                                height: 17,
-                                fontSize: 9,
-                                fontWeight: 700,
-                                backgroundColor: '#111315',
-                                border: '1.5px solid #fff',
-                                padding: '0 3px',
-                              }}
-                            >
-                              {(item.badge ?? 0) > 99 ? '99+' : item.badge}
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="min-width-0">
-                          <div style={{ fontSize: 15, fontWeight: 600, color: '#1a1f2e' }}>{item.title}</div>
-                          <div style={{ fontSize: 12, color: '#6c757d', marginTop: 2, lineHeight: 1.35 }}>{item.subtitle}</div>
-                        </div>
-                      </div>
-                      <i className="bi bi-chevron-right" style={{ fontSize: '1.1rem', color: '#8e8e8e', flexShrink: 0 }} />
-                    </button>
-                  ))}
-                </div>
-
-                <hr className="my-4" />
-
-                <div
-                  className="mb-2"
-                  style={{
-                    borderRadius: 14,
-                    border: '1px solid #e4e7ee',
-                    backgroundColor: '#fff',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="w-100 border-0 d-flex align-items-center justify-content-between text-start"
-                    style={{ padding: '12px', backgroundColor: '#fff', cursor: 'pointer' }}
-                    onClick={() => setShowSettingsRecentNewsList((v) => !v)}
-                  >
-                    <div className="d-flex align-items-center flex-grow-1 min-width-0 me-2">
-                      <div
-                        className="d-flex align-items-center justify-content-center flex-shrink-0"
-                        style={{
-                          width: 34,
-                          height: 34,
-                          borderRadius: 999,
-                          backgroundColor: '#eef1f6',
-                          marginRight: 10,
-                        }}
-                      >
-                        <i className="bi bi-newspaper" style={{ fontSize: '1.1rem', color: '#1a1f2e' }} />
-                      </div>
-                      <div className="min-width-0">
-                        <div style={{ fontSize: 15, fontWeight: 600, color: '#1a1f2e' }}>Recently added schools / news</div>
-                        <div style={{ fontSize: 12, color: '#6c757d', marginTop: 2 }}>Tap to view latest posted news</div>
-                      </div>
-                    </div>
-                    <i
-                      className={`bi ${showSettingsRecentNewsList ? 'bi-chevron-up' : 'bi-chevron-right'}`}
-                      style={{ fontSize: '1.1rem', color: '#8e8e8e', flexShrink: 0 }}
-                    />
-                  </button>
-                </div>
-
-                {showSettingsRecentNewsList ? (
-                  <div className="mt-2">{renderSettingsRecentNewsList()}</div>
-                ) : null}
-
-                <hr className="my-4" />
-                <div className="d-flex flex-wrap gap-3 small">
-                  <a
-                    href="https://sembuzz.com/#privacy"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-secondary"
-                    style={{ textDecoration: 'underline' }}
-                  >
-                    Privacy policy
-                  </a>
-                  <a
-                    href="https://sembuzz.com/#terms-of-service"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-secondary"
-                    style={{ textDecoration: 'underline' }}
-                  >
-                    Terms and conditions
-                  </a>
-                </div>
-                <div className="mt-3">
-                  <button
-                    type="button"
-                    className="btn btn-link btn-sm text-danger p-0 border-0"
-                    style={{ textDecoration: 'none', fontWeight: 600 }}
-                    onClick={() => setShowDeleteAccountModal(true)}
-                  >
-                    Delete account
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          <StudentProfileHub
+            user={user ? { name: user.name, email: user.email, schoolName: user.schoolName } : null}
+            profilePicUrl={settingsProfilePicUrl}
+            avatarFailed={settingsAvatarFailed}
+            onAvatarError={() => setSettingsAvatarFailed(true)}
+            onOpenAccountProfile={() => navigate('/profile')}
+            onLogout={() => setShowLogoutConfirmModal(true)}
+            onLogin={() => {
+              setSettingsLoginView('login');
+              setShowSettingsLoginPopup(true);
+            }}
+            onSignup={() => setShowSignupPopup(true)}
+            settingsActions={settingsActions}
+            onSettingsAction={handleSettingsActionPress}
+            showRecentNews={showSettingsRecentNewsList}
+            onToggleRecentNews={() => setShowSettingsRecentNewsList((v) => !v)}
+            recentNewsContent={renderSettingsRecentNewsList()}
+            guestRecentEvents={settingsRecentSorted}
+            onGuestRecentEventClick={(e) => {
+              setBottomNavActive('home');
+              if (e.schoolId) {
+                setSearchParams((prev) => {
+                  const next = new URLSearchParams(prev);
+                  next.set('schoolId', e.schoolId);
+                  return next;
+                });
+              }
+              setSelectedSettingsEvent(e);
+              navigate('/', { replace: true });
+            }}
+            onDeleteAccount={() => setShowDeleteAccountModal(true)}
+          />
         ) : bottomNavActive === 'liked' ? (
           /* Liked news — same as Saved: list + full post detail when item selected */
           <div style={{ maxWidth: '600px', margin: '0 auto', paddingBottom: '1rem' }}>
@@ -3350,569 +2637,105 @@ export const PublicEvents = () => {
             )}
           </div>
         ) : bottomNavActive === 'apps' ? (
-          /* Apps — horizontally centered (left–right), top-aligned (no vertical center); school name when logged in, else Sembuzz */
-          <div
-            className="d-flex flex-column align-items-center justify-content-start"
-            style={{
-              width: '100%',
-              paddingBottom: '1rem',
-            }}
-          >
-            <div key={appsScreenKey} className="d-flex flex-column align-items-center mb-4" style={{ width: '100%', maxWidth: '600px' }}>
-              <div className="d-flex flex-wrap justify-content-center" style={{ gap: '0.15rem' }} aria-hidden="true">
-                {(user?.schoolName?.trim() || 'Sembuzz').split('').map((letter, i) => (
-                  <span
-                    key={i}
-                    className="sembuzz-letter"
-                    style={{
-                      display: 'inline-block',
-                      fontSize: '2rem',
-                      color: '#1a1f2e',
-                      opacity: 0,
-                      animation: 'sembuzz-reveal 0.35s ease forwards',
-                      animationDelay: `${i * 0.06}s`,
-                    }}
-                  >
-                    {letter}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <h2 className="mb-3 text-center w-100" style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1a1f2e' }}>Follow us</h2>
-            <ClubMessagingBadges
-              isAuthenticated={!!user}
-              currentUserId={user?.id}
-              onRequireLogin={() => setShowSettingsLoginPopup(true)}
-            />
-            <div className="d-flex flex-column align-items-center w-100" style={{ gap: '1.5rem', maxWidth: '600px' }}>
-              {user && schoolSocialAccounts.length > 0 ? (
-                (() => {
-                  const groups = schoolSocialAccounts.reduce<{ key: string; icon: string; pageName: string; accounts: SchoolSocialAccountPublic[] }[]>((acc, account) => {
-                    const key = `${account.pageName}|${account.icon}`;
-                    const existing = acc.find((g) => g.key === key);
-                    if (existing) existing.accounts.push(account);
-                    else acc.push({ key, icon: account.icon, pageName: account.pageName, accounts: [account] });
-                    return acc;
-                  }, []);
-                  return groups.map((group) => (
-                    <div key={group.key} className="d-flex flex-column align-items-center w-100" style={{ maxWidth: '400px' }}>
-                      <div className="d-flex align-items-center gap-2 mb-2 w-100 justify-content-center flex-wrap">
-                        <span
-                          className="d-flex align-items-center justify-content-center rounded-2 flex-shrink-0 overflow-hidden"
-                          style={{ width: 44, height: 44, backgroundColor: '#fff', border: '1px solid #eee' }}
-                        >
-                          {isImageIconValue(group.icon) ? (
-                            <img src={imageSrc(group.icon)} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                          ) : group.icon.startsWith('fa-') ? (
-                            <i className={group.icon} style={{ fontSize: '1.25rem', color: '#1a1f2e' }} />
-                          ) : (
-                            <i className={`bi ${group.icon}`} style={{ fontSize: '1.25rem', color: '#1a1f2e' }} />
-                          )}
-                        </span>
-                        <span style={{ fontWeight: 600, color: '#1a1f2e', fontSize: '1.1rem' }}>{group.pageName || 'Club'}</span>
-                      </div>
-                      <div className="d-flex flex-wrap gap-2 justify-content-center">
-                        {group.accounts.map((acc) => {
-                          const iconColor = PLATFORM_COLORS[acc.platformId] ?? '#1a1f2e';
-                          const platformIcon = PLATFORM_ICONS[acc.platformId] ?? 'bi-link';
-                          return (
-                            <a
-                              key={acc.id}
-                              href={acc.link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="d-flex align-items-center justify-content-center rounded-3 text-decoration-none"
-                              style={{ width: 48, height: 48, color: iconColor, backgroundColor: `${iconColor}18`, transition: 'transform 0.2s ease' }}
-                              aria-label={acc.platformName}
-                              title={acc.platformName}
-                            >
-                              <i className={`bi ${platformIcon}`} style={{ fontSize: '1.35rem' }} />
-                            </a>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ));
-                })()
-              ) : (
-                <div className="d-flex flex-wrap gap-3 justify-content-center">
-                  <a
-                    href="https://www.linkedin.com/company/sembuzzsdmlhq/posts/?feedView=all"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="d-flex align-items-center justify-content-center rounded-3 text-decoration-none"
-                    style={{ width: 72, height: 72, color: '#0a66c2', backgroundColor: 'transparent', transition: 'transform 0.2s ease' }}
-                    aria-label="LinkedIn"
-                  >
-                    <i className="bi bi-linkedin" style={{ fontSize: '2rem' }} />
-                  </a>
-                  <a
-                    href="https://www.facebook.com/people/Sembuzzofficial/61555782134710/?ref=1"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="d-flex align-items-center justify-content-center rounded-3 text-decoration-none"
-                    style={{ width: 72, height: 72, color: '#1877f2', backgroundColor: 'transparent', transition: 'transform 0.2s ease' }}
-                    aria-label="Facebook"
-                  >
-                    <i className="bi bi-facebook" style={{ fontSize: '2rem' }} />
-                  </a>
-                  <a
-                    href="https://www.instagram.com/sembuzzofficial?igsh=MWRxaHRldjZ1N3Z2cg=="
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="d-flex align-items-center justify-content-center rounded-3 text-decoration-none"
-                    style={{ width: 72, height: 72, color: '#e4405f', backgroundColor: 'transparent', transition: 'transform 0.2s ease' }}
-                    aria-label="Instagram"
-                  >
-                    <i className="bi bi-instagram" style={{ fontSize: '2rem' }} />
-                  </a>
-                </div>
-              )}
-            </div>
-            <p className="mt-3 small text-muted mb-0 text-center">
-              {user && schoolSocialAccounts.length > 0 ? 'Your school\'s social accounts.' : 'Connect with us on social media.'}
-            </p>
-            <style>{`
-              @keyframes sembuzz-reveal {
-                from { opacity: 0; transform: translateX(-6px); }
-                to { opacity: 1; transform: translateX(0); }
-              }
-            `}</style>
-          </div>
+          <EventsAppsScreen
+            animationKey={appsScreenKey}
+            schoolName={user?.schoolName ?? null}
+            signedIn={!!user}
+            schoolSocialAccounts={schoolSocialAccounts}
+            messagingSection={
+              <ClubMessagingBadges
+                isAuthenticated={!!user}
+                onRequireLogin={() => setShowSettingsLoginPopup(true)}
+              />
+            }
+          />
         ) : (
           <div>
             <Fragment>
-        <div style={{ maxWidth: '600px', margin: '0 auto', marginBottom: '1rem' }}>
-          <style>{`
-            .content-categories-scroll::-webkit-scrollbar { height: 4px; }
-            .content-categories-scroll::-webkit-scrollbar-track { background: transparent; }
-            .content-categories-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 4px; }
-            .content-categories-scroll { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.2) transparent; }
-            .feed-tab-slide { animation: feedTabSlide 0.3s ease-out; }
-            @keyframes feedTabSlide { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
-            .home-feed-tabs-row { display: flex; align-items: stretch; background: #000; border-bottom: 1px solid rgba(255,255,255,0.1); }
-            .home-feed-tabs-gear { flex: 0 0 52px; border: none; background: transparent; display: flex; align-items: center; justify-content: center; padding: 0.75rem 0.5rem; cursor: pointer; color: #fff; transition: background 0.2s ease; }
-            .home-feed-tabs-gear:hover { background: rgba(255,255,255,0.08); }
-            .home-feed-tabs-gear i { font-size: 1.25rem; }
-            .home-feed-tabs { flex: 1; display: flex; min-width: 0; }
-            .home-feed-tabs .home-feed-tab { flex: 1; border: none; background: none; padding: 0.75rem 1rem; font-size: 0.95rem; font-weight: 600; color: #8e8e8e; cursor: pointer; position: relative; transition: color 0.2s ease; }
-            .home-feed-tabs .home-feed-tab:hover { color: #b0b0b0; }
-            .home-feed-tabs .home-feed-tab.active { color: #fff; }
-            .home-feed-tabs .home-feed-tab.active::after { content: ''; position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 70%; height: 3px; background: #fff; border-radius: 3px 3px 0 0; }
-            .home-feed-tab-inner { display: inline-flex; align-items: center; gap: 8px; }
-            .home-feed-tab-logo { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; background: #fff; flex-shrink: 0; }
-            .home-feed-tab-logo-fallback { width: 20px; height: 20px; border-radius: 50%; background: #e5e7eb; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #374151; flex-shrink: 0; }
-          `}</style>
-          {user && bottomNavActive === 'home' && (
-            <div className="home-feed-tabs-row" style={{ marginBottom: '0.5rem', borderRadius: '8px 8px 0 0', overflow: 'hidden' }}>
-              <button
-                type="button"
-                className="home-feed-tabs-gear"
-                onClick={() => setBottomNavActive('settings')}
-                aria-label="Settings"
-                title="Settings"
-              >
-                <i className="bi bi-gear-fill" aria-hidden />
-              </button>
+        <div className="events-feed-primary">
+          {bottomNavActive === 'home' &&
+            (user || (schoolExternalEnabled && schoolId)) &&
+            (user ? true : schoolExternalEnabled) && (
+            <div className="home-feed-tabs-shell">
+            <div className="home-feed-tabs-row">
+              {user ? (
+                <button
+                  type="button"
+                  className="home-feed-tabs-gear"
+                  onClick={() => setBottomNavActive('settings')}
+                  aria-label="Settings"
+                  title="Settings"
+                >
+                  <i className="bi bi-gear-fill" aria-hidden />
+                </button>
+              ) : (
+                <div className="home-feed-tabs-gear" aria-hidden style={{ pointerEvents: 'none', opacity: 0 }} />
+              )}
               <div className="home-feed-tabs" role="tablist" aria-label="School feed">
                 <button
                   type="button"
                   role="tab"
-                  className={`home-feed-tab ${!showAllSchoolsFeed ? 'active' : ''}`}
-                  onClick={() => { setShowAllSchoolsFeed(false); setAllSchoolsFilterSchoolId(null); setUpcomingDateFilter(null); setSelectedUpcomingPost(null); }}
-                  aria-pressed={!showAllSchoolsFeed}
+                  className={`home-feed-tab ${homeFeedMode === 'mySchool' ? 'active' : ''}`}
+                  onClick={() => {
+                    setHomeFeedMode('mySchool');
+                    setAllSchoolsFilterSchoolId(null);
+                    setUpcomingDateFilter(null);
+                    setSelectedUpcomingPost(null);
+                  }}
+                  aria-pressed={homeFeedMode === 'mySchool'}
                 >
                   <span className="home-feed-tab-inner">
-                    {mySchoolTabLogoUrl ? (
+                    {user && mySchoolTabLogoUrl ? (
                       <img src={mySchoolTabLogoUrl} alt="" className="home-feed-tab-logo" />
-                    ) : (
+                    ) : user ? (
                       <span className="home-feed-tab-logo-fallback" aria-hidden>
                         {(user.name?.trim()?.charAt(0) || 'S').toUpperCase()}
                       </span>
+                    ) : (
+                      <i className="bi bi-mortarboard home-feed-tab-icon" aria-hidden />
                     )}
                     <span>My school</span>
                   </span>
                 </button>
-                <button
-                  type="button"
-                  role="tab"
-                  className={`home-feed-tab ${showAllSchoolsFeed ? 'active' : ''}`}
-                  onClick={() => { setShowAllSchoolsFeed(true); setUpcomingDateFilter(null); setSelectedUpcomingPost(null); }}
-                  aria-pressed={showAllSchoolsFeed}
-                >
-                  <span className="home-feed-tab-inner">
-                    <i
-                      className="bi bi-building"
-                      style={{
-                        fontSize: '14px',
-                        color: showAllSchoolsFeed ? '#fff' : '#6b7280',
-                        flexShrink: 0,
-                      }}
-                      aria-hidden
-                    />
-                    <span>All schools</span>
-                  </span>
-                </button>
-              </div>
-            </div>
-          )}
-          {!user && (
-            <div
-              className="d-flex align-items-start gap-2 mb-2 px-1 py-2 rounded"
-              style={{
-                backgroundColor: '#fff8e6',
-                border: '1px solid #ffe8a3',
-              }}
-            >
-              <i className="bi bi-info-circle-fill flex-shrink-0 mt-1" style={{ color: '#997404', fontSize: '0.95rem' }} aria-hidden />
-              <p className="mb-0 small flex-grow-1" style={{ color: '#664d03', lineHeight: 1.45 }}>
-                Sign in to customize your school feed and join school chat groups.
-              </p>
-              <button
-                type="button"
-                className="btn btn-link btn-sm p-0 text-nowrap flex-shrink-0 text-decoration-none fw-semibold"
-                style={{ color: '#664d03' }}
-                onClick={openGuestLogin}
-              >
-                Sign in
-              </button>
-            </div>
-          )}
-          <div className="d-flex justify-content-between align-items-center gap-2">
-            <div
-              ref={contentCategoriesRef}
-              className="d-flex align-items-center gap-2 py-1 content-categories-scroll"
-              style={{
-                minWidth: 0,
-                flex: 1,
-                justifyContent: 'flex-start',
-                overflowX: 'auto',
-                overflowY: 'hidden',
-                flexWrap: 'nowrap',
-                WebkitOverflowScrolling: 'touch',
-                marginRight: '0.5rem',
-              }}
-            >
-              {user && showAllSchoolsFeed ? (
-                <>
-                  {showSchoolFilterUi ? (
-                    <>
-                      <button
-                        type="button"
-                        className={`btn btn-sm rounded-pill flex-shrink-0 text-nowrap d-inline-flex align-items-center gap-2 ${allSchoolsFilterSchoolId ? 'btn-dark' : 'btn-outline-dark'}`}
-                        style={{ fontWeight: allSchoolsFilterSchoolId ? 600 : 500, padding: '0.35rem 0.85rem', fontSize: '0.875rem' }}
-                        onClick={() => openSchoolPicker('allSchools')}
-                      >
-                        <i className="bi bi-building" aria-hidden />
-                        {selectedAllSchoolsFilterName ?? 'Select school'}
-                        <i className="bi bi-chevron-down" style={{ fontSize: '0.75rem' }} aria-hidden />
-                      </button>
-                      {allSchoolsFilterSchoolId && (
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-link flex-shrink-0 text-nowrap text-decoration-none px-1"
-                          onClick={() => setAllSchoolsFilterSchoolId(null)}
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </>
-                  ) : null}
+                {schoolExternalEnabled ? (
                   <button
                     type="button"
-                    className={`btn btn-sm rounded-pill flex-shrink-0 text-nowrap ${feedSort === 'latest' ? 'btn-dark' : 'btn-outline-dark'}`}
-                    style={{ fontWeight: feedSort === 'latest' ? 600 : 400, padding: '0.35rem 0.75rem', fontSize: '0.875rem' }}
-                    onClick={() => setFeedSort('latest')}
-                  >
-                    Latest
-                  </button>
-                  <button
-                    type="button"
-                    className={`btn btn-sm rounded-pill flex-shrink-0 text-nowrap ${feedSort === 'popular' ? 'btn-dark' : 'btn-outline-dark'}`}
-                    style={{ fontWeight: feedSort === 'popular' ? 600 : 400, padding: '0.35rem 0.75rem', fontSize: '0.875rem' }}
-                    onClick={() => setFeedSort('popular')}
-                  >
-                    Popular
-                  </button>
-                </>
-              ) : !user ? (
-                showSchoolFilterUi ? (
-                  <>
-                    <button
-                      type="button"
-                      className={`btn btn-sm rounded-pill flex-shrink-0 text-nowrap d-inline-flex align-items-center gap-2 ${schoolId ? 'btn-dark' : 'btn-outline-dark'}`}
-                      style={{ fontWeight: schoolId ? 600 : 500, padding: '0.35rem 0.85rem', fontSize: '0.875rem' }}
-                      onClick={() => openSchoolPicker('guest')}
-                    >
-                      <i className="bi bi-building" aria-hidden />
-                      {selectedGuestSchoolName ?? 'Select school'}
-                      <i className="bi bi-chevron-down" style={{ fontSize: '0.75rem' }} aria-hidden />
-                    </button>
-                    {schoolId && (
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-link flex-shrink-0 text-nowrap text-decoration-none px-1"
-                        onClick={() => applyGuestSchoolFilter(null)}
-                      >
-                        Clear
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className={`btn btn-sm rounded-pill flex-shrink-0 text-nowrap ${feedSort === 'latest' ? 'btn-dark' : 'btn-outline-dark'}`}
-                      style={{ fontWeight: feedSort === 'latest' ? 600 : 400, padding: '0.35rem 0.75rem', fontSize: '0.875rem' }}
-                      onClick={() => setFeedSort('latest')}
-                    >
-                      Latest
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn btn-sm rounded-pill flex-shrink-0 text-nowrap ${feedSort === 'popular' ? 'btn-dark' : 'btn-outline-dark'}`}
-                      style={{ fontWeight: feedSort === 'popular' ? 600 : 400, padding: '0.35rem 0.75rem', fontSize: '0.875rem' }}
-                      onClick={() => setFeedSort('popular')}
-                    >
-                      Popular
-                    </button>
-                  </>
-                ) : null
-              ) : (
-                <>
-                  {user && !showAllSchoolsFeed && showSchoolFilterUi && homeContentCategories.length > 0 && (
-                    <>
-                      {selectedSubCategoryIds.length > 0 && (
-                        <button
-                          type="button"
-                          className="btn btn-sm rounded-pill flex-shrink-0 btn-outline-dark text-nowrap"
-                          style={{ fontWeight: 600, padding: '0.35rem 0.75rem', fontSize: '0.8125rem' }}
-                          onClick={clearContentCategoryFilter}
-                        >
-                          Reset All
-                        </button>
-                      )}
-                      {homeContentCategories.map((cat: CategoryPublic) => {
-                        const hasSelection = selectedSubCategoryIds.some((id: string) =>
-                          cat.subcategories.some((s: { id: string }) => s.id === id),
-                        );
-                        const isOpen = contentExpandedCategoryId === cat.id;
-                        const emphasis = hasSelection || isOpen;
-                        return (
-                          <button
-                            key={cat.id}
-                            type="button"
-                            className="btn btn-sm rounded-pill flex-shrink-0 btn-outline-dark text-nowrap"
-                            style={{
-                              fontWeight: emphasis ? 600 : 400,
-                              padding: '0.35rem 0.75rem',
-                              fontSize: '0.875rem',
-                              borderColor: emphasis ? '#212529' : '#343a40',
-                            }}
-                            onClick={() => {
-                              const next = contentExpandedCategoryId === cat.id ? null : cat.id;
-                              setContentExpandedCategoryId(next);
-                              if (next) eventsFilter?.setSelectedCategory(cat.id, cat.name);
-                            }}
-                            title={cat.name}
-                            aria-expanded={isOpen}
-                          >
-                            {cat.name}
-                          </button>
-                        );
-                      })}
-                    </>
-                  )}
-                </>
-              )}
-            </div>
-            {showSchoolFilterUi && (
-            <div className="d-flex align-items-center gap-1 small flex-shrink-0">
-              <div className="position-relative flex-shrink-0">
-                <button
-                  type="button"
-                  className="btn border-0 py-1 px-2 rounded d-flex align-items-center"
-                  style={{
-                    backgroundColor:
-                      filterDropdownOpen ||
-                      feedSort !== 'latest' ||
-                      (!user && !!schoolId) ||
-                      !!loggedInFeedDateFilter ||
-                      !!loggedInFeedPostTypeFilter ||
-                      !!(user && showAllSchoolsFeed && allSchoolsFilterSchoolId)
-                        ? 'rgba(13, 202, 240, 0.15)'
-                        : 'transparent',
-                    color:
-                      filterDropdownOpen ||
-                      (!user && !!schoolId) ||
-                      !!loggedInFeedDateFilter ||
-                      !!loggedInFeedPostTypeFilter ||
-                      !!(user && showAllSchoolsFeed && allSchoolsFilterSchoolId)
-                        ? '#087990'
-                        : '#6c757d',
-                  }}
-                  onClick={() => setFilterDropdownOpen((o) => !o)}
-                  title="Filter and sort"
-                  aria-label="Filter"
-                  aria-expanded={filterDropdownOpen}
-                >
-                  <i className="bi bi-funnel" style={{ fontSize: '1.1rem' }} />
-                </button>
-                {filterDropdownOpen && (
-                  <div
-                    ref={calendarDropdownRef}
-                    className="shadow-sm border bg-white rounded py-2"
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      right: 0,
-                      marginTop: 4,
-                      minWidth: 260,
-                      zIndex: 1050,
+                    role="tab"
+                    className={`home-feed-tab ${homeFeedMode === 'external' ? 'active' : ''}`}
+                    onClick={() => {
+                      setHomeFeedMode('external');
+                      setUpcomingDateFilter(null);
+                      setSelectedUpcomingPost(null);
                     }}
+                    aria-pressed={homeFeedMode === 'external'}
                   >
-                    <div className="d-flex align-items-center justify-content-between px-3 py-1 small fw-600 text-secondary border-bottom mb-1">
-                      <span>Filter</span>
-                      <button
-                        type="button"
-                        className="btn btn-link p-0 border-0 text-secondary"
-                        style={{ minWidth: 28, minHeight: 28, lineHeight: 1 }}
-                        onClick={() => setFilterDropdownOpen(false)}
-                        aria-label="Close filter"
-                        title="Close"
-                      >
-                        <i className="bi bi-x-lg" style={{ fontSize: '1rem' }} />
-                      </button>
-                    </div>
-                    {!(user && showAllSchoolsFeed) ? (
-                      <>
-                        <div className="px-3 py-1 small text-muted">Sort</div>
-                        <div className="px-3 pt-1 pb-2 d-flex align-items-center gap-2">
-                          <button
-                            type="button"
-                            className={`btn btn-sm rounded-pill ${feedSort === 'latest' ? 'btn-dark' : 'btn-outline-dark'}`}
-                            onClick={() => {
-                              setFeedSort('latest');
-                              setFilterDropdownOpen(false);
-                            }}
-                          >
-                            Latest
-                          </button>
-                          <button
-                            type="button"
-                            className={`btn btn-sm rounded-pill ${feedSort === 'popular' ? 'btn-dark' : 'btn-outline-dark'}`}
-                            onClick={() => {
-                              setFeedSort('popular');
-                              setFilterDropdownOpen(false);
-                            }}
-                          >
-                            Popular
-                          </button>
-                        </div>
-                      </>
-                    ) : null}
-                    {user ? (
-                      <>
-                    <div className="px-3 py-1 small text-muted border-top mt-1 pt-2">View by post type</div>
-                      <div className="px-3 pt-1 pb-2">
-                        <div className="d-flex flex-column gap-2 mb-2">
-                          <button
-                            type="button"
-                            className={`btn btn-sm rounded-pill text-start ${
-                              loggedInFeedPostTypeFilter === 'event' ? 'btn-dark' : 'btn-outline-dark'
-                            }`}
-                            onClick={() =>
-                              setLoggedInFeedPostTypeFilter((m) => (m === 'event' ? null : 'event'))
-                            }
-                          >
-                            Filter by event date details
-                          </button>
-                          <button
-                            type="button"
-                            className={`btn btn-sm rounded-pill text-start ${
-                              loggedInFeedPostTypeFilter === 'posted' ? 'btn-dark' : 'btn-outline-dark'
-                            }`}
-                            onClick={() =>
-                              setLoggedInFeedPostTypeFilter((m) => (m === 'posted' ? null : 'posted'))
-                            }
-                          >
-                            Filter by post date
-                          </button>
-                        </div>
-                        {loggedInFeedPostTypeFilter ? (
-                          <>
-                            <label htmlFor="logged-in-feed-date" className="form-label small fw-semibold mb-1">
-                              Date
-                            </label>
-                            <input
-                              id="logged-in-feed-date"
-                              type="date"
-                              className="form-control form-control-sm mb-2"
-                              value={loggedInFeedDateFilter ?? ''}
-                              onChange={(e) => setLoggedInFeedDateFilter(e.target.value.trim() || null)}
-                            />
-                            <div className="d-flex gap-2 flex-wrap align-items-center">
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-dark rounded-pill"
-                                onClick={() => setLoggedInFeedDateFilter(toYmd(new Date()))}
-                              >
-                                Today
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-dark rounded-pill"
-                                onClick={() => {
-                                  const d = new Date();
-                                  d.setDate(d.getDate() + 1);
-                                  setLoggedInFeedDateFilter(toYmd(d));
-                                }}
-                              >
-                                Tomorrow
-                              </button>
-                              {loggedInFeedDateFilter || loggedInFeedPostTypeFilter ? (
-                                <button
-                                  type="button"
-                                  className="btn btn-sm btn-link text-decoration-none px-1"
-                                  onClick={() => {
-                                    setLoggedInFeedDateFilter(null);
-                                    setLoggedInFeedPostTypeFilter(null);
-                                  }}
-                                >
-                                  Clear
-                                </button>
-                              ) : null}
-                            </div>
-                          </>
-                        ) : (
-                          <p className="small text-muted mb-0">
-                            Choose a post type, then pick a date.
-                          </p>
-                        )}
-                      </div>
-                      </>
-                    ) : null}
-                  </div>
+                    <span className="home-feed-tab-inner">
+                      <i className="bi bi-box-arrow-in-right home-feed-tab-icon" aria-hidden />
+                      <span>External</span>
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    role="tab"
+                    className={`home-feed-tab ${showAllSchoolsFeed ? 'active' : ''}`}
+                    onClick={() => {
+                      setHomeFeedMode('allSchools');
+                      setUpcomingDateFilter(null);
+                      setSelectedUpcomingPost(null);
+                    }}
+                    aria-pressed={showAllSchoolsFeed}
+                  >
+                    <span className="home-feed-tab-inner">
+                      <i className="bi bi-building home-feed-tab-icon" aria-hidden />
+                      <span>All schools</span>
+                    </span>
+                  </button>
                 )}
               </div>
-              <button
-                type="button"
-                className="btn border-0 py-1 px-2 rounded d-flex align-items-center flex-shrink-0"
-                style={{
-                  backgroundColor:
-                    calendarFilterOpen || !!upcomingDateFilter
-                      ? 'rgba(13, 202, 240, 0.15)'
-                      : 'transparent',
-                  color: calendarFilterOpen || !!upcomingDateFilter ? '#087990' : '#6c757d',
-                }}
-                onClick={openCalendarFilter}
-                title="Filter news by date"
-                aria-label="Calendar"
-                aria-expanded={calendarFilterOpen}
-              >
-                <i className="bi bi-calendar3" style={{ fontSize: '1.1rem' }} />
-              </button>
             </div>
-            )}
-          </div>
-
+            </div>
+          )}
           {user && isLoggedInHome && loggedInPostTypeDateFilterActive ? (
             <div className="d-flex align-items-center justify-content-between gap-2 px-2 py-2 small">
               <span className="text-muted">
@@ -3933,7 +2756,7 @@ export const PublicEvents = () => {
             </div>
           ) : null}
 
-          {user && !showAllSchoolsFeed && showSchoolFilterUi && selectedSubCategoryMeta.length > 0 && (
+          {user && homeFeedMode === 'mySchool' && showSchoolFilterUi && selectedSubCategoryMeta.length > 0 && (
             <div
               className="d-flex flex-wrap gap-2 px-2 py-2"
               style={{
@@ -4591,11 +3414,9 @@ export const PublicEvents = () => {
           </div>
         )}
 
-        </div>
-
         {filterMode !== 'school' && (
           <div
-            key={user && bottomNavActive === 'home' ? `feed-${showAllSchoolsFeed ? 'all' : 'my'}` : 'feed-single'}
+            key={user && bottomNavActive === 'home' ? `feed-${homeFeedMode}` : 'feed-single'}
             className={user && bottomNavActive === 'home' ? 'feed-tab-slide' : ''}
             style={{ minHeight: 0 }}
           >
@@ -4792,7 +3613,7 @@ export const PublicEvents = () => {
                     className="dropdown-item small"
                     onClick={(e) => {
                       e.stopPropagation();
-                      const returnUrl = `${window.location.origin}/events`;
+                      const returnUrl = `${window.location.origin}/`;
                       const url = buildGoogleCalendarAddAuthUrl(post, returnUrl);
                       window.open(url, '_blank', 'noopener,noreferrer');
                       setGoogleCalDropdownPostId(null);
@@ -4806,6 +3627,12 @@ export const PublicEvents = () => {
               );
             })()}
           </div>
+        ) : bottomNavActive === 'home' && showExternalHomeFeed && user ? (
+          <ExternalPublicFeedPanel
+            signedIn
+            onSignIn={openGuestLogin}
+            onFeedSwipeDirection={(direction) => setBottomNavVisible(direction === 'down')}
+          />
         ) : isLoading ? (
           <div className="text-center py-5">
             <div className="spinner-border text-secondary" role="status" />
@@ -4824,14 +3651,15 @@ export const PublicEvents = () => {
               Retry
             </button>
           </div>
-        ) : feedItems.length === 0 ? (
+        ) : feedItems.length === 0 &&
+          !(bottomNavActive === 'home' && showExternalHomeFeed && !user) ? (
           <div className="card border-0 shadow-sm" style={{ borderRadius: '12px' }}>
             <div className="card-body text-center py-5 px-4">
               <i className="bi bi-newspaper" style={{ fontSize: '3rem', color: '#6c757d', marginBottom: '1rem' }} />
               <p className="text-muted mb-0">
                 {eventsFilter?.searchQuery?.trim()
                   ? 'No news matches your search.'
-                  : schoolId
+                  : schoolId && !showExternalHomeFeed
                     ? 'No approved news for this school yet.'
                     : 'No approved news yet.'}
               </p>
@@ -4858,7 +3686,11 @@ export const PublicEvents = () => {
           </div>
         ) : bottomNavActive === 'home' ? (
           <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+            {showExternalHomeFeed && !user ? (
+              <ExternalPublicFeedPanel signedIn={false} onSignIn={openGuestLogin} />
+            ) : null}
             <InshortsHomeFeed
+              key={feedSort}
               feedItems={feedItems}
               onFeedSwipeDirection={(direction) => {
                 setBottomNavVisible(direction === 'down');
@@ -4919,6 +3751,8 @@ export const PublicEvents = () => {
         )}
           </div>
         )}
+
+          </div>
           </Fragment>
           </div>
         )}
@@ -5187,25 +4021,8 @@ export const PublicEvents = () => {
         onRequireLogin={() => setShowSettingsLoginPopup(true)}
       />
 
-      {/* Bottom nav — Search, Home, Account, Apps, Chat (universities calendar tab removed; use top calendar when Filters enabled) */}
-      <EventsBottomNav
-        activeTab={eventsBottomNavActiveTab}
-        onSelectTab={handleEventsBottomNavSelect}
-        notifUnreadCount={notifUnreadCount}
-        chatUnreadCount={messagesUnreadCount}
-        visible={bottomNavVisible}
-        zIndex={
-          showSettingsLoginPopup ||
-          showSignupPopup ||
-          showFirstLoginCategories ||
-          showChangeCategoryModal ||
-          showHelpModal ||
-          showDeleteAccountModal ||
-          showLogoutConfirmModal
-            ? 1070
-            : 1030
-        }
-      />
+      </main>
+      </div>
     </div>
   );
 }

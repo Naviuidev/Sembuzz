@@ -4,6 +4,7 @@ import { AdminSidebarNav, type AdminSidebarItem } from './AdminSidebarNav';
 const menuItems: AdminSidebarItem[] = [
   { path: '/super-admin/dashboard', label: 'Dashboard', icon: 'bi-grid-1x2' },
   { path: '/super-admin/schools/new', label: 'Create School', icon: 'bi-building-add' },
+  { path: '/super-admin/external', label: 'External', icon: 'bi-box-arrow-up-right' },
   { path: '/super-admin/features', label: 'Features', icon: 'bi-star' },
   { path: '/super-admin/queries', label: 'Queries', icon: 'bi-chat-left-text' },
   {

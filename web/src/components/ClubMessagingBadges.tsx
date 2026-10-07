@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   userClubGroupChatsService,
@@ -8,28 +8,27 @@ import {
   userDirectChatsService,
   USER_DIRECT_CHATS_UNREAD_QUERY_KEY,
 } from '../services/user-direct-chats.service';
-import { DirectChatPanel } from './DirectChatPanel';
+import { useChatPopup } from '../contexts/ChatPopupContext';
+import { ChatSidePanelShell } from './ChatSidePanelShell';
 import { imageSrc, isImageIconValue } from '../utils/image';
 
 const TEXT_DARK = '#1a1f2e';
 const TEXT_MUTED = '#6c757d';
 
-type BadgeId = 'group-chat' | 'your-chat';
 type GroupStep = 'list' | 'detail';
 
 interface ClubMessagingBadgesProps {
   isAuthenticated: boolean;
-  currentUserId?: string | null;
   onRequireLogin: () => void;
 }
 
 export function ClubMessagingBadges({
   isAuthenticated,
-  currentUserId,
   onRequireLogin,
 }: ClubMessagingBadgesProps) {
   const queryClient = useQueryClient();
-  const [activeBadge, setActiveBadge] = useState<BadgeId | null>(null);
+  const { openChat } = useChatPopup();
+  const [groupPanelOpen, setGroupPanelOpen] = useState(false);
   const [groupStep, setGroupStep] = useState<GroupStep>('list');
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [requestMessage, setRequestMessage] = useState<string | null>(null);
@@ -38,7 +37,7 @@ export function ClubMessagingBadges({
   const { data: joinable = [], isLoading } = useQuery({
     queryKey: ['user', 'club-group-chats', 'joinable'],
     queryFn: userClubGroupChatsService.listJoinable,
-    enabled: isAuthenticated && activeBadge === 'group-chat',
+    enabled: isAuthenticated && groupPanelOpen,
   });
 
   const { data: directUnread } = useQuery({
@@ -77,24 +76,32 @@ export function ClubMessagingBadges({
     },
   });
 
-  const closeModal = useCallback(() => {
-    setActiveBadge(null);
+  const closeGroupPanel = useCallback(() => {
+    setGroupPanelOpen(false);
     setGroupStep('list');
     setSelectedChatId(null);
     setRequestMessage(null);
     setRequestError(null);
   }, []);
 
-  function openBadge(id: BadgeId) {
+  function openGroupPanel() {
     if (!isAuthenticated) {
       onRequireLogin();
       return;
     }
-    setActiveBadge(id);
+    setGroupPanelOpen(true);
     setGroupStep('list');
     setSelectedChatId(null);
     setRequestMessage(null);
     setRequestError(null);
+  }
+
+  function openYourChat() {
+    if (!isAuthenticated) {
+      onRequireLogin();
+      return;
+    }
+    openChat();
   }
 
   const selectedChat = joinable.find((c) => c.id === selectedChatId) ?? null;
@@ -115,20 +122,11 @@ export function ClubMessagingBadges({
 
   return (
     <>
-      <div className="d-flex flex-wrap justify-content-center gap-2 mb-4 w-100">
+      <div className="events-apps-messaging-actions">
         <button
           type="button"
-          className="btn d-inline-flex align-items-center gap-2"
-          style={{
-            borderRadius: 999,
-            padding: '0.5rem 1.1rem',
-            fontWeight: 600,
-            fontSize: '0.9rem',
-            backgroundColor: activeBadge === 'group-chat' ? TEXT_DARK : '#f3f4f6',
-            color: activeBadge === 'group-chat' ? '#fff' : TEXT_DARK,
-            border: 'none',
-          }}
-          onClick={() => openBadge('group-chat')}
+          className={`events-apps-messaging-btn${groupPanelOpen ? ' is-active' : ''}`}
+          onClick={openGroupPanel}
         >
           <i className="bi bi-people-fill" aria-hidden />
           Group chat
@@ -136,17 +134,8 @@ export function ClubMessagingBadges({
         {showDirectMessaging ? (
         <button
           type="button"
-          className="btn d-inline-flex align-items-center gap-2 position-relative"
-          style={{
-            borderRadius: 999,
-            padding: '0.5rem 1.1rem',
-            fontWeight: 600,
-            fontSize: '0.9rem',
-            backgroundColor: activeBadge === 'your-chat' ? TEXT_DARK : '#f3f4f6',
-            color: activeBadge === 'your-chat' ? '#fff' : TEXT_DARK,
-            border: 'none',
-          }}
-          onClick={() => openBadge('your-chat')}
+          className="events-apps-messaging-btn position-relative"
+          onClick={openYourChat}
         >
           <i className="bi bi-chat-heart" aria-hidden />
           Your chat
@@ -162,121 +151,116 @@ export function ClubMessagingBadges({
         ) : null}
       </div>
 
-      {activeBadge === 'group-chat' ? (
-        <ModalShell
-          title={groupStep === 'list' ? 'Group chats' : selectedChat?.pageName || 'Group chat'}
-          onClose={closeModal}
-        >
-          {groupStep === 'list' ? (
-            <>
-              <p className="small text-muted mb-3">
-                Select a club group chat to request access. Your subcategory admin must approve before
-                you can message in the group.
-              </p>
-              {isLoading ? (
-                <p className="small text-muted">Loading club groups…</p>
-              ) : joinable.length === 0 ? (
-                <p className="small text-muted mb-0">
-                  No club group chats are available yet. Ask your school admin to enable group chat
-                  for a club.
+      {groupPanelOpen ? (
+        <ChatSidePanelShell ariaLabel="Group chats" onClose={closeGroupPanel}>
+          <div className="d-flex align-items-center justify-content-between border-bottom px-3 py-2 flex-shrink-0">
+            <h2 className="h6 mb-0 fw-semibold" style={{ color: TEXT_DARK }}>
+              {groupStep === 'list' ? 'Group chats' : selectedChat?.pageName || 'Group chat'}
+            </h2>
+            <button
+              type="button"
+              className="btn btn-link p-0 text-decoration-none"
+              style={{ color: TEXT_MUTED }}
+              onClick={closeGroupPanel}
+              aria-label="Close"
+            >
+              <i className="bi bi-x-lg" aria-hidden />
+            </button>
+          </div>
+          <div className="flex-grow-1 overflow-auto p-3" style={{ minHeight: 0 }}>
+            {groupStep === 'list' ? (
+              <>
+                <p className="small text-muted mb-3">
+                  Select a club group chat to request access. Your subcategory admin must approve before
+                  you can message in the group.
                 </p>
-              ) : (
-                <ul className="list-unstyled mb-0 d-flex flex-column gap-2">
-                  {joinable.map((chat) => (
-                    <JoinableClubRow
-                      key={chat.id}
-                      chat={chat}
-                      onSelect={() => selectGroup(chat)}
-                    />
-                  ))}
-                </ul>
-              )}
-            </>
-          ) : selectedChat ? (
-            <>
-              <button
-                type="button"
-                className="btn btn-link btn-sm p-0 mb-3 text-decoration-none"
-                style={{ color: TEXT_MUTED }}
-                onClick={backToList}
-              >
-                ← Back to group chats
-              </button>
-
-              <div className="d-flex align-items-center gap-3 p-3 mb-3 border" style={{ borderRadius: 0 }}>
-                <ClubIcon icon={selectedChat.icon} name={selectedChat.pageName} />
-                <div>
-                  <div className="fw-semibold" style={{ color: TEXT_DARK }}>
-                    {selectedChat.pageName || 'Club'}
-                  </div>
-                  <MembershipStatusLabel status={selectedChat.membershipStatus} />
-                </div>
-              </div>
-
-              <p className="small text-muted mb-3">
-                {selectedChat.membershipStatus === 'approved'
-                  ? 'You are already approved for this group. Open the chat icon on this screen to message.'
-                  : selectedChat.membershipStatus === 'pending'
-                    ? 'Your join request is waiting for subcategory admin approval.'
-                    : selectedChat.membershipStatus === 'banned'
-                      ? 'You are not allowed to join this group. Contact your subcategory admin.'
-                      : 'Send a join request. Once approved, you can read and send messages in this group.'}
-              </p>
-
-              {requestError ? (
-                <div className="alert alert-danger border-0 py-2 small mb-2" style={{ borderRadius: 0 }}>
-                  {requestError}
-                </div>
-              ) : null}
-              {requestMessage ? (
-                <div className="alert alert-success border-0 py-2 small mb-2" style={{ borderRadius: 0 }}>
-                  {requestMessage}
-                </div>
-              ) : null}
-
-              <div className="d-flex justify-content-end">
+                {isLoading ? (
+                  <p className="small text-muted">Loading club groups…</p>
+                ) : joinable.length === 0 ? (
+                  <p className="small text-muted mb-0">
+                    No club group chats are available yet. Ask your school admin to enable group chat
+                    for a club.
+                  </p>
+                ) : (
+                  <ul className="list-unstyled mb-0 d-flex flex-column gap-2">
+                    {joinable.map((chat) => (
+                      <JoinableClubRow
+                        key={chat.id}
+                        chat={chat}
+                        onSelect={() => selectGroup(chat)}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </>
+            ) : selectedChat ? (
+              <>
                 <button
                   type="button"
-                  className="btn"
-                  disabled={
-                    selectedChat.membershipStatus === 'pending' ||
-                    selectedChat.membershipStatus === 'approved' ||
-                    selectedChat.membershipStatus === 'banned' ||
-                    requestMutation.isPending
-                  }
-                  style={{
-                    backgroundColor: TEXT_DARK,
-                    color: '#fff',
-                    borderRadius: 0,
-                    opacity:
+                  className="btn btn-link btn-sm p-0 mb-3 text-decoration-none"
+                  style={{ color: TEXT_MUTED }}
+                  onClick={backToList}
+                >
+                  ← Back to group chats
+                </button>
+
+                <div
+                  className="d-flex align-items-center gap-3 p-3 mb-3 border rounded-3"
+                  style={{ borderColor: '#e9ecef' }}
+                >
+                  <ClubIcon icon={selectedChat.icon} name={selectedChat.pageName} />
+                  <div>
+                    <div className="fw-semibold" style={{ color: TEXT_DARK }}>
+                      {selectedChat.pageName || 'Club'}
+                    </div>
+                    <MembershipStatusLabel status={selectedChat.membershipStatus} />
+                  </div>
+                </div>
+
+                <p className="small text-muted mb-3">
+                  {selectedChat.membershipStatus === 'approved'
+                    ? 'You are approved. Use the chat bubble on this screen to open the conversation.'
+                    : selectedChat.membershipStatus === 'pending'
+                      ? 'Your join request is waiting for subcategory admin approval.'
+                      : selectedChat.membershipStatus === 'banned'
+                        ? 'You are not allowed to join this group. Contact your subcategory admin.'
+                        : 'Send a join request. Once approved, you can read and send messages in this group.'}
+                </p>
+
+                {requestError ? (
+                  <div className="alert alert-danger border-0 py-2 small mb-2 rounded-3">{requestError}</div>
+                ) : null}
+                {requestMessage ? (
+                  <div className="alert alert-success border-0 py-2 small mb-2 rounded-3">{requestMessage}</div>
+                ) : null}
+
+                <div className="d-flex justify-content-end">
+                  <button
+                    type="button"
+                    className="btn btn-dark rounded-pill px-3"
+                    disabled={
                       selectedChat.membershipStatus === 'pending' ||
                       selectedChat.membershipStatus === 'approved' ||
-                      selectedChat.membershipStatus === 'banned'
-                        ? 0.55
-                        : 1,
-                  }}
-                  onClick={() => requestMutation.mutate(selectedChat.id)}
-                >
-                  {requestMutation.isPending
-                    ? 'Sending…'
-                    : selectedChat.membershipStatus === 'pending'
-                      ? 'Request pending'
-                      : selectedChat.membershipStatus === 'approved'
-                        ? 'Already joined'
-                        : selectedChat.membershipStatus === 'banned'
-                          ? 'Not allowed'
-                          : 'Request to join'}
-                </button>
-              </div>
-            </>
-          ) : null}
-        </ModalShell>
-      ) : null}
-
-      {activeBadge === 'your-chat' && showDirectMessaging ? (
-        <ModalShell title="Messages" onClose={closeModal} wide>
-          <DirectChatPanel currentUserId={currentUserId} />
-        </ModalShell>
+                      selectedChat.membershipStatus === 'banned' ||
+                      requestMutation.isPending
+                    }
+                    onClick={() => requestMutation.mutate(selectedChat.id)}
+                  >
+                    {requestMutation.isPending
+                      ? 'Sending…'
+                      : selectedChat.membershipStatus === 'pending'
+                        ? 'Request pending'
+                        : selectedChat.membershipStatus === 'approved'
+                          ? 'Already joined'
+                          : selectedChat.membershipStatus === 'banned'
+                            ? 'Not allowed'
+                            : 'Request to join'}
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </div>
+        </ChatSidePanelShell>
       ) : null}
     </>
   );
@@ -300,54 +284,6 @@ function MembershipStatusLabel({
   return <div className="small text-muted">{label}</div>;
 }
 
-function ModalShell({
-  title,
-  onClose,
-  wide,
-  children,
-}: {
-  title: string;
-  onClose: () => void;
-  wide?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 1060,
-        backgroundColor: 'rgba(0,0,0,0.45)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '1rem',
-      }}
-      onClick={onClose}
-    >
-      <div
-        className="card border-0 shadow-lg"
-        style={{ maxWidth: wide ? 520 : 480, width: '100%', borderRadius: 0 }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="card-body p-4">
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <h2 className="h5 mb-0" style={{ color: TEXT_DARK, fontWeight: 600 }}>
-              {title}
-            </h2>
-            <button type="button" className="btn btn-link p-0 text-muted" onClick={onClose} aria-label="Close">
-              <i className="bi bi-x-lg" />
-            </button>
-          </div>
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function JoinableClubRow({
   chat,
   onSelect,
@@ -359,12 +295,11 @@ function JoinableClubRow({
     <li>
       <button
         type="button"
-        className="w-100 text-start border d-flex align-items-center gap-3 p-3"
+        className="w-100 text-start border d-flex align-items-center gap-3 p-3 rounded-3"
         style={{
-          borderRadius: 0,
           cursor: 'pointer',
-          borderColor: '#dee2e6',
-          backgroundColor: '#fff',
+          borderColor: '#e9ecef',
+          backgroundColor: '#f8fafc',
         }}
         onClick={onSelect}
       >

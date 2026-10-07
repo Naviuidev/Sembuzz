@@ -23,16 +23,21 @@ export function AdminNavbarActions({
   logoutLabel = 'Logout',
   compactLogout = false,
   tone = 'light',
+  showNotifications = true,
 }: {
   role: AdminActionItemsRole;
   onLogout: () => void;
   logoutLabel?: string;
   compactLogout?: boolean;
   tone?: AdminNavbarTone;
+  /** Hide bell when portal has no action-items API (e.g. external admin). */
+  showNotifications?: boolean;
 }) {
   return (
     <div className={`d-flex align-items-center${tone === 'light' ? ' admin-navbar-actions' : ''}`}>
-      <AdminActionNotificationsBell role={role} tone={tone === 'light' ? 'light' : 'dark'} />
+      {showNotifications ? (
+        <AdminActionNotificationsBell role={role} tone={tone === 'light' ? 'light' : 'dark'} />
+      ) : null}
       <LogoutButton
         onClick={onLogout}
         label={logoutLabel}
@@ -105,7 +110,7 @@ export function AdminNavbarShell({
   if (tone === 'light') {
     return (
       <nav
-        className="admin-navbar admin-navbar--light sticky-top"
+        className="admin-navbar admin-navbar--light"
         style={{ '--admin-accent': accentColor } as CSSProperties}
       >
         <div className="admin-navbar-inner">

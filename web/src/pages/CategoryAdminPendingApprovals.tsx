@@ -1,7 +1,5 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CategoryAdminNavbar } from '../components/CategoryAdminNavbar';
-import { CategoryAdminSidebar } from '../components/CategoryAdminSidebar';
 import {
   categoryAdminEventsService,
   type PendingEventForCategoryAdmin,
@@ -54,19 +52,23 @@ function imageSrc(url: string): string {
   return `${base}${path}`;
 }
 
-const btnStyle = {
-  borderRadius: '0px',
-  padding: '0.35rem 0.6rem',
-  fontSize: '0.8rem',
-  marginRight: '0.35rem',
-  marginBottom: '0.25rem',
-} as const;
-
 const queryKey = ['category-admin', 'events', 'pending'] as const;
 
-export const CategoryAdminPendingApprovals = () => {
+function pendingStatusPill(status: string) {
+  const map: Record<string, { label: string; className: string }> = {
+    pending: { label: 'Pending approval', className: 'admin-pill admin-pill--status-progress' },
+    scheduled: { label: 'Scheduled', className: 'admin-pill admin-pill--status-progress' },
+    schedule_missed: { label: 'Schedule missed', className: 'admin-pill admin-pill--status-pending' },
+    reverted: { label: 'Changes requested', className: 'admin-pill admin-pill--neutral' },
+  };
+  const badge = eventStatusBadge(status);
+  const s = map[status] ?? { label: badge.label, className: 'admin-pill admin-pill--neutral' };
+  return <span className={s.className}>{s.label}</span>;
+}
+
+export function CategoryAdminPendingApprovalsPanel() {
   const queryClient = useQueryClient();
-  const [expandedViewId, setExpandedViewId] = useState<string | null>(null);
+  const [viewEvent, setViewEvent] = useState<PendingEventForCategoryAdmin | null>(null);
   const [editEvent, setEditEvent] = useState<PendingEventForCategoryAdmin | null>(null);
   const [editForm, setEditForm] = useState<UpdateEventDto>({});
   const [editActionButtons, setEditActionButtons] = useState<EventActionButton[]>([]);
@@ -191,176 +193,204 @@ export const CategoryAdminPendingApprovals = () => {
     setApproveRescheduleAt(defaultFutureDateTimeLocal());
   };
 
-  const renderDetailRow = (row: PendingEventForCategoryAdmin) => {
-    const images = parseImageUrls(row.imageUrls);
-    return (
-      <tr key={`${row.id}-detail`} style={{ backgroundColor: '#f8f9fa', borderBottom: '1px solid #dee2e6' }}>
-        <td colSpan={7} style={{ padding: '1rem 1rem 1.5rem', verticalAlign: 'top' }}>
-          <div style={{ maxWidth: '100%' }}>
-            <h6 style={{ color: '#1a1f2e', marginBottom: '0.75rem', fontWeight: '600' }}>Event details</h6>
-            {row.description && (
-              <p style={{ marginBottom: '0.75rem', color: '#1a1f2e' }}>{row.description}</p>
-            )}
-            <EventPostReviewSummary event={row} className="mb-3" />
-            <p className="mb-1"><strong>Subcategory:</strong> {row.subCategory?.name ?? '—'}</p>
-            <p className="mb-1"><strong>Submitted by:</strong> {row.subCategoryAdmin?.name ?? '—'} ({row.subCategoryAdmin?.email ?? '—'})</p>
-            <p className="mb-1"><strong>Requested publish:</strong> {formatPublishAt(row.publishAt)}</p>
-            {row.status === 'schedule_missed' && (
-              <p className="mb-1 text-danger"><strong>Original scheduled time has passed.</strong></p>
-            )}
-            <p className="mb-1"><strong>Date:</strong> {formatDate(row.createdAt)}</p>
-            <p className="mb-2"><strong>Comments:</strong> {row.commentsEnabled ? 'Enabled' : 'Disabled'}</p>
-            {images.length > 0 && (
-              <div className="mb-0">
-                <strong>Images:</strong>
-                <div className="d-flex flex-wrap gap-2 mt-1">
-                  {images.slice(0, 4).map((url, i) => {
-                    const src = imageSrc(url);
-                    return (
-                      <a key={i} href={src} target="_blank" rel="noopener noreferrer">
-                        <img src={src} alt="" style={{ maxHeight: '80px', maxWidth: '120px', objectFit: 'cover', border: '1px solid #dee2e6' }} />
-                      </a>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+  return (
+    <>
+      <div className="category-admin-pending-panel admin-approved-posts">
+        {isLoading ? (
+          <div className="admin-loading-state">
+            <div className="spinner-border text-secondary" role="status" />
+            <p className="mt-2 mb-0">Loading pending approvals…</p>
+          </div>
+        ) : error ? (
+          <div className="admin-notice">
+            <p className="admin-form-hint admin-form-hint--error mb-0">Failed to load pending approvals.</p>
+          </div>
+        ) : pendingEvents.length === 0 ? (
+          <div className="admin-empty-state">
+            <i className="bi bi-clock-history" style={{ fontSize: '2.5rem', opacity: 0.45 }} aria-hidden />
+            <p className="mt-3 mb-0">No pending approvals right now.</p>
+          </div>
+        ) : (
+          <>
+            <div className="admin-approved-posts__toolbar">
+              <span className="admin-approved-posts__count">
+                {pendingEvents.length} pending {pendingEvents.length === 1 ? 'post' : 'posts'}
+              </span>
+            </div>
+            <div className="admin-table-wrap">
+              <table className="admin-table admin-approved-posts__table admin-pending-posts__table">
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>Subcategory</th>
+                    <th>Submitted by</th>
+                    <th>Publish</th>
+                    <th>Status</th>
+                    <th>Submitted</th>
+                    <th className="admin-approved-posts__actions-col" aria-label="Actions">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingEvents.map((row) => (
+                    <tr key={row.id}>
+                      <td>
+                        <span className="admin-table__strong">{row.title}</span>
+                      </td>
+                      <td>{row.subCategory?.name ?? '—'}</td>
+                      <td>
+                        {row.subCategoryAdmin?.name ?? '—'}
+                        {row.subCategoryAdmin?.email ? (
+                          <span className="d-block admin-form-hint">{row.subCategoryAdmin.email}</span>
+                        ) : null}
+                      </td>
+                      <td className="admin-table__details">{formatPublishAt(row.publishAt)}</td>
+                      <td>{pendingStatusPill(row.status)}</td>
+                      <td className="admin-table__details">{formatDate(row.createdAt)}</td>
+                      <td>
+                        <div className="admin-table-actions admin-approved-posts__row-actions admin-pending-posts__actions">
+                          <button
+                            type="button"
+                            className="admin-icon-btn"
+                            aria-label={`View ${row.title}`}
+                            onClick={() => setViewEvent(row)}
+                          >
+                            <i className="bi bi-eye" aria-hidden />
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-icon-btn admin-icon-btn--edit"
+                            aria-label={`Edit ${row.title}`}
+                            onClick={() => handleEditOpen(row)}
+                          >
+                            <i className="bi bi-pencil" aria-hidden />
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-icon-btn"
+                            aria-label={`Revert ${row.title} for changes`}
+                            title="Revert for changes"
+                            onClick={() => {
+                              setRevertEvent(row);
+                              setRevertNotes('');
+                            }}
+                          >
+                            <i className="bi bi-arrow-return-left" aria-hidden />
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-icon-btn"
+                            aria-label={`Approve ${row.title}`}
+                            title="Approve"
+                            onClick={() => openApproveModal(row)}
+                          >
+                            <i className="bi bi-check-lg" aria-hidden />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
+
+      {viewEvent ? (
+        <div
+          className="admin-modal-overlay admin-modal-overlay--elevated"
+          onClick={() => setViewEvent(null)}
+          role="presentation"
+        >
+          <div
+            className="admin-modal admin-modal--lg"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pending-post-view-title"
+          >
             <button
               type="button"
-              className="btn btn-outline-secondary btn-sm mt-2"
-              style={{ borderRadius: '0px' }}
-              onClick={() => setExpandedViewId(null)}
+              className="admin-modal__close"
+              aria-label="Close"
+              onClick={() => setViewEvent(null)}
             >
-              Close details
+              <i className="bi bi-x-lg" aria-hidden />
             </button>
-          </div>
-        </td>
-      </tr>
-    );
-  };
-
-  return (
-    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
-      <CategoryAdminNavbar />
-      <div className="admin-shell-body">
-        <CategoryAdminSidebar />
-        <div className="admin-main">
-          <div className="mb-4">
-            <h1 style={{
-              fontSize: '2rem',
-              fontWeight: 'normal',
-              color: '#1a1f2e',
-              marginBottom: '0.5rem'
-            }}>
-              Pending approvals
-            </h1>
-            <p style={{
-              color: '#6c757d',
-              fontSize: '1rem',
-              marginBottom: 0
-            }}>
-              Events submitted by subcategory admins awaiting your approval
-            </p>
-          </div>
-
-          <div className="card border-0 shadow-sm" style={{ borderRadius: '0px' }}>
-            <div className="card-body p-4">
-              {isLoading ? (
-                <div className="text-center py-5">
-                  <div className="spinner-border text-secondary" role="status" />
-                  <p className="mt-2 mb-0" style={{ color: '#6c757d' }}>Loading…</p>
+            <div className="admin-modal__body admin-modal__body--with-close admin-modal__scroll">
+              <h3 className="admin-modal__title" id="pending-post-view-title">{viewEvent.title}</h3>
+              {viewEvent.description ? <p className="admin-modal__text">{viewEvent.description}</p> : null}
+              <EventPostReviewSummary event={viewEvent} className="mb-3" />
+              <div className="admin-detail-grid mb-3">
+                <div>
+                  <span className="admin-detail-label">Subcategory</span>
+                  <p className="admin-detail-value mb-0">{viewEvent.subCategory?.name ?? '—'}</p>
                 </div>
-              ) : error ? (
-                <div className="text-center py-5">
-                  <i className="bi bi-exclamation-circle" style={{ fontSize: '3rem', color: '#dc3545', marginBottom: '1rem' }} />
-                  <p style={{ color: '#6c757d', margin: 0 }}>Failed to load pending approvals</p>
+                <div>
+                  <span className="admin-detail-label">Submitted by</span>
+                  <p className="admin-detail-value mb-0">
+                    {viewEvent.subCategoryAdmin?.name ?? '—'}
+                    {viewEvent.subCategoryAdmin?.email ? ` · ${viewEvent.subCategoryAdmin.email}` : ''}
+                  </p>
                 </div>
-              ) : pendingEvents.length === 0 ? (
-                <div className="text-center py-5">
-                  <i className="bi bi-clock-history" style={{ fontSize: '3rem', color: '#6c757d', marginBottom: '1rem' }} />
-                  <p style={{ color: '#6c757d', margin: 0 }}>No pending approvals at the moment</p>
+                <div>
+                  <span className="admin-detail-label">Requested publish</span>
+                  <p className="admin-detail-value mb-0">{formatPublishAt(viewEvent.publishAt)}</p>
                 </div>
-              ) : (
-                <div className="table-responsive">
-                  <table className="table table-hover" style={{ marginBottom: 0 }}>
-                    <thead>
-                      <tr style={{ borderBottom: '2px solid #dee2e6' }}>
-                        <th style={{ color: '#1a1f2e', fontWeight: '600', padding: '1rem', backgroundColor: '#f8f9fa' }}>Title</th>
-                        <th style={{ color: '#1a1f2e', fontWeight: '600', padding: '1rem', backgroundColor: '#f8f9fa' }}>Subcategory</th>
-                        <th style={{ color: '#1a1f2e', fontWeight: '600', padding: '1rem', backgroundColor: '#f8f9fa' }}>Submitted by</th>
-                        <th style={{ color: '#1a1f2e', fontWeight: '600', padding: '1rem', backgroundColor: '#f8f9fa' }}>Publish</th>
-                        <th style={{ color: '#1a1f2e', fontWeight: '600', padding: '1rem', backgroundColor: '#f8f9fa' }}>Status</th>
-                        <th style={{ color: '#1a1f2e', fontWeight: '600', padding: '1rem', backgroundColor: '#f8f9fa' }}>Date</th>
-                        <th style={{ color: '#1a1f2e', fontWeight: '600', padding: '1rem', backgroundColor: '#f8f9fa' }}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pendingEvents.map((row) => (
-                        <React.Fragment key={row.id}>
-                          <tr style={{ borderBottom: '1px solid #dee2e6' }}>
-                            <td style={{ padding: '1rem', verticalAlign: 'middle', color: '#1a1f2e' }}>{row.title}</td>
-                            <td style={{ padding: '1rem', verticalAlign: 'middle' }}>{row.subCategory?.name ?? '—'}</td>
-                            <td style={{ padding: '1rem', verticalAlign: 'middle' }}>
-                              {row.subCategoryAdmin?.name ?? '—'}
-                              {row.subCategoryAdmin?.email && (
-                                <span className="d-block small text-muted">{row.subCategoryAdmin.email}</span>
-                              )}
-                            </td>
-                            <td style={{ padding: '1rem', verticalAlign: 'middle', color: '#6c757d' }}>
-                              {formatPublishAt(row.publishAt)}
-                            </td>
-                            <td style={{ padding: '1rem', verticalAlign: 'middle' }}>
-                              <span className={`badge ${eventStatusBadge(row.status).className}`}>
-                                {eventStatusBadge(row.status).label}
-                              </span>
-                            </td>
-                            <td style={{ padding: '1rem', verticalAlign: 'middle', color: '#6c757d' }}>{formatDate(row.createdAt)}</td>
-                            <td style={{ padding: '1rem', verticalAlign: 'middle' }}>
-                              <button
-                                type="button"
-                                className="btn btn-outline-secondary btn-sm"
-                                style={btnStyle}
-                                onClick={() => setExpandedViewId((id) => (id === row.id ? null : row.id))}
-                              >
-                                {expandedViewId === row.id ? 'Hide' : 'View'}
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-outline-secondary btn-sm"
-                                style={btnStyle}
-                                onClick={() => handleEditOpen(row)}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-outline-warning btn-sm"
-                                style={btnStyle}
-                                onClick={() => { setRevertEvent(row); setRevertNotes(''); }}
-                              >
-                                Revert for changes
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-success btn-sm"
-                                style={btnStyle}
-                                onClick={() => openApproveModal(row)}
-                              >
-                                Approve
-                              </button>
-                            </td>
-                          </tr>
-                          {expandedViewId === row.id && renderDetailRow(row)}
-                        </React.Fragment>
-                      ))}
-                    </tbody>
-                  </table>
+                <div>
+                  <span className="admin-detail-label">Submitted</span>
+                  <p className="admin-detail-value mb-0">{formatDate(viewEvent.createdAt)}</p>
                 </div>
-              )}
+              </div>
+              {viewEvent.status === 'schedule_missed' ? (
+                <p className="admin-form-hint admin-form-hint--error">Original scheduled time has passed.</p>
+              ) : null}
+              {parseImageUrls(viewEvent.imageUrls).length > 0 ? (
+                <div className="admin-create-post-upload-thumbs">
+                  {parseImageUrls(viewEvent.imageUrls).slice(0, 4).map((url, i) => (
+                    <a key={i} href={imageSrc(url)} target="_blank" rel="noopener noreferrer">
+                      <img src={imageSrc(url)} alt="" width={72} height={72} />
+                    </a>
+                  ))}
+                </div>
+              ) : null}
+              <div className="admin-modal__footer admin-modal__footer--between mt-3">
+                <button type="button" className="admin-btn-secondary" onClick={() => setViewEvent(null)}>
+                  Close
+                </button>
+                <div className="d-flex flex-wrap gap-2">
+                  <button type="button" className="admin-btn-secondary" onClick={() => handleEditOpen(viewEvent)}>
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-btn-secondary"
+                    onClick={() => {
+                      setRevertEvent(viewEvent);
+                      setRevertNotes('');
+                      setViewEvent(null);
+                    }}
+                  >
+                    Revert
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-btn-primary"
+                    onClick={() => {
+                      openApproveModal(viewEvent);
+                      setViewEvent(null);
+                    }}
+                  >
+                    Approve
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      ) : null}
 
       {/* Edit modal */}
       {editEvent && (
@@ -577,6 +607,6 @@ export const CategoryAdminPendingApprovals = () => {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
-};
+}

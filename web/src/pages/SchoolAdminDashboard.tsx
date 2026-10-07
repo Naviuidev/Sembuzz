@@ -9,14 +9,14 @@ import { schoolAdminPendingUsersService } from '../services/school-admin-pending
 
 const QUICK_LINKS = [
   {
-    to: '/school-admin/user-requests',
+    to: '/school-admin/users',
     icon: 'bi-person-plus',
     title: 'User requests',
     meta: (pending: number | undefined) =>
       pending === undefined ? 'Loading…' : `${pending} pending · Approve or deny signups`,
   },
   {
-    to: '/school-admin/approved-users',
+    to: '/school-admin/users?tab=approved',
     icon: 'bi-person-check',
     title: 'Approved users',
     meta: (approved: number | undefined) =>
@@ -29,7 +29,7 @@ const QUICK_LINKS = [
     meta: () => 'Post views, engagement, and trends',
   },
   {
-    to: '/school-admin/create-post',
+    to: '/school-admin/posts',
     icon: 'bi-plus-circle',
     title: 'Create post',
     meta: () => 'Publish content for your school',

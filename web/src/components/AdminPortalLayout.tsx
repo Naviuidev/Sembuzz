@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 
 /** Shared dashboard chrome: light navbar + accent sidebar + scrollable main. */
 export function AdminPortalLayout({
@@ -10,6 +10,11 @@ export function AdminPortalLayout({
   sidebar: ReactNode;
   children: ReactNode;
 }) {
+  useEffect(() => {
+    document.documentElement.classList.add('admin-portal-document');
+    return () => document.documentElement.classList.remove('admin-portal-document');
+  }, []);
+
   return (
     <div className="admin-shell" style={{ backgroundColor: '#f8fafc' }}>
       {navbar}

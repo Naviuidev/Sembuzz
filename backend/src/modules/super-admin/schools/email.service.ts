@@ -53,13 +53,38 @@ export class EmailService {
       tenure?: number;
       features: string[];
     },
+    options?: { loginPath?: string; accountKind?: 'school' | 'external' },
   ) {
     const featuresList = schoolDetails.features.join(', ');
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const loginPath = options?.loginPath ?? '/school-admin/login';
+    const loginUrl = `${frontendUrl}${loginPath}`;
+    const isExternal = options?.accountKind === 'external';
+    const subject = isExternal
+      ? 'Welcome to SemBuzz - Your External Admin Account'
+      : 'Welcome to SemBuzz - Your School Account Has Been Created';
+    const greeting = isExternal ? 'Dear External Administrator,' : 'Dear School Administrator,';
+    const intro = isExternal
+      ? 'Your external admin account has been created on SemBuzz. Use the credentials below to sign in to the External Admin portal.'
+      : 'Your school account has been successfully created on SemBuzz. Below are your login credentials and school details:';
+    const detailsHeading = isExternal ? 'Assigned categories' : 'School Information';
+    const detailsBody = isExternal
+      ? `<p><strong>Categories:</strong> ${featuresList}</p>`
+      : `
+                <p><strong>School Name:</strong> ${schoolName}</p>
+                ${schoolDetails.country ? `<p><strong>Country:</strong> ${schoolDetails.country}</p>` : ''}
+                ${schoolDetails.state ? `<p><strong>State:</strong> ${schoolDetails.state}</p>` : ''}
+                <p><strong>City:</strong> ${schoolDetails.city}</p>
+                ${schoolDetails.tenure ? `<p><strong>Project Tenure:</strong> ${schoolDetails.tenure} months</p>` : ''}
+                <p><strong>Enabled Features:</strong> ${featuresList}</p>`;
+    const finalStep = isExternal
+      ? 'Open your external admin dashboard to manage content for your assigned categories'
+      : "Start managing your school's features and settings";
 
     const mailOptions = {
       from: process.env.SMTP_FROM || process.env.SMTP_USER,
       to: adminEmail,
-      subject: 'Welcome to SemBuzz - Your School Account Has Been Created',
+      subject,
       html: `
         <!DOCTYPE html>
         <html>
@@ -80,9 +105,9 @@ export class EmailService {
               <h1>Welcome to SemBuzz!</h1>
             </div>
             <div class="content">
-              <p>Dear School Administrator,</p>
+              <p>${greeting}</p>
               
-              <p>Your school account has been successfully created on SemBuzz. Below are your login credentials and school details:</p>
+              <p>${intro}</p>
               
               <div class="credentials">
                 <h3 style="margin-top: 0; color: #1a1f2e;">Login Credentials</h3>
@@ -92,13 +117,8 @@ export class EmailService {
               </div>
               
               <div class="credentials">
-                <h3 style="margin-top: 0; color: #1a1f2e;">School Information</h3>
-                <p><strong>School Name:</strong> ${schoolName}</p>
-                ${schoolDetails.country ? `<p><strong>Country:</strong> ${schoolDetails.country}</p>` : ''}
-                ${schoolDetails.state ? `<p><strong>State:</strong> ${schoolDetails.state}</p>` : ''}
-                <p><strong>City:</strong> ${schoolDetails.city}</p>
-                ${schoolDetails.tenure ? `<p><strong>Project Tenure:</strong> ${schoolDetails.tenure} months</p>` : ''}
-                <p><strong>Enabled Features:</strong> ${featuresList}</p>
+                <h3 style="margin-top: 0; color: #1a1f2e;">${detailsHeading}</h3>
+                ${detailsBody}
               </div>
               
               <h3 style="color: #1a1f2e;">Next Steps:</h3>
@@ -106,11 +126,11 @@ export class EmailService {
                 <li>Log in using your <strong>Reference Number (${refNum})</strong> or <strong>Email (${adminEmail})</strong> as your User ID</li>
                 <li>Use the temporary password provided above</li>
                 <li>You will be prompted to change your password on first login</li>
-                <li>Start managing your school's features and settings</li>
+                <li>${finalStep}</li>
               </ol>
               
               <p style="margin-top: 30px;">
-                <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/school-admin/login" class="button">Login to SemBuzz</a>
+                <a href="${loginUrl}" class="button">Login to SemBuzz</a>
               </p>
               
               <p style="margin-top: 30px; color: #6c757d; font-size: 14px;">
@@ -135,7 +155,9 @@ export class EmailService {
         tempPassword,
         schoolName,
       });
-      console.warn('[EmailService] Admin can log in at /school-admin/login with Ref Number or Email + temp password, then set a custom password.');
+      console.warn(
+        `[EmailService] Admin can log in at ${loginPath} with Ref Number or Email + temp password, then set a custom password.`,
+      );
     };
 
     // Require SMTP so caller gets a clear error (same as approval/rejection emails)
@@ -2678,5 +2700,191 @@ export class EmailService {
       console.error('[EmailService] ❌ Failed to send club group approval email:', error?.message || error);
       if (!isDev) throw error;
     }
+  }
+
+  async sendExternalPipelineRequestToSchoolAdmin(
+    schoolAdminEmail: string,
+    schoolAdminName: string,
+    schoolName: string,
+    externalAdminName: string,
+    externalAdminEmail: string,
+    categoryName: string,
+    requestMessage: string | null,
+    reviewUrl: string,
+  ) {
+    const note = requestMessage?.trim()
+      ? `<p style="white-space: pre-wrap;">${requestMessage}</p>`
+      : '<p><em>No additional message.</em></p>';
+    const mailOptions = {
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: schoolAdminEmail,
+      subject: `External pipeline access request — ${categoryName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background:#1a1f2e;color:#fff;padding:20px;text-align:center;"><h1 style="margin:0;">Pipeline access request</h1></div>
+          <div style="padding:24px;background:#f8f9fa;">
+            <p>Hi ${schoolAdminName},</p>
+            <p><strong>${externalAdminName}</strong> (${externalAdminEmail}) requested pipeline access to share external category <strong>${categoryName}</strong> with students at <strong>${schoolName}</strong>.</p>
+            ${note}
+            <p style="margin-top:24px;"><a href="${reviewUrl}" style="display:inline-block;padding:12px 24px;background:#1a1f2e;color:#fff;text-decoration:none;border-radius:999px;">Review in External config</a></p>
+          </div>
+        </div>
+      `,
+    };
+    await this.transporter.sendMail(mailOptions);
+  }
+
+  async sendExternalPipelineUpdateToExternalAdmin(
+    externalAdminEmail: string,
+    externalAdminName: string,
+    schoolName: string,
+    categoryName: string,
+    action: 'query' | 'approved' | 'rejected' | 'banned',
+    message: string,
+    privacyUrl: string,
+  ) {
+    const titles: Record<string, string> = {
+      query: 'School admin sent a query',
+      approved: 'Pipeline access approved',
+      rejected: 'Pipeline access rejected',
+      banned: 'Pipeline access blocked',
+    };
+    const mailOptions = {
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: externalAdminEmail,
+      subject: `${titles[action]} — ${schoolName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background:#7c3aed;color:#fff;padding:20px;text-align:center;"><h1 style="margin:0;">${titles[action]}</h1></div>
+          <div style="padding:24px;background:#f8f9fa;">
+            <p>Hi ${externalAdminName},</p>
+            <p>School <strong>${schoolName}</strong> responded to your pipeline request for category <strong>${categoryName}</strong>.</p>
+            <div style="background:#fff;padding:16px;border-left:4px solid #7c3aed;margin:16px 0;"><p style="margin:0;white-space:pre-wrap;">${message}</p></div>
+            <p><a href="${privacyUrl}" style="display:inline-block;padding:12px 24px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:999px;">View in Privacy</a></p>
+          </div>
+        </div>
+      `,
+    };
+    await this.transporter.sendMail(mailOptions);
+  }
+
+  async sendExternalPostSubmittedToSchoolAdmin(
+    schoolAdminEmail: string,
+    schoolAdminName: string,
+    schoolName: string,
+    externalAdminName: string,
+    externalAdminEmail: string,
+    categoryName: string,
+    postTitle: string,
+    reviewUrl: string,
+  ) {
+    const mailOptions = {
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: schoolAdminEmail,
+      subject: `External post for approval — ${postTitle}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background:#1a1f2e;color:#fff;padding:20px;text-align:center;"><h1 style="margin:0;">Post approval</h1></div>
+          <div style="padding:24px;background:#f8f9fa;">
+            <p>Hi ${schoolAdminName},</p>
+            <p><strong>${externalAdminName}</strong> (${externalAdminEmail}) submitted post <strong>${postTitle}</strong> for category <strong>${categoryName}</strong> at <strong>${schoolName}</strong>.</p>
+            <p><a href="${reviewUrl}" style="display:inline-block;padding:12px 24px;background:#1a1f2e;color:#fff;text-decoration:none;border-radius:999px;">Review in External config</a></p>
+          </div>
+        </div>
+      `,
+    };
+    await this.transporter.sendMail(mailOptions);
+  }
+
+  async sendExternalPostUpdateToExternalAdmin(
+    externalAdminEmail: string,
+    externalAdminName: string,
+    schoolName: string,
+    categoryName: string,
+    postTitle: string,
+    action: 'query' | 'approved' | 'rejected' | 'banned',
+    message: string,
+    postsUrl: string,
+  ) {
+    const titles: Record<string, string> = {
+      query: 'School admin sent a query',
+      approved: 'Post approved',
+      rejected: 'Post rejected',
+      banned: 'Post blocked',
+    };
+    const mailOptions = {
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: externalAdminEmail,
+      subject: `${titles[action]} — ${postTitle}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background:#7c3aed;color:#fff;padding:20px;text-align:center;"><h1 style="margin:0;">${titles[action]}</h1></div>
+          <div style="padding:24px;background:#f8f9fa;">
+            <p>Hi ${externalAdminName},</p>
+            <p>School <strong>${schoolName}</strong> responded to your post <strong>${postTitle}</strong> (${categoryName}).</p>
+            <div style="background:#fff;padding:16px;border-left:4px solid #7c3aed;margin:16px 0;"><p style="margin:0;white-space:pre-wrap;">${message}</p></div>
+            <p><a href="${postsUrl}" style="display:inline-block;padding:12px 24px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:999px;">View in Posts</a></p>
+          </div>
+        </div>
+      `,
+    };
+    await this.transporter.sendMail(mailOptions);
+  }
+
+  async sendExternalPostReplyToSchoolAdmin(
+    schoolAdminEmail: string,
+    schoolAdminName: string,
+    externalAdminName: string,
+    schoolName: string,
+    categoryName: string,
+    postTitle: string,
+    message: string,
+    reviewUrl: string,
+  ) {
+    const mailOptions = {
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: schoolAdminEmail,
+      subject: `External admin reply — ${postTitle}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background:#1a1f2e;color:#fff;padding:20px;text-align:center;"><h1 style="margin:0;">External admin reply</h1></div>
+          <div style="padding:24px;background:#f8f9fa;">
+            <p>Hi ${schoolAdminName},</p>
+            <p><strong>${externalAdminName}</strong> replied about post <strong>${postTitle}</strong> (${categoryName}) at <strong>${schoolName}</strong>.</p>
+            <div style="background:#fff;padding:16px;border-left:4px solid #1a1f2e;margin:16px 0;"><p style="margin:0;white-space:pre-wrap;">${message}</p></div>
+            <p><a href="${reviewUrl}" style="display:inline-block;padding:12px 24px;background:#1a1f2e;color:#fff;text-decoration:none;border-radius:999px;">Open conversation</a></p>
+          </div>
+        </div>
+      `,
+    };
+    await this.transporter.sendMail(mailOptions);
+  }
+
+  async sendExternalPipelineReplyToSchoolAdmin(
+    schoolAdminEmail: string,
+    schoolAdminName: string,
+    externalAdminName: string,
+    schoolName: string,
+    categoryName: string,
+    message: string,
+    reviewUrl: string,
+  ) {
+    const mailOptions = {
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: schoolAdminEmail,
+      subject: `Reply from external admin — ${categoryName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background:#1a1f2e;color:#fff;padding:20px;text-align:center;"><h1 style="margin:0;">External admin reply</h1></div>
+          <div style="padding:24px;background:#f8f9fa;">
+            <p>Hi ${schoolAdminName},</p>
+            <p><strong>${externalAdminName}</strong> replied regarding pipeline access for <strong>${categoryName}</strong> at <strong>${schoolName}</strong>.</p>
+            <div style="background:#fff;padding:16px;border-left:4px solid #1a1f2e;margin:16px 0;"><p style="margin:0;white-space:pre-wrap;">${message}</p></div>
+            <p><a href="${reviewUrl}" style="display:inline-block;padding:12px 24px;background:#1a1f2e;color:#fff;text-decoration:none;border-radius:999px;">Open conversation</a></p>
+          </div>
+        </div>
+      `,
+    };
+    await this.transporter.sendMail(mailOptions);
   }
 }

@@ -8,8 +8,7 @@ import type { ChatGroupListItem } from './chat-groups.types';
 import type { DirectChatUser } from '../services/user-direct-chats.service';
 import { userStudentChatGroupsService } from '../services/user-student-chat-groups.service';
 import { userClubGroupChatsService } from '../services/user-club-group-chats.service';
-
-const PANEL_OFFSET_BOTTOM = '88px';
+import { ChatSidePanelShell } from './ChatSidePanelShell';
 
 type PanelView = 'groups' | 'thread' | 'direct';
 
@@ -84,33 +83,7 @@ export function StudentChatGroupsWidget() {
   );
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Chat groups"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 1055,
-        backgroundColor: 'rgba(0,0,0,0.35)',
-        display: 'flex',
-        alignItems: 'flex-end',
-        justifyContent: 'flex-end',
-        padding: `0 1rem calc(${PANEL_OFFSET_BOTTOM} + 0.75rem) 1rem`,
-      }}
-      onClick={handleClose}
-    >
-      <div
-        className="card border-0 shadow-lg d-flex flex-column overflow-hidden"
-        style={{
-          width: '100%',
-          maxWidth: 400,
-          height: 'min(78vh, 580px)',
-          borderRadius: 16,
-          backgroundColor: '#fff',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
+    <ChatSidePanelShell ariaLabel="Chat groups" onClose={handleClose}>
         {panelView === 'groups' ? (
           <ChatGroupsView
             embedded
@@ -160,7 +133,6 @@ export function StudentChatGroupsWidget() {
             headerExtra={closeButton}
           />
         ) : null}
-      </div>
-    </div>
+    </ChatSidePanelShell>
   );
 }

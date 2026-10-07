@@ -1,10 +1,8 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { schoolAdminDirectChatsService } from '../services/school-admin-direct-chats.service';
 
-const TEXT_DARK = '#1a1f2e';
-
-export function SchoolAdminDirectMessagingPanel() {
+export function SchoolAdminDirectMessagingPanel({ panelStyle }: { panelStyle?: CSSProperties }) {
   const queryClient = useQueryClient();
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -27,45 +25,57 @@ export function SchoolAdminDirectMessagingPanel() {
     },
   });
 
+  const body = (
+    <>
+      <p className="admin-form-hint mb-3">
+        Allow students at your school to message each other directly. Subcategory admins can review 1:1
+        chats in read-only mode but cannot change this setting.
+      </p>
+      {message ? (
+        <div
+          className={`admin-notice mb-3${message.type === 'success' ? ' admin-notice--info' : ''}`}
+          role="alert"
+        >
+          <p className="mb-0">{message.text}</p>
+        </div>
+      ) : null}
+      {isLoading ? (
+        <p className="admin-form-hint mb-0">Loading settings…</p>
+      ) : (
+        <div className="form-check form-switch">
+          <input
+            className="form-check-input"
+            type="checkbox"
+            role="switch"
+            id="school-direct-messaging-enabled"
+            checked={settings?.isEnabled ?? true}
+            disabled={updateMutation.isPending}
+            onChange={(e) => updateMutation.mutate(e.target.checked)}
+          />
+          <label className="form-check-label" htmlFor="school-direct-messaging-enabled">
+            {settings?.isEnabled ?? true ? 'Students can send 1:1 messages' : '1:1 messaging is off'}
+          </label>
+        </div>
+      )}
+    </>
+  );
+
+  if (panelStyle) {
+    return (
+      <section className="admin-panel" style={panelStyle}>
+        <div className="admin-panel__header">
+          <h2 className="admin-panel__title">1:1 student messaging</h2>
+        </div>
+        <div className="admin-panel__body">{body}</div>
+      </section>
+    );
+  }
+
   return (
     <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 0 }}>
       <div className="card-body">
-        <h2 className="h6 mb-2" style={{ color: TEXT_DARK }}>
-          1:1 student messaging
-        </h2>
-        <p className="small text-muted mb-3">
-          Allow students at your school to message each other directly. Subcategory admins can
-          review 1:1 chats in read-only mode but cannot change this setting.
-        </p>
-        {message ? (
-          <div
-            className={`alert ${message.type === 'success' ? 'alert-success' : 'alert-danger'} py-2 mb-3`}
-            style={{ borderRadius: 0 }}
-            role="alert"
-          >
-            {message.text}
-          </div>
-        ) : null}
-        {isLoading ? (
-          <p className="small text-muted mb-0">Loading settings…</p>
-        ) : (
-          <div className="form-check form-switch">
-            <input
-              className="form-check-input"
-              type="checkbox"
-              role="switch"
-              id="school-direct-messaging-enabled"
-              checked={settings?.isEnabled ?? true}
-              disabled={updateMutation.isPending}
-              onChange={(e) => updateMutation.mutate(e.target.checked)}
-            />
-            <label className="form-check-label" htmlFor="school-direct-messaging-enabled">
-              {settings?.isEnabled ?? true
-                ? 'Students can send 1:1 messages'
-                : '1:1 messaging is off'}
-            </label>
-          </div>
-        )}
+        <h2 className="h6 mb-2">1:1 student messaging</h2>
+        {body}
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, type CSSProperties } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AdsAdminLayout } from '../components/AdsAdminLayout';
+import { ADMIN_PORTAL_ACCENTS } from '../constants/adminPortalTheme';
 import { adsAdminBannerAdsService } from '../services/ads-admin-banner-ads.service';
 import { adsAdminSponsoredAdsService } from '../services/ads-admin-sponsored-ads.service';
 import { imageSrc } from '../utils/image';
@@ -44,6 +45,7 @@ export const AdsAdminAdsAnalytics = () => {
   const [toggleOffSubmitting, setToggleOffSubmitting] = useState(false);
 
   const queryClient = useQueryClient();
+  const panelStyle = { '--admin-accent': ADMIN_PORTAL_ACCENTS.ads } as CSSProperties;
 
   type AdRow = { id: string; startAt: string; endAt: string; externalLink?: string | null };
 
@@ -56,13 +58,11 @@ export const AdsAdminAdsAnalytics = () => {
   const { data: bannerList = [] } = useQuery({
     queryKey: ['ads-admin', 'banner-ads', 'list'],
     queryFn: () => adsAdminBannerAdsService.list(),
-    enabled: tab === 'banner',
   });
 
   const { data: sponsoredList = [] } = useQuery({
     queryKey: ['ads-admin', 'sponsored-ads', 'list'],
     queryFn: () => adsAdminSponsoredAdsService.list(),
-    enabled: tab === 'sponsored',
   });
 
   const { dateFrom: queryDateFrom, dateTo: queryDateTo } = useMemo(() => {
@@ -276,106 +276,172 @@ export const AdsAdminAdsAnalytics = () => {
     }
   };
 
+  const dateRangeLabel =
+    queryDateFrom && queryDateTo
+      ? queryDateFrom === queryDateTo
+        ? queryDateFrom
+        : `${queryDateFrom} – ${queryDateTo}`
+      : null;
+
+  const graphViewButtons = (['line', 'bar', 'donut'] as const).map((view) => (
+    <button
+      key={view}
+      type="button"
+      className={`admin-dashboard-badge admin-analytics-chart-badge${graphView === view ? ' is-active' : ''}`}
+      aria-pressed={graphView === view}
+      onClick={() => setGraphView(view)}
+    >
+      {view === 'line' && <i className="bi bi-graph-up me-1" aria-hidden />}
+      {view === 'bar' && <i className="bi bi-bar-chart-fill me-1" aria-hidden />}
+      {view === 'donut' && <i className="bi bi-pie-chart-fill me-1" aria-hidden />}
+      <span className="text-capitalize">{view}</span>
+    </button>
+  ));
+
+  const analyticsFilters = (
+    <div className="admin-analytics-toolbar__filters d-flex flex-wrap align-items-center gap-2">
+      {tab === 'banner' ? (
+        <select
+          className="form-select form-select-sm admin-form-control admin-analytics-toolbar__select"
+          aria-label="Banner ad"
+          value={filterBannerAdId}
+          onChange={(e) => setFilterBannerAdId(e.target.value)}
+        >
+          <option value="">All banner ads</option>
+          {bannerList.map((ad: { id: string; startAt: string; endAt: string }) => (
+            <option key={ad.id} value={ad.id}>
+              Banner {new Date(ad.startAt).toLocaleDateString()} – {new Date(ad.endAt).toLocaleDateString()}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <select
+          className="form-select form-select-sm admin-form-control admin-analytics-toolbar__select"
+          aria-label="Sponsored ad"
+          value={filterSponsoredAdId}
+          onChange={(e) => setFilterSponsoredAdId(e.target.value)}
+        >
+          <option value="">All sponsored ads</option>
+          {sponsoredList.map((ad: { id: string; title?: string | null; startAt: string }) => (
+            <option key={ad.id} value={ad.id}>
+              {ad.title || `Ad ${new Date(ad.startAt).toLocaleDateString()}`}
+            </option>
+          ))}
+        </select>
+      )}
+      <select
+        className="form-select form-select-sm admin-form-control admin-analytics-toolbar__select"
+        aria-label="Date range"
+        value={dateRangePreset}
+        onChange={(e) => setDateRangePreset(e.target.value)}
+      >
+        {DATE_RANGE_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+      {dateRangePreset === 'custom' && (
+        <>
+          <input
+            type="date"
+            className="form-control form-control-sm admin-form-control admin-analytics-toolbar__date"
+            aria-label="From date"
+            value={filterDateFrom}
+            onChange={(e) => setFilterDateFrom(e.target.value)}
+          />
+          <span className="admin-analytics-toolbar__sep" aria-hidden>–</span>
+          <input
+            type="date"
+            className="form-control form-control-sm admin-form-control admin-analytics-toolbar__date"
+            aria-label="To date"
+            value={filterDateTo}
+            onChange={(e) => setFilterDateTo(e.target.value)}
+          />
+        </>
+      )}
+    </div>
+  );
+
+  const statGrid = (views: number, clicks: number, loading: boolean) => (
+    <div className="admin-analytics-stat-grid mb-4" style={panelStyle}>
+      <div className="admin-analytics-stat admin-analytics-stat--likes">
+        <div className="admin-analytics-stat__top">
+          <span className="admin-analytics-stat__label">Views</span>
+          <i className="bi bi-eye admin-analytics-stat__icon" aria-hidden />
+        </div>
+        <p className="admin-analytics-stat__value">{loading ? '…' : views.toLocaleString()}</p>
+      </div>
+      <div className="admin-analytics-stat admin-analytics-stat--saved">
+        <div className="admin-analytics-stat__top">
+          <span className="admin-analytics-stat__label">Clicks</span>
+          <i className="bi bi-cursor admin-analytics-stat__icon" aria-hidden />
+        </div>
+        <p className="admin-analytics-stat__value">{loading ? '…' : clicks.toLocaleString()}</p>
+      </div>
+    </div>
+  );
+
   return (
     <AdsAdminLayout>
-          <div className="mb-4">
-            <h1 className="h4 mb-1" style={{ color: '#1a1f2e', fontWeight: 600 }}>
-              Ads Analytics
-            </h1>
-            <p className="small text-muted mb-0">
-              View analytics for banner ads and sponsored ads.
+      <div className="admin-analytics-page">
+        <header className="admin-page-header admin-page-header--toolbar" style={panelStyle}>
+          <div>
+            <h1 className="admin-page-title">Ads analytics</h1>
+            <p className="admin-page-subtitle">
+              Views and clicks for {tab === 'banner' ? 'banner' : 'sponsored'} ads
+              {dateRangeLabel ? (
+                <>
+                  {' '}
+                  · <span className="admin-analytics-date-pill">{dateRangeLabel}</span>
+                </>
+              ) : null}
             </p>
+            <nav className="admin-dashboard-badges mt-3 mb-0" aria-label="Ad type">
+              <button
+                type="button"
+                className={`admin-dashboard-badge${tab === 'banner' ? ' is-active' : ''}`}
+                onClick={() => setTab('banner')}
+              >
+                Banner ads
+              </button>
+              <button
+                type="button"
+                className={`admin-dashboard-badge${tab === 'sponsored' ? ' is-active' : ''}`}
+                onClick={() => setTab('sponsored')}
+              >
+                Sponsored ads
+              </button>
+            </nav>
           </div>
-
-          <div className="d-flex flex-wrap gap-3 mb-4">
-            <button
-              type="button"
-              className="btn rounded-3 border-0 d-flex align-items-center gap-2 px-4 py-3"
-              style={{
-                backgroundColor: tab === 'banner' ? 'rgba(13, 202, 240, 0.2)' : '#fff',
-                color: tab === 'banner' ? '#087990' : '#6c757d',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-                border: '1px solid #e9ecef',
-              }}
-              onClick={() => setTab('banner')}
-            >
-              <i className="bi bi-image" style={{ fontSize: '1.25rem' }} />
-              <span className="fw-semibold">Banner Ads Analytics</span>
-            </button>
-            <button
-              type="button"
-              className="btn rounded-3 border-0 d-flex align-items-center gap-2 px-4 py-3"
-              style={{
-                backgroundColor: tab === 'sponsored' ? 'rgba(25, 135, 84, 0.2)' : '#fff',
-                color: tab === 'sponsored' ? '#0f5132' : '#6c757d',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-                border: '1px solid #e9ecef',
-              }}
-              onClick={() => setTab('sponsored')}
-            >
-              <i className="bi bi-badge-ad" style={{ fontSize: '1.25rem' }} />
-              <span className="fw-semibold">Sponsored Ads Analytics</span>
-            </button>
-          </div>
+          <div className="admin-page-toolbar__actions admin-analytics-toolbar">{analyticsFilters}</div>
+        </header>
 
           {tab === 'sponsored' && (
             <>
-              <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-                <div className="d-flex align-items-center gap-2 flex-wrap">
-                  <select className="form-select form-select-sm" style={{ width: 'auto', minWidth: 180 }} value={filterSponsoredAdId} onChange={(e) => setFilterSponsoredAdId(e.target.value)}>
-                    <option value="">All sponsored ads</option>
-                    {sponsoredList.map((ad: { id: string; title?: string | null; startAt: string }) => (
-                      <option key={ad.id} value={ad.id}>{ad.title || `Ad ${new Date(ad.startAt).toLocaleDateString()}`}</option>
-                    ))}
-                  </select>
-                  <select className="form-select form-select-sm" style={{ width: 'auto', minWidth: 140 }} value={dateRangePreset} onChange={(e) => setDateRangePreset(e.target.value)}>
-                    {DATE_RANGE_OPTIONS.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
-                  </select>
-                  {dateRangePreset === 'custom' && (
-                    <>
-                      <input type="date" className="form-control form-control-sm" style={{ width: 140 }} value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} />
-                      <span className="text-muted">–</span>
-                      <input type="date" className="form-control form-control-sm" style={{ width: 140 }} value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} />
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="d-flex flex-wrap gap-3 mb-4">
-                <div className="rounded-3 p-3 flex-grow-1" style={{ minWidth: 140, maxWidth: 220, backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid #e9ecef' }}>
-                  <div className="d-flex align-items-center justify-content-between">
-                    <span className="small text-muted">Views</span>
-                    <i className="bi bi-eye-fill text-primary" style={{ fontSize: '1.1rem' }} />
+              {statGrid(sponsoredTotals.views, sponsoredTotals.clicks, sponsoredAnalyticsLoading)}
+              <section className="admin-panel admin-analytics-charts mb-4" style={panelStyle}>
+                <div className="admin-panel__header admin-analytics-charts__header">
+                  <div>
+                    <h2 className="admin-panel__title">Engagement overview</h2>
+                    <p className="admin-form-hint mb-0 mt-1">Views and clicks over the selected date range.</p>
                   </div>
-                  <div className="h4 mb-0 mt-1" style={{ color: '#1a1f2e', fontWeight: 700 }}>{sponsoredTotals.views}</div>
+                  <nav className="admin-dashboard-badges admin-analytics-chart-badges mb-0" aria-label="Chart type">
+                    {graphViewButtons}
+                  </nav>
                 </div>
-                <div className="rounded-3 p-3 flex-grow-1" style={{ minWidth: 140, maxWidth: 220, backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid #e9ecef' }}>
-                  <div className="d-flex align-items-center justify-content-between">
-                    <span className="small text-muted">Clicks</span>
-                    <i className="bi bi-cursor-fill text-success" style={{ fontSize: '1.1rem' }} />
-                  </div>
-                  <div className="h4 mb-0 mt-1" style={{ color: '#1a1f2e', fontWeight: 700 }}>{sponsoredTotals.clicks}</div>
-                </div>
-              </div>
-              <div className="rounded-3 overflow-hidden mb-4" style={{ backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid #e9ecef' }}>
-                <div className="px-3 py-3 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-2" style={{ backgroundColor: '#f8f9fa' }}>
-                  <h2 className="h6 mb-0" style={{ color: '#1a1f2e', fontWeight: 600 }}>Engagement overview</h2>
-                  <div className="d-flex align-items-center gap-1">
-                    {(['line', 'bar', 'donut'] as const).map((view) => (
-                      <button key={view} type="button" className="btn btn-sm d-flex align-items-center gap-2 rounded-2 border-0" style={{ backgroundColor: graphView === view ? 'rgba(25, 135, 84, 0.15)' : 'transparent', color: graphView === view ? '#0f5132' : '#6c757d', fontWeight: graphView === view ? 600 : 400 }} onClick={() => setGraphView(view)}>
-                        {view === 'line' && <i className="bi bi-graph-up" />}
-                        {view === 'bar' && <i className="bi bi-bar-chart-fill" />}
-                        {view === 'donut' && <i className="bi bi-pie-chart-fill" />}
-                        <span className="text-capitalize">{view}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="p-4 position-relative" onMouseLeave={() => setChartTooltip(null)}>
+                <div
+                  className="admin-panel__body admin-analytics-chart-stage position-relative"
+                  onMouseLeave={() => setChartTooltip(null)}
+                >
                   {chartTooltip && (
-                    <div className="position-fixed px-2 py-1 small rounded shadow-sm border" style={{ left: chartTooltip.x + 12, top: chartTooltip.y + 12, backgroundColor: '#1a1f2e', color: '#fff', zIndex: 9999, pointerEvents: 'none', whiteSpace: 'nowrap' }}>{chartTooltip.text}</div>
+                    <div
+                      className="admin-analytics-chart-tooltip"
+                      style={{ left: chartTooltip.x + 12, top: chartTooltip.y + 12 }}
+                    >
+                      {chartTooltip.text}
+                    </div>
                   )}
                   {sponsoredAnalyticsLoading ? (
-                    <p className="text-muted text-center py-4 mb-0 small">Loading…</p>
+                    <p className="admin-analytics-empty mb-0">Loading analytics…</p>
                   ) : (
                     <>
                       {graphView === 'line' && sponsoredByDay.length > 0 && (() => {
@@ -468,28 +534,33 @@ export const AdsAdminAdsAnalytics = () => {
                     </>
                   )}
                 </div>
-              </div>
-              <div className="rounded-3 overflow-hidden" style={{ backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid #e9ecef' }}>
-                <div className="px-3 py-2 border-bottom" style={{ backgroundColor: '#f8f9fa' }}>
-                  <h2 className="h6 mb-0" style={{ color: '#1a1f2e', fontWeight: 600 }}>Sponsored ad performance</h2>
-                  <p className="small text-muted mb-0 mt-1">Views and clicks per sponsored ad. Toggle inactive ads on to reactivate with new schedule and URL.</p>
+              </section>
+              <section className="admin-panel admin-analytics-table-panel" style={panelStyle}>
+                <div className="admin-panel__header">
+                  <div>
+                    <h2 className="admin-panel__title">Sponsored ad performance</h2>
+                    <p className="admin-form-hint mb-0 mt-1">
+                      Per-ad views and clicks. Toggle inactive ads on to reactivate with a new schedule.
+                    </p>
+                  </div>
                 </div>
-                <div className="table-responsive">
-                  <table className="table table-hover align-middle mb-0">
-                    <thead style={{ backgroundColor: '#f8f9fa', color: '#6c757d', fontSize: '0.8125rem' }}>
+                <div className="admin-panel__body admin-panel__body--flush-top">
+                  <div className="admin-table-wrap">
+                  <table className="admin-table admin-analytics-table">
+                    <thead>
                       <tr>
-                        <th style={{ fontWeight: 600 }}>Ad</th>
-                        <th style={{ fontWeight: 600, minWidth: 180 }}>Scheduled at</th>
-                        <th style={{ fontWeight: 600, width: 100 }}>Status</th>
-                        <th style={{ fontWeight: 600 }}>Attached URL</th>
-                        <th style={{ fontWeight: 600, width: 90, textAlign: 'right' }}>Views</th>
-                        <th style={{ fontWeight: 600, width: 90, textAlign: 'right' }}>Clicks</th>
-                        <th style={{ fontWeight: 600, width: 56 }}></th>
+                        <th scope="col">Ad</th>
+                        <th scope="col">Scheduled at</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Attached URL</th>
+                        <th scope="col" className="admin-analytics-table__num">Views</th>
+                        <th scope="col" className="admin-analytics-table__num">Clicks</th>
+                        <th scope="col">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {sponsoredAdsWithCounts.length === 0 ? (
-                        <tr><td colSpan={7} className="text-center text-muted py-4">No sponsored ads in this range.</td></tr>
+                        <tr><td colSpan={7} className="admin-table-empty">No sponsored ads in this range.</td></tr>
                       ) : (
                         sponsoredAdsWithCounts.map((ad) => {
                           const start = new Date(ad.startAt);
@@ -543,10 +614,18 @@ export const AdsAdminAdsAnalytics = () => {
                                   <span className="small text-muted">—</span>
                                 )}
                               </td>
-                              <td className="text-end"><span style={{ fontWeight: 600, color: '#1a1f2e' }}>{ad.views}</span></td>
-                              <td className="text-end"><span style={{ fontWeight: 600, color: '#1a1f2e' }}>{ad.clicks}</span></td>
-                              <td className="text-end">
-                                <button type="button" className="btn btn-link btn-sm text-danger p-0 border-0" onClick={() => handleDeleteClick(ad, 'sponsored')} title="Delete" aria-label="Delete"><i className="bi bi-trash" style={{ fontSize: '1.1rem' }} /></button>
+                              <td className="admin-analytics-table__num"><strong>{ad.views}</strong></td>
+                              <td className="admin-analytics-table__num"><strong>{ad.clicks}</strong></td>
+                              <td>
+                                <button
+                                  type="button"
+                                  className="admin-icon-btn admin-icon-btn--danger"
+                                  onClick={() => handleDeleteClick(ad, 'sponsored')}
+                                  title="Delete"
+                                  aria-label="Delete"
+                                >
+                                  <i className="bi bi-trash" aria-hidden />
+                                </button>
                               </td>
                             </tr>
                           );
@@ -554,100 +633,39 @@ export const AdsAdminAdsAnalytics = () => {
                       )}
                     </tbody>
                   </table>
+                  </div>
                 </div>
-              </div>
+              </section>
             </>
           )}
 
           {tab === 'banner' && (
             <>
-              <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-                <div className="d-flex align-items-center gap-2 flex-wrap">
-                  <select
-                    className="form-select form-select-sm"
-                    style={{ width: 'auto', minWidth: 180 }}
-                    value={filterBannerAdId}
-                    onChange={(e) => setFilterBannerAdId(e.target.value)}
-                  >
-                    <option value="">All banner ads</option>
-                    {bannerList.map((ad: { id: string; startAt: string; endAt: string }) => (
-                      <option key={ad.id} value={ad.id}>
-                        Banner {new Date(ad.startAt).toLocaleDateString()} – {new Date(ad.endAt).toLocaleDateString()}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    className="form-select form-select-sm"
-                    style={{ width: 'auto', minWidth: 140 }}
-                    value={dateRangePreset}
-                    onChange={(e) => setDateRangePreset(e.target.value)}
-                  >
-                    {DATE_RANGE_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                  {dateRangePreset === 'custom' && (
-                    <>
-                      <input type="date" className="form-control form-control-sm" style={{ width: 140 }} value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} />
-                      <span className="text-muted">–</span>
-                      <input type="date" className="form-control form-control-sm" style={{ width: 140 }} value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} />
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div className="d-flex flex-wrap gap-3 mb-4">
-                <div className="rounded-3 p-3 flex-grow-1" style={{ minWidth: 140, maxWidth: 220, backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid #e9ecef' }}>
-                  <div className="d-flex align-items-center justify-content-between">
-                    <span className="small text-muted">Views</span>
-                    <i className="bi bi-eye-fill text-primary" style={{ fontSize: '1.1rem' }} />
+              {statGrid(totalViews, totalClicks, analyticsLoading)}
+              <section className="admin-panel admin-analytics-charts mb-4" style={panelStyle}>
+                <div className="admin-panel__header admin-analytics-charts__header">
+                  <div>
+                    <h2 className="admin-panel__title">Engagement overview</h2>
+                    <p className="admin-form-hint mb-0 mt-1">Views and clicks over the selected date range.</p>
                   </div>
-                  <div className="h4 mb-0 mt-1" style={{ color: '#1a1f2e', fontWeight: 700 }}>{totalViews}</div>
+                  <nav className="admin-dashboard-badges admin-analytics-chart-badges mb-0" aria-label="Chart type">
+                    {graphViewButtons}
+                  </nav>
                 </div>
-                <div className="rounded-3 p-3 flex-grow-1" style={{ minWidth: 140, maxWidth: 220, backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid #e9ecef' }}>
-                  <div className="d-flex align-items-center justify-content-between">
-                    <span className="small text-muted">Clicks</span>
-                    <i className="bi bi-cursor-fill text-success" style={{ fontSize: '1.1rem' }} />
-                  </div>
-                  <div className="h4 mb-0 mt-1" style={{ color: '#1a1f2e', fontWeight: 700 }}>{totalClicks}</div>
-                </div>
-              </div>
-
-              <div className="rounded-3 overflow-hidden mb-4" style={{ backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid #e9ecef' }}>
-                <div className="px-3 py-3 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-2" style={{ backgroundColor: '#f8f9fa' }}>
-                  <h2 className="h6 mb-0" style={{ color: '#1a1f2e', fontWeight: 600 }}>Engagement overview</h2>
-                  <div className="d-flex align-items-center gap-1">
-                    {(['line', 'bar', 'donut'] as const).map((view) => (
-                      <button
-                        key={view}
-                        type="button"
-                        className="btn btn-sm d-flex align-items-center gap-2 rounded-2 border-0"
-                        style={{
-                          backgroundColor: graphView === view ? 'rgba(13, 202, 240, 0.15)' : 'transparent',
-                          color: graphView === view ? '#087990' : '#6c757d',
-                          fontWeight: graphView === view ? 600 : 400,
-                        }}
-                        onClick={() => setGraphView(view)}
-                      >
-                        {view === 'line' && <i className="bi bi-graph-up" />}
-                        {view === 'bar' && <i className="bi bi-bar-chart-fill" />}
-                        {view === 'donut' && <i className="bi bi-pie-chart-fill" />}
-                        <span className="text-capitalize">{view}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="p-4 position-relative" onMouseLeave={() => setChartTooltip(null)}>
+                <div
+                  className="admin-panel__body admin-analytics-chart-stage position-relative"
+                  onMouseLeave={() => setChartTooltip(null)}
+                >
                   {chartTooltip && (
                     <div
-                      className="position-fixed px-2 py-1 small rounded shadow-sm border"
-                      style={{ left: chartTooltip.x + 12, top: chartTooltip.y + 12, backgroundColor: '#1a1f2e', color: '#fff', zIndex: 9999, pointerEvents: 'none', whiteSpace: 'nowrap' }}
+                      className="admin-analytics-chart-tooltip"
+                      style={{ left: chartTooltip.x + 12, top: chartTooltip.y + 12 }}
                     >
                       {chartTooltip.text}
                     </div>
                   )}
                   {analyticsLoading ? (
-                    <p className="text-muted text-center py-4 mb-0 small">Loading…</p>
+                    <p className="admin-analytics-empty mb-0">Loading analytics…</p>
                   ) : (
                     <>
                       {graphView === 'line' && byDay.length > 0 && (() => {
@@ -777,30 +795,35 @@ export const AdsAdminAdsAnalytics = () => {
                     </>
                   )}
                 </div>
-              </div>
+              </section>
 
-              <div className="rounded-3 overflow-hidden" style={{ backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid #e9ecef' }}>
-                <div className="px-3 py-2 border-bottom" style={{ backgroundColor: '#f8f9fa' }}>
-                  <h2 className="h6 mb-0" style={{ color: '#1a1f2e', fontWeight: 600 }}>Banner ad performance</h2>
-                  <p className="small text-muted mb-0 mt-1">Views and clicks per banner ad in the selected date range. Toggle inactive ads on to reactivate with new schedule and URL.</p>
+              <section className="admin-panel admin-analytics-table-panel" style={panelStyle}>
+                <div className="admin-panel__header">
+                  <div>
+                    <h2 className="admin-panel__title">Banner ad performance</h2>
+                    <p className="admin-form-hint mb-0 mt-1">
+                      Per-banner views and clicks. Toggle inactive ads on to reactivate with a new schedule.
+                    </p>
+                  </div>
                 </div>
-                <div className="table-responsive">
-                  <table className="table table-hover align-middle mb-0">
-                    <thead style={{ backgroundColor: '#f8f9fa', color: '#6c757d', fontSize: '0.8125rem' }}>
+                <div className="admin-panel__body admin-panel__body--flush-top">
+                  <div className="admin-table-wrap">
+                  <table className="admin-table admin-analytics-table">
+                    <thead>
                       <tr>
-                        <th style={{ fontWeight: 600 }}>Banner</th>
-                        <th style={{ fontWeight: 600, minWidth: 180 }}>Scheduled at</th>
-                        <th style={{ fontWeight: 600, width: 100 }}>Status</th>
-                        <th style={{ fontWeight: 600 }}>Attached URL</th>
-                        <th style={{ fontWeight: 600, width: 90, textAlign: 'right' }}>Views</th>
-                        <th style={{ fontWeight: 600, width: 90, textAlign: 'right' }}>Clicks</th>
-                        <th style={{ fontWeight: 600, width: 56 }}></th>
+                        <th scope="col">Banner</th>
+                        <th scope="col">Scheduled at</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Attached URL</th>
+                        <th scope="col" className="admin-analytics-table__num">Views</th>
+                        <th scope="col" className="admin-analytics-table__num">Clicks</th>
+                        <th scope="col">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {adsWithCounts.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="text-center text-muted py-4">No banner ads in this range.</td>
+                          <td colSpan={7} className="admin-table-empty">No banner ads in this range.</td>
                         </tr>
                       ) : (
                         adsWithCounts.map((ad) => {
@@ -849,17 +872,17 @@ export const AdsAdminAdsAnalytics = () => {
                                   <span className="small text-muted">—</span>
                                 )}
                               </td>
-                              <td className="text-end"><span style={{ fontWeight: 600, color: '#1a1f2e' }}>{ad.views}</span></td>
-                              <td className="text-end"><span style={{ fontWeight: 600, color: '#1a1f2e' }}>{ad.clicks}</span></td>
-                              <td className="text-end">
+                              <td className="admin-analytics-table__num"><strong>{ad.views}</strong></td>
+                              <td className="admin-analytics-table__num"><strong>{ad.clicks}</strong></td>
+                              <td>
                                 <button
                                   type="button"
-                                  className="btn btn-link btn-sm text-danger p-0 border-0"
+                                  className="admin-icon-btn admin-icon-btn--danger"
                                   onClick={() => handleDeleteClick(ad, 'banner')}
                                   title="Delete banner ad"
                                   aria-label="Delete banner ad"
                                 >
-                                  <i className="bi bi-trash" style={{ fontSize: '1.1rem' }} />
+                                  <i className="bi bi-trash" aria-hidden />
                                 </button>
                               </td>
                             </tr>
@@ -868,25 +891,23 @@ export const AdsAdminAdsAnalytics = () => {
                       )}
                     </tbody>
                   </table>
+                  </div>
                 </div>
-              </div>
+              </section>
             </>
           )}
 
           {toggleOffConfirm && (
-            <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} tabIndex={-1}>
-              <div className="modal-dialog modal-dialog-centered">
-                <div className="modal-content rounded-3">
-                  <div className="modal-header border-0 pb-0">
-                    <h5 className="modal-title" style={{ fontWeight: 600, color: '#1a1f2e' }}>Turn off {toggleOffConfirm.type === 'sponsored' ? 'sponsored' : 'banner'} ad?</h5>
-                    <button type="button" className="btn-close" aria-label="Close" onClick={() => !toggleOffSubmitting && setToggleOffConfirm(null)} disabled={toggleOffSubmitting} />
-                  </div>
-                  <div className="modal-body pt-2">
-                    <p className="mb-0">By turning off this ad, it will <strong>no longer be displayed</strong> to users. You can turn it back on later with a new schedule from this page.</p>
-                  </div>
-                  <div className="modal-footer border-0 pt-0">
-                    <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setToggleOffConfirm(null)} disabled={toggleOffSubmitting}>Cancel</button>
-                    <button type="button" className="btn btn-warning btn-sm" onClick={confirmToggleOff} disabled={toggleOffSubmitting}>
+            <div className="admin-modal-overlay" role="presentation" onClick={() => !toggleOffSubmitting && setToggleOffConfirm(null)}>
+              <div className="admin-modal" role="alertdialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+                <div className="admin-modal__body">
+                  <h3 className="admin-modal__title">Turn off {toggleOffConfirm.type === 'sponsored' ? 'sponsored' : 'banner'} ad?</h3>
+                  <p className="admin-modal__text mb-0">
+                    By turning off this ad, it will <strong>no longer be displayed</strong> to users. You can turn it back on later with a new schedule from this page.
+                  </p>
+                  <div className="admin-modal__footer">
+                    <button type="button" className="admin-btn-secondary" onClick={() => setToggleOffConfirm(null)} disabled={toggleOffSubmitting}>Cancel</button>
+                    <button type="button" className="admin-btn-primary" onClick={confirmToggleOff} disabled={toggleOffSubmitting}>
                       {toggleOffSubmitting ? 'Turning off…' : 'Turn off ad'}
                     </button>
                   </div>
@@ -896,55 +917,41 @@ export const AdsAdminAdsAnalytics = () => {
           )}
 
           {reactivateAdId && (
-            <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} tabIndex={-1}>
-              <div className="modal-dialog modal-dialog-centered">
-                <div className="modal-content rounded-3">
-                  <div className="modal-header border-0 pb-0">
-                    <h5 className="modal-title" style={{ fontWeight: 600, color: '#1a1f2e' }}>{reactivateType === 'sponsored' ? 'Reactivate sponsored ad' : 'Reactivate banner ad'}</h5>
-                    <button type="button" className="btn-close" aria-label="Close" onClick={closeReactivateModal} />
-                  </div>
-                  <form onSubmit={submitReactivate}>
-                    <div className="modal-body pt-2">
-                      <p className="small text-muted mb-3">Set new start and end date/time and optional URL. The same {reactivateType === 'sponsored' ? 'sponsored' : 'banner'} ad will be shown again without uploading a new image.</p>
-                      {reactivateError && <div className="alert alert-danger py-2 small mb-3">{reactivateError}</div>}
-                      <div className="mb-3">
-                        <label className="form-label small fw-semibold">Start date & time <span className="text-muted fw-normal">(CST)</span></label>
-                        <input type="datetime-local" className="form-control form-control-sm" value={reactivateStartAt} onChange={(e) => setReactivateStartAt(e.target.value)} required />
-                      </div>
-                      <div className="mb-3">
-                        <label className="form-label small fw-semibold">End date & time <span className="text-muted fw-normal">(CST)</span></label>
-                        <input type="datetime-local" className="form-control form-control-sm" value={reactivateEndAt} onChange={(e) => setReactivateEndAt(e.target.value)} required />
-                      </div>
-                      <div className="mb-3">
-                        <label className="form-label small fw-semibold">Attached URL (optional)</label>
-                        <input type="url" className="form-control form-control-sm" placeholder="https://..." value={reactivateUrl} onChange={(e) => setReactivateUrl(e.target.value)} />
-                      </div>
-                    </div>
-                    <div className="modal-footer border-0 pt-0">
-                      <button type="button" className="btn btn-outline-secondary btn-sm" onClick={closeReactivateModal}>Cancel</button>
-                      <button type="submit" className="btn btn-primary btn-sm" disabled={reactivateSubmitting}>
-                        {reactivateSubmitting ? 'Posting…' : 'Post ad'}
+            <div className="admin-modal-overlay" role="presentation" onClick={closeReactivateModal}>
+              <div className="admin-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+                <form onSubmit={submitReactivate}>
+                  <div className="admin-modal__body">
+                    <h3 className="admin-modal__title">{reactivateType === 'sponsored' ? 'Reactivate sponsored ad' : 'Reactivate banner ad'}</h3>
+                    <p className="admin-form-hint mb-3">
+                      Set new start and end date/time and optional URL. The same ad will show again without a new upload.
+                    </p>
+                    {reactivateError ? <p className="admin-form-hint admin-form-hint--error">{reactivateError}</p> : null}
+                    <label className="admin-form-label" htmlFor="ads-reactivate-start">Start date & time (CST)</label>
+                    <input id="ads-reactivate-start" type="datetime-local" className="form-control admin-form-control mb-3" value={reactivateStartAt} onChange={(e) => setReactivateStartAt(e.target.value)} required />
+                    <label className="admin-form-label" htmlFor="ads-reactivate-end">End date & time (CST)</label>
+                    <input id="ads-reactivate-end" type="datetime-local" className="form-control admin-form-control mb-3" value={reactivateEndAt} onChange={(e) => setReactivateEndAt(e.target.value)} required />
+                    <label className="admin-form-label" htmlFor="ads-reactivate-url">Attached URL (optional)</label>
+                    <input id="ads-reactivate-url" type="url" className="form-control admin-form-control" placeholder="https://..." value={reactivateUrl} onChange={(e) => setReactivateUrl(e.target.value)} />
+                    <div className="admin-modal__footer mt-3">
+                      <button type="button" className="admin-btn-secondary" onClick={closeReactivateModal}>Cancel</button>
+                      <button type="submit" className="admin-btn-primary" disabled={reactivateSubmitting}>
+                        {reactivateSubmitting ? 'Saving…' : 'Save schedule'}
                       </button>
                     </div>
-                  </form>
-                </div>
+                  </div>
+                </form>
               </div>
             </div>
           )}
 
           {showActiveBlockModal && (
-            <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} tabIndex={-1}>
-              <div className="modal-dialog modal-dialog-centered">
-                <div className="modal-content rounded-3">
-                  <div className="modal-header border-0 pb-0">
-                    <h5 className="modal-title" style={{ fontWeight: 600, color: '#1a1f2e' }}>Cannot delete active ad</h5>
-                    <button type="button" className="btn-close" aria-label="Close" onClick={() => setShowActiveBlockModal(false)} />
-                  </div>
-                  <div className="modal-body pt-2">
-                    <p className="mb-0">The current ad is in active status. Make sure to set the ad to inactive first, then only the ad can be deleted.</p>
-                  </div>
-                  <div className="modal-footer border-0 pt-0">
-                    <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowActiveBlockModal(false)}>OK</button>
+            <div className="admin-modal-overlay" role="presentation" onClick={() => setShowActiveBlockModal(false)}>
+              <div className="admin-modal" role="alertdialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+                <div className="admin-modal__body">
+                  <h3 className="admin-modal__title">Cannot delete active ad</h3>
+                  <p className="admin-modal__text mb-0">Turn the ad off first, then you can delete it.</p>
+                  <div className="admin-modal__footer">
+                    <button type="button" className="admin-btn-primary" onClick={() => setShowActiveBlockModal(false)}>OK</button>
                   </div>
                 </div>
               </div>
@@ -952,20 +959,15 @@ export const AdsAdminAdsAnalytics = () => {
           )}
 
           {deleteConfirmAdId && (
-            <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} tabIndex={-1}>
-              <div className="modal-dialog modal-dialog-centered">
-                <div className="modal-content rounded-3">
-                  <div className="modal-header border-0 pb-0">
-                    <h5 className="modal-title" style={{ fontWeight: 600, color: '#1a1f2e' }}>{deleteConfirmType === 'sponsored' ? 'Delete sponsored ad' : 'Delete banner ad'}</h5>
-                    <button type="button" className="btn-close" aria-label="Close" onClick={() => { setDeleteConfirmAdId(null); setDeleteError(null); }} />
-                  </div>
-                  <div className="modal-body pt-2">
-                    <p className="mb-0">Delete this {deleteConfirmType === 'sponsored' ? 'sponsored' : 'banner'} ad? This action cannot be undone.</p>
-                    {deleteError && <div className="alert alert-danger py-2 small mt-3 mb-0">{deleteError}</div>}
-                  </div>
-                  <div className="modal-footer border-0 pt-0">
-                    <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => { setDeleteConfirmAdId(null); setDeleteError(null); }} disabled={deleteDeleting}>Cancel</button>
-                    <button type="button" className="btn btn-danger btn-sm" onClick={handleDeleteConfirm} disabled={deleteDeleting}>
+            <div className="admin-modal-overlay" role="presentation" onClick={() => !deleteDeleting && (setDeleteConfirmAdId(null), setDeleteError(null))}>
+              <div className="admin-modal" role="alertdialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+                <div className="admin-modal__body">
+                  <h3 className="admin-modal__title">{deleteConfirmType === 'sponsored' ? 'Delete sponsored ad' : 'Delete banner ad'}</h3>
+                  <p className="admin-modal__text">This action cannot be undone.</p>
+                  {deleteError ? <p className="admin-form-hint admin-form-hint--error">{deleteError}</p> : null}
+                  <div className="admin-modal__footer">
+                    <button type="button" className="admin-btn-secondary" disabled={deleteDeleting} onClick={() => { setDeleteConfirmAdId(null); setDeleteError(null); }}>Cancel</button>
+                    <button type="button" className="admin-btn-danger" disabled={deleteDeleting} onClick={handleDeleteConfirm}>
                       {deleteDeleting ? 'Deleting…' : 'Delete'}
                     </button>
                   </div>
@@ -973,6 +975,7 @@ export const AdsAdminAdsAnalytics = () => {
               </div>
             </div>
           )}
+      </div>
     </AdsAdminLayout>
   );
 };

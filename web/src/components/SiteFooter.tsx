@@ -20,16 +20,16 @@ export const SOCIAL_LINKS = [
 ] as const;
 
 export const FOOTER_EXPLORE_LINKS = [
-  { to: '/events', label: 'Events', type: 'route' as const },
+  { to: '/', label: 'Events', type: 'route' as const },
   { to: '/blogs', label: 'Blogs', type: 'route' as const },
-  { to: '/#faqs', label: 'FAQ', type: 'hash' as const },
-  { to: '/#contact-us', label: 'Contact', type: 'hash' as const },
+  { to: '/about#faqs', label: 'FAQ', type: 'hash' as const },
+  { to: '/about#contact-us', label: 'Contact', type: 'hash' as const },
 ];
 
 export const FOOTER_LEGAL_LINKS = [
   { to: '/privacy', label: 'Privacy Policy', type: 'route' as const },
   { to: '/terms', label: 'Terms & Conditions', type: 'route' as const },
-  { to: '/#community-guidelines', label: 'Community Guidelines', type: 'hash' as const },
+  { to: '/about#community-guidelines', label: 'Community Guidelines', type: 'hash' as const },
 ];
 
 function FooterLink({
@@ -71,16 +71,16 @@ export function SiteFooter() {
     const hash = to.includes('#') ? to.split('#')[1] : '';
     if (!hash) return;
 
-    if (location.pathname === '/') {
+    if (location.pathname === '/about') {
       const el = document.getElementById(hash);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        window.history.replaceState(null, '', `#${hash}`);
+        window.history.replaceState(null, '', `/about#${hash}`);
       }
       return;
     }
 
-    navigate(`/#${hash}`);
+    navigate(`/about#${hash}`);
   };
 
   return (

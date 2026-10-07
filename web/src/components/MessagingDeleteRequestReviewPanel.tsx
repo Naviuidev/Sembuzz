@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { invalidateAdminActionItemsForPrefix } from '../services/admin-action-items.service';
 
@@ -20,6 +20,7 @@ type ReviewService = {
 };
 
 interface MessagingDeleteRequestReviewPanelProps {
+  panelStyle?: CSSProperties;
   title: string;
   description: string;
   queryKeyPrefix: string;
@@ -31,6 +32,7 @@ interface MessagingDeleteRequestReviewPanelProps {
 }
 
 export function MessagingDeleteRequestReviewPanel({
+  panelStyle,
   title,
   description,
   queryKeyPrefix,
@@ -92,34 +94,36 @@ export function MessagingDeleteRequestReviewPanel({
     onSettled: () => setActingId(null),
   });
 
-  return (
-    <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 0 }}>
-      <div className="card-body">
-        <h2 className="h6 mb-2" style={{ color: TEXT_DARK }}>
-          {title}
-        </h2>
-        <p className="text-muted small mb-3">{description}</p>
+  const body = (
+    <>
+        <p className="admin-form-hint mb-3">{description}</p>
 
-        {message ? <div className="alert alert-success py-2">{message}</div> : null}
-        {error ? <div className="alert alert-danger py-2">{error}</div> : null}
+        {message ? (
+          <div className="admin-notice admin-notice--info mb-3">
+            <p className="mb-0">{message}</p>
+          </div>
+        ) : null}
+        {error ? (
+          <p className="admin-form-hint admin-form-hint--error mb-3">{error}</p>
+        ) : null}
 
-        <div className="btn-group mb-3" role="group">
+        <nav className="admin-dashboard-badges mb-3" aria-label={`${title} filter`}>
           {(['pending', 'approved', 'declined', 'all'] as const).map((tab) => (
             <button
               key={tab}
               type="button"
-              className={`btn btn-sm ${filter === tab ? 'btn-dark' : 'btn-outline-secondary'}`}
+              className={`admin-dashboard-badge${filter === tab ? ' is-active' : ''}`}
               onClick={() => setFilter(tab)}
             >
               {tab === 'all' ? 'All' : tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
           ))}
-        </div>
+        </nav>
 
         {isLoading ? (
-          <p className="text-muted mb-0">Loading delete requests…</p>
+          <p className="admin-form-hint mb-0">Loading delete requests…</p>
         ) : requests.length === 0 ? (
-          <p className="text-muted mb-0">No delete requests in this list.</p>
+          <p className="admin-form-hint mb-0">No delete requests in this list.</p>
         ) : (
           <div className="d-flex flex-column gap-3">
             {requests.map((row) => (
@@ -182,7 +186,28 @@ export function MessagingDeleteRequestReviewPanel({
             ))}
           </div>
         )}
-      </div>
+    </>
+  );
+
+  return (
+    <>
+      {panelStyle ? (
+        <section className="admin-panel" style={panelStyle}>
+          <div className="admin-panel__header">
+            <h2 className="admin-panel__title">{title}</h2>
+          </div>
+          <div className="admin-panel__body">{body}</div>
+        </section>
+      ) : (
+        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 0 }}>
+          <div className="card-body">
+            <h2 className="h6 mb-2" style={{ color: TEXT_DARK }}>
+              {title}
+            </h2>
+            {body}
+          </div>
+        </div>
+      )}
 
       {declineModal ? (
         <div
@@ -231,6 +256,6 @@ export function MessagingDeleteRequestReviewPanel({
           </div>
         </div>
       ) : null}
-    </div>
+    </>
   );
 }

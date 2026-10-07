@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useUserAuth } from '../contexts/UserAuthContext';
 import { imageSrc } from '../utils/image';
 
@@ -12,7 +12,17 @@ type EventsBottomNavProps = {
   chatUnreadCount?: number;
   visible?: boolean;
   zIndex?: number;
+  /** When true, shows a fixed left sidebar on large screens and bottom bar on small screens. */
+  responsiveLayout?: boolean;
 };
+
+const TAB_META: { tab: EventsBottomNavTab; label: string; icon: string; iconActive: string }[] = [
+  { tab: 'home', label: 'Home', icon: 'bi-house-door', iconActive: 'bi-house-door-fill' },
+  { tab: 'search', label: 'Search', icon: 'bi-search', iconActive: 'bi-search' },
+  { tab: 'settings', label: 'Profile', icon: 'bi-person', iconActive: 'bi-person-fill' },
+  { tab: 'apps', label: 'Apps', icon: 'bi-grid-3x3-gap', iconActive: 'bi-grid-3x3-gap-fill' },
+  { tab: 'chat', label: 'Messages', icon: 'bi-chat-dots', iconActive: 'bi-chat-dots-fill' },
+];
 
 export function EventsBottomNav({
   activeTab,
@@ -21,6 +31,7 @@ export function EventsBottomNav({
   chatUnreadCount = 0,
   visible = true,
   zIndex = 1030,
+  responsiveLayout = false,
 }: EventsBottomNavProps) {
   const { user } = useUserAuth();
   const profileImageValue =
@@ -35,190 +46,165 @@ export function EventsBottomNav({
     setSettingsProfileImgFailed(false);
   }, [user?.id, user?.schoolImage, profileImageValue]);
 
-  const iconColor = (tab: EventsBottomNavTab) => (activeTab === tab ? '#1a1f2e' : '#6c757d');
+  const isActive = (tab: EventsBottomNavTab) => activeTab === tab;
+
+  const renderProfileIcon = (size: number) => {
+    if (profileImageValue && !settingsProfileImgFailed) {
+      return (
+        <img
+          src={imageSrc(profileImageValue)}
+          alt=""
+          className="events-nav-profile-img"
+          style={{ width: size, height: size }}
+          onError={() => setSettingsProfileImgFailed(true)}
+        />
+      );
+    }
+    if (user?.schoolImage && !settingsSchoolImgFailed) {
+      return (
+        <img
+          src={imageSrc(user.schoolImage)}
+          alt=""
+          className="events-nav-profile-img"
+          style={{ width: size, height: size }}
+          onError={() => setSettingsSchoolImgFailed(true)}
+        />
+      );
+    }
+    if (user) {
+      return (
+        <span
+          className="events-nav-profile-fallback"
+          style={{ width: size, height: size, fontSize: size * 0.42 }}
+        >
+          {(user.schoolName?.trim()?.charAt(0) || user.name?.trim()?.charAt(0) || '?').slice(0, 1)}
+        </span>
+      );
+    }
+    return (
+      <i
+        className={`bi ${isActive('settings') ? 'bi-person-fill' : 'bi-person'}`}
+        aria-hidden
+      />
+    );
+  };
+
+  const renderBadge = (count: number) =>
+    count > 0 ? (
+      <span className="events-nav-badge">
+        {count > 99 ? '99+' : count}
+      </span>
+    ) : null;
+
+  const profileControl = (size: number, showNotifBadge: boolean) => (
+    <span
+      className={`events-nav-profile-wrap position-relative d-inline-flex align-items-center justify-content-center${
+        isActive('settings') ? ' is-active' : ''
+      }`}
+    >
+      {renderProfileIcon(size)}
+      {showNotifBadge && user && notifUnreadCount > 0 ? renderBadge(notifUnreadCount) : null}
+    </span>
+  );
+
+  const renderSidebarItem = (tab: EventsBottomNavTab, label: string, icon: string, iconActive: string) => {
+    const active = isActive(tab);
+    return (
+      <button
+        key={tab}
+        type="button"
+        className={`events-sidebar-nav-item${active ? ' is-active' : ''}`}
+        aria-label={label}
+        aria-current={active ? 'page' : undefined}
+        onClick={() => onSelectTab(tab)}
+      >
+        <span className="events-sidebar-nav-icon">
+          {tab === 'settings' ? (
+            profileControl(24, true)
+          ) : tab === 'chat' ? (
+            <span className="position-relative d-inline-flex">
+              <i className={`bi ${active ? iconActive : icon}`} aria-hidden />
+              {renderBadge(chatUnreadCount)}
+            </span>
+          ) : (
+            <i className={`bi ${active ? iconActive : icon}`} aria-hidden />
+          )}
+        </span>
+        <span className="events-sidebar-nav-label">{label}</span>
+      </button>
+    );
+  };
+
+  const renderBottomIconButton = (tab: EventsBottomNavTab, ariaLabel: string, children: ReactNode) => (
+    <button
+      type="button"
+      className={`events-bottom-nav-btn${isActive(tab) ? ' is-active' : ''}`}
+      aria-label={ariaLabel}
+      aria-current={isActive(tab) ? 'page' : undefined}
+      onClick={() => onSelectTab(tab)}
+    >
+      {children}
+    </button>
+  );
 
   return (
     <>
+      {responsiveLayout ? (
+        <aside className="events-sidebar-nav" aria-label="Primary">
+          <div className="events-sidebar-nav-inner">
+            <nav className="events-sidebar-nav-list">
+              {TAB_META.map(({ tab, label, icon, iconActive }) =>
+                renderSidebarItem(tab, label, icon, iconActive),
+              )}
+            </nav>
+          </div>
+        </aside>
+      ) : null}
+
       <div
+        className={`events-bottom-nav-host${responsiveLayout ? ' events-bottom-nav-host--responsive' : ''}`}
         style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
           zIndex,
-          display: 'flex',
-          justifyContent: 'center',
-          paddingLeft: '1rem',
-          paddingRight: '1rem',
-          paddingBottom: 'max(10px, env(safe-area-inset-bottom, 0px))',
-          transform: visible ? 'translateY(0)' : 'translateY(120%)',
+          transform: visible ? 'translateY(0)' : 'translateY(110%)',
           opacity: visible ? 1 : 0,
-          transition: 'transform 260ms ease, opacity 260ms ease',
           pointerEvents: visible ? 'auto' : 'none',
         }}
       >
-        <div
-          className="events-bottom-nav-shell"
-          style={{
-            width: '100%',
-            maxWidth: '600px',
-            background: '#fff',
-            borderTopLeftRadius: 24,
-            borderTopRightRadius: 24,
-            boxShadow: '0 -2px 16px rgba(0,0,0,0.08)',
-            padding: '10px 8px',
-          }}
-        >
-          <div className="d-flex justify-content-between align-items-center" style={{ gap: 4 }}>
-            <button
-              type="button"
-              className={`events-bottom-nav-btn ${activeTab === 'search' ? 'events-bottom-nav-btn-active' : ''}`}
-              aria-label="Search"
-              aria-current={activeTab === 'search' ? 'page' : undefined}
-              onClick={() => onSelectTab('search')}
-            >
-              <i className="bi bi-search" style={{ fontSize: '1.375rem', color: iconColor('search') }} />
-            </button>
-            <button
-              type="button"
-              className={`events-bottom-nav-btn ${activeTab === 'home' ? 'events-bottom-nav-btn-active' : ''}`}
-              aria-label="Home"
-              aria-current={activeTab === 'home' ? 'page' : undefined}
-              onClick={() => onSelectTab('home')}
-            >
-              <i className="bi bi-house-door" style={{ fontSize: '1.375rem', color: iconColor('home') }} />
-            </button>
-            <button
-              type="button"
-              className={`events-bottom-nav-btn ${activeTab === 'settings' ? 'events-bottom-nav-btn-active' : ''}`}
-              aria-label="Account"
-              aria-current={activeTab === 'settings' ? 'page' : undefined}
-              onClick={() => onSelectTab('settings')}
-            >
-              <span className="position-relative d-inline-flex align-items-center justify-content-center">
-                {profileImageValue && !settingsProfileImgFailed ? (
-                  <img
-                    src={imageSrc(profileImageValue)}
-                    alt=""
-                    style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }}
-                    onError={() => setSettingsProfileImgFailed(true)}
-                  />
-                ) : user?.schoolImage && !settingsSchoolImgFailed ? (
-                  <img
-                    src={imageSrc(user.schoolImage)}
-                    alt=""
-                    style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }}
-                    onError={() => setSettingsSchoolImgFailed(true)}
-                  />
-                ) : user ? (
-                  <span
-                    className="d-inline-flex align-items-center justify-content-center fw-bold text-uppercase"
-                    style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: '50%',
-                      background: '#eef1f6',
-                      fontSize: '0.7rem',
-                      color: '#1a1f2e',
-                    }}
-                  >
-                    {(user.schoolName?.trim()?.charAt(0) || user.name?.trim()?.charAt(0) || '?').slice(0, 1)}
-                  </span>
-                ) : (
-                  <i className="bi bi-person" style={{ fontSize: '1.25rem', color: iconColor('settings') }} />
-                )}
-                {user && notifUnreadCount > 0 ? (
-                  <span
-                    className="position-absolute rounded-pill bg-danger text-white"
-                    style={{
-                      top: -6,
-                      right: -8,
-                      minWidth: 16,
-                      height: 16,
-                      fontSize: 9,
-                      fontWeight: 700,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '0 3px',
-                      lineHeight: 1,
-                      border: '1.5px solid #fff',
-                    }}
-                  >
-                    {notifUnreadCount > 99 ? '99+' : notifUnreadCount}
-                  </span>
-                ) : null}
-              </span>
-            </button>
-            <button
-              type="button"
-              className={`events-bottom-nav-btn ${activeTab === 'apps' ? 'events-bottom-nav-btn-active' : ''}`}
-              aria-label="Apps"
-              aria-current={activeTab === 'apps' ? 'page' : undefined}
-              onClick={() => onSelectTab('apps')}
-            >
-              <i className="bi bi-grid-3x3-gap" style={{ fontSize: '1.375rem', color: iconColor('apps') }} />
-            </button>
-            <button
-              type="button"
-              className={`events-bottom-nav-btn ${activeTab === 'chat' ? 'events-bottom-nav-btn-active' : ''}`}
-              aria-label="Chat"
-              aria-current={activeTab === 'chat' ? 'page' : undefined}
-              onClick={() => onSelectTab('chat')}
-            >
+        <div className="events-bottom-nav-shell">
+          <div className="d-flex justify-content-between align-items-center events-bottom-nav-row">
+            {renderBottomIconButton(
+              'home',
+              'Home',
+              <i className={`bi ${isActive('home') ? 'bi-house-door-fill' : 'bi-house-door'}`} aria-hidden />,
+            )}
+            {renderBottomIconButton(
+              'search',
+              'Search',
+              <i className="bi bi-search" aria-hidden />,
+            )}
+            {renderBottomIconButton('settings', 'Profile', profileControl(26, true))}
+            {renderBottomIconButton(
+              'apps',
+              'Apps',
+              <i
+                className={`bi ${isActive('apps') ? 'bi-grid-3x3-gap-fill' : 'bi-grid-3x3-gap'}`}
+                aria-hidden
+              />,
+            )}
+            {renderBottomIconButton(
+              'chat',
+              'Messages',
               <span className="position-relative d-inline-flex">
-                <i className="bi bi-chat-dots" style={{ fontSize: '1.375rem', color: iconColor('chat') }} />
-                {chatUnreadCount > 0 ? (
-                  <span
-                    className="position-absolute rounded-pill bg-danger text-white"
-                    style={{
-                      top: -6,
-                      right: -10,
-                      minWidth: 16,
-                      height: 16,
-                      fontSize: 9,
-                      fontWeight: 700,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '0 3px',
-                      border: '1.5px solid #fff',
-                    }}
-                  >
-                    {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
-                  </span>
-                ) : null}
-              </span>
-            </button>
+                <i
+                  className={`bi ${isActive('chat') ? 'bi-chat-dots-fill' : 'bi-chat-dots'}`}
+                  aria-hidden
+                />
+                {renderBadge(chatUnreadCount)}
+              </span>,
+            )}
           </div>
         </div>
       </div>
-      <style>{`
-        .events-bottom-nav-btn {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 8px 10px;
-          margin: 0 4px;
-          border: none;
-          border-radius: 14px;
-          background: transparent;
-          cursor: pointer;
-          transition: background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-        }
-        .events-bottom-nav-btn:hover {
-          background: rgba(26, 31, 46, 0.04);
-        }
-        .events-bottom-nav-btn-active {
-          background: #f3f6ff !important;
-          border: 1px solid #dbe4ff !important;
-          box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
-        }
-        .events-bottom-nav-btn-active:hover {
-          background: #f3f6ff !important;
-        }
-      `}</style>
     </>
   );
 }

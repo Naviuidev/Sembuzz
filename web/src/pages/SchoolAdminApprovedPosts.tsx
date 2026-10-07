@@ -1,11 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { SchoolAdminNavbar } from '../components/SchoolAdminNavbar';
-import { SchoolAdminSidebar } from '../components/SchoolAdminSidebar';
 import {
   schoolAdminPostsService,
   type SchoolAdminPost,
 } from '../services/school-admin-posts.service';
-import { EventPostReviewSummary } from '../components/EventPostReviewSummary';
 import {
   EventPostDetailFields,
   actionButtonsForApi,
@@ -15,17 +12,10 @@ import {
   validateActionButtons,
 } from '../components/EventPostDetailFields';
 import type { EventActionButton } from '../types/event-post';
-
-function formatDate(iso: string) {
-  try {
-    return new Date(iso).toLocaleString(undefined, {
-      dateStyle: 'short',
-      timeStyle: 'short',
-    });
-  } catch {
-    return iso;
-  }
-}
+import { imageSrc } from '../utils/image';
+import { CreatePostLivePreview } from '../components/CreatePostLivePreview';
+import { ADMIN_PORTAL_ACCENTS } from '../constants/adminPortalTheme';
+import { useSchoolAdminAuth } from '../contexts/SchoolAdminAuthContext';
 
 function parseImageUrls(imageUrls: string | null): string[] {
   if (!imageUrls) return [];
@@ -37,17 +27,23 @@ function parseImageUrls(imageUrls: string | null): string[] {
   }
 }
 
-/** First ~40 words of text */
-function firstWords(text: string | null, maxWords = 40): string {
-  if (!text || !text.trim()) return '';
-  const words = text.trim().split(/\s+/).slice(0, maxWords);
-  return words.join(' ') + (words.length >= maxWords ? '…' : '');
+function statusPill(status: string) {
+  const map: Record<string, { label: string; className: string }> = {
+    scheduled: { label: 'Scheduled', className: 'admin-pill admin-pill--status-progress' },
+    published: { label: 'Published', className: 'admin-pill admin-pill--status-done' },
+    approved: { label: 'Published', className: 'admin-pill admin-pill--status-done' },
+  };
+  const s = map[status] ?? { label: status, className: 'admin-pill admin-pill--neutral' };
+  return <span className={s.className}>{s.label}</span>;
 }
 
-export const SchoolAdminApprovedPosts = () => {
+export function SchoolAdminApprovedPostsPanel() {
+  const { user } = useSchoolAdminAuth();
   const [posts, setPosts] = useState<SchoolAdminPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [previewPost, setPreviewPost] = useState<SchoolAdminPost | null>(null);
+  const [previewMode, setPreviewMode] = useState<'mobile' | 'tablet' | 'web'>('mobile');
   const [viewPost, setViewPost] = useState<SchoolAdminPost | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editActionButtons, setEditActionButtons] = useState<EventActionButton[]>([]);
@@ -103,9 +99,14 @@ export const SchoolAdminApprovedPosts = () => {
     fetchPosts();
   }, []);
 
-  const handleView = (post: SchoolAdminPost) => {
+  const openPreview = (post: SchoolAdminPost) => {
+    setPreviewPost(post);
+    setPreviewMode('mobile');
+  };
+
+  const openEdit = (post: SchoolAdminPost) => {
     setViewPost(post);
-    setIsEditing(false);
+    setIsEditing(true);
     setEditForm({
       title: post.title,
       description: post.description ?? '',
@@ -120,9 +121,17 @@ export const SchoolAdminApprovedPosts = () => {
     setEditActionButtons(parseStoredActionButtons(post.actionButtons));
   };
 
-  const handleEditClick = () => setIsEditing(true);
+  const handleEditFromPreview = () => {
+    if (!previewPost) return;
+    const post = previewPost;
+    setPreviewPost(null);
+    openEdit(post);
+  };
 
-  const handleEditCancel = () => setIsEditing(false);
+  const handleEditCancel = () => {
+    setIsEditing(false);
+    setViewPost(null);
+  };
 
   const handleEditSave = async () => {
     if (!viewPost) return;
@@ -148,7 +157,7 @@ export const SchoolAdminApprovedPosts = () => {
         imageUrls: imageUrlsFiltered.length > 0 ? imageUrlsFiltered : [],
       });
       setPosts((prev) => prev.map((p) => (p.id === viewPost.id ? updated : p)));
-      setViewPost(updated);
+      setViewPost(null);
       setIsEditing(false);
     } catch (err) {
       const msg =
@@ -212,158 +221,224 @@ export const SchoolAdminApprovedPosts = () => {
   };
 
   return (
-    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
-      <SchoolAdminNavbar />
-      <div className="admin-shell-body">
-        <SchoolAdminSidebar />
-        <div className="admin-main">
-          <div className="mb-4">
-            <h1 style={{ fontSize: '2rem', fontWeight: 'normal', color: '#1a1f2e', marginBottom: '0.5rem' }}>
-              Approved posts
-            </h1>
-            <p style={{ color: '#6c757d', fontSize: '1rem', marginBottom: 0 }}>
-              Approved posts from subcategory admins. View, edit (title, description, link, images), or delete.
-            </p>
-          </div>
-
-          {error && (
-            <div className="alert alert-danger mb-4" style={{ borderRadius: '0px' }}>
-              {error}
-            </div>
-          )}
-
-          {loading ? (
-            <div className="text-center py-5">
-              <div className="spinner-border text-secondary" />
-              <p className="mt-2 mb-0 text-muted">Loading approved posts…</p>
-            </div>
-          ) : approvedPosts.length === 0 ? (
-            <div className="card border-0 shadow-sm p-5 text-center" style={{ borderRadius: '0px' }}>
-              <i className="bi bi-globe" style={{ fontSize: '3rem', color: '#6c757d' }} />
-              <p className="text-muted mb-0 mt-2">No approved posts yet.</p>
-            </div>
-          ) : (
-            <div className="row g-4">
-              {approvedPosts.map((post) => {
-                const images = parseImageUrls(post.imageUrls);
-                const firstImg = images[0] ?? null;
-                return (
-                  <div key={post.id} className="col-12 col-sm-6 col-lg-4">
-                    <div
-                      className="card border-0 shadow-sm h-100"
-                      style={{ borderRadius: '0px', overflow: 'hidden' }}
-                    >
-                      {firstImg && (
-                        <div
-                          style={{
-                            height: '180px',
-                            backgroundColor: '#eee',
-                            backgroundImage: `url(${firstImg})`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                          }}
-                        />
-                      )}
-                      <div className="card-body p-3">
-                        <h5 className="card-title mb-2" style={{ fontSize: '1.1rem', color: '#1a1f2e', fontWeight: '600' }}>
-                          {post.title}
-                        </h5>
-                        <p className="card-text small text-muted mb-3" style={{ minHeight: '3.6em' }}>
-                          {firstWords(post.description, 40)}
-                        </p>
-                        <button
-                          type="button"
-                          className="btn btn-sm"
-                          style={{
-                            border: '1px solid #dee2e6',
-                            borderRadius: '50px',
-                            padding: '0.35rem 1rem',
-                            color: '#1a1f2e',
-                            fontWeight: '500',
-                          }}
-                          onClick={() => handleView(post)}
-                        >
-                          View
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+    <>
+      {error ? (
+        <div className="admin-notice mb-3">
+          <p className="admin-form-hint admin-form-hint--error mb-0">{error}</p>
         </div>
-      </div>
+      ) : null}
 
-      {/* View / Edit modal */}
-      {viewPost && (
+      {loading ? (
+        <div className="admin-loading-state">
+          <div className="spinner-border text-secondary" role="status" />
+          <p className="mt-2 mb-0">Loading approved posts…</p>
+        </div>
+      ) : approvedPosts.length === 0 ? (
+        <div className="admin-empty-state">
+          <i className="bi bi-check2-circle" style={{ fontSize: '2.5rem', opacity: 0.45 }} aria-hidden />
+          <p className="mt-3 mb-0">No approved posts yet.</p>
+          <p className="small mb-0">Posts from subcategory admins appear here once approved or published.</p>
+        </div>
+      ) : (
+        <div className="admin-approved-posts">
+          <div className="admin-approved-posts__toolbar">
+            <span className="admin-approved-posts__count">
+              {approvedPosts.length} approved {approvedPosts.length === 1 ? 'post' : 'posts'}
+            </span>
+          </div>
+          <div className="admin-table-wrap">
+            <table className="admin-table admin-approved-posts__table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Category / Subcategory</th>
+                  <th>Posted by</th>
+                  <th className="admin-approved-posts__actions-col" aria-label="Actions">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {approvedPosts.map((post) => {
+                  const categoryLabel = [post.subCategory?.category?.name, post.subCategory?.name]
+                    .filter(Boolean)
+                    .join(' / ');
+                  const author =
+                    post.subCategoryAdmin?.name ??
+                    post.subCategoryAdmin?.email ??
+                    post.schoolAdmin?.name ??
+                    '—';
+                  return (
+                    <tr key={post.id}>
+                      <td>
+                        <span className="admin-table__strong">{post.title}</span>
+                        <span className="d-block mt-1">{statusPill(post.status)}</span>
+                      </td>
+                      <td>{categoryLabel || '—'}</td>
+                      <td>{author}</td>
+                      <td>
+                        <div className="admin-table-actions admin-approved-posts__row-actions">
+                          <button
+                            type="button"
+                            className="admin-icon-btn"
+                            aria-label={`Preview ${post.title}`}
+                            onClick={() => openPreview(post)}
+                          >
+                            <i className="bi bi-eye" aria-hidden />
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-icon-btn admin-icon-btn--danger"
+                            aria-label={`Delete ${post.title}`}
+                            onClick={() => handleDeleteClick(post.id)}
+                          >
+                            <i className="bi bi-trash" aria-hidden />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {previewPost ? (
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1050,
-          }}
-          onClick={() => !isEditing && setViewPost(null)}
+          className="admin-modal-overlay admin-modal-overlay--elevated"
+          onClick={() => setPreviewPost(null)}
+          role="presentation"
         >
           <div
-            className="card border-0 shadow-lg"
-            style={{
-              borderRadius: '0px',
-              minWidth: '400px',
-              maxWidth: '600px',
-              width: '90%',
-              maxHeight: '90vh',
-              overflow: 'auto',
-            }}
+            className="admin-modal admin-modal--preview-post"
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="approved-post-preview-title"
           >
-            <div className="card-body p-4">
-              {isEditing ? (
-                <>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1a1f2e', marginBottom: '1rem' }}>
-                    Edit post
-                  </h3>
+            <button
+              type="button"
+              className="admin-modal__close"
+              aria-label="Close preview"
+              onClick={() => setPreviewPost(null)}
+            >
+              <i className="bi bi-x-lg" aria-hidden />
+            </button>
+            <div className="admin-modal__body admin-modal__body--with-close">
+              <h3 className="admin-modal__title" id="approved-post-preview-title">Post preview</h3>
+              <p className="admin-form-hint mb-3">{previewPost.title}</p>
+              <div
+                className="admin-create-post-preview-toggle mb-3"
+                role="tablist"
+                aria-label="Preview device"
+              >
+                {(['mobile', 'tablet', 'web'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    role="tab"
+                    aria-selected={previewMode === mode}
+                    className={previewMode === mode ? 'is-active' : ''}
+                    onClick={() => setPreviewMode(mode)}
+                  >
+                    {mode === 'mobile' ? 'Mobile' : mode === 'tablet' ? 'Tablet' : 'Web'}
+                  </button>
+                ))}
+              </div>
+              <div className="admin-approved-posts__preview-frame">
+                <CreatePostLivePreview
+                  title={previewPost.title}
+                  description={previewPost.description ?? ''}
+                  categoryName={previewPost.subCategory?.category?.name ?? ''}
+                  subCategoryName={previewPost.subCategory?.name ?? ''}
+                  schoolName={user?.schoolName || user?.schoolDomain || 'Your school'}
+                  eventDate={eventDateToInputValue(previewPost.eventDate ?? null)}
+                  eventStartTime={eventTimeToInputValue(previewPost.eventStartTime ?? null)}
+                  eventEndTime={eventTimeToInputValue(previewPost.eventEndTime ?? null)}
+                  eventLocation={previewPost.eventLocation?.trim() ?? ''}
+                  actionButtons={actionButtonsForApi(
+                    parseStoredActionButtons(previewPost.actionButtons),
+                  )}
+                  coverSrc={
+                    parseImageUrls(previewPost.imageUrls)[0]
+                      ? imageSrc(parseImageUrls(previewPost.imageUrls)[0])
+                      : ''
+                  }
+                  previewMode={previewMode}
+                  accentColor={ADMIN_PORTAL_ACCENTS.school}
+                  commentsEnabled={previewPost.commentsEnabled}
+                />
+              </div>
+              <div className="admin-modal__footer admin-modal__footer--between mt-3">
+                <button type="button" className="admin-btn-secondary" onClick={() => setPreviewPost(null)}>
+                  Close
+                </button>
+                <button type="button" className="admin-btn-primary" onClick={handleEditFromPreview}>
+                  Edit post
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {viewPost && isEditing ? (
+        <div
+          className="admin-modal-overlay admin-modal-overlay--elevated"
+          onClick={() => !saving && handleEditCancel()}
+          role="presentation"
+        >
+          <div
+            className="admin-modal admin-modal--xl"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="approved-post-modal-title"
+          >
+            <button
+              type="button"
+              className="admin-modal__close"
+              aria-label="Close"
+              onClick={() => !saving && handleEditCancel()}
+            >
+              <i className="bi bi-x-lg" aria-hidden />
+            </button>
+            <div className="admin-modal__body admin-modal__body--with-close admin-modal__scroll">
+              <>
+                  <h3 className="admin-modal__title" id="approved-post-modal-title">Edit post</h3>
                   <div className="mb-3">
-                    <label className="form-label small fw-500" style={{ color: '#1a1f2e' }}>
-                      Title
-                    </label>
+                    <label className="admin-form-label" htmlFor="approved-edit-title">Title</label>
                     <input
+                      id="approved-edit-title"
                       type="text"
-                      className="form-control"
+                      className="form-control admin-form-control"
                       value={editForm.title}
                       onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
                       placeholder="Post title"
-                      style={{ borderRadius: '0px' }}
                     />
                   </div>
                   <div className="mb-3">
-                    <label className="form-label small fw-500" style={{ color: '#1a1f2e' }}>
-                      Description
-                    </label>
+                    <label className="admin-form-label" htmlFor="approved-edit-desc">Description</label>
                     <textarea
-                      className="form-control"
+                      id="approved-edit-desc"
+                      className="form-control admin-form-control"
                       rows={4}
                       value={editForm.description}
                       onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
                       placeholder="Description"
-                      style={{ borderRadius: '0px' }}
                     />
                   </div>
                   <div className="mb-3">
-                    <label className="form-label small fw-500" style={{ color: '#1a1f2e' }}>
-                      External link
-                    </label>
+                    <label className="admin-form-label" htmlFor="approved-edit-link">External link</label>
                     <input
+                      id="approved-edit-link"
                       type="url"
-                      className="form-control"
+                      className="form-control admin-form-control"
                       value={editForm.externalLink}
                       onChange={(e) => setEditForm((f) => ({ ...f, externalLink: e.target.value }))}
                       placeholder="https://..."
-                      style={{ borderRadius: '0px' }}
                     />
                   </div>
                   <EventPostDetailFields
@@ -392,31 +467,26 @@ export const SchoolAdminApprovedPosts = () => {
                     </div>
                   </div>
                   <div className="mb-3">
-                    <label className="form-label small fw-500" style={{ color: '#1a1f2e' }}>
-                      Images
-                    </label>
-                    {editForm.imageUrls.length > 0 && (
-                      <div className="d-flex flex-wrap gap-2 mb-2">
+                    <label className="admin-form-label">Images</label>
+                    {editForm.imageUrls.length > 0 ? (
+                      <div className="admin-create-post-upload-thumbs mb-2">
                         {editForm.imageUrls.map((url, i) => (
-                          <div key={i} className="position-relative d-inline-block">
-                            <img
-                              src={url}
-                              alt=""
-                              style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: '6px', border: '1px solid #dee2e6' }}
-                            />
+                          <div key={i} className="position-relative">
+                            <img src={imageSrc(url)} alt="" width={72} height={72} />
                             <button
                               type="button"
-                              className="position-absolute top-0 end-0 btn btn-sm btn-danger rounded-circle p-0"
-                              style={{ width: 22, height: 22, fontSize: '0.75rem', lineHeight: 1 }}
+                              className="admin-icon-btn admin-icon-btn--danger position-absolute top-0 end-0"
+                              style={{ transform: 'translate(25%, -25%)' }}
                               onClick={() => removeImageUrl(i)}
                               title="Remove image"
+                              aria-label="Remove image"
                             >
-                              ×
+                              <i className="bi bi-x" aria-hidden />
                             </button>
                           </div>
                         ))}
                       </div>
-                    )}
+                    ) : null}
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -427,210 +497,55 @@ export const SchoolAdminApprovedPosts = () => {
                     />
                     <button
                       type="button"
-                      className="btn btn-sm"
-                      style={{
-                        border: '1px solid #dee2e6',
-                        borderRadius: '0px',
-                        padding: '0.4rem 0.9rem',
-                        color: '#1a1f2e',
-                        fontWeight: '500',
-                      }}
+                      className="admin-btn-secondary admin-btn-sm"
                       disabled={uploadingImages}
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      {uploadingImages ? (
-                        <>
-                          <span className="spinner-border spinner-border-sm me-1" />
-                          Uploading…
-                        </>
-                      ) : (
-                        <>Choose file(s)</>
-                      )}
+                      {uploadingImages ? 'Uploading…' : 'Choose images'}
                     </button>
-                    <span className="text-muted small ms-2">JPEG, PNG, GIF, WebP. Max 10MB each.</span>
+                    <p className="admin-form-hint mt-2 mb-0">JPEG, PNG, GIF, WebP. Max 10MB each.</p>
                   </div>
-                  <div className="d-flex justify-content-end gap-2 flex-wrap">
-                    <button
-                      type="button"
-                      className="btn btn-sm"
-                      style={{
-                        backgroundColor: 'transparent',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '50px',
-                        padding: '0.5rem 1rem',
-                        color: '#1a1f2e',
-                        fontWeight: '500',
-                      }}
-                      onClick={handleEditCancel}
-                      disabled={saving}
-                    >
+                  <div className="admin-modal__footer admin-modal__footer--between">
+                    <button type="button" className="admin-btn-secondary" onClick={handleEditCancel} disabled={saving}>
                       Cancel
                     </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-primary"
-                      style={{ borderRadius: '50px', padding: '0.5rem 1rem', fontWeight: '500' }}
-                      onClick={handleEditSave}
-                      disabled={saving}
-                    >
-                      {saving ? (
-                        <>
-                          <span className="spinner-border spinner-border-sm me-1" />
-                          Saving…
-                        </>
-                      ) : (
-                        'Update'
-                      )}
+                    <button type="button" className="admin-btn-primary" onClick={handleEditSave} disabled={saving}>
+                      {saving ? 'Saving…' : 'Save changes'}
                     </button>
                   </div>
-                </>
-              ) : (
-                <>
-                  <h3 style={{ fontSize: '1.5rem', fontWeight: 'normal', color: '#1a1f2e', marginBottom: '1rem' }}>
-                    {viewPost.title}
-                  </h3>
-                  <p className="text-muted small mb-2">
-                    {viewPost.subCategory?.category?.name} / {viewPost.subCategory?.name}
-                  </p>
-                  <EventPostReviewSummary event={viewPost} className="mb-3" />
-                  {viewPost.description && (
-                    <p className="mb-3" style={{ whiteSpace: 'pre-wrap', color: '#6c757d' }}>
-                      {viewPost.description}
-                    </p>
-                  )}
-                  <p className="mb-2 small">
-                    <strong>Comments:</strong> {viewPost.commentsEnabled ? 'Enabled' : 'Disabled'}
-                  </p>
-                  {parseImageUrls(viewPost.imageUrls).length > 0 && (
-                    <div className="mb-3">
-                      <div className="d-flex flex-wrap gap-2">
-                        {parseImageUrls(viewPost.imageUrls).map((url, i) => (
-                          <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="d-block">
-                            <img
-                              src={url}
-                              alt=""
-                              style={{ maxWidth: 120, maxHeight: 120, objectFit: 'cover', borderRadius: '6px' }}
-                            />
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <p className="text-muted small mb-3">
-                    Posted by {viewPost.subCategoryAdmin?.name ?? viewPost.subCategoryAdmin?.email} ·{' '}
-                    {formatDate(viewPost.createdAt)}
-                  </p>
-                  <div className="d-flex justify-content-end gap-2 flex-wrap">
-                    <button
-                      type="button"
-                      className="btn btn-sm"
-                      style={{
-                        backgroundColor: '#1a1f2e',
-                        border: 'none',
-                        borderRadius: '50px',
-                        padding: '0.5rem 1rem',
-                        color: '#fff',
-                        fontWeight: '500',
-                      }}
-                      onClick={handleEditClick}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm"
-                      style={{
-                        backgroundColor: 'transparent',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '50px',
-                        padding: '0.5rem 1rem',
-                        color: '#1a1f2e',
-                        fontWeight: '500',
-                      }}
-                      onClick={() => setViewPost(null)}
-                    >
-                      Close
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-danger"
-                      style={{ borderRadius: '50px', padding: '0.5rem 1rem', fontWeight: '500' }}
-                      onClick={() => handleDeleteClick(viewPost.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </>
-              )}
+              </>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Delete confirm */}
-      {deleteId && (
+      {deleteId ? (
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1060,
-          }}
+          className="admin-modal-overlay admin-modal-overlay--elevated"
           onClick={() => !deleting && setDeleteId(null)}
+          role="presentation"
         >
-          <div
-            className="card border-0 shadow-lg"
-            style={{ borderRadius: '0px', minWidth: '400px', maxWidth: '500px', width: '90%' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="card-body p-4">
-              <h3 style={{ fontSize: '1.5rem', fontWeight: 'normal', color: '#1a1f2e', marginBottom: '1rem' }}>
-                Confirm Delete
-              </h3>
-              <p style={{ color: '#6c757d', marginBottom: '1.5rem' }}>
-                Are you sure you want to delete this post? This cannot be undone.
-              </p>
-              <div className="d-flex justify-content-end gap-3">
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <div className="admin-modal__body">
+              <h3 className="admin-modal__title">Delete this post?</h3>
+              <p className="admin-modal__text">This cannot be undone. The post will be removed from your school feed.</p>
+              <div className="admin-modal__footer">
                 <button
                   type="button"
+                  className="admin-btn-secondary"
                   onClick={() => !deleting && setDeleteId(null)}
                   disabled={deleting}
-                  className="btn"
-                  style={{
-                    backgroundColor: 'transparent',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '50px',
-                    padding: '0.5rem 1.5rem',
-                    color: '#1a1f2e',
-                    fontWeight: '500',
-                  }}
                 >
                   Cancel
                 </button>
-                <button
-                  type="button"
-                  onClick={handleDeleteConfirm}
-                  disabled={deleting}
-                  className="btn btn-danger"
-                  style={{ borderRadius: '50px', padding: '0.5rem 1.5rem', fontWeight: '500' }}
-                >
-                  {deleting ? (
-                    <>
-                      <span className="spinner-border spinner-border-sm me-1" />
-                      Deleting…
-                    </>
-                  ) : (
-                    'Delete'
-                  )}
+                <button type="button" className="admin-btn-danger" onClick={handleDeleteConfirm} disabled={deleting}>
+                  {deleting ? 'Deleting…' : 'Delete'}
                 </button>
               </div>
             </div>
           </div>
         </div>
-      )}
-    </div>
+      ) : null}
+    </>
   );
-};
+}

@@ -1,26 +1,20 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CategoryAdminNavbar } from '../components/CategoryAdminNavbar';
-import { CategoryAdminSidebar } from '../components/CategoryAdminSidebar';
 import { StatusPopup } from '../components/StatusPopup';
-import { categoryAdminEventsService } from '../services/category-admin-events.service';
-import { EventPostReviewSummary } from '../components/EventPostReviewSummary';
-
-function formatDate(iso: string) {
-  try {
-    return new Date(iso).toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return iso;
-  }
-}
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+import { CreatePostLivePreview } from '../components/CreatePostLivePreview';
+import {
+  actionButtonsForApi,
+  eventDateToInputValue,
+  eventTimeToInputValue,
+  parseStoredActionButtons,
+} from '../components/EventPostDetailFields';
+import { ADMIN_PORTAL_ACCENTS } from '../constants/adminPortalTheme';
+import { useCategoryAdminAuth } from '../contexts/CategoryAdminAuthContext';
+import {
+  categoryAdminEventsService,
+  type ApprovedEventForCategoryAdmin,
+} from '../services/category-admin-events.service';
+import { imageSrc } from '../utils/image';
 
 function parseImageUrls(imageUrls: string | null): string[] {
   if (!imageUrls) return [];
@@ -32,24 +26,28 @@ function parseImageUrls(imageUrls: string | null): string[] {
   }
 }
 
-function imageSrc(url: string): string {
-  if (!url) return '';
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  const base = API_BASE.replace(/\/$/, '');
-  const path = url.startsWith('/') ? url : `/${url}`;
-  return `${base}${path}`;
+function statusPill(status: string) {
+  const map: Record<string, { label: string; className: string }> = {
+    scheduled: { label: 'Scheduled', className: 'admin-pill admin-pill--status-progress' },
+    published: { label: 'Published', className: 'admin-pill admin-pill--status-done' },
+    approved: { label: 'Published', className: 'admin-pill admin-pill--status-done' },
+  };
+  const s = map[status] ?? { label: status, className: 'admin-pill admin-pill--neutral' };
+  return <span className={s.className}>{s.label}</span>;
 }
 
 const queryKey = ['category-admin', 'events', 'approved'] as const;
 
-export const CategoryAdminApprovedPosts = () => {
+export function CategoryAdminApprovedPostsPanel() {
+  const { user } = useCategoryAdminAuth();
   const queryClient = useQueryClient();
-  const [selectedPostId, setSelectedPostId] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
-  const [popupShow, setPopupShow] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [previewPost, setPreviewPost] = useState<ApprovedEventForCategoryAdmin | null>(null);
+  const [previewMode, setPreviewMode] = useState<'mobile' | 'tablet' | 'web'>('mobile');
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [popupShow, setPopupShow] = useState(false);
   const [popupType, setPopupType] = useState<'success' | 'error'>('success');
-  const [popupMessage, setPopupMessage] = useState<string>('');
+  const [popupMessage, setPopupMessage] = useState('');
 
   const { data: approvedEvents = [], isLoading, error } = useQuery({
     queryKey,
@@ -67,373 +65,227 @@ export const CategoryAdminApprovedPosts = () => {
     );
   }, [approvedEvents, searchQuery]);
 
-  const selectedPost = useMemo(
-    () => approvedEvents.find((e) => e.id === selectedPostId) ?? null,
-    [approvedEvents, selectedPostId],
-  );
-
   const deleteMutation = useMutation({
     mutationFn: (eventId: string) => categoryAdminEventsService.deleteApproved(eventId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
-      setShowDeleteConfirm(false);
-      setSelectedPostId('');
+      setDeleteId(null);
+      setPreviewPost(null);
       setPopupType('success');
-      setPopupMessage('Post deleted successfully!');
+      setPopupMessage('Post deleted successfully.');
       setPopupShow(true);
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
-      setShowDeleteConfirm(false);
+      setDeleteId(null);
       setPopupType('error');
       setPopupMessage(err?.response?.data?.message ?? 'Failed to delete post');
       setPopupShow(true);
     },
   });
 
-  const handleDelete = () => {
-    if (!selectedPostId) return;
-    setShowDeleteConfirm(true);
-  };
-
-  const confirmDelete = () => {
-    if (!selectedPostId) return;
-    deleteMutation.mutate(selectedPostId);
-  };
+  const deleteTarget = deleteId ? approvedEvents.find((e) => e.id === deleteId) : null;
 
   return (
-    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
-      <CategoryAdminNavbar />
-      <div className="admin-shell-body">
-        <CategoryAdminSidebar />
-        <div className="admin-main">
-          <h1 style={{
-            fontSize: '2rem',
-            fontWeight: 'normal',
-            color: '#1a1f2e',
-            marginBottom: '2rem'
-          }}>
-            Approved post
-          </h1>
+    <>
+      {error ? (
+        <div className="admin-notice mb-3">
+          <p className="admin-form-hint admin-form-hint--error mb-0">Failed to load approved posts.</p>
+        </div>
+      ) : null}
 
-          {/* Search Bar - same style as Edit School */}
-          <div className="mb-4" style={{ maxWidth: '600px', margin: '0 auto 2rem' }}>
-            <div style={{ position: 'relative' }}>
-              <i
-                className="bi bi-search"
-                style={{
-                  position: 'absolute',
-                  left: '1rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: '#6c757d',
-                  fontSize: '1.1rem'
-                }}
-              />
+      {isLoading ? (
+        <div className="admin-loading-state">
+          <div className="spinner-border text-secondary" role="status" />
+          <p className="mt-2 mb-0">Loading approved posts…</p>
+        </div>
+      ) : approvedEvents.length === 0 ? (
+        <div className="admin-empty-state">
+          <i className="bi bi-check2-circle" style={{ fontSize: '2.5rem', opacity: 0.45 }} aria-hidden />
+          <p className="mt-3 mb-0">No approved posts yet.</p>
+          <p className="small mb-0">Posts appear here after you approve subcategory admin submissions.</p>
+        </div>
+      ) : (
+        <div className="admin-approved-posts">
+          <div className="admin-approved-posts__toolbar">
+            <span className="admin-approved-posts__count">
+              {filteredEvents.length} of {approvedEvents.length} approved{' '}
+              {approvedEvents.length === 1 ? 'post' : 'posts'}
+            </span>
+            <div className="admin-approved-posts__search">
+              <i className="bi bi-search" aria-hidden />
               <input
-                type="text"
-                className="form-control"
-                placeholder="Search approved posts"
+                type="search"
+                className="form-control admin-form-control"
+                placeholder="Search by title, subcategory, or author…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  borderRadius: '50px',
-                  padding: '0.75rem 1rem 0.75rem 3rem',
-                  fontSize: '1rem',
-                  border: '1px solid #dee2e6'
-                }}
+                aria-label="Search approved posts"
               />
             </div>
           </div>
 
-          {/* List view: cards with title + posted date only */}
-          {!selectedPostId && (
-            <div className="row g-3 justify-content-center mb-4">
-              {isLoading ? (
-                <div className="col-12 text-center py-5">
-                  <div className="spinner-border text-secondary" role="status" />
-                  <p className="mt-2 mb-0" style={{ color: '#6c757d' }}>Loading…</p>
-                </div>
-              ) : error ? (
-                <div className="col-12 text-center py-5">
-                  <p style={{ color: '#dc3545' }}>Failed to load approved posts</p>
-                </div>
-              ) : filteredEvents.length > 0 ? (
-                filteredEvents.map((event) => (
-                  <div key={event.id} className="col-md-3 col-sm-6">
-                    <div
-                      onClick={() => setSelectedPostId(event.id)}
-                      style={{
-                        border: '1px solid rgb(26, 31, 46)',
-                        borderRadius: '4px',
-                        padding: '1.5rem',
-                        backgroundColor: 'white',
-                        cursor: 'pointer',
-                        transition: '0.3s',
-                        minHeight: '100px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        textAlign: 'center',
-                        color: '#1a1f2e'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'rgb(26 31 46 / 5%)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'rgb(26 31 46 / 2%)';
-                      }}
-                    >
-                      {(() => {
-                        const images = parseImageUrls(event.imageUrls).slice(0, 4);
-                        return images.length > 0 ? (
-                          <div className="d-flex gap-1 mb-2 rounded overflow-hidden" style={{ minHeight: '56px' }}>
-                            {images.map((url, i) => (
-                              <img
-                                key={i}
-                                src={imageSrc(url)}
-                                alt=""
-                                style={{
-                                  width: images.length === 1 ? '100%' : undefined,
-                                  flex: images.length > 1 ? 1 : undefined,
-                                  height: '56px',
-                                  objectFit: 'cover'
-                                }}
-                              />
-                            ))}
+          {filteredEvents.length === 0 ? (
+            <p className="admin-form-hint text-center py-4 mb-0">No posts match your search.</p>
+          ) : (
+            <div className="admin-table-wrap">
+              <table className="admin-table admin-approved-posts__table">
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>Subcategory</th>
+                    <th>Posted by</th>
+                    <th className="admin-approved-posts__actions-col" aria-label="Actions">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredEvents.map((post) => {
+                    const author =
+                      post.subCategoryAdmin?.name ?? post.subCategoryAdmin?.email ?? '—';
+                    return (
+                      <tr key={post.id}>
+                        <td>
+                          <span className="admin-table__strong">{post.title}</span>
+                          <span className="d-block mt-1">{statusPill(post.status)}</span>
+                        </td>
+                        <td>{post.subCategory?.name ?? '—'}</td>
+                        <td>{author}</td>
+                        <td>
+                          <div className="admin-table-actions admin-approved-posts__row-actions">
+                            <button
+                              type="button"
+                              className="admin-icon-btn"
+                              aria-label={`Preview ${post.title}`}
+                              onClick={() => setPreviewPost(post)}
+                            >
+                              <i className="bi bi-eye" aria-hidden />
+                            </button>
+                            <button
+                              type="button"
+                              className="admin-icon-btn admin-icon-btn--danger"
+                              aria-label={`Delete ${post.title}`}
+                              onClick={() => setDeleteId(post.id)}
+                            >
+                              <i className="bi bi-trash" aria-hidden />
+                            </button>
                           </div>
-                        ) : null;
-                      })()}
-                      <span style={{
-                        color: '#1a1f2e',
-                        fontWeight: '500',
-                        fontSize: '1rem',
-                        marginBottom: '0.5rem'
-                      }}>
-                        {event.title}
-                      </span>
-                      <span style={{
-                        color: '#6c757d',
-                        fontSize: '0.875rem'
-                      }}>
-                        {formatDate(event.updatedAt)}
-                      </span>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="col-12 text-center py-5">
-                  <p style={{ color: '#6c757d' }}>
-                    {searchQuery ? 'No posts found matching your search.' : 'No approved posts yet.'}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Detail view: post details + Delete */}
-          {selectedPostId && selectedPost && (
-            <div className="card border-0 shadow-sm" style={{ borderRadius: '0px' }}>
-              <div className="card-body p-4">
-                <div className="d-flex justify-content-between align-items-center mb-4">
-                  <h2 style={{
-                    fontSize: '1.5rem',
-                    fontWeight: 'normal',
-                    color: '#1a1f2e',
-                    margin: 0
-                  }}>
-                    Post details
-                  </h2>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedPostId('')}
-                    className="btn"
-                    style={{
-                      backgroundColor: 'transparent',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '50px',
-                      padding: '0.5rem 1rem',
-                      color: '#1a1f2e',
-                      fontWeight: '500'
-                    }}
-                  >
-                    <i className="bi bi-arrow-left me-2" />
-                    Back to list
-                  </button>
-                </div>
-
-                <div className="mb-4">
-                  <h3 style={{ fontSize: '1.25rem', color: '#1a1f2e', marginBottom: '1rem' }}>
-                    {selectedPost.title}
-                  </h3>
-                  {selectedPost.description && (
-                    <p style={{ color: '#1a1f2e', marginBottom: '1rem' }}>{selectedPost.description}</p>
-                  )}
-                  <EventPostReviewSummary event={selectedPost} className="mb-3" />
-                  <p className="mb-1"><strong>Subcategory:</strong> {selectedPost.subCategory?.name ?? '—'}</p>
-                  <p className="mb-1"><strong>Submitted by:</strong> {selectedPost.subCategoryAdmin?.name ?? '—'} ({selectedPost.subCategoryAdmin?.email ?? '—'})</p>
-                  <p className="mb-1"><strong>Posted date:</strong> {formatDate(selectedPost.updatedAt)}</p>
-                  <p className="mb-2"><strong>Comments:</strong> {selectedPost.commentsEnabled ? 'Enabled' : 'Disabled'}</p>
-                  {(() => {
-                    const images = parseImageUrls(selectedPost.imageUrls).slice(0, 4);
-                    return images.length > 0 ? (
-                      <div className="mb-0">
-                        <strong>Images:</strong>
-                        <div className="d-flex flex-wrap gap-2 mt-1">
-                          {images.map((url, i) => {
-                            const src = imageSrc(url);
-                            return (
-                              <a key={i} href={src} target="_blank" rel="noopener noreferrer">
-                                <img
-                                  src={src}
-                                  alt=""
-                                  style={{
-                                    maxHeight: '80px',
-                                    maxWidth: '120px',
-                                    objectFit: 'cover',
-                                    border: '1px solid #dee2e6'
-                                  }}
-                                />
-                              </a>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : null;
-                  })()}
-                </div>
-
-                {/* Actions: Preview (opens users' website), Delete */}
-                <div className="d-flex justify-content-between align-items-center pt-4" style={{ borderTop: '1px solid #dee2e6' }}>
-                  <div className="d-flex gap-2">
-                    {selectedPost.schoolId && (
-                      <a
-                        href={`/events?schoolId=${encodeURIComponent(selectedPost.schoolId)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn"
-                        style={{
-                          backgroundColor: '#1a1f2e',
-                          border: 'none',
-                          borderRadius: '50px',
-                          padding: '0.5rem 1.5rem',
-                          color: '#fff',
-                          fontWeight: '500',
-                          transition: 'all 0.3s',
-                          textDecoration: 'none'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#333';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = '#1a1f2e';
-                        }}
-                      >
-                        Preview
-                      </a>
-                    )}
-                    <button
-                      type="button"
-                      onClick={handleDelete}
-                      disabled={deleteMutation.isPending}
-                      className="btn"
-                      style={{
-                        backgroundColor: '#dc3545',
-                        border: 'none',
-                        borderRadius: '50px',
-                        padding: '0.5rem 1.5rem',
-                        color: '#fff',
-                        fontWeight: '500',
-                        transition: 'all 0.3s',
-                        opacity: deleteMutation.isPending ? 0.7 : 1
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!deleteMutation.isPending) {
-                          e.currentTarget.style.backgroundColor = '#c82333';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!deleteMutation.isPending) {
-                          e.currentTarget.style.backgroundColor = '#dc3545';
-                        }
-                      }}
-                    >
-                      {deleteMutation.isPending ? 'Deleting...' : 'Delete post'}
-                    </button>
-                  </div>
-                </div>
-              </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
-      </div>
+      )}
 
-      {/* Delete confirmation modal - same style as Edit School */}
-      {showDeleteConfirm && selectedPost && (
+      {previewPost ? (
         <div
-          className="modal show d-block"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={() => setShowDeleteConfirm(false)}
+          className="admin-modal-overlay admin-modal-overlay--elevated"
+          onClick={() => setPreviewPost(null)}
+          role="presentation"
         >
           <div
-            className="modal-dialog modal-dialog-centered"
+            className="admin-modal admin-modal--preview-post"
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cat-approved-post-preview-title"
           >
-            <div className="modal-content" style={{ borderRadius: '0px' }}>
-              <div className="modal-header border-0">
-                <h5 className="modal-title" style={{ color: '#1a1f2e' }}>
-                  Confirm delete
-                </h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setShowDeleteConfirm(false)}
+            <button
+              type="button"
+              className="admin-modal__close"
+              aria-label="Close preview"
+              onClick={() => setPreviewPost(null)}
+            >
+              <i className="bi bi-x-lg" aria-hidden />
+            </button>
+            <div className="admin-modal__body admin-modal__body--with-close">
+              <h3 className="admin-modal__title" id="cat-approved-post-preview-title">Post preview</h3>
+              <p className="admin-form-hint mb-3">{previewPost.title}</p>
+              <div className="admin-create-post-preview-toggle mb-3" role="tablist" aria-label="Preview device">
+                {(['mobile', 'tablet', 'web'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    role="tab"
+                    aria-selected={previewMode === mode}
+                    className={previewMode === mode ? 'is-active' : ''}
+                    onClick={() => setPreviewMode(mode)}
+                  >
+                    {mode === 'mobile' ? 'Mobile' : mode === 'tablet' ? 'Tablet' : 'Web'}
+                  </button>
+                ))}
+              </div>
+              <div className="admin-approved-posts__preview-frame">
+                <CreatePostLivePreview
+                  title={previewPost.title}
+                  description={previewPost.description ?? ''}
+                  categoryName=""
+                  subCategoryName={previewPost.subCategory?.name ?? ''}
+                  schoolName={user?.schoolName || user?.schoolDomain || 'School'}
+                  eventDate={eventDateToInputValue(previewPost.eventDate ?? null)}
+                  eventStartTime={eventTimeToInputValue(previewPost.eventStartTime ?? null)}
+                  eventEndTime={eventTimeToInputValue(previewPost.eventEndTime ?? null)}
+                  eventLocation={previewPost.eventLocation?.trim() ?? ''}
+                  actionButtons={actionButtonsForApi(parseStoredActionButtons(previewPost.actionButtons))}
+                  coverSrc={
+                    parseImageUrls(previewPost.imageUrls)[0]
+                      ? imageSrc(parseImageUrls(previewPost.imageUrls)[0])
+                      : ''
+                  }
+                  previewMode={previewMode}
+                  accentColor={ADMIN_PORTAL_ACCENTS.category}
+                  commentsEnabled={previewPost.commentsEnabled}
                 />
               </div>
-              <div className="modal-body">
-                <p style={{ color: '#6c757d' }}>
-                  Are you sure you want to delete <strong>{selectedPost.title}</strong>?
-                  This action cannot be undone and will remove the post from the website.
-                </p>
+              <div className="admin-modal__footer mt-3">
+                <button type="button" className="admin-btn-secondary" onClick={() => setPreviewPost(null)}>
+                  Close
+                </button>
               </div>
-              <div className="modal-footer border-0">
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteId && deleteTarget ? (
+        <div
+          className="admin-modal-overlay admin-modal-overlay--elevated"
+          onClick={() => !deleteMutation.isPending && setDeleteId(null)}
+          role="presentation"
+        >
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <div className="admin-modal__body">
+              <h3 className="admin-modal__title">Delete this post?</h3>
+              <p className="admin-modal__text">
+                Delete <strong>{deleteTarget.title}</strong>? This cannot be undone and removes the post from the
+                public feed.
+              </p>
+              <div className="admin-modal__footer">
                 <button
                   type="button"
-                  className="btn"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  style={{
-                    backgroundColor: 'transparent',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '50px',
-                    padding: '0.5rem 1.5rem',
-                    color: '#1a1f2e',
-                    fontWeight: '500'
-                  }}
+                  className="admin-btn-secondary"
+                  onClick={() => !deleteMutation.isPending && setDeleteId(null)}
+                  disabled={deleteMutation.isPending}
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
-                  className="btn"
-                  onClick={confirmDelete}
+                  className="admin-btn-danger"
+                  onClick={() => deleteMutation.mutate(deleteId)}
                   disabled={deleteMutation.isPending}
-                  style={{
-                    backgroundColor: '#dc3545',
-                    border: 'none',
-                    borderRadius: '50px',
-                    padding: '0.5rem 1.5rem',
-                    color: '#fff',
-                    fontWeight: '500',
-                    opacity: deleteMutation.isPending ? 0.7 : 1
-                  }}
                 >
-                  {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+                  {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
                 </button>
               </div>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       <StatusPopup
         show={popupShow}
@@ -441,6 +293,6 @@ export const CategoryAdminApprovedPosts = () => {
         message={popupMessage}
         onClose={() => setPopupShow(false)}
       />
-    </div>
+    </>
   );
-};
+}

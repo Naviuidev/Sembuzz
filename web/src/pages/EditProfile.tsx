@@ -1,6 +1,7 @@
 import { type FormEvent, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { SchoolNavbar } from '../components/SchoolNavbar';
+import { EventsStudentShell } from '../components/EventsStudentShell';
+import { ProfileSubpageHeader } from '../components/StudentProfileHub';
 import { AccountIdentityPanel } from '../components/AccountIdentityPanel';
 import { useUserAuth } from '../contexts/UserAuthContext';
 import { userAuthService } from '../services/user-auth.service';
@@ -101,44 +102,24 @@ export const EditProfile = () => {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fafafa', paddingBottom: '2rem' }}>
-      <SchoolNavbar />
-      <div className="container py-4" style={{ maxWidth: 640 }}>
-        <div className="d-flex align-items-center gap-2 mb-4">
-          <button
-            type="button"
-            className="btn btn-link p-0 text-decoration-none d-flex align-items-center"
-            onClick={() => navigate('/profile')}
-            aria-label="Back to Profile"
-          >
-            <i className="bi bi-arrow-left" style={{ fontSize: '1.25rem', color: '#1a1f2e' }} />
-          </button>
-          <h1 className="mb-0" style={{ fontSize: '1.5rem', fontWeight: 600, color: '#1a1f2e' }}>
-            Edit profile
-          </h1>
-        </div>
+    <EventsStudentShell activeTab="settings" contentClassName="events-student-shell-page">
+      <div className="student-profile">
+        <ProfileSubpageHeader title="Edit profile" onBack={() => navigate('/profile')} />
 
-        <form onSubmit={(e) => void handleSubmit(e)}>
+        <form className="student-profile-form-card" onSubmit={(e) => void handleSubmit(e)}>
           <div className="d-flex flex-column align-items-center mb-4">
-            <div
-              className="rounded-circle border d-flex align-items-center justify-content-center overflow-hidden mb-2"
-              style={{
-                width: 88,
-                height: 88,
-                borderWidth: 3,
-                borderColor: '#0b4a99',
-                backgroundColor: '#e9ecef',
-              }}
-            >
-              {resolvedImageUrl ? (
-                <img src={resolvedImageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <span className="fw-bold text-secondary" style={{ fontSize: '1.5rem' }}>
-                  {(firstName || user.name || '?').charAt(0).toUpperCase()}
-                </span>
-              )}
+            <div className="student-profile-view-avatar" style={{ width: 96, height: 96 }}>
+              <div className="student-profile-view-avatar__inner">
+                {resolvedImageUrl ? (
+                  <img src={resolvedImageUrl} alt="" />
+                ) : (
+                  <span className="fw-bold text-secondary" style={{ fontSize: '1.5rem' }}>
+                    {(firstName || user.name || '?').charAt(0).toUpperCase()}
+                  </span>
+                )}
+              </div>
             </div>
-            <label className="btn btn-sm btn-outline-secondary rounded-pill mb-0">
+            <label className="student-profile-btn student-profile-btn--secondary mt-2 mb-0">
               {uploading ? 'Uploading…' : 'Change photo'}
               <input
                 type="file"
@@ -230,11 +211,11 @@ export const EditProfile = () => {
           {error ? <div className="alert alert-danger py-2 small mb-3">{error}</div> : null}
           {success ? <div className="alert alert-success py-2 small mb-3">{success}</div> : null}
 
-          <button type="submit" className="btn btn-dark w-100 rounded-3 py-2 fw-semibold" disabled={saving || uploading}>
+          <button type="submit" className="student-profile-save-btn" disabled={saving || uploading}>
             {saving ? 'Saving…' : 'Save changes'}
           </button>
         </form>
       </div>
-    </div>
+    </EventsStudentShell>
   );
 };

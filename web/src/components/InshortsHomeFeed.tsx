@@ -3,9 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ApprovedEventPublic, SponsoredAdPublic, BannerAdPublic } from '../services/public-events.service';
 import { assignBannersToEventSlides, type PublicFeedItem } from '../utils/publicFeed';
 import { imageSrc } from '../utils/image';
-import { EventPostPublicMeta, EventPostPublicActionButtons } from './EventPostPublicExtras';
-import { EventPostPublicDescriptionRow } from './EventPostPublicDescriptionRow';
-import { eventPostHasScheduleMeta } from '../utils/eventPostPublic';
+import { CreatePostLivePreview } from './CreatePostLivePreview';
+import { approvedEventToCreatePostPreview } from '../utils/eventPostPublic';
 import { userEventsService, type EventCommentResponse } from '../services/user-events.service';
 
 function formatRelativeTime(iso: string): string {
@@ -170,10 +169,9 @@ function EventSlideWithEngagement({
   const [commentText, setCommentText] = useState('');
   const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
   const [authHintVisible, setAuthHintVisible] = useState(false);
-  const [descExpanded, setDescExpanded] = useState(false);
   const authHintTimerRef = useRef<number | null>(null);
 
-  const imgs = parseImages(event.imageUrls);
+  const previewProps = approvedEventToCreatePostPreview(event);
 
   const { data: comments = [], isLoading: commentsLoading } = useQuery({
     queryKey: ['user', 'events', event.id, 'comments'],
@@ -224,79 +222,63 @@ function EventSlideWithEngagement({
     }, 1500);
   };
 
+  const engageBar = (
+    <div
+      className="inshorts-engage-bar"
+      role="toolbar"
+      aria-label="Engagement"
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      <div className="inshorts-engage-bar__actions">
+        <button
+          type="button"
+          className={`inshorts-engage-bar-btn ${isLiked ? 'inshorts-engage-bar-btn--liked' : ''}`}
+          title={!currentUserId ? 'Sign in to like' : undefined}
+          onClick={currentUserId ? onLike : showAuthHint}
+          aria-label={isLiked ? 'Unlike' : 'Like'}
+        >
+          <i className={isLiked ? 'bi bi-heart-fill' : 'bi bi-heart'} aria-hidden />
+        </button>
+        <button
+          type="button"
+          className={`inshorts-engage-bar-btn ${isSaved ? 'inshorts-engage-bar-btn--saved' : ''}`}
+          title={!currentUserId ? 'Sign in to save' : undefined}
+          onClick={currentUserId ? onSave : showAuthHint}
+          aria-label={isSaved ? 'Unsave' : 'Save'}
+        >
+          <i className={isSaved ? 'bi bi-bookmark-fill' : 'bi bi-bookmark'} aria-hidden />
+        </button>
+        {event.commentsEnabled ? (
+          <button
+            type="button"
+            className="inshorts-engage-bar-btn"
+            title={!currentUserId ? 'Sign in to comment' : undefined}
+            onClick={currentUserId ? () => setCommentsOpen((o) => !o) : showAuthHint}
+            aria-label="Comments"
+          >
+            <i className="bi bi-chat" aria-hidden />
+          </button>
+        ) : null}
+      </div>
+      <div className="inshorts-engage-bar__meta">
+        {likeCount > 0 ? <span className="inshorts-engage-bar-likes">{likeCount} likes</span> : null}
+        {event.commentsEnabled && commentCount > 0 ? (
+          <span className="inshorts-engage-bar-comments">{commentCount} comments</span>
+        ) : null}
+        {authHintVisible ? <span className="inshorts-auth-hint-bubble">Login required</span> : null}
+      </div>
+    </div>
+  );
+
   return (
     <article className="inshorts-slide" data-slide-index={slideIndex}>
-      <div className="inshorts-card inshorts-card--event">
-        <div className="inshorts-hero-wrap">
-          <InshortsHeroCarousel urls={imgs} emptyLabel="SemBuzz" />
-          <div
-            className="inshorts-engage-pill"
-            role="toolbar"
-            aria-label="Engagement"
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              className={`inshorts-engage-pill-btn ${isLiked ? 'inshorts-engage-pill-btn--liked' : ''}`}
-              title={!currentUserId ? 'Sign in to like' : undefined}
-              onClick={currentUserId ? onLike : showAuthHint}
-              aria-label={isLiked ? 'Unlike' : 'Like'}
-            >
-              <i className={isLiked ? 'bi bi-heart-fill' : 'bi bi-heart'} aria-hidden />
-            </button>
-            <span className="inshorts-engage-pill-count">{likeCount}</span>
-            <button
-              type="button"
-              className={`inshorts-engage-pill-btn ${isSaved ? 'inshorts-engage-pill-btn--saved' : ''}`}
-              title={!currentUserId ? 'Sign in to save' : undefined}
-              onClick={currentUserId ? onSave : showAuthHint}
-              aria-label={isSaved ? 'Unsave' : 'Save'}
-            >
-              <i className={isSaved ? 'bi bi-bookmark-fill' : 'bi bi-bookmark'} aria-hidden />
-            </button>
-            {event.commentsEnabled ? (
-              <>
-                <button
-                  type="button"
-                  className="inshorts-engage-pill-btn"
-                  title={!currentUserId ? 'Sign in to comment' : undefined}
-                  onClick={currentUserId ? () => setCommentsOpen((o) => !o) : undefined}
-                  disabled={!currentUserId}
-                  aria-label="Comments"
-                >
-                  <i className="bi bi-chat" aria-hidden />
-                </button>
-                <span className="inshorts-engage-pill-count">{commentCount}</span>
-              </>
-            ) : null}
-            {authHintVisible ? <span className="inshorts-auth-hint-bubble">Login required</span> : null}
+      <div className="inshorts-card inshorts-card--event inshorts-card--post-preview inshorts-card--ig">
+        <div className="inshorts-body inshorts-body--grow inshorts-body--post-preview inshorts-body--ig">
+          <div className="inshorts-post-preview-wrap inshorts-post-preview-wrap--ig">
+            <CreatePostLivePreview {...previewProps} liveFeed belowHero={engageBar} />
           </div>
-        </div>
-        <div className="inshorts-meta">
-          {event.school?.image ? (
-            <img src={imageSrc(event.school.image)} alt="" className="inshorts-mini-logo" />
-          ) : (
-            <div className="inshorts-mini-logo-ph">{event.school?.name?.charAt(0) ?? '?'}</div>
-          )}
-          <span className="inshorts-source">{event.school?.name ?? 'School'}</span>
-        </div>
-        <div className="inshorts-body inshorts-body--grow">
-          <h2 className="inshorts-title">{event.title}</h2>
-          {eventPostHasScheduleMeta(event) ? (
-            <div className="inshorts-event-meta px-0">
-              <EventPostPublicMeta event={event} compact />
-            </div>
-          ) : null}
-          <EventPostPublicDescriptionRow
-            event={event}
-            description={event.description ?? ''}
-            expanded={descExpanded}
-            onExpand={() => setDescExpanded(true)}
-            compact
-          />
-          <EventPostPublicActionButtons event={event} compact />
-          <p className="inshorts-time">{formatRelativeTime(event.updatedAt || event.createdAt)}</p>
+          <p className="inshorts-time inshorts-time--ig">{formatRelativeTime(event.updatedAt || event.createdAt)}</p>
           {banner ? (
             <button
               type="button"

@@ -19,7 +19,7 @@ const FAQ_ITEMS = [
   {
     icon: 'bi-laptop',
     q: 'What devices are supported?',
-    a: 'SemBuzz is available on iOS and Android. You can also browse the campus feed, blogs, and events from any web browser at /events.',
+    a: 'SemBuzz is available on iOS and Android. You can also browse the campus feed, blogs, and events from any web browser at sembuzz.com.',
   },
   {
     icon: 'bi-headset',

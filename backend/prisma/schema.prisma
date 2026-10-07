@@ -27,6 +27,7 @@ model PlatformUser {
   categoryAdmins    CategoryAdmin[]
   subCategoryAdmins SubCategoryAdmin[]
   adsAdmins         AdsAdmin[]
+  externalAdmins    ExternalAdmin[]
   users             User[]
 
   @@map("platform_users")
@@ -50,6 +51,247 @@ model SuperAdmin {
 
   @@index([email])
   @@map("super_admins")
+}
+
+// ============================================
+// EXTERNAL CATEGORIES & EXTERNAL ADMINS (platform-wide, super admin)
+// ============================================
+
+model ExternalCategory {
+  id          String   @id @default(uuid())
+  name        String
+  description String?  @db.VarChar(500)
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  adminLinks         ExternalAdminCategory[]
+  pipelineRequests   ExternalCategorySchoolPipelineRequest[]
+  postRequests       ExternalSchoolPostRequest[]
+  subcategoryLinks   ExternalCategorySubcategoryLinkRequest[]
+
+  @@map("external_categories")
+}
+
+model ExternalAdmin {
+  id             String   @id @default(uuid())
+  refNum         String   @unique
+  platformUserId String
+  name           String
+  email          String
+  password       String
+  isActive       Boolean  @default(true)
+  isFirstLogin   Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  platformUser PlatformUser            @relation(fields: [platformUserId], references: [id], onDelete: Cascade)
+  categories   ExternalAdminCategory[]
+  pipelineRequests ExternalCategorySchoolPipelineRequest[]
+  postRequests ExternalSchoolPostRequest[]
+  subcategoryLinks ExternalCategorySubcategoryLinkRequest[]
+
+  @@unique([platformUserId])
+  @@index([email])
+  @@map("external_admins")
+}
+
+model ExternalCategorySchoolPipelineRequest {
+  id                      String    @id @default(uuid())
+  externalAdminId         String
+  externalCategoryId      String
+  schoolId                String
+  status                  String    @default("pending")
+  requestMessage          String?   @db.Text
+  schoolAdminMessage      String?   @db.Text
+  reviewedBySchoolAdminId String?
+  reviewedAt              DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  externalAdmin    ExternalAdmin    @relation(fields: [externalAdminId], references: [id], onDelete: Cascade)
+  externalCategory ExternalCategory @relation(fields: [externalCategoryId], references: [id], onDelete: Cascade)
+  school           School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  threadMessages   ExternalPipelineRequestMessage[]
+
+  @@unique([externalAdminId, externalCategoryId, schoolId])
+  @@index([schoolId, status])
+  @@index([externalAdminId])
+  @@map("external_category_school_pipeline_requests")
+}
+
+model ExternalPipelineRequestMessage {
+  id                String   @id @default(uuid())
+  pipelineRequestId String
+  senderRole        String
+  body              String   @db.Text
+  createdAt         DateTime @default(now())
+
+  pipelineRequest ExternalCategorySchoolPipelineRequest @relation(fields: [pipelineRequestId], references: [id], onDelete: Cascade)
+
+  @@index([pipelineRequestId, createdAt])
+  @@map("external_pipeline_request_messages")
+}
+
+model ExternalAdminCategory {
+  id                 String   @id @default(uuid())
+  externalAdminId    String
+  externalCategoryId String
+  createdAt          DateTime @default(now())
+
+  externalAdmin    ExternalAdmin    @relation(fields: [externalAdminId], references: [id], onDelete: Cascade)
+  externalCategory ExternalCategory @relation(fields: [externalCategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([externalAdminId, externalCategoryId])
+  @@map("external_admin_categories")
+}
+
+model ExternalCategorySubcategoryLinkRequest {
+  id                              String    @id @default(uuid())
+  externalAdminId                 String
+  externalCategoryId              String
+  subCategoryId                   String
+  schoolId                        String
+  status                          String    @default("pending")
+  subcategoryAdminMessage         String?   @db.Text
+  reviewedBySubCategoryAdminId    String?
+  reviewedAt                      DateTime?
+  createdAt                       DateTime  @default(now())
+  updatedAt                       DateTime  @updatedAt
+
+  externalAdmin    ExternalAdmin    @relation(fields: [externalAdminId], references: [id], onDelete: Cascade)
+  externalCategory ExternalCategory @relation(fields: [externalCategoryId], references: [id], onDelete: Cascade)
+  subCategory      SubCategory      @relation(fields: [subCategoryId], references: [id], onDelete: Cascade)
+  school           School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  threadMessages   ExternalCategorySubcategoryLinkMessage[]
+
+  @@unique([externalAdminId, externalCategoryId, subCategoryId])
+  @@index([subCategoryId, status])
+  @@map("external_category_subcategory_link_requests")
+}
+
+model ExternalCategorySubcategoryLinkMessage {
+  id            String   @id @default(uuid())
+  linkRequestId String
+  senderRole    String
+  body          String   @db.Text
+  createdAt     DateTime @default(now())
+
+  linkRequest ExternalCategorySubcategoryLinkRequest @relation(fields: [linkRequestId], references: [id], onDelete: Cascade)
+
+  @@index([linkRequestId, createdAt])
+  @@map("external_category_subcategory_link_messages")
+}
+
+model ExternalSchoolPostRequest {
+  id                      String    @id @default(uuid())
+  externalAdminId         String
+  externalCategoryId      String
+  schoolId                String
+  subCategoryId           String?
+  contentType             String    @default("event") @db.VarChar(20)
+  title                   String    @db.VarChar(500)
+  description             String?   @db.Text
+  externalLink            String?   @db.VarChar(500)
+  imageUrls               String?   @db.Text
+  eventDate               DateTime? @db.Date
+  eventStartTime          String?   @db.VarChar(5)
+  eventEndTime            String?   @db.VarChar(5)
+  eventLocation           String?   @db.VarChar(500)
+  actionButtons           String?   @db.Text
+  commentsEnabled         Boolean   @default(false)
+  companyName             String?   @db.VarChar(255)
+  companyLogoUrl          String?   @db.VarChar(500)
+  jobType                 String?   @db.VarChar(50)
+  workMode                String?   @db.VarChar(50)
+  jobLocation             String?   @db.VarChar(500)
+  eligibilityRequirements String?   @db.Text
+  skillsRequired          String?   @db.Text
+  experienceRequired      String?   @db.VarChar(80)
+  salaryStipend           String?   @db.VarChar(255)
+  applicationDeadline     DateTime? @db.Date
+  applicationMethod       String?   @db.VarChar(20)
+  applicationTarget       String?   @db.VarChar(500)
+  contactPerson           String?   @db.VarChar(255)
+  contactEmail            String?   @db.VarChar(255)
+  contactPhone            String?   @db.VarChar(50)
+  postedByOrganization    String?   @db.VarChar(255)
+  jobPublishStatus        String?   @db.VarChar(20)
+  applyButtonEnabled      Boolean   @default(false)
+  saveJobButtonEnabled    Boolean   @default(false)
+  applyButtonUrl          String?   @db.VarChar(500)
+  offerCategory           String?   @db.VarChar(80)
+  originalPrice           String?   @db.VarChar(100)
+  offerPriceDiscount      String?   @db.VarChar(255)
+  couponCode              String?   @db.VarChar(100)
+  offerValidFrom          DateTime? @db.Date
+  offerValidUntil         DateTime? @db.Date
+  howToRedeem             String?   @db.Text
+  redemptionUrl           String?   @db.VarChar(500)
+  termsAndConditions      String?   @db.Text
+  offerContactInfo        String?   @db.Text
+  offerPublishStatus      String?   @db.VarChar(20)
+  discountType            String?   @db.VarChar(20)
+  discountValue           String?   @db.VarChar(100)
+  maximumDiscount         String?   @db.VarChar(100)
+  minimumPurchase         String?   @db.VarChar(100)
+  usageLimit              String?   @db.VarChar(100)
+  redemptionsPerStudent   String?   @db.VarChar(100)
+  applicableLocations     String?   @db.VarChar(500)
+  offerAvailability       String?   @db.VarChar(20)
+  studentIdRequired       Boolean   @default(false)
+  campaignType            String?   @db.VarChar(80)
+  campaignTargetAudience  String?   @db.Text
+  status                  String    @default("pending")
+  schoolAdminMessage      String?   @db.Text
+  reviewedBySchoolAdminId String?
+  reviewedAt              DateTime?
+  subcategoryStatus       String?
+  subcategoryAdminMessage String?   @db.Text
+  reviewedBySubCategoryAdminId String?
+  subcategoryReviewedAt   DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  externalAdmin    ExternalAdmin    @relation(fields: [externalAdminId], references: [id], onDelete: Cascade)
+  externalCategory ExternalCategory @relation(fields: [externalCategoryId], references: [id], onDelete: Cascade)
+  school           School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subCategory      SubCategory?     @relation(fields: [subCategoryId], references: [id], onDelete: SetNull)
+  threadMessages   ExternalSchoolPostRequestMessage[]
+  subcategoryThreadMessages ExternalSchoolPostSubcategoryMessage[]
+  savedByUsers     UserSavedExternalPost[]
+
+  @@index([schoolId, status])
+  @@index([externalAdminId])
+  @@index([subCategoryId, subcategoryStatus])
+  @@map("external_school_post_requests")
+}
+
+model ExternalSchoolPostSubcategoryMessage {
+  id            String   @id @default(uuid())
+  postRequestId String
+  senderRole    String
+  body          String   @db.Text
+  createdAt     DateTime @default(now())
+
+  postRequest ExternalSchoolPostRequest @relation(fields: [postRequestId], references: [id], onDelete: Cascade)
+
+  @@index([postRequestId, createdAt])
+  @@map("external_school_post_subcategory_messages")
+}
+
+model ExternalSchoolPostRequestMessage {
+  id            String   @id @default(uuid())
+  postRequestId String
+  senderRole    String
+  body          String   @db.Text
+  createdAt     DateTime @default(now())
+
+  postRequest ExternalSchoolPostRequest @relation(fields: [postRequestId], references: [id], onDelete: Cascade)
+
+  @@index([postRequestId, createdAt])
+  @@map("external_school_post_request_messages")
 }
 
 // ============================================
@@ -108,6 +350,9 @@ model School {
   sponsoredAds                       SponsoredAd[]
   blogPosts                          BlogPost[]
   adminEmailChangeRequests           AdminEmailChangeRequest[]
+  externalPipelineRequests         ExternalCategorySchoolPipelineRequest[]
+  externalPostRequests             ExternalSchoolPostRequest[]
+  externalSubcategoryLinks         ExternalCategorySubcategoryLinkRequest[]
 
   @@map("schools")
 }
@@ -446,6 +691,8 @@ model SubCategory {
   upcomingPosts                 UpcomingPost[]
   blogPosts                     BlogPost[]
   userNotificationSubCategories UserNotificationSubCategory[]
+  externalPostRequests          ExternalSchoolPostRequest[]
+  externalCategoryLinks         ExternalCategorySubcategoryLinkRequest[]
 
   @@map("sub_categories")
 }
@@ -728,6 +975,21 @@ model UserSavedEvent {
   @@map("user_saved_events")
 }
 
+model UserSavedExternalPost {
+  id            String   @id @default(uuid())
+  userId        String
+  postRequestId String
+  createdAt     DateTime @default(now())
+
+  user        User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postRequest ExternalSchoolPostRequest @relation(fields: [postRequestId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postRequestId])
+  @@index([userId])
+  @@index([postRequestId])
+  @@map("user_saved_external_posts")
+}
+
 // Upcoming / scheduled news by school admin (no approval; visible on scheduledTo date)
 model UpcomingPost {
   id             String   @id @default(uuid())
@@ -855,6 +1117,7 @@ model User {
   eventLikes     EventLike[]
   eventComments  EventComment[]
   savedEvents    UserSavedEvent[]
+  savedExternalPosts UserSavedExternalPost[]
   helpQueries    UserHelpQuery[]
   pushDevices               UserPushDevice[]
   notificationSubCategories UserNotificationSubCategory[]

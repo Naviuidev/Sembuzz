@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { SchoolAdminNavbar } from '../components/SchoolAdminNavbar';
-import { SchoolAdminSidebar } from '../components/SchoolAdminSidebar';
 import {
   schoolAdminPendingUsersService,
   type PendingUser,
@@ -32,7 +30,7 @@ function getDocFilename(url: string): string {
   return seg && seg.includes('.') ? seg : 'document';
 }
 
-export const SchoolAdminUserRequests = () => {
+export function SchoolAdminUserRequestsPanel() {
   const queryClient = useQueryClient();
   const [pending, setPending] = useState<PendingUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -158,33 +156,7 @@ export const SchoolAdminUserRequests = () => {
   };
 
   return (
-    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
-      <SchoolAdminNavbar />
-      <div className="admin-shell-body">
-        <SchoolAdminSidebar />
-        <div className="admin-main">
-          <div className="mb-4">
-            <h1
-              style={{
-                fontSize: '2rem',
-                fontWeight: 'normal',
-                color: '#1a1f2e',
-                marginBottom: '0.5rem',
-              }}
-            >
-              User requests
-            </h1>
-            <p
-              style={{
-                color: '#6c757d',
-                fontSize: '1rem',
-                marginBottom: 0,
-              }}
-            >
-              Students who registered with Gmail/Yahoo (public email) and uploaded a school doc. View doc, approve, ask to reupload, or reject.
-            </p>
-          </div>
-
+    <>
           {error && (
             <div className="alert alert-danger mb-4" style={{ borderRadius: '0px' }}>
               {error}
@@ -196,9 +168,7 @@ export const SchoolAdminUserRequests = () => {
             </div>
           )}
 
-          <div className="card border-0 shadow-sm" style={{ borderRadius: '0px' }}>
-            <div className="card-body p-4">
-              {loading ? (
+          {loading ? (
                 <div className="text-center py-5">
                   <div className="spinner-border text-secondary" role="status" />
                   <p className="mt-2 mb-0" style={{ color: '#6c757d' }}>
@@ -364,8 +334,6 @@ export const SchoolAdminUserRequests = () => {
                   </table>
                 </div>
               )}
-            </div>
-          </div>
 
           {/* View doc modal */}
           {viewDocUrl && (
@@ -554,8 +522,6 @@ export const SchoolAdminUserRequests = () => {
               </div>
             </div>
           )}
-        </div>
-      </div>
-    </div>
+    </>
   );
-};
+}

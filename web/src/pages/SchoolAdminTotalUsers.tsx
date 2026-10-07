@@ -1,6 +1,4 @@
 import { useState, useEffect } from 'react';
-import { SchoolAdminNavbar } from '../components/SchoolAdminNavbar';
-import { SchoolAdminSidebar } from '../components/SchoolAdminSidebar';
 import { schoolAdminStudentsService, type SchoolStudent } from '../services/school-admin-students.service';
 import { categoryAdminsService, type CategoryAdmin } from '../services/category-admins.service';
 import {
@@ -25,7 +23,7 @@ function formatDate(iso: string) {
   }
 }
 
-export const SchoolAdminTotalUsers = () => {
+export function SchoolAdminTotalUsersPanel() {
   const [students, setStudents] = useState<SchoolStudent[]>([]);
   const [categoryAdmins, setCategoryAdmins] = useState<CategoryAdmin[]>([]);
   const [subcategoryAdmins, setSubcategoryAdmins] = useState<SchoolAdminSubCategoryAdmin[]>([]);
@@ -139,20 +137,7 @@ export const SchoolAdminTotalUsers = () => {
   };
 
   return (
-    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
-      <SchoolAdminNavbar />
-      <div className="admin-shell-body">
-        <SchoolAdminSidebar />
-        <div className="admin-main">
-          <div className="mb-4">
-            <h1 style={{ fontSize: '2rem', fontWeight: 'normal', color: '#1a1f2e', marginBottom: '0.5rem' }}>
-              Total users
-            </h1>
-            <p style={{ color: '#6c757d', fontSize: '1rem', marginBottom: 0 }}>
-              Students and admins in your school. Ban an admin to revoke their admin access.
-            </p>
-          </div>
-
+    <>
           {/* Summary count cards - same flow as Edit School: click card → cards hide, data shows with Back to List */}
           {!activeSection && (
             <div className="row g-3 justify-content-center mb-4">
@@ -507,8 +492,6 @@ export const SchoolAdminTotalUsers = () => {
             </div>
             </>
           ) : null}
-        </div>
-      </div>
-    </div>
+    </>
   );
-};
+}

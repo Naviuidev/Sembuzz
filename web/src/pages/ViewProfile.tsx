@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { SchoolNavbar } from '../components/SchoolNavbar';
+import { EventsStudentShell } from '../components/EventsStudentShell';
+import { ProfileSubpageHeader } from '../components/StudentProfileHub';
 import { useUserAuth } from '../contexts/UserAuthContext';
 import { imageSrc } from '../utils/image';
 
@@ -20,77 +21,45 @@ export const ViewProfile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white" style={{ paddingBottom: '2rem' }}>
-      <SchoolNavbar />
-      <div className="container py-4" style={{ maxWidth: 640 }}>
-        <div className="d-flex align-items-center gap-2 mb-4">
-          <button
-            type="button"
-            className="btn btn-link p-0 text-decoration-none d-flex align-items-center"
-            onClick={() => navigate('/profile')}
-            aria-label="Back to Profile"
-          >
-            <i className="bi bi-arrow-left" style={{ fontSize: '1.25rem', color: '#1a1f2e' }} />
-          </button>
-          <h1 className="mb-0" style={{ fontSize: '1.5rem', fontWeight: 600, color: '#1a1f2e' }}>
-            View profile
-          </h1>
+    <EventsStudentShell activeTab="settings" contentClassName="events-student-shell-page">
+      <div className="student-profile">
+        <ProfileSubpageHeader title="View profile" onBack={() => navigate('/profile')} />
+
+        <div className="d-flex justify-content-center mb-2">
+          <div className="student-profile-view-avatar">
+            <div className="student-profile-view-avatar__inner">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" />
+              ) : (
+                <i className="bi bi-person" style={{ fontSize: '2.5rem', color: '#94a3b8' }} aria-hidden />
+              )}
+            </div>
+          </div>
         </div>
 
-        <div className="d-flex justify-content-center py-4 mb-3">
-          {avatarUrl ? (
-            <img src={avatarUrl} alt="" style={{ width: 170, height: 170, borderRadius: '50%', objectFit: 'cover' }} />
-          ) : (
-            <div
-              className="d-flex align-items-center justify-content-center"
-              style={{
-                width: 170,
-                height: 170,
-                borderRadius: '50%',
-                backgroundColor: '#eef1f4',
-              }}
-            >
-              <i className="bi bi-person" style={{ fontSize: '3rem', color: '#7d8590' }} />
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-3 border p-3" style={{ borderColor: '#edf0f2' }}>
-          <div className="small fw-bold text-secondary mb-2" style={{ letterSpacing: '0.05em' }}>
-            PROFILE DETAILS
+        <div className="student-profile-details">
+          <div className="student-profile-details__row">
+            <div className="student-profile-details__label">First name</div>
+            <div className="student-profile-details__value">{firstName}</div>
           </div>
-          <div className="py-2 border-bottom" style={{ borderColor: '#e7ebef' }}>
-            <div className="small text-secondary">First name</div>
-            <div className="fw-semibold" style={{ color: '#1a1f2e' }}>
-              {firstName}
-            </div>
+          <div className="student-profile-details__row">
+            <div className="student-profile-details__label">Last name</div>
+            <div className="student-profile-details__value">{lastName}</div>
           </div>
-          <div className="py-2 border-bottom" style={{ borderColor: '#e7ebef' }}>
-            <div className="small text-secondary">Last name</div>
-            <div className="fw-semibold" style={{ color: '#1a1f2e' }}>
-              {lastName}
-            </div>
+          <div className="student-profile-details__row">
+            <div className="student-profile-details__label">User ID</div>
+            <div className="student-profile-details__value font-monospace small">{user.userId || '—'}</div>
           </div>
-          <div className="py-2 border-bottom" style={{ borderColor: '#e7ebef' }}>
-            <div className="small text-secondary">User ID</div>
-            <div className="fw-semibold font-monospace small text-break" style={{ color: '#1a1f2e', wordBreak: 'break-all' }}>
-              {user.userId || '—'}
-            </div>
+          <div className="student-profile-details__row">
+            <div className="student-profile-details__label">Email</div>
+            <div className="student-profile-details__value">{user.email}</div>
           </div>
-          <div className="py-2 border-bottom" style={{ borderColor: '#e7ebef' }}>
-            <div className="small text-secondary">Email</div>
-            <div className="fw-semibold" style={{ color: '#1a1f2e' }}>
-              {user.email}
-            </div>
-          </div>
-          <div className="py-2">
-            <div className="small text-secondary">School</div>
-            <div className="fw-semibold" style={{ color: '#1a1f2e' }}>
-              {user.schoolName || '—'}
-            </div>
+          <div className="student-profile-details__row">
+            <div className="student-profile-details__label">School</div>
+            <div className="student-profile-details__value">{user.schoolName || '—'}</div>
           </div>
         </div>
       </div>
-    </div>
+    </EventsStudentShell>
   );
 };

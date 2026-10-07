@@ -1,4 +1,17 @@
-export const EVENT_DESCRIPTION_MAX_WORDS = 45;
+export const EVENT_DESCRIPTION_MAX_WORDS = 60;
+
+export function splitEventDescription(text: string): { teaser: string; about: string | null } {
+  const trimmed = text.trim();
+  if (!trimmed) return { teaser: '', about: null };
+  const words = trimmed.split(/\s+/);
+  if (words.length <= EVENT_DESCRIPTION_MAX_WORDS) {
+    return { teaser: trimmed, about: null };
+  }
+  return {
+    teaser: words.slice(0, EVENT_DESCRIPTION_MAX_WORDS).join(' '),
+    about: words.slice(EVENT_DESCRIPTION_MAX_WORDS).join(' '),
+  };
+}
 
 export type EventActionButtonStored = { label: string; url: string };
 
@@ -48,6 +61,20 @@ export function formatEventTimeRange(
   if (s) return formatHmDisplay(s);
   if (e) return formatHmDisplay(e);
   return null;
+}
+
+export function formatEventOccurrenceDate(iso: string | null | undefined): string | null {
+  if (!iso?.trim()) return null;
+  const ymd = iso.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+  const d = new Date(`${ymd}T12:00:00.000Z`);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
 
 export function formatEventOccurrenceDateShort(iso: string | null | undefined): string | null {

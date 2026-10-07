@@ -3,6 +3,7 @@ import { useState, type ReactNode } from 'react';
 import { useUserAuth } from '../contexts/UserAuthContext';
 import { useEventsFilter } from '../contexts/EventsFilterContext';
 import { HOME_FEATURE_SECTIONS } from '../constants/homeFeatures';
+import { isPublicEventsPath, PUBLIC_EVENTS_PATH } from '../utils/publicEventsRoute';
 
 const navLinkStyle = {
   color: '#1a1f2e',
@@ -52,11 +53,10 @@ export const Navbar = () => {
   const navigate = useNavigate();
   const { user, logout, isAuthenticated } = useUserAuth();
   const eventsFilter = useEventsFilter();
-  const isActive = (path: string) => location.pathname === path;
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [featuresDropdownOpen, setFeaturesDropdownOpen] = useState(false);
   const [mobileFeaturesOpen, setMobileFeaturesOpen] = useState(false);
-  const isEventsPage = location.pathname === '/events';
+  const isEventsPage = isPublicEventsPath(location.pathname);
   const showEventsNav = isAuthenticated && isEventsPage && eventsFilter;
 
   const closeMobileMenu = () => {
@@ -65,28 +65,28 @@ export const Navbar = () => {
   };
 
   const openLogin = () => {
-    navigate('/events', { state: { openAuth: 'login', bottomNav: 'settings' } });
+    navigate(PUBLIC_EVENTS_PATH, { state: { openAuth: 'login', bottomNav: 'settings' } });
   };
 
   const scrollToFeature = (sectionId: string) => {
     closeMobileMenu();
     setFeaturesDropdownOpen(false);
 
-    if (location.pathname === '/') {
+    if (location.pathname === '/about') {
       const el = document.getElementById(sectionId);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        window.history.replaceState(null, '', `#${sectionId}`);
+        window.history.replaceState(null, '', `/about#${sectionId}`);
       }
       return;
     }
 
-    navigate(`/#${sectionId}`);
+    navigate(`/about#${sectionId}`);
   };
 
   return (
     <>
-      <nav className="navbar sticky-top navbar-expand-lg site-navbar">
+      <nav className={`navbar sticky-top navbar-expand-lg site-navbar${isEventsPage ? ' navbar--feed' : ''}`}>
         <div className="container-fluid site-navbar-inner px-3 px-lg-4">
           {/* Desktop — logo left, links center, login right */}
           <div className="w-100 site-navbar-desktop">
@@ -95,7 +95,7 @@ export const Navbar = () => {
                 className="navbar-brand d-flex align-items-center site-navbar-brand mb-0"
                 to="/"
                 onClick={(e) => {
-                  if (location.pathname === '/') {
+                  if (isEventsPage) {
                     e.preventDefault();
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }
@@ -156,10 +156,13 @@ export const Navbar = () => {
                   </ul>
                 </li>
                 <li className="nav-item">
-                  <NavLinkHover to="/#faqs">FAQ</NavLinkHover>
+                  <NavLinkHover to="/about#faqs">FAQ</NavLinkHover>
                 </li>
                 <li className="nav-item">
-                  <NavLinkHover to="/events" className={`nav-link ${isActive('/events') ? 'active' : ''}`}>
+                  <NavLinkHover
+                    to={PUBLIC_EVENTS_PATH}
+                    className={`nav-link ${isEventsPage ? 'active' : ''}`}
+                  >
                     Events
                   </NavLinkHover>
                 </li>
@@ -172,7 +175,7 @@ export const Navbar = () => {
                   </NavLinkHover>
                 </li>
                 <li className="nav-item">
-                  <NavLinkHover to="/#contact-us">Contact</NavLinkHover>
+                  <NavLinkHover to="/about#contact-us">Contact</NavLinkHover>
                 </li>
               </ul>
             </div>
@@ -195,7 +198,7 @@ export const Navbar = () => {
                   onChange={(e) => eventsFilter.setSearchQuery(e.target.value)}
                 />
                 <Link
-                  to="/events"
+                  to={PUBLIC_EVENTS_PATH}
                   className="btn btn-link p-1 site-navbar-icon-btn"
                   title="Settings"
                   aria-label="Settings"
@@ -259,7 +262,7 @@ export const Navbar = () => {
               className="navbar-brand d-flex align-items-center site-navbar-brand"
               to="/"
               onClick={(e) => {
-                if (location.pathname === '/') {
+                if (isEventsPage) {
                   e.preventDefault();
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }
@@ -333,7 +336,7 @@ export const Navbar = () => {
               className="d-flex align-items-center"
               onClick={() => {
                 closeMobileMenu();
-                if (location.pathname === '/') {
+                if (isEventsPage) {
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }
               }}
@@ -398,12 +401,12 @@ export const Navbar = () => {
               )}
             </li>
             <li className="mb-3">
-              <Link to="/#faqs" onClick={closeMobileMenu} className="d-block py-2 px-3 mobile-nav-link">
+              <Link to="/about#faqs" onClick={closeMobileMenu} className="d-block py-2 px-3 mobile-nav-link">
                 FAQ
               </Link>
             </li>
             <li className="mb-3">
-              <Link to="/events" onClick={closeMobileMenu} className="d-block py-2 px-3 mobile-nav-link">
+              <Link to={PUBLIC_EVENTS_PATH} onClick={closeMobileMenu} className="d-block py-2 px-3 mobile-nav-link">
                 Events
               </Link>
             </li>
@@ -413,7 +416,7 @@ export const Navbar = () => {
               </Link>
             </li>
             <li className="mb-3">
-              <Link to="/#contact-us" onClick={closeMobileMenu} className="d-block py-2 px-3 mobile-nav-link">
+              <Link to="/about#contact-us" onClick={closeMobileMenu} className="d-block py-2 px-3 mobile-nav-link">
                 Contact
               </Link>
             </li>

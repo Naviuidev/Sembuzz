@@ -18,6 +18,8 @@ import { SchoolAdminDirectChatsModule } from './direct-chats/school-admin-direct
 import { SchoolAdminStudentChatGroupRequestsModule } from './student-chat-group-requests/school-admin-student-chat-group-requests.module';
 import { SchoolAdminClubGroupChatDeleteRequestsModule } from './club-group-chat-delete-requests/school-admin-club-group-chat-delete-requests.module';
 import { SchoolAdminStudentChatGroupDeleteRequestsModule } from './student-chat-group-delete-requests/school-admin-student-chat-group-delete-requests.module';
+import { SchoolAdminExternalPipelineModule } from './external-pipeline/external-pipeline.module';
+import { SchoolAdminExternalPostRequestsModule } from './external-post-requests/external-post-requests.module';
 
 @Module({
   imports: [
@@ -40,6 +42,8 @@ import { SchoolAdminStudentChatGroupDeleteRequestsModule } from './student-chat-
     SchoolAdminStudentChatGroupRequestsModule,
     SchoolAdminClubGroupChatDeleteRequestsModule,
     SchoolAdminStudentChatGroupDeleteRequestsModule,
+    SchoolAdminExternalPipelineModule,
+    SchoolAdminExternalPostRequestsModule,
   ],
   exports: [
     SchoolAdminAuthModule,

@@ -1,38 +1,42 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { SchoolNavbar } from '../components/SchoolNavbar';
-import { EventsBottomNav, type EventsBottomNavTab } from '../components/EventsBottomNav';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { EventsStudentShell } from '../components/EventsStudentShell';
 import { useUserAuth } from '../contexts/UserAuthContext';
 import { userEventsService, type SavedEventItem } from '../services/user-events.service';
-import { userNotificationsService, USER_NOTIFICATIONS_UNREAD_QUERY_KEY } from '../services/user-notifications.service';
+import {
+  userExternalFeedService,
+  type SavedExternalPostRow,
+} from '../services/user-external-feed.service';
 import { imageSrc } from '../utils/image';
-import { EventPostPublicMeta, EventPostPublicActionButtons } from '../components/EventPostPublicExtras';
-import { EventPostPublicDescriptionRow } from '../components/EventPostPublicDescriptionRow';
+import { EventPostPublicContent } from '../components/EventPostPublicContent';
+import { ExternalPublicPostCard } from '../components/ExternalPublicPostCard';
+import { externalPostContentTypeLabel } from '../utils/externalOfferPostView';
+import {
+  filterSavedExternalByTab,
+  parseSavedTabParam,
+  savedExternalDisplayName,
+  savedExternalSubtitle,
+  type SavedCollectionTab,
+} from '../utils/savedCollections';
 
-function parseImageUrls(imageUrls: string | null): string[] {
-  if (!imageUrls) return [];
-  try {
-    const parsed = JSON.parse(imageUrls);
-    return Array.isArray(parsed) ? parsed.filter((u): u is string => typeof u === 'string') : [];
-  } catch {
-    return [];
-  }
+const TAB_LABELS: Record<SavedCollectionTab, string> = {
+  news: 'School news',
+  jobs: 'Jobs',
+  offers: 'Offers',
+  campaigns: 'Campaigns',
+};
+
+function contentTypeBadgeClass(contentType: string): string {
+  if (contentType === 'job') return 'saved-items-badge saved-items-badge--job';
+  if (contentType === 'offer') return 'saved-items-badge saved-items-badge--offer';
+  if (contentType === 'campaign') return 'saved-items-badge saved-items-badge--campaign';
+  return 'saved-items-badge saved-items-badge--event';
 }
 
-/** Full post detail view (stays on saved screen). */
 function SavedEventDetail({ event, onBack }: { event: SavedEventItem; onBack: () => void }) {
-  const [slideIndex, setSlideIndex] = useState(0);
-  const [descExpanded, setDescExpanded] = useState(false);
-  const images = parseImageUrls(event.imageUrls);
-  const schoolName = event.school?.name ?? 'School';
-  const schoolLogo = event.school?.image ?? null;
-  const hasMultipleImages = images.length > 1;
-  const goPrev = () => setSlideIndex((i) => (i <= 0 ? images.length - 1 : i - 1));
-  const goNext = () => setSlideIndex((i) => (i >= images.length - 1 ? 0 : i + 1));
-
   return (
-    <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+    <>
       <button
         type="button"
         className="btn btn-link p-0 text-decoration-none d-flex align-items-center gap-2 mb-3"
@@ -43,81 +47,22 @@ function SavedEventDetail({ event, onBack }: { event: SavedEventItem; onBack: ()
         <span style={{ fontWeight: 500, color: '#1a1f2e' }}>Back to list</span>
       </button>
       <article className="card border-0 shadow-sm" style={{ borderRadius: '12px', overflow: 'hidden' }}>
-        <div className="d-flex align-items-center gap-2 px-3 py-2" style={{ borderBottom: '1px solid #eee' }}>
-          {schoolLogo ? (
-            <img src={imageSrc(schoolLogo)} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} />
-          ) : (
-            <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e9ecef', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6c757d', fontWeight: 700 }}>
-              {schoolName.charAt(0)?.toUpperCase() ?? '?'}
-            </div>
-          )}
-          <div>
-            <div style={{ fontWeight: 600, color: '#1a1f2e', fontSize: '0.95rem' }}>{schoolName}</div>
-            <div style={{ fontSize: '0.75rem', color: '#8e8e8e' }}>{event.subCategory?.name ?? 'Post'}</div>
-          </div>
-        </div>
-        {images[0] ? (
-          <div style={{ position: 'relative', width: '100%', backgroundColor: '#fafafa' }}>
-            <div style={{ overflow: 'hidden', width: '100%' }}>
-              <div
-                style={{
-                  display: 'flex',
-                  transform: `translateX(-${slideIndex * 100}%)`,
-                  transition: 'transform 0.3s ease-out',
-                }}
-              >
-                {images.map((url, i) => (
-                  <div key={i} style={{ minWidth: '100%', flexShrink: 0, minHeight: 'min(300px, 40vh)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <img src={imageSrc(url)} alt="" style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }} />
-                  </div>
-                ))}
-              </div>
-            </div>
-            {hasMultipleImages && (
-              <>
-                <button type="button" onClick={goPrev} aria-label="Previous" style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.9)', boxShadow: '0 1px 4px rgba(0,0,0,0.2)', cursor: 'pointer' }}>
-                  <i className="bi bi-chevron-left" />
-                </button>
-                <button type="button" onClick={goNext} aria-label="Next" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.9)', boxShadow: '0 1px 4px rgba(0,0,0,0.2)', cursor: 'pointer' }}>
-                  <i className="bi bi-chevron-right" />
-                </button>
-              </>
-            )}
-          </div>
-        ) : (
-          <div style={{ minHeight: '200px', background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8e8e8e' }}>
-            <i className="bi bi-image" style={{ fontSize: '3rem' }} />
-          </div>
-        )}
         <div className="px-3 py-3">
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#1a1f2e', marginBottom: '0.35rem', lineHeight: 1.35 }}>
-            {event.title}
-          </h2>
-          <EventPostPublicMeta event={event} compact />
-          <EventPostPublicDescriptionRow
-            event={event}
-            description={event.description ?? ''}
-            expanded={descExpanded}
-            onExpand={() => setDescExpanded(true)}
-            compact
-          />
-          <EventPostPublicActionButtons event={event} compact />
+          <EventPostPublicContent event={event} showHero />
         </div>
       </article>
-    </div>
+    </>
   );
 }
 
-/** Compact row — same layout as Liked news list in PublicEvents */
 function SavedEventRow({ event, onSelect }: { event: SavedEventItem; onSelect: () => void }) {
   const schoolName = event.school?.name ?? 'School';
   const schoolLogo = event.school?.image ?? null;
-  const location = event.school?.city ?? event.school?.name ?? event.subCategory?.name ?? '—';
+  const location = event.school?.city ?? event.subCategory?.name ?? '—';
 
   return (
     <div
-      className="d-flex align-items-center gap-3 p-3 rounded-3 border bg-white"
-      style={{ borderColor: '#eee', cursor: 'pointer' }}
+      className="saved-items-row"
       onClick={onSelect}
       role="button"
       tabIndex={0}
@@ -129,117 +74,251 @@ function SavedEventRow({ event, onSelect }: { event: SavedEventItem; onSelect: (
       }}
     >
       {schoolLogo ? (
-        <img src={imageSrc(schoolLogo)} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+        <img src={imageSrc(schoolLogo)} alt="" className="saved-items-row__avatar" />
       ) : (
-        <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#e9ecef', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6c757d', fontWeight: 700, flexShrink: 0 }}>
+        <div className="saved-items-row__avatar saved-items-row__avatar--fallback">
           {schoolName.charAt(0)?.toUpperCase() ?? '?'}
         </div>
       )}
-      <div className="flex-grow-1 min-w-0">
-        <div style={{ fontWeight: 600, color: '#1a1f2e', fontSize: '0.95rem' }}>{event.title}</div>
-        <div style={{ fontSize: '0.8rem', color: '#6c757d' }}>{location}</div>
+      <div className="saved-items-row__body">
+        <span className="saved-items-badge saved-items-badge--news">School news</span>
+        {event.subCategory?.name ? (
+          <span className="saved-items-badge saved-items-badge--cat">{event.subCategory.name}</span>
+        ) : null}
+        <div className="saved-items-row__title">{event.title}</div>
+        <div className="saved-items-row__sub">{location}</div>
       </div>
-      <i className="bi bi-chevron-right text-muted" style={{ fontSize: '1rem' }} aria-hidden />
+      <i className="bi bi-chevron-right text-muted" aria-hidden />
     </div>
+  );
+}
+
+function SavedExternalRow({
+  row,
+  onSelect,
+}: {
+  row: SavedExternalPostRow;
+  onSelect: () => void;
+}) {
+  const typeLabel = externalPostContentTypeLabel(row);
+  const displayName = savedExternalDisplayName(row);
+  const sub = savedExternalSubtitle(row);
+
+  return (
+    <div
+      className="saved-items-row"
+      onClick={onSelect}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+    >
+      <div className="saved-items-row__avatar saved-items-row__avatar--external">
+        <i className="bi bi-briefcase" aria-hidden />
+      </div>
+      <div className="saved-items-row__body">
+        <span className={contentTypeBadgeClass(row.contentType ?? 'event')}>{typeLabel}</span>
+        {row.externalCategory?.name ? (
+          <span className="saved-items-badge saved-items-badge--cat">{row.externalCategory.name}</span>
+        ) : null}
+        <div className="saved-items-row__title">{displayName}</div>
+        {sub ? <div className="saved-items-row__sub">{sub}</div> : null}
+      </div>
+      <i className="bi bi-chevron-right text-muted" aria-hidden />
+    </div>
+  );
+}
+
+function SavedExternalDetail({
+  row,
+  onBack,
+  onUnsave,
+}: {
+  row: SavedExternalPostRow;
+  onBack: () => void;
+  onUnsave: () => void;
+}) {
+  return (
+    <>
+      <div className="d-flex align-items-center justify-content-between gap-2 mb-3">
+        <button
+          type="button"
+          className="btn btn-link p-0 text-decoration-none d-flex align-items-center gap-2"
+          onClick={onBack}
+          aria-label="Back to list"
+        >
+          <i className="bi bi-arrow-left" style={{ fontSize: '1.25rem', color: '#1a1f2e' }} />
+          <span style={{ fontWeight: 500, color: '#1a1f2e' }}>Back to list</span>
+        </button>
+        <button type="button" className="btn btn-outline-secondary btn-sm rounded-pill" onClick={onUnsave}>
+          Remove
+        </button>
+      </div>
+      <div className="d-flex flex-wrap gap-2 mb-2">
+        <span className={contentTypeBadgeClass(row.contentType ?? 'event')}>{externalPostContentTypeLabel(row)}</span>
+        {row.externalCategory?.name ? (
+          <span className="saved-items-badge saved-items-badge--cat">{row.externalCategory.name}</span>
+        ) : null}
+      </div>
+      <article className="card border-0 shadow-sm" style={{ borderRadius: '12px', overflow: 'hidden' }}>
+        <div className="p-2">
+          <ExternalPublicPostCard row={row} isSaved onToggleSave={onUnsave} />
+        </div>
+      </article>
+    </>
   );
 }
 
 export const SavedItems = () => {
   const { user } = useUserAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = parseSavedTabParam(searchParams.get('tab'));
   const [selectedEvent, setSelectedEvent] = useState<SavedEventItem | null>(null);
+  const [selectedExternal, setSelectedExternal] = useState<SavedExternalPostRow | null>(null);
 
-  const { data: savedEvents = [], isLoading, isError, refetch } = useQuery({
+  const setTab = (next: SavedCollectionTab) => {
+    setSearchParams({ tab: next }, { replace: true });
+    setSelectedEvent(null);
+    setSelectedExternal(null);
+  };
+
+  const { data: savedEvents = [], isLoading: newsLoading, isError: newsError, refetch: refetchNews } = useQuery({
     queryKey: ['user', 'events', 'saved'],
     queryFn: () => userEventsService.getSavedEvents(),
     enabled: !!user,
   });
 
-  const { data: unreadNotifData } = useQuery({
-    queryKey: USER_NOTIFICATIONS_UNREAD_QUERY_KEY,
-    queryFn: () => userNotificationsService.getUnreadCount(),
+  const { data: savedExternal = [], isLoading: extLoading, isError: extError, refetch: refetchExt } = useQuery({
+    queryKey: ['user', 'external-feed', 'saved'],
+    queryFn: () => userExternalFeedService.getSavedPosts(),
     enabled: !!user,
-    refetchInterval: 15_000,
   });
-  const notifUnreadCount = unreadNotifData?.unreadCount ?? 0;
 
-  const handleBottomNav = (tab: EventsBottomNavTab) => {
-    if (tab === 'chat') {
-      navigate('/messages');
-      return;
+  const savedJobs = useMemo(() => filterSavedExternalByTab(savedExternal, 'jobs'), [savedExternal]);
+  const savedOffers = useMemo(() => filterSavedExternalByTab(savedExternal, 'offers'), [savedExternal]);
+  const savedCampaigns = useMemo(() => filterSavedExternalByTab(savedExternal, 'campaigns'), [savedExternal]);
+
+  const unsaveMutation = useMutation({
+    mutationFn: (postId: string) => userExternalFeedService.toggleSave(postId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user', 'external-feed', 'saved'] });
+      queryClient.invalidateQueries({ queryKey: ['user', 'external-feed', 'engagement'] });
+      setSelectedExternal(null);
+    },
+  });
+
+  useEffect(() => {
+    if (!user) {
+      navigate('/events', { replace: true, state: { openAuth: 'login' } });
     }
-    navigate('/events', { state: { bottomNav: tab } });
+  }, [user, navigate]);
+
+  if (!user) return null;
+
+  const counts: Record<SavedCollectionTab, number> = {
+    news: savedEvents.length,
+    jobs: savedJobs.length,
+    offers: savedOffers.length,
+    campaigns: savedCampaigns.length,
   };
 
-  if (!user) {
-    navigate('/events', { replace: true, state: { openAuth: 'login' } });
-    return null;
-  }
+  const listForTab = () => {
+    if (tab === 'news') return { items: savedEvents, loading: newsLoading, error: newsError, refetch: refetchNews };
+    if (tab === 'jobs') return { items: savedJobs, loading: extLoading, error: extError, refetch: refetchExt };
+    if (tab === 'offers') return { items: savedOffers, loading: extLoading, error: extError, refetch: refetchExt };
+    return { items: savedCampaigns, loading: extLoading, error: extError, refetch: refetchExt };
+  };
 
-  const loadError = isError ? 'Could not load saved news. Pull down to try again.' : null;
+  const { items, loading, error, refetch } = listForTab();
+
+  const emptyCopy: Record<SavedCollectionTab, string> = {
+    news: 'No saved school news yet. Save posts from your home feed.',
+    jobs: 'No saved jobs yet. Use Save job on External job posts.',
+    offers: 'No saved offers yet. Bookmark offers from the External feed.',
+    campaigns: 'No saved campaigns yet. Bookmark campaigns from the External feed.',
+  };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fafafa', paddingBottom: '5.5rem' }}>
-      <SchoolNavbar />
-      <div className="container py-4" style={{ maxWidth: 640 }}>
-        {selectedEvent ? (
-          <SavedEventDetail event={selectedEvent} onBack={() => setSelectedEvent(null)} />
-        ) : (
-          <>
-            <div className="d-flex align-items-center gap-2 mb-3">
+    <EventsStudentShell activeTab="settings" activeSavedTab={tab} contentClassName="events-student-shell-page">
+      {selectedEvent ? (
+        <SavedEventDetail event={selectedEvent} onBack={() => setSelectedEvent(null)} />
+      ) : selectedExternal ? (
+        <SavedExternalDetail
+          row={selectedExternal}
+          onBack={() => setSelectedExternal(null)}
+          onUnsave={() => unsaveMutation.mutate(selectedExternal.id)}
+        />
+      ) : (
+        <>
+          <div className="d-flex align-items-center gap-2 mb-3">
+            <button
+              type="button"
+              className="btn btn-link p-0 text-decoration-none d-flex align-items-center"
+              onClick={() => navigate('/events', { state: { bottomNav: 'settings' } })}
+              aria-label="Back to Settings"
+            >
+              <i className="bi bi-arrow-left" style={{ fontSize: '1.25rem', color: '#1a1f2e' }} />
+            </button>
+            <h1 className="mb-0 saved-items-page__title">Saved</h1>
+          </div>
+
+          <div className="saved-items-tabs saved-items-tabs--scroll" role="tablist" aria-label="Saved collections">
+            {(Object.keys(TAB_LABELS) as SavedCollectionTab[]).map((key) => (
               <button
+                key={key}
                 type="button"
-                className="btn btn-link p-0 text-decoration-none d-flex align-items-center"
-                onClick={() => navigate('/events', { state: { bottomNav: 'settings' } })}
-                aria-label="Back to Settings"
+                role="tab"
+                className={tab === key ? 'is-active' : ''}
+                aria-selected={tab === key}
+                onClick={() => setTab(key)}
               >
-                <i className="bi bi-arrow-left" style={{ fontSize: '1.25rem', color: '#1a1f2e' }} />
+                {TAB_LABELS[key]}
+                {counts[key] > 0 ? <span className="saved-items-tabs__count">{counts[key]}</span> : null}
               </button>
-              <h1 className="mb-0" style={{ fontSize: '1.5rem', fontWeight: 600, color: '#1a1f2e' }}>
-                Saved news
-              </h1>
+            ))}
+          </div>
+
+          {loading ? (
+            <div className="text-center py-5">
+              <div className="spinner-border text-secondary" role="status" />
+              <p className="mt-2 mb-0 text-muted small">Loading…</p>
             </div>
+          ) : error && items.length === 0 ? (
+            <div className="text-center py-5">
+              <p className="text-muted small mb-3">Could not load saved items.</p>
+              <button type="button" className="btn btn-outline-primary btn-sm rounded-pill" onClick={() => void refetch()}>
+                Try again
+              </button>
+            </div>
+          ) : items.length === 0 ? (
+            <p className="text-muted text-center py-5 small mb-0">{emptyCopy[tab]}</p>
+          ) : (
+            <div className="d-flex flex-column gap-2">
+              {tab === 'news'
+                ? savedEvents.map((event: SavedEventItem) => (
+                    <SavedEventRow key={event.id} event={event} onSelect={() => setSelectedEvent(event)} />
+                  ))
+                : (items as SavedExternalPostRow[]).map((row) => (
+                    <SavedExternalRow key={row.id} row={row} onSelect={() => setSelectedExternal(row)} />
+                  ))}
+            </div>
+          )}
 
-            {isLoading ? (
-              <div className="text-center py-5">
-                <div className="spinner-border text-secondary" role="status" />
-                <p className="mt-2 mb-0 text-muted small">Loading…</p>
-              </div>
-            ) : loadError && savedEvents.length === 0 ? (
-              <div className="text-center py-5">
-                <p className="text-muted small mb-3">{loadError}</p>
-                <button type="button" className="btn btn-outline-primary btn-sm rounded-pill" onClick={() => void refetch()}>
-                  Try again
-                </button>
-              </div>
-            ) : savedEvents.length === 0 ? (
-              <p className="text-muted text-center py-5 small mb-0">
-                No saved posts yet. Save posts from your home feed to see them here.
-              </p>
-            ) : (
-              <div className="d-flex flex-column gap-2" style={{ maxWidth: 600, margin: '0 auto' }}>
-                {savedEvents.map((event: SavedEventItem) => (
-                  <SavedEventRow key={event.id} event={event} onSelect={() => setSelectedEvent(event)} />
-                ))}
-              </div>
-            )}
-
-            {!isLoading && savedEvents.length > 0 && (
-              <div className="text-center mt-3">
-                <button type="button" className="btn btn-link btn-sm text-muted" onClick={() => void refetch()}>
-                  Refresh
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      <EventsBottomNav
-        activeTab="settings"
-        onSelectTab={handleBottomNav}
-        notifUnreadCount={notifUnreadCount}
-      />
-    </div>
+          {!loading && items.length > 0 ? (
+            <div className="text-center mt-3">
+              <button type="button" className="btn btn-link btn-sm text-muted" onClick={() => void refetch()}>
+                Refresh
+              </button>
+            </div>
+          ) : null}
+        </>
+      )}
+    </EventsStudentShell>
   );
 };

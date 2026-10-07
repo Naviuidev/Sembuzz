@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { SchoolNavbar } from '../components/SchoolNavbar';
+import { EventsStudentShell } from '../components/EventsStudentShell';
+import { ProfileSubpageHeader } from '../components/StudentProfileHub';
 import { useUserAuth } from '../contexts/UserAuthContext';
 import { userAuthService } from '../services/user-auth.service';
 
@@ -16,29 +17,25 @@ function legalHref(pathWithHash: string): string {
 type OptionRowProps = {
   icon: string;
   label: string;
+  hint?: string;
   onClick: () => void;
   destructive?: boolean;
 };
 
-function OptionRow({ icon, label, onClick, destructive }: OptionRowProps) {
+function OptionRow({ icon, label, hint, onClick, destructive }: OptionRowProps) {
   return (
-    <button
-      type="button"
-      className="w-100 border-0 text-start d-flex align-items-center justify-content-between rounded-3 mb-2 px-3 py-3"
-      style={{
-        backgroundColor: destructive ? '#fff7f8' : '#fff',
-        border: destructive ? '1px solid #f7d7db' : '1px solid #eceef2',
-        cursor: 'pointer',
-      }}
-      onClick={onClick}
-    >
-      <span className="d-flex align-items-center gap-2">
-        <i className={`bi ${icon}`} style={{ fontSize: '1.15rem', color: destructive ? '#dc3545' : '#1a1f2e' }} />
-        <span style={{ fontSize: '0.95rem', fontWeight: destructive ? 600 : 500, color: destructive ? '#dc3545' : '#1a1f2e' }}>
-          {label}
-        </span>
+    <button type="button" className="student-profile-menu__item" onClick={onClick}>
+      <span
+        className="student-profile-menu__icon-wrap"
+        style={destructive ? { background: '#fef2f2', color: '#dc2626' } : undefined}
+      >
+        <i className={`bi ${icon}`} aria-hidden />
       </span>
-      <i className="bi bi-chevron-right" style={{ fontSize: '1rem', color: destructive ? '#dc3545' : '#6c757d' }} />
+      <span className="student-profile-menu__text">
+        <span className="student-profile-menu__title" style={destructive ? { color: '#dc2626' } : undefined}>{label}</span>
+        {hint ? <span className="student-profile-menu__subtitle">{hint}</span> : null}
+      </span>
+      <i className="bi bi-chevron-right student-profile-menu__chevron" aria-hidden />
     </button>
   );
 }
@@ -50,10 +47,6 @@ export const AccountProfile = () => {
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  const goSettingsHub = () => {
-    navigate('/events', { state: { bottomNav: 'settings' } });
-  };
 
   const handleDeleteAccount = async () => {
     const password = deletePassword.trim();
@@ -85,103 +78,73 @@ export const AccountProfile = () => {
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#f8f9fa', paddingBottom: '2rem' }}>
-      <SchoolNavbar />
-      <div className="container py-3" style={{ maxWidth: 640 }}>
-        <div className="d-flex align-items-center mb-4">
-          <div style={{ width: 44 }} className="d-flex justify-content-start flex-shrink-0">
-            <button
-              type="button"
-              className="btn btn-link p-0 text-decoration-none"
-              onClick={goSettingsHub}
-              aria-label="Back"
-            >
-              <i className="bi bi-chevron-left" style={{ fontSize: '1.35rem', color: '#1a1f2e' }} />
-            </button>
-          </div>
-          <h1 className="flex-grow-1 text-center mb-0" style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1a1f2e' }}>
-            Profile
-          </h1>
-          <div style={{ width: 44 }} className="d-flex justify-content-end flex-shrink-0">
-            <button
-              type="button"
-              className="border-0 d-flex align-items-center justify-content-center"
-              onClick={goSettingsHub}
-              aria-label="Settings"
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: '50%',
-                backgroundColor: '#0b4a99',
-                color: '#fff',
-                boxShadow: '0 2px 10px rgba(11, 74, 153, 0.35)',
-              }}
-            >
-              <i className="bi bi-gear" style={{ fontSize: '1.1rem' }} />
-            </button>
-          </div>
+    <EventsStudentShell activeTab="settings" contentClassName="events-student-shell-page">
+      <div className="student-profile">
+        <ProfileSubpageHeader
+          title="Account"
+          backLabel="Back to profile"
+          onBack={() => navigate('/events', { state: { bottomNav: 'settings' } })}
+        />
+
+        <p className="student-profile-section-title">Profile</p>
+        <div className="student-profile-card student-profile-menu mb-4">
+          <OptionRow icon="bi-pencil-square" label="Edit profile" hint="Name, photo, password" onClick={() => navigate('/profile/edit')} />
+          <OptionRow icon="bi-person" label="View profile" hint="Your public details" onClick={() => navigate('/profile/view')} />
         </div>
 
-        <h2 className="mb-1" style={{ fontSize: '1.375rem', fontWeight: 700, color: '#1a1f2e' }}>
-          Account options
-        </h2>
-        <p className="small text-secondary mb-3" style={{ lineHeight: 1.4 }}>
-          Manage your profile, legal pages, and account actions.
-        </p>
+        <p className="student-profile-section-title">Legal</p>
+        <div className="student-profile-card student-profile-menu mb-4">
+          <OptionRow
+            icon="bi-shield-check"
+            label="Privacy policy"
+            onClick={() => window.open(legalHref('/privacy'), '_blank', 'noopener,noreferrer')}
+          />
+          <OptionRow
+            icon="bi-file-text"
+            label="Terms and conditions"
+            onClick={() => window.open(legalHref('/terms'), '_blank', 'noopener,noreferrer')}
+          />
+          <OptionRow
+            icon="bi-people"
+            label="Community guidelines"
+            onClick={() => window.open(legalHref('/#community-guidelines'), '_blank', 'noopener,noreferrer')}
+          />
+        </div>
 
-        <OptionRow icon="bi-pencil-square" label="Edit profile" onClick={() => navigate('/profile/edit')} />
-        <OptionRow icon="bi-person" label="View profile" onClick={() => navigate('/profile/view')} />
-        <OptionRow
-          icon="bi-shield-check"
-          label="Privacy policy"
-          onClick={() => {
-            window.open(legalHref('/privacy'), '_blank', 'noopener,noreferrer');
-          }}
-        />
-        <OptionRow
-          icon="bi-file-text"
-          label="Terms and conditions"
-          onClick={() => {
-            window.open(legalHref('/terms'), '_blank', 'noopener,noreferrer');
-          }}
-        />
-        <OptionRow
-          icon="bi-people"
-          label="Community guideline"
-          onClick={() => {
-            window.open(legalHref('/#community-guidelines'), '_blank', 'noopener,noreferrer');
-          }}
-        />
-        <OptionRow
-          icon="bi-trash"
-          label="Delete account"
-          destructive
-          onClick={() => {
-            setDeletePassword('');
-            setDeleteError(null);
-            setShowDeleteModal(true);
-          }}
-        />
+        <p className="student-profile-section-title">Danger zone</p>
+        <div className="student-profile-card student-profile-menu">
+          <OptionRow
+            icon="bi-trash"
+            label="Delete account"
+            hint="Permanent — cannot be undone"
+            destructive
+            onClick={() => {
+              setDeletePassword('');
+              setDeleteError(null);
+              setShowDeleteModal(true);
+            }}
+          />
+        </div>
       </div>
 
       {showDeleteModal ? (
         <div
           className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center p-3"
-          style={{ backgroundColor: 'rgba(0,0,0,0.38)', zIndex: 1050 }}
+          style={{ backgroundColor: 'rgba(15,23,42,0.45)', zIndex: 1050 }}
           role="dialog"
           aria-modal="true"
           aria-labelledby="delete-account-title"
           onClick={() => !deleteLoading && setShowDeleteModal(false)}
         >
           <div
-            className="bg-white rounded-3 p-3 w-100"
+            className="student-profile-form-card w-100"
             style={{ maxWidth: 400 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 id="delete-account-title" className="h5 fw-bold mb-2" style={{ color: '#1a1f2e' }}>
+            <h3 id="delete-account-title" className="h5 fw-bold mb-2">
               Delete account
             </h3>
-            <p className="small text-secondary mb-2">This action is permanent. Enter your password to continue.</p>
+            <p className="small text-secondary mb-3">This action is permanent. Enter your password to continue.</p>
             <input
               type="password"
               className="form-control mb-2"
@@ -194,10 +157,10 @@ export const AccountProfile = () => {
               }}
             />
             {deleteError ? <p className="small text-danger mb-2">{deleteError}</p> : null}
-            <div className="d-flex justify-content-end gap-2 mt-2">
+            <div className="d-flex justify-content-end gap-2 mt-3">
               <button
                 type="button"
-                className="btn btn-outline-secondary btn-sm"
+                className="student-profile-btn student-profile-btn--secondary"
                 disabled={deleteLoading}
                 onClick={() => !deleteLoading && setShowDeleteModal(false)}
               >
@@ -205,16 +168,17 @@ export const AccountProfile = () => {
               </button>
               <button
                 type="button"
-                className="btn btn-danger btn-sm"
+                className="student-profile-btn student-profile-btn--primary"
+                style={{ background: '#dc2626' }}
                 disabled={!deletePassword.trim() || deleteLoading}
                 onClick={() => void handleDeleteAccount()}
               >
-                {deleteLoading ? 'Deleting…' : 'Delete account'}
+                {deleteLoading ? 'Deleting…' : 'Delete'}
               </button>
             </div>
           </div>
         </div>
       ) : null}
-    </div>
+    </EventsStudentShell>
   );
 };

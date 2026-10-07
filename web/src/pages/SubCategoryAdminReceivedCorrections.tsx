@@ -7,7 +7,7 @@ export const SubCategoryAdminReceivedCorrections = () => {
   const navigate = useNavigate();
 
   const handleMakeCorrections = (event: RevertedEvent) => {
-    navigate('/subcategory-admin/post-event', { state: { resubmitEvent: event } });
+    navigate('/subcategory-admin/posts', { state: { resubmitEvent: event } });
   };
 
   return (

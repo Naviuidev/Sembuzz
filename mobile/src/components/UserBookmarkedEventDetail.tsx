@@ -1,25 +1,8 @@
-import React, { useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Image,
-  TouchableOpacity,
-  Modal,
-  Pressable,
-  useWindowDimensions,
-} from 'react-native';
-import { parseImageUrls } from '../services/publicBlogs';
-import { imageSrc } from '../utils/image';
-import { SchoolLogo } from './SchoolLogo';
+import React from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Pressable } from 'react-native';
 import type { LikedEventItem, SavedEventItem } from '../services/userEvents';
 import type { ApprovedEventPublic } from '../services/events';
-import {
-  EventPostPublicActionButtons,
-  EventPostPublicDescriptionRow,
-  EventPostPublicMeta,
-} from './EventPostPublicContent';
+import { EventPostDetailBody } from './EventPostPublicContent';
 
 type BookmarkedEvent = LikedEventItem | SavedEventItem | ApprovedEventPublic;
 
@@ -30,18 +13,7 @@ type Props = {
 };
 
 export function UserBookmarkedEventDetailModal({ visible, event, onClose }: Props) {
-  const { width } = useWindowDimensions();
-  const [slideIndex, setSlideIndex] = useState(0);
-
-  const images = useMemo(() => (event ? parseImageUrls(event.imageUrls) : []), [event?.imageUrls]);
-
-  React.useEffect(() => {
-    setSlideIndex(0);
-  }, [event?.id]);
-
   if (!event) return null;
-
-  const schoolName = event.school?.name ?? 'School';
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -55,52 +27,7 @@ export function UserBookmarkedEventDetailModal({ visible, event, onClose }: Prop
             </TouchableOpacity>
           </View>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollInner}>
-            <View style={styles.cardHeader}>
-              <SchoolLogo school={event.school} size={44} borderRadius={22} />
-              <View style={styles.headerText}>
-                <Text style={styles.schoolName}>{schoolName}</Text>
-                <Text style={styles.subCat}>{event.subCategory?.name ?? 'Post'}</Text>
-              </View>
-            </View>
-
-            {images[0] ? (
-              <View style={styles.galleryWrap}>
-                <ScrollView
-                  horizontal
-                  pagingEnabled
-                  showsHorizontalScrollIndicator={false}
-                  onMomentumScrollEnd={(e) => {
-                    const x = e.nativeEvent.contentOffset.x;
-                    const idx = Math.round(x / width);
-                    if (idx >= 0 && idx < images.length) setSlideIndex(idx);
-                  }}
-                >
-                  {images.map((url, i) => (
-                    <View key={i} style={{ width }}>
-                      <Image
-                        source={{ uri: imageSrc(url) }}
-                        style={styles.heroImage}
-                        resizeMode="contain"
-                      />
-                    </View>
-                  ))}
-                </ScrollView>
-                {images.length > 1 ? (
-                  <Text style={styles.pageHint}>
-                    {slideIndex + 1} / {images.length}
-                  </Text>
-                ) : null}
-              </View>
-            ) : (
-              <View style={styles.placeholder}>
-                <Text style={styles.placeholderText}>No image</Text>
-              </View>
-            )}
-
-            <Text style={styles.title}>{event.title}</Text>
-            <EventPostPublicMeta event={event} />
-            <EventPostPublicDescriptionRow event={event} />
-            <EventPostPublicActionButtons event={event} />
+            <EventPostDetailBody event={event} showHero />
           </ScrollView>
         </View>
       </View>
@@ -121,128 +48,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
-    overflow: 'hidden',
+    paddingBottom: 24,
   },
   sheetHeader: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#eee',
+    paddingTop: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
-  backBtn: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#1a1f2e',
-    borderRadius: 999,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  backArrow: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  backText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  scrollInner: {
-    paddingBottom: 32,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#eee',
-    gap: 10,
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-  },
-  avatarPh: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#e9ecef',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarLetter: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#6c757d',
-  },
-  headerText: {
-    flex: 1,
-    minWidth: 0,
-  },
-  schoolName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1a1f2e',
-  },
-  subCat: {
-    fontSize: 12,
-    color: '#8e8e8e',
-    marginTop: 2,
-  },
-  galleryWrap: {
-    backgroundColor: '#fafafa',
-  },
-  heroImage: {
-    width: '100%',
-    height: 280,
-    backgroundColor: '#fafafa',
-  },
-  pageHint: {
-    textAlign: 'center',
-    fontSize: 13,
-    color: '#6c757d',
-    paddingVertical: 8,
-  },
-  placeholder: {
-    height: 200,
-    backgroundColor: '#f0f0f0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  placeholderText: {
-    color: '#8e8e8e',
-    fontSize: 14,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1f2e',
-    paddingHorizontal: 16,
-    marginTop: 16,
-  },
-  desc: {
-    fontSize: 14,
-    color: '#6c757d',
-    lineHeight: 22,
-    paddingHorizontal: 16,
-    marginTop: 8,
-  },
-  linkBtn: {
-    alignSelf: 'flex-start',
-    marginHorizontal: 16,
-    marginTop: 16,
-    backgroundColor: '#212529',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 999,
-  },
-  linkBtnText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  backArrow: { fontSize: 20, color: '#1a1f2e' },
+  backText: { fontSize: 16, fontWeight: '500', color: '#1a1f2e' },
+  scrollInner: { paddingHorizontal: 16, paddingVertical: 16 },
 });

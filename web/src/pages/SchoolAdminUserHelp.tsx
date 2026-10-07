@@ -1,7 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { SchoolAdminNavbar } from '../components/SchoolAdminNavbar';
-import { SchoolAdminSidebar } from '../components/SchoolAdminSidebar';
-import { SchoolAdminProtectedRoute } from '../components/SchoolAdminProtectedRoute';
 import { schoolAdminUserHelpService, type UserHelpQueryForAdmin } from '../services/school-admin-user-help.service';
 
 function formatDate(iso: string) {
@@ -15,83 +12,67 @@ function formatDate(iso: string) {
   }
 }
 
-export const SchoolAdminUserHelp = () => {
+function statusPillClass(status: string): string {
+  const s = status.toLowerCase();
+  if (s === 'open' || s === 'pending') return 'admin-pill admin-pill--warning';
+  if (s === 'resolved' || s === 'closed') return 'admin-pill admin-pill--active';
+  return 'admin-pill admin-pill--neutral';
+}
+
+export function SchoolAdminUserHelpPanel() {
   const { data: queries = [], isLoading, error } = useQuery({
     queryKey: ['school-admin', 'user-help'],
     queryFn: () => schoolAdminUserHelpService.getAll(),
   });
 
-  return (
-    <SchoolAdminProtectedRoute>
-      <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
-        <SchoolAdminNavbar />
-        <div className="admin-shell-body">
-          <SchoolAdminSidebar />
-          <div className="admin-main">
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 600, color: '#1a1f2e', marginBottom: '0.5rem' }}>
-              Users help
-            </h1>
-            <p style={{ color: '#6c757d', marginBottom: '1.5rem' }}>
-              Queries raised by app users from your school. They will see these in the Help tab in the app.
-            </p>
-
-            {isLoading && (
-              <div className="text-center py-5">
-                <div className="spinner-border text-primary" role="status" />
-                <p className="mt-2 mb-0 text-muted">Loading…</p>
-              </div>
-            )}
-
-            {error && (
-              <div className="alert alert-danger" style={{ borderRadius: '8px' }}>
-                {error instanceof Error ? error.message : 'Failed to load user help queries.'}
-              </div>
-            )}
-
-            {!isLoading && !error && queries.length === 0 && (
-              <div className="card border-0 shadow-sm" style={{ borderRadius: '12px' }}>
-                <div className="card-body text-center py-5">
-                  <i className="bi bi-question-circle text-muted" style={{ fontSize: '3rem' }} />
-                  <p className="mt-2 mb-0 text-muted">No user queries yet.</p>
-                  <p className="small text-muted mt-1">When app users raise a query from the Help screen, it will appear here.</p>
-                </div>
-              </div>
-            )}
-
-            {!isLoading && !error && queries.length > 0 && (
-              <div className="card border-0 shadow-sm" style={{ borderRadius: '12px' }}>
-                <div className="card-body p-0">
-                  <ul className="list-unstyled mb-0">
-                    {queries.map((q: UserHelpQueryForAdmin) => (
-                      <li
-                        key={q.id}
-                        className="p-4 border-bottom"
-                        style={{ borderColor: '#eee' }}
-                      >
-                        <div className="d-flex justify-content-between align-items-start flex-wrap gap-2">
-                          <div>
-                            <span className="fw-semibold" style={{ color: '#1a1f2e' }}>
-                              {q.user?.name ?? 'Unknown'}
-                            </span>
-                            <span className="text-muted small ms-2">{q.user?.email}</span>
-                          </div>
-                          <span className="badge bg-secondary" style={{ fontSize: '0.75rem' }}>
-                            {q.status}
-                          </span>
-                        </div>
-                        <p className="text-muted small mb-1 mt-1">{formatDate(q.createdAt)}</p>
-                        <p className="mb-0 mt-2" style={{ whiteSpace: 'pre-wrap', color: '#1a1f2e' }}>
-                          {q.message}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+  if (isLoading) {
+    return (
+      <div className="admin-loading-state">
+        <div className="spinner-border spinner-border-sm text-secondary mb-2" role="status" />
+        <p className="mb-0">Loading user help queries…</p>
       </div>
-    </SchoolAdminProtectedRoute>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="admin-notice mb-0">
+        <p className="admin-form-hint admin-form-hint--error mb-0">
+          {error instanceof Error ? error.message : 'Failed to load user help queries.'}
+        </p>
+      </div>
+    );
+  }
+
+  if (queries.length === 0) {
+    return (
+      <div className="admin-empty-state">
+        <i className="bi bi-question-circle d-block mb-3" style={{ fontSize: '2.5rem', color: '#94a3b8' }} aria-hidden />
+        <p className="mb-1">No user queries yet.</p>
+        <p className="admin-form-hint mb-0">
+          When app users raise a query from the Help screen, it will appear here.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <ul className="admin-help-query-list list-unstyled mb-0">
+      {queries.map((q: UserHelpQueryForAdmin) => (
+        <li key={q.id} className="admin-help-query-list__item">
+          <div className="d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <div>
+              <span className="admin-table__strong">{q.user?.name ?? 'Unknown'}</span>
+              {q.user?.email ? <span className="text-muted small ms-2">{q.user.email}</span> : null}
+            </div>
+            <span className={statusPillClass(q.status)}>{q.status}</span>
+          </div>
+          <p className="admin-form-hint mb-2 mt-1">{formatDate(q.createdAt)}</p>
+          <p className="mb-0" style={{ whiteSpace: 'pre-wrap', color: '#334155', lineHeight: 1.5 }}>
+            {q.message}
+          </p>
+        </li>
+      ))}
+    </ul>
   );
-};
+}

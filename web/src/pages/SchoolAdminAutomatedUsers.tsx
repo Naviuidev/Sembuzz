@@ -1,6 +1,4 @@
 import { useState, useEffect } from 'react';
-import { SchoolAdminNavbar } from '../components/SchoolAdminNavbar';
-import { SchoolAdminSidebar } from '../components/SchoolAdminSidebar';
 import {
   schoolAdminStudentsService,
   type SchoolStudent,
@@ -28,7 +26,7 @@ function getDocFilename(url: string): string {
   return seg && seg.includes('.') ? seg : 'document';
 }
 
-export const SchoolAdminAutomatedUsers = () => {
+export function SchoolAdminAutomatedUsersPanel() {
   const [users, setUsers] = useState<SchoolStudent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,36 +81,14 @@ export const SchoolAdminAutomatedUsers = () => {
   };
 
   return (
-    <div className="admin-shell" style={{ backgroundColor: '#fafafa' }}>
-      <SchoolAdminNavbar />
-      <div className="admin-shell-body">
-        <SchoolAdminSidebar />
-        <div className="admin-main">
-          <div className="mb-4">
-            <h1
-              style={{
-                fontSize: '2rem',
-                fontWeight: 'normal',
-                color: '#1a1f2e',
-                marginBottom: '0.5rem',
-              }}
-            >
-              Automated users
-            </h1>
-            <p style={{ color: '#6c757d', fontSize: '1rem', marginBottom: 0 }}>
-              Students who signed up with a school-domain email and verified via OTP. Ban to revoke login; unban to restore.
-            </p>
-          </div>
-
+    <>
           {error && (
             <div className="alert alert-danger mb-4" style={{ borderRadius: '0px' }}>
               {error}
             </div>
           )}
 
-          <div className="card border-0 shadow-sm" style={{ borderRadius: '0px' }}>
-            <div className="card-body p-4">
-              {loading ? (
+          {loading ? (
                 <div className="text-center py-5">
                   <div className="spinner-border text-secondary" />
                   <p className="mt-2 mb-0 text-muted">Loading…</p>
@@ -246,8 +222,6 @@ export const SchoolAdminAutomatedUsers = () => {
                   </table>
                 </div>
               )}
-            </div>
-          </div>
 
           {/* View doc modal (same as user-requests) */}
           {viewDocUrl && (
@@ -340,8 +314,6 @@ export const SchoolAdminAutomatedUsers = () => {
               </div>
             </div>
           )}
-        </div>
-      </div>
-    </div>
+    </>
   );
-};
+}

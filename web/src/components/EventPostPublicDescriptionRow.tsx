@@ -1,6 +1,5 @@
 import type { ApprovedEventPublic } from '../services/public-events.service';
 import { EventPostPublicDescription } from './EventPostPublicDescription';
-import { eventPillStyle } from './eventPostPillButton';
 
 type Props = {
   event: Pick<ApprovedEventPublic, 'externalLink'>;
@@ -44,11 +43,8 @@ export function EventPostPublicDescriptionRow({ event, description, expanded, on
           href={externalLink}
           target="_blank"
           rel="noopener noreferrer"
-          className="btn btn-dark btn-sm rounded-pill flex-shrink-0 text-decoration-none"
-          style={{
-            ...eventPillStyle(compact, 'dark'),
-            marginTop: hasDescription ? 2 : 0,
-          }}
+          className="event-post-detail__know-more flex-shrink-0 text-decoration-none"
+          style={{ marginTop: hasDescription ? 2 : 0 }}
         >
           Know more
         </a>

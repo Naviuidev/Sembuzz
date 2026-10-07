@@ -302,6 +302,45 @@
   color: var(--admin-accent, #3468f9);
 }
 
+.admin-login-callout {
+  margin-bottom: 1.25rem;
+  padding: 0.875rem 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.admin-login-callout strong {
+  display: block;
+  color: #0f172a;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.admin-login-callout ul {
+  margin: 0;
+  padding-left: 1.15rem;
+}
+
+.admin-login-callout li {
+  margin-bottom: 0.2rem;
+}
+
+.admin-login-panel--centered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-login-loading-text {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: #64748b;
+}
+
 /* —— Super Admin (and light) dashboard navbar —— */
 .admin-navbar--light {
   flex-shrink: 0;
@@ -390,14 +429,14 @@
 /* —— Admin sidebar (same solid accent as login left panel) —— */
 .admin-sidebar--portal {
   --sidebar-accent: #3468f9;
-  width: 260px;
+  width: 100%;
+  max-width: var(--admin-sidebar-width, 260px);
   background: var(--sidebar-accent);
   border-right: 1px solid color-mix(in srgb, var(--sidebar-accent) 85%, #0f172a);
   padding: 0 0 1rem;
   position: relative;
-  overflow-x: hidden;
-  overflow-y: auto;
-  flex-shrink: 0;
+  min-height: 0;
+  height: 100%;
   color: #f8fafc;
 }
 

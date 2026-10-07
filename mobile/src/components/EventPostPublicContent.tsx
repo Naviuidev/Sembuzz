@@ -1,251 +1,213 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Linking, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Linking, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
-  EVENT_DESCRIPTION_MAX_WORDS,
   eventPostHasActionButtons,
   eventPostHasScheduleMeta,
-  formatEventDuration,
-  formatEventOccurrenceDateShort,
+  formatEventOccurrenceDate,
   formatEventTimeRange,
   parseEventActionButtonsPublic,
+  EVENT_DESCRIPTION_MAX_WORDS,
   truncateWords,
   type EventPostPublicFields,
 } from '../utils/eventPostPublic';
+import { imageSrc } from '../utils/image';
+import { parseImageUrls } from '../services/publicBlogs';
 
-const TEXT = '#1a1f2e';
-const MUTED = '#6c757d';
-const DIVIDER = '#dee2e6';
+const TEXT = '#0f172a';
+const MUTED = '#64748b';
+const ACCENT = '#3468f9';
 
 type Props = {
   event: EventPostPublicFields;
   compact?: boolean;
+  showHero?: boolean;
 };
 
-function MetaSep() {
-  return <Text style={styles.metaSep}>|</Text>;
+function schoolBadgeLabel(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
+  return name.slice(0, 3).toUpperCase() || 'SB';
+}
+
+function isPrimaryAction(label: string): boolean {
+  const l = label.toLowerCase();
+  if (l.includes('google calendar') || l.includes('apple calendar')) return false;
+  if (l.includes('calendar') && !l.includes('rsvp')) return false;
+  return true;
 }
 
 export function EventPostPublicMeta({ event, compact }: Props) {
-  if (!eventPostHasScheduleMeta(event)) return null;
-
-  const dateLabel = formatEventOccurrenceDateShort(event.eventDate ?? null);
-  const timeLabel = formatEventTimeRange(event.eventStartTime, event.eventEndTime);
-  const durationLabel = formatEventDuration(event.eventStartTime, event.eventEndTime);
-  const location = event.eventLocation?.trim() || null;
-  const fontSize = compact ? 14 : 15;
-
-  return (
-    <View style={[styles.metaWrap, compact && styles.metaWrapCompact]}>
-      <Ionicons name="calendar-outline" size={compact ? 18 : 20} color={MUTED} style={styles.metaLeadIcon} />
-      <View style={styles.metaTextRow}>
-        {dateLabel ? <Text style={[styles.metaText, { fontSize }]}>{dateLabel}</Text> : null}
-        {dateLabel && (timeLabel || location) ? <MetaSep /> : null}
-        {timeLabel ? (
-          <View style={styles.metaInline}>
-            <Ionicons name="time-outline" size={14} color={MUTED} />
-            <Text style={[styles.metaText, { fontSize }]}>
-              {timeLabel}
-              {durationLabel ? <Text style={styles.metaDuration}> {durationLabel}</Text> : null}
-            </Text>
-          </View>
-        ) : null}
-        {timeLabel && location ? <MetaSep /> : null}
-        {location ? (
-          <View style={styles.metaInline}>
-            <Ionicons name="location-outline" size={14} color={MUTED} />
-            <Text style={[styles.metaText, { fontSize, flexShrink: 1 }]}>{location}</Text>
-          </View>
-        ) : null}
-      </View>
-    </View>
-  );
+  return <EventPostDetailBody event={event} compact={compact} showHero={false} metaOnly />;
 }
 
 export function EventPostPublicDescriptionRow({ event, compact }: Props) {
-  const [expanded, setExpanded] = useState(false);
-  const externalLink = event.externalLink?.trim() || null;
-  const trimmed = (event.description ?? '').trim();
-  const hasDescription = !!trimmed;
+  return <EventPostDetailBody event={event} compact={compact} showHero={false} descOnly />;
+}
 
-  if (!hasDescription && !externalLink) return null;
+export function EventPostPublicActionButtons({ event, compact }: Props) {
+  return <EventPostDetailBody event={event} compact={compact} showHero={false} actionsOnly />;
+}
 
-  const { text, truncated } = expanded
-    ? { text: trimmed, truncated: false }
-    : truncateWords(trimmed, EVENT_DESCRIPTION_MAX_WORDS);
+export function EventPostDetailBody({
+  event,
+  compact,
+  showHero = true,
+  metaOnly,
+  descOnly,
+  actionsOnly,
+}: Props & { metaOnly?: boolean; descOnly?: boolean; actionsOnly?: boolean }) {
+  const [descExpanded, setDescExpanded] = useState(false);
+  const schoolName = event.school?.name ?? '';
+  const images = parseImageUrls(event.imageUrls);
+  const hero = images[0] ? imageSrc(images[0]) : '';
+  const dateLabel = formatEventOccurrenceDate(event.eventDate ?? null);
+  const timeLabel = formatEventTimeRange(event.eventStartTime, event.eventEndTime);
+  const location = event.eventLocation?.trim() || '';
+  const trimmedDesc = (event.description ?? '').trim();
+  const { text: descPreview, truncated: descTruncated } = descExpanded
+    ? { text: trimmedDesc, truncated: false }
+    : truncateWords(trimmedDesc, EVENT_DESCRIPTION_MAX_WORDS);
+  const categoryLabel = event.subCategory?.name ?? '';
+  const buttons = parseEventActionButtonsPublic(event.actionButtons);
 
-  const openLink = () => {
-    if (externalLink) Linking.openURL(externalLink).catch(() => {});
-  };
+  const showMeta = !descOnly && !actionsOnly && eventPostHasScheduleMeta(event);
+  const showDesc = !metaOnly && !actionsOnly && !!descPreview;
+  const showActions = !metaOnly && !descOnly && eventPostHasActionButtons(event);
+  const showTitle = !metaOnly && !descOnly && !actionsOnly;
 
   return (
-    <View style={[styles.descRow, compact && styles.descRowCompact]}>
-      <View style={styles.descCol}>
-        {hasDescription ? (
-          <Text style={[styles.descText, compact && styles.descTextCompact]}>
-            {text}
-            {truncated ? (
-              <Text style={styles.readMore} onPress={() => setExpanded(true)}>
-                {' '}
-                Read more
-              </Text>
-            ) : null}
-          </Text>
-        ) : null}
-      </View>
-      {externalLink ? (
-        <TouchableOpacity style={[styles.knowMorePill, compact && styles.knowMorePillCompact]} onPress={openLink} activeOpacity={0.85}>
-          <Text style={styles.knowMorePillText}>Know more</Text>
+    <View style={compact ? styles.rootCompact : styles.root}>
+      {showHero && !metaOnly && !descOnly && !actionsOnly ? (
+        <View style={styles.heroWrap}>
+          {hero ? (
+            <Image source={{ uri: hero }} style={styles.hero} resizeMode="cover" />
+          ) : (
+            <View style={[styles.hero, styles.heroPh]}>
+              <Ionicons name="image-outline" size={32} color="#94a3b8" />
+            </View>
+          )}
+          {schoolName ? (
+            <View style={styles.schoolBadge}>
+              <Text style={styles.schoolBadgeText}>{schoolBadgeLabel(schoolName)}</Text>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      {showTitle ? <Text style={styles.title}>{event.title}</Text> : null}
+
+      {showMeta ? (
+        <View style={styles.metaBlock}>
+          {dateLabel ? (
+            <View style={styles.metaRow}>
+              <Ionicons name="calendar-outline" size={16} color={MUTED} />
+              <Text style={styles.metaText}>{dateLabel}</Text>
+            </View>
+          ) : null}
+          {timeLabel ? (
+            <View style={styles.metaRow}>
+              <Ionicons name="time-outline" size={16} color={MUTED} />
+              <Text style={styles.metaText}>{timeLabel}</Text>
+            </View>
+          ) : null}
+          {location ? (
+            <View style={styles.metaRow}>
+              <Ionicons name="location-outline" size={16} color={MUTED} />
+              <Text style={styles.metaText}>{location}</Text>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      {categoryLabel && !metaOnly && !descOnly && !actionsOnly ? (
+        <View style={styles.categoryPill}>
+          <Text style={styles.categoryText}>{categoryLabel}</Text>
+        </View>
+      ) : null}
+
+      {showDesc ? (
+        <Text style={styles.teaser}>
+          {descPreview}
+          {!descExpanded && descTruncated ? '…' : null}
+        </Text>
+      ) : null}
+      {descTruncated && !descExpanded && !metaOnly && !descOnly && !actionsOnly ? (
+        <TouchableOpacity onPress={() => setDescExpanded(true)} activeOpacity={0.7} hitSlop={8}>
+          <Text style={styles.knowMore}>Know more</Text>
         </TouchableOpacity>
+      ) : null}
+
+      {showActions ? (
+        <View style={styles.actions}>
+          {buttons.map((b) => {
+            const primary = isPrimaryAction(b.label);
+            return (
+              <TouchableOpacity
+                key={`${b.label}-${b.url}`}
+                style={[styles.actionBtn, primary ? styles.actionPrimary : styles.actionSecondary]}
+                onPress={() => Linking.openURL(b.url).catch(() => {})}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.actionText, primary && styles.actionTextPrimary]}>{b.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       ) : null}
     </View>
   );
 }
 
-export function EventPostPublicActionButtons({ event, compact }: Props) {
-  if (!eventPostHasActionButtons(event)) return null;
-  const buttons = parseEventActionButtonsPublic(event.actionButtons);
-
-  return (
-    <View style={[styles.actionsRow, compact && styles.actionsRowCompact]}>
-      {buttons.map((b) => (
-        <TouchableOpacity
-          key={`${b.label}-${b.url}`}
-          style={[styles.actionBadge, compact && styles.actionBadgeCompact]}
-          onPress={() => Linking.openURL(b.url).catch(() => {})}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="link-outline" size={14} color={TEXT} style={{ opacity: 0.85 }} />
-          <Text style={styles.actionBadgeText} numberOfLines={2}>
-            {b.label}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  metaWrap: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    marginTop: 10,
-    marginBottom: 8,
+  root: { paddingBottom: 4 },
+  rootCompact: { paddingBottom: 2 },
+  heroWrap: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginBottom: 14,
+    backgroundColor: '#f1f5f9',
+    aspectRatio: 16 / 10,
+    maxHeight: 220,
   },
-  metaWrapCompact: {
-    marginTop: 6,
-    marginBottom: 6,
-  },
-  metaLeadIcon: {
-    marginTop: 2,
-  },
-  metaTextRow: {
-    flex: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metaText: {
-    color: TEXT,
-    fontWeight: '600',
-    lineHeight: 20,
-  },
-  metaDuration: {
-    fontWeight: '400',
-    color: MUTED,
-    fontSize: 13,
-  },
-  metaSep: {
-    color: DIVIDER,
-    fontWeight: '400',
-  },
-  metaInline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    flexShrink: 1,
-  },
-  descRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    marginTop: 4,
-    marginBottom: 4,
-  },
-  descRowCompact: {
-    marginTop: 2,
-  },
-  descCol: {
-    flex: 1,
-    minWidth: 0,
-  },
-  descText: {
-    color: '#495057',
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  descTextCompact: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  readMore: {
-    color: '#0d6efd',
-    fontWeight: '500',
-  },
-  knowMorePill: {
-    backgroundColor: '#1a1f2e',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    minWidth: 116,
-    alignItems: 'center',
-    flexShrink: 0,
-  },
-  knowMorePillCompact: {
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    minWidth: 108,
-  },
-  knowMorePillText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 10,
-    marginBottom: 6,
-  },
-  actionsRowCompact: {
-    marginTop: 8,
-  },
-  actionBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    minWidth: 152,
-    maxWidth: 184,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+  hero: { width: '100%', height: '100%' },
+  heroPh: { alignItems: 'center', justifyContent: 'center' },
+  schoolBadge: {
+    position: 'absolute',
+    left: 10,
+    bottom: 10,
+    backgroundColor: 'rgba(255,255,255,0.95)',
     borderRadius: 8,
-    backgroundColor: '#f1f3f5',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  schoolBadgeText: { fontSize: 11, fontWeight: '800', color: TEXT },
+  title: { fontSize: 18, fontWeight: '700', color: TEXT, lineHeight: 24, marginBottom: 12 },
+  metaBlock: { gap: 8, marginBottom: 12 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  metaText: { fontSize: 14, color: '#475569', flex: 1 },
+  categoryPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#eff6ff',
+    borderColor: '#bfdbfe',
     borderWidth: 1,
-    borderColor: '#ced4da',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginBottom: 12,
   },
-  actionBadgeCompact: {
-    minWidth: 140,
-    paddingVertical: 9,
+  categoryText: { fontSize: 13, fontWeight: '600', color: '#1d4ed8' },
+  teaser: { fontSize: 14, lineHeight: 22, color: MUTED, marginBottom: 6 },
+  knowMore: { fontSize: 14, fontWeight: '600', color: ACCENT, marginBottom: 14 },
+  actions: { gap: 8, marginBottom: 12 },
+  actionBtn: {
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    alignItems: 'center',
   },
-  actionBadgeText: {
-    color: TEXT,
-    fontSize: 13,
-    fontWeight: '600',
-    textAlign: 'center',
-    flexShrink: 1,
-  },
+  actionPrimary: { backgroundColor: ACCENT },
+  actionSecondary: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0' },
+  actionText: { fontSize: 14, fontWeight: '600', color: TEXT, textAlign: 'center' },
+  actionTextPrimary: { color: '#fff' },
 });

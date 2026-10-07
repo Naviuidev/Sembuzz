@@ -20,7 +20,7 @@ const EXPERIENCE_TABS: {
     icon: 'bi-search',
     title: 'One feed on web and mobile — filter by school and category',
     intro:
-      'Students scroll an Inshorts-style campus feed on the mobile app and at /events on web — with category filters, search, and cross-school browsing when enabled.',
+      'Students scroll an Inshorts-style campus feed on the mobile app and on the web home page — with category filters, search, and cross-school browsing when enabled.',
     capabilities: [
       'Swipe or scroll through events, internships, and campus news',
       'Search across posts and filter by category or subcategory',
@@ -120,7 +120,7 @@ export function HomeStudentExperienceSection() {
                   ))}
                 </ul>
                 <div className="home-student-ctas">
-                  <Link to="/events" className="home-student-cta">
+                  <Link to="/" className="home-student-cta">
                     Open web feed
                     <i className="bi bi-arrow-up-right" aria-hidden />
                   </Link>

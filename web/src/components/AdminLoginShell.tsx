@@ -7,7 +7,7 @@ import {
 
 export type AdminLoginVariant = AdminPortalKey;
 
-const VARIANT_CONFIG: Record<
+export const ADMIN_LOGIN_HERO_CONFIG: Record<
   AdminLoginVariant,
   {
     heroGreeting: string;
@@ -38,6 +38,11 @@ const VARIANT_CONFIG: Record<
     heroGreeting: 'Hello, Ads Admin! 👋',
     heroSubtitle:
       'Create banner and sponsored placements that reach students when it matters most.',
+  },
+  external: {
+    heroGreeting: 'Hello, External Admin! 👋',
+    heroSubtitle:
+      'Manage platform-wide external categories and content outside the school hierarchy.',
   },
 };
 
@@ -80,7 +85,7 @@ export function AdminLoginShell({
   forgotPasswordHref,
   footer,
 }: AdminLoginShellProps) {
-  const meta = VARIANT_CONFIG[variant];
+  const meta = ADMIN_LOGIN_HERO_CONFIG[variant];
   const accent = ADMIN_PORTAL_ACCENTS[variant];
   const badge = ADMIN_PORTAL_LABELS[variant];
   const year = new Date().getFullYear();

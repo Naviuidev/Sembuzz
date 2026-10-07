@@ -1,10 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { SubCategoryAdminLayout } from '../components/SubCategoryAdminLayout';
+import { ADMIN_PORTAL_ACCENTS } from '../constants/adminPortalTheme';
 import { SubCategoryAdminMessageConfigPanel } from '../components/SubCategoryAdminMessageConfigPanel';
 import { CategoryAdminMessagesPanel } from '../components/CategoryAdminMessagesPanel';
-
-const TEXT_DARK = '#1a1f2e';
 
 type SubCategoryPrivacyTab = 'message-config' | 'messages';
 
@@ -13,11 +12,21 @@ function tabFromParam(tab: string | null): SubCategoryPrivacyTab {
   return 'message-config';
 }
 
+const TAB_SUBTITLES: Record<SubCategoryPrivacyTab, string> = {
+  'message-config': 'Request club group chats and manage student group messaging for your subcategories.',
+  messages: 'Direct messages with category admins and school admins.',
+};
+
 export const SubCategoryAdminPrivacy = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [privacyTab, setPrivacyTab] = useState<SubCategoryPrivacyTab>(() =>
     tabFromParam(searchParams.get('tab')),
   );
+  const panelStyle = { '--admin-accent': ADMIN_PORTAL_ACCENTS.subcategory } as CSSProperties;
+
+  useEffect(() => {
+    setPrivacyTab(tabFromParam(searchParams.get('tab')));
+  }, [searchParams]);
 
   const handleTabChange = (tab: SubCategoryPrivacyTab) => {
     setPrivacyTab(tab);
@@ -37,48 +46,39 @@ export const SubCategoryAdminPrivacy = () => {
 
   return (
     <SubCategoryAdminLayout>
-      <div className="mb-4">
-        <h1
-          style={{
-            fontSize: '2rem',
-            fontWeight: 'normal',
-            color: TEXT_DARK,
-            margin: 0,
-            marginBottom: '0.5rem',
-          }}
-        >
-          Privacy — Messaging
-        </h1>
-        <p style={{ color: '#6c757d', fontSize: '1rem', margin: 0 }}>
-          Request club group chats, approve student join requests, and manage group messaging.
-        </p>
-      </div>
+      <div className="admin-privacy-page">
+        <header className="admin-page-header" style={panelStyle}>
+          <h1 className="admin-page-title">Privacy</h1>
+          <p className="admin-page-subtitle">{TAB_SUBTITLES[privacyTab]}</p>
+          <nav className="admin-dashboard-badges mb-0" aria-label="Privacy sections">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                className={`admin-dashboard-badge${privacyTab === tab.id ? ' is-active' : ''}`}
+                aria-pressed={privacyTab === tab.id}
+                onClick={() => handleTabChange(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        </header>
 
-      <div className="d-flex gap-2 mb-4 flex-wrap">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => handleTabChange(tab.id)}
-            className="btn btn-sm"
-            style={{
-              borderRadius: 50,
-              padding: '0.45rem 1.1rem',
-              backgroundColor: privacyTab === tab.id ? TEXT_DARK : '#fff',
-              color: privacyTab === tab.id ? '#fff' : TEXT_DARK,
-              border: `1px solid ${TEXT_DARK}`,
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {privacyTab === 'message-config' ? (
+          <section className="admin-panel" style={panelStyle}>
+            <div className="admin-panel__body">
+              <SubCategoryAdminMessageConfigPanel />
+            </div>
+          </section>
+        ) : (
+          <section className="admin-panel" style={panelStyle}>
+            <div className="admin-panel__body">
+              <CategoryAdminMessagesPanel variant="subcategory" />
+            </div>
+          </section>
+        )}
       </div>
-
-      {privacyTab === 'message-config' ? (
-        <SubCategoryAdminMessageConfigPanel />
-      ) : (
-        <CategoryAdminMessagesPanel variant="subcategory" />
-      )}
     </SubCategoryAdminLayout>
   );
 };

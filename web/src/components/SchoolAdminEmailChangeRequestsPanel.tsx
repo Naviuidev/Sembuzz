@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ConfigureAdminEmailModal } from './ConfigureAdminEmailModal';
 import {
@@ -12,9 +12,11 @@ const TEXT_DARK = '#1a1f2e';
 const TEXT_MUTED = '#6c757d';
 
 export function SchoolAdminEmailChangeRequestsPanel({
+  panelStyle,
   requests,
   isLoading,
 }: {
+  panelStyle?: CSSProperties;
   requests: AdminEmailChangeRequest[];
   isLoading: boolean;
 }) {
@@ -39,7 +41,13 @@ export function SchoolAdminEmailChangeRequestsPanel({
   });
 
   if (isLoading) {
-    return (
+    return panelStyle ? (
+      <section className="admin-panel mb-4" style={panelStyle}>
+        <div className="admin-panel__body">
+          <div className="admin-loading-state">Loading email change requests…</div>
+        </div>
+      </section>
+    ) : (
       <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 0 }}>
         <div className="card-body p-4">
           <p className="text-muted mb-0">Loading email change requests…</p>
@@ -52,16 +60,7 @@ export function SchoolAdminEmailChangeRequestsPanel({
     return null;
   }
 
-  return (
-    <>
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 0 }}>
-        <div className="card-body p-4">
-          <h2 className="h5 mb-3" style={{ color: TEXT_DARK, fontWeight: 500 }}>
-            Pending email change requests
-          </h2>
-          <p className="small text-muted mb-3">
-            Requests verified by OTP and waiting for your review.
-          </p>
+  const list = (
           <div className="d-flex flex-column gap-3">
             {requests.map((req) => (
               <div
@@ -112,8 +111,31 @@ export function SchoolAdminEmailChangeRequestsPanel({
               </div>
             ))}
           </div>
+  );
+
+  return (
+    <>
+      {panelStyle ? (
+        <section className="admin-panel mb-4" style={panelStyle}>
+          <div className="admin-panel__header">
+            <h2 className="admin-panel__title">Pending email change requests</h2>
+          </div>
+          <div className="admin-panel__body">
+            <p className="admin-form-hint mb-3">Requests verified by OTP and waiting for your review.</p>
+            {list}
+          </div>
+        </section>
+      ) : (
+        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 0 }}>
+          <div className="card-body p-4">
+            <h2 className="h5 mb-3" style={{ color: TEXT_DARK, fontWeight: 500 }}>
+              Pending email change requests
+            </h2>
+            <p className="small text-muted mb-3">Requests verified by OTP and waiting for your review.</p>
+            {list}
+          </div>
         </div>
-      </div>
+      )}
 
       <ConfigureAdminEmailModal
         show={!!activeRequest}

@@ -28,6 +28,13 @@ export interface CategoryPublic {
   subcategories: { id: string; name: string }[];
 }
 
+export interface ExternalCategoryPublic {
+  id: string;
+  name: string;
+  description: string | null;
+  sortOrder: number;
+}
+
 export interface UpcomingPostPublic {
   id: string;
   schoolId: string;
@@ -57,6 +64,20 @@ export const publicEventsService = {
     if (schoolId != null && String(schoolId).trim()) params.schoolId = String(schoolId).trim();
     const response = await api.get<UpcomingPostPublic[]>('/events/upcoming', { params });
     return Array.isArray(response.data) ? response.data : [];
+  },
+
+  getExternalCategories: async (): Promise<ExternalCategoryPublic[]> => {
+    const response = await api.get('/events/external-categories');
+    return Array.isArray(response.data) ? response.data : [];
+  },
+
+  getSchoolExternalEnabled: async (schoolId: string): Promise<boolean> => {
+    const sid = String(schoolId ?? '').trim();
+    if (!sid) return false;
+    const response = await api.get<{ enabled?: boolean }>('/events/school-external-enabled', {
+      params: { schoolId: sid },
+    });
+    return Boolean(response.data?.enabled);
   },
 
   getCategoriesBySchool: async (schoolId: string): Promise<CategoryPublic[]> => {

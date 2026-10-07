@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AdminIdentityCard, resolvePlatformUserId } from './AdminIdentityCard';
 import { SchoolAdminEmailChangeRequestsPanel } from './SchoolAdminEmailChangeRequestsPanel';
@@ -18,9 +18,6 @@ import {
 } from '../services/admin-email-change-requests.service';
 import { invalidateAdminActionItems } from '../services/admin-action-items.service';
 
-const TEXT_DARK = '#1a1f2e';
-const TEXT_MUTED = '#6c757d';
-
 type AdminRoleTab = 'category-admin' | 'ads-admin' | 'subcategory-admin';
 
 const ROLE_TABS: { id: AdminRoleTab; label: string }[] = [
@@ -35,7 +32,7 @@ const TAB_TO_TARGET_ROLE: Record<AdminRoleTab, AdminEmailChangeTargetRole> = {
   'subcategory-admin': 'subcategory_admin',
 };
 
-export function SchoolAdminPrivacyOverview() {
+export function SchoolAdminPrivacyOverview({ panelStyle }: { panelStyle: CSSProperties }) {
   const queryClient = useQueryClient();
   const { user } = useSchoolAdminAuth();
   const [roleTab, setRoleTab] = useState<AdminRoleTab>('category-admin');
@@ -94,9 +91,7 @@ export function SchoolAdminPrivacyOverview() {
     targetRole: AdminEmailChangeTargetRole,
     targetAdminId: string,
     reason: string,
-  ) => {
-    return initiateMutation.mutateAsync({ targetRole, targetAdminId, reason });
-  };
+  ) => initiateMutation.mutateAsync({ targetRole, targetAdminId, reason });
 
   const handleConfirmOtp = async (requestId: string, otp: string) => {
     await confirmOtpMutation.mutateAsync({ requestId, otp });
@@ -106,9 +101,9 @@ export function SchoolAdminPrivacyOverview() {
     const targetRole = TAB_TO_TARGET_ROLE[roleTab];
 
     if (roleTab === 'category-admin') {
-      if (categoryLoading) return <p className="text-muted">Loading category admins…</p>;
+      if (categoryLoading) return <div className="admin-loading-state">Loading category admins…</div>;
       if (categoryAdmins.length === 0) {
-        return <p className="text-muted mb-0">No category admins for this school yet.</p>;
+        return <p className="admin-form-hint mb-0">No category admins for this school yet.</p>;
       }
       return categoryAdmins.map((admin) => (
         <AdminIdentityCard
@@ -116,9 +111,7 @@ export function SchoolAdminPrivacyOverview() {
           title={admin.name}
           adminRole="Category admin"
           subtitle={
-            admin.categories?.map((c) => c.category.name).join(', ') ||
-            admin.category?.name ||
-            undefined
+            admin.categories?.map((c) => c.category.name).join(', ') || admin.category?.name || undefined
           }
           userId={resolvePlatformUserId(admin)}
           email={admin.email}
@@ -131,12 +124,11 @@ export function SchoolAdminPrivacyOverview() {
     }
 
     if (roleTab === 'ads-admin') {
-      if (adsLoading) return <p className="text-muted">Loading ads admins…</p>;
+      if (adsLoading) return <div className="admin-loading-state">Loading ads admins…</div>;
       if (adsAdmins.length === 0) {
         return (
-          <p className="text-muted mb-0">
-            No ads admin is configured for this school. Ads admins are created when the Ads feature is
-            enabled.
+          <p className="admin-form-hint mb-0">
+            No ads admin is configured for this school. Ads admins are created when the Ads feature is enabled.
           </p>
         );
       }
@@ -156,9 +148,9 @@ export function SchoolAdminPrivacyOverview() {
       ));
     }
 
-    if (subcategoryLoading) return <p className="text-muted">Loading subcategory admins…</p>;
+    if (subcategoryLoading) return <div className="admin-loading-state">Loading subcategory admins…</div>;
     if (subcategoryAdmins.length === 0) {
-      return <p className="text-muted mb-0">No subcategory admins for this school yet.</p>;
+      return <p className="admin-form-hint mb-0">No subcategory admins for this school yet.</p>;
     }
     return subcategoryAdmins.map((admin) => (
       <AdminIdentityCard
@@ -182,86 +174,56 @@ export function SchoolAdminPrivacyOverview() {
     adsLoading,
     subcategoryAdmins,
     subcategoryLoading,
-    initiateMutation.mutateAsync,
-    confirmOtpMutation.mutateAsync,
   ]);
 
   return (
     <>
-      <div className="mb-4">
-        <h1
-          style={{
-            fontSize: '2rem',
-            fontWeight: 'normal',
-            color: TEXT_DARK,
-            margin: 0,
-            marginBottom: '0.5rem',
-          }}
-        >
-          Privacy
-        </h1>
-        <p style={{ color: TEXT_MUTED, fontSize: '1rem', margin: 0 }}>
-          School features and admin account emails you manage for your organization.
-        </p>
-      </div>
+      <SchoolAdminEmailChangeRequestsPanel
+        panelStyle={panelStyle}
+        requests={emailChangeRequests}
+        isLoading={requestsLoading}
+      />
 
-      <SchoolAdminEmailChangeRequestsPanel requests={emailChangeRequests} isLoading={requestsLoading} />
-
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 0 }}>
-        <div className="card-body p-4">
-          <h2 className="h5 mb-3" style={{ color: TEXT_DARK, fontWeight: 500 }}>
-            Enabled features
-          </h2>
-          <p className="small text-muted mb-3">
-            Features turned on for <strong>{user?.schoolName || 'your school'}</strong> by the super
-            admin.
+      <section className="admin-panel mb-4" style={panelStyle}>
+        <div className="admin-panel__header">
+          <h2 className="admin-panel__title">Enabled features</h2>
+        </div>
+        <div className="admin-panel__body">
+          <p className="admin-form-hint mb-3">
+            Features turned on for <strong>{user?.schoolName || 'your school'}</strong> by the super admin.
           </p>
           <div className="d-flex flex-wrap gap-2">
             {features.length > 0 ? (
               features.map((feature) => (
-                <span
-                  key={feature.code}
-                  className="badge rounded-pill"
-                  style={{
-                    backgroundColor: '#e7f3ff',
-                    color: TEXT_DARK,
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    padding: '0.4rem 0.85rem',
-                    border: '1px solid #dee2e6',
-                  }}
-                >
+                <span key={feature.code} className="admin-pill admin-pill--neutral">
                   {feature.name}
                 </span>
               ))
             ) : (
-              <span style={{ color: TEXT_MUTED, fontSize: '0.875rem' }}>No features enabled</span>
+              <span className="admin-form-hint mb-0">No features enabled</span>
             )}
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="d-flex gap-2 mb-4 flex-wrap">
-        {ROLE_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setRoleTab(tab.id)}
-            className="btn btn-sm"
-            style={{
-              borderRadius: 50,
-              padding: '0.45rem 1.1rem',
-              backgroundColor: roleTab === tab.id ? TEXT_DARK : '#fff',
-              color: roleTab === tab.id ? '#fff' : TEXT_DARK,
-              border: `1px solid ${TEXT_DARK}`,
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      <div>{roleContent}</div>
+      <section className="admin-panel" style={panelStyle}>
+        <div className="admin-panel__header">
+          <h2 className="admin-panel__title">Admin identities</h2>
+          <nav className="admin-dashboard-badges mb-0" aria-label="Admin role type" style={panelStyle}>
+            {ROLE_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                className={`admin-dashboard-badge${roleTab === tab.id ? ' is-active' : ''}`}
+                onClick={() => setRoleTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+        <div className="admin-panel__body">{roleContent}</div>
+      </section>
     </>
   );
 }

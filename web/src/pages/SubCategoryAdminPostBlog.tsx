@@ -1,12 +1,15 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, type CSSProperties, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { SubCategoryAdminLayout } from '../components/SubCategoryAdminLayout';
+import { ADMIN_PORTAL_ACCENTS } from '../constants/adminPortalTheme';
 import { useSubCategoryAdminAuth } from '../contexts/SubCategoryAdminAuthContext';
+import { invalidateAdminActionItems } from '../services/admin-action-items.service';
 import {
   subcategoryAdminBlogsService,
   type CreateBlogContentBlock,
 } from '../services/subcategory-admin-blogs.service';
-import { BlogBlockRenderer } from '../components/BlogBlockRenderer';
+import { CreateBlogLivePreview } from '../components/CreateBlogLivePreview';
 import type { ContentBlock } from '../services/public-blogs.service';
 import { imageSrc } from '../utils/image';
 
@@ -118,13 +121,19 @@ function toPreviewBlocks(blocks: EditorBlock[]): ContentBlock[] {
 }
 
 export function SubCategoryAdminPostBlogPanel({
+  embedded = false,
+  hubHeader,
   resubmitBlog,
   onSubmitted,
 }: {
+  embedded?: boolean;
+  hubHeader?: ReactNode;
   resubmitBlog?: ResubmitBlog;
   onSubmitted?: () => void;
 }) {
+  const queryClient = useQueryClient();
   const { user, refreshUser } = useSubCategoryAdminAuth();
+  const panelStyle = { '--admin-accent': ADMIN_PORTAL_ACCENTS.subcategory } as CSSProperties;
 
   const availableSubcategories =
     user?.subCategories && user.subCategories.length > 0
@@ -149,7 +158,7 @@ export function SubCategoryAdminPostBlogPanel({
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit');
+  const [previewMode, setPreviewMode] = useState<'mobile' | 'tablet' | 'web'>('mobile');
   const hasAppliedResubmit = useRef(false);
 
   const previewBlocks = useMemo(() => toPreviewBlocks(blocks), [blocks]);
@@ -344,6 +353,8 @@ export function SubCategoryAdminPostBlogPanel({
         heroButtonLink: heroButtonLink.trim() || undefined,
         contentBlocks: finalBlocks.length ? finalBlocks : undefined,
       });
+      await queryClient.invalidateQueries({ queryKey: ['subcategory-admin', 'blogs'] });
+      void invalidateAdminActionItems(queryClient, 'subcategory-admin');
       if (onSubmitted) {
         onSubmitted();
       }
@@ -375,55 +386,51 @@ export function SubCategoryAdminPostBlogPanel({
     listingSummary.trim().slice(0, 220) ||
     'Hero subtitle appears here when you fill Banner subtitle or Listing summary.';
 
-  return (
-    <>
-      {error && (
-        <div className="alert alert-danger" style={{ borderRadius: 0 }}>
-          {error}
+  const sectionHead = (num: number, titleText: string) => (
+    <div className="admin-create-post-section__head">
+      <span className="admin-create-post-section__num">{num}</span>
+      <h2 className="admin-create-post-section__title">{titleText}</h2>
+    </div>
+  );
+
+  const page = (
+    <div
+      className={`admin-create-post-page admin-create-post-page--blog${
+        embedded ? ' admin-create-post-page--embedded' : ''
+      }`}
+      style={panelStyle}
+    >
+      {error ? (
+        <div className="admin-notice mb-3">
+          <p className="admin-form-hint admin-form-hint--error mb-0">{error}</p>
         </div>
-      )}
+      ) : null}
 
-      <ul className="nav nav-tabs d-lg-none mb-3 border-0">
-        <li className="nav-item">
-          <button
-            type="button"
-            className={`nav-link ${activeTab === 'edit' ? 'active fw-semibold' : ''}`}
-            onClick={() => setActiveTab('edit')}
-          >
-            Edit
-          </button>
-        </li>
-        <li className="nav-item">
-          <button
-            type="button"
-            className={`nav-link ${activeTab === 'preview' ? 'active fw-semibold' : ''}`}
-            onClick={() => setActiveTab('preview')}
-          >
-            Preview
-          </button>
-        </li>
-      </ul>
+      <div
+        className={`admin-create-post-layout admin-create-post-layout--blog${
+          embedded && !hubHeader ? ' admin-create-post-layout--embedded' : ''
+        }${hubHeader ? ' admin-create-post-layout--hub' : ''}`}
+      >
+        {hubHeader ? (
+          <div className="admin-create-post-header admin-create-post-layout__header admin-create-post-layout__header--hub">
+            {hubHeader}
+          </div>
+        ) : null}
+        {!embedded && !hubHeader ? (
+          <div className="admin-create-post-header admin-create-post-layout__header">
+            <h1 className="admin-page-title">Post blog</h1>
+            <p className="admin-page-subtitle mb-0">
+              Build your article with blocks, preview it, then submit for category admin approval.
+            </p>
+          </div>
+        ) : null}
 
-      <form onSubmit={handleSubmit}>
-        <div className="row g-4">
-          <div
-            className={`col-lg-7 ${activeTab === 'preview' ? 'd-none d-lg-block' : ''}`}
-          >
-            <div
-              className="card border-0 shadow-sm mb-4"
-              style={{ borderRadius: 0 }}
-            >
-              <div className="card-body p-4">
-                <div
-                  className="mb-4 p-3 rounded"
-                  style={{
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #e9ecef',
-                  }}
-                >
-                  <div className="small fw-semibold text-secondary mb-2">
-                    Posting to subcategory
-                  </div>
+        <form id="subcategory-admin-blog-form" className="admin-create-post-main" onSubmit={handleSubmit}>
+          <section className="admin-panel admin-create-post-section" style={panelStyle}>
+            <div className="admin-panel__body">
+              {sectionHead(1, 'Audience & title')}
+              <div className="admin-notice admin-notice--info mb-3">
+                <p className="admin-form-label mb-1">Posting to subcategory</p>
                   {availableSubcategories.length === 0 ? (
                     <p className="small text-muted mb-0">
                       No subcategory assigned. Contact your school admin.
@@ -434,8 +441,8 @@ export function SubCategoryAdminPostBlogPanel({
                     </p>
                   ) : (
                     <select
-                      className="form-select"
-                      style={{ borderRadius: 0, maxWidth: 320 }}
+                      className="form-select admin-form-control"
+                      style={{ maxWidth: 320 }}
                       value={subcategoryId}
                       onChange={(e) => setSubcategoryId(e.target.value)}
                     >
@@ -448,155 +455,126 @@ export function SubCategoryAdminPostBlogPanel({
                   )}
                 </div>
 
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">Title</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    style={{ borderRadius: 0 }}
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    maxLength={500}
-                    placeholder="Blog title"
-                  />
-                </div>
+              <div className="mb-3">
+                <label className="admin-form-label" htmlFor="sca-blog-title">Title</label>
+                <input
+                  id="sca-blog-title"
+                  type="text"
+                  className="form-control admin-form-control"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  maxLength={500}
+                  placeholder="Blog title"
+                />
+              </div>
+            </div>
+          </section>
 
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">
-                    Banner (hero) — optional
-                  </label>
-                  <p className="small text-muted mb-2">
-                    Shown over the cover image on the public blog page.
-                  </p>
-                  <input
-                    type="text"
-                    className="form-control mb-2"
-                    style={{ borderRadius: 0 }}
-                    placeholder="Banner headline (defaults to title if empty)"
-                    value={heroTitle}
-                    onChange={(e) => setHeroTitle(e.target.value)}
-                    maxLength={300}
-                  />
-                  <textarea
-                    className="form-control mb-2"
-                    style={{ borderRadius: 0, minHeight: 72 }}
-                    placeholder="Banner subtitle"
-                    value={heroParagraph}
-                    onChange={(e) => setHeroParagraph(e.target.value)}
-                  />
-                  <div className="row g-2">
-                    <div className="col-md-6">
-                      <input
-                        type="text"
-                        className="form-control"
-                        style={{ borderRadius: 0 }}
-                        placeholder="Button label (optional)"
-                        value={heroButtonText}
-                        onChange={(e) => setHeroButtonText(e.target.value)}
-                        maxLength={120}
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <input
-                        type="text"
-                        className="form-control"
-                        style={{ borderRadius: 0 }}
-                        placeholder="Button link URL or path"
-                        value={heroButtonLink}
-                        onChange={(e) => setHeroButtonLink(e.target.value)}
-                      />
-                    </div>
+          <section className="admin-panel admin-create-post-section" style={panelStyle}>
+            <div className="admin-panel__body">
+              {sectionHead(2, 'Banner & listing')}
+              <p className="admin-form-hint mb-3">Hero text appears over the cover on the public blog page.</p>
+              <div className="mb-3">
+                <label className="admin-form-label" htmlFor="sca-blog-hero-title">Banner headline</label>
+                <input
+                  id="sca-blog-hero-title"
+                  type="text"
+                  className="form-control admin-form-control mb-2"
+                  placeholder="Defaults to title if empty"
+                  value={heroTitle}
+                  onChange={(e) => setHeroTitle(e.target.value)}
+                  maxLength={300}
+                />
+                <label className="admin-form-label" htmlFor="sca-blog-hero-para">Banner subtitle</label>
+                <textarea
+                  id="sca-blog-hero-para"
+                  className="form-control admin-form-control mb-2"
+                  style={{ minHeight: 72 }}
+                  placeholder="Banner subtitle"
+                  value={heroParagraph}
+                  onChange={(e) => setHeroParagraph(e.target.value)}
+                />
+                <div className="row g-2">
+                  <div className="col-md-6">
+                    <input
+                      type="text"
+                      className="form-control admin-form-control"
+                      placeholder="Button label (optional)"
+                      value={heroButtonText}
+                      onChange={(e) => setHeroButtonText(e.target.value)}
+                      maxLength={120}
+                    />
+                  </div>
+                  <div className="col-md-6">
+                    <input
+                      type="text"
+                      className="form-control admin-form-control"
+                      placeholder="Button link URL or path"
+                      value={heroButtonLink}
+                      onChange={(e) => setHeroButtonLink(e.target.value)}
+                    />
                   </div>
                 </div>
-
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">
-                    Cover image (optional)
-                  </label>
-                  <input
-                    type="file"
-                    accept={ALLOWED_IMAGE_TYPES.join(',')}
-                    className="form-control"
-                    style={{ borderRadius: 0 }}
-                    onChange={handleCoverChange}
+              </div>
+              <div className="mb-3">
+                <label className="admin-form-label" htmlFor="sca-blog-cover">Cover image (optional)</label>
+                <input
+                  id="sca-blog-cover"
+                  type="file"
+                  accept={ALLOWED_IMAGE_TYPES.join(',')}
+                  className="form-control admin-form-control"
+                  onChange={handleCoverChange}
+                />
+                {coverPreview ? (
+                  <img
+                    src={coverPreview}
+                    alt=""
+                    className="mt-2"
+                    style={{ maxHeight: 140, objectFit: 'cover', borderRadius: 8 }}
                   />
-                  {coverPreview && (
-                    <img
-                      src={coverPreview}
-                      alt=""
-                      className="mt-2"
-                      style={{
-                        maxHeight: 140,
-                        objectFit: 'cover',
-                        border: '1px solid #dee2e6',
-                      }}
-                    />
-                  )}
-                </div>
+                ) : null}
+              </div>
+              <div className="mb-0">
+                <label className="admin-form-label" htmlFor="sca-blog-summary">Listing summary (optional)</label>
+                <textarea
+                  id="sca-blog-summary"
+                  className="form-control admin-form-control"
+                  style={{ minHeight: 80 }}
+                  placeholder="Short text for blog cards. If empty, text is taken from your blocks."
+                  value={listingSummary}
+                  onChange={(e) => setListingSummary(e.target.value)}
+                />
+              </div>
+            </div>
+          </section>
 
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">
-                    Listing summary (optional)
-                  </label>
-                  <textarea
-                    className="form-control"
-                    style={{ borderRadius: 0, minHeight: 80 }}
-                    placeholder="Short text for blog cards / search. If empty, text is taken from your blocks."
-                    value={listingSummary}
-                    onChange={(e) => setListingSummary(e.target.value)}
-                  />
-                </div>
+          <section className="admin-panel admin-create-post-section" style={panelStyle}>
+            <div className="admin-panel__body">
+              {sectionHead(3, 'Article blocks')}
+              <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+                <button type="button" className="admin-btn-secondary admin-btn-sm" onClick={() => addBlock('heading')}>
+                  + Heading
+                </button>
+                <button type="button" className="admin-btn-secondary admin-btn-sm" onClick={() => addBlock('paragraph')}>
+                  + Paragraph
+                </button>
+                <button
+                  type="button"
+                  className="admin-btn-secondary admin-btn-sm"
+                  onClick={() => addBlock('heading_para')}
+                >
+                  + Heading + paragraph
+                </button>
+                <button type="button" className="admin-btn-secondary admin-btn-sm" onClick={() => addBlock('image')}>
+                  + Image
+                </button>
+              </div>
+              <p className="admin-form-hint mb-3">
+                Blocks use a 12-column grid. Column width 6 = half width on desktop.
+              </p>
 
-                <hr className="my-4" />
-                <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
-                  <span className="fw-semibold me-2">Article blocks</span>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-secondary"
-                    style={{ borderRadius: 0 }}
-                    onClick={() => addBlock('heading')}
-                  >
-                    + Heading
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-secondary"
-                    style={{ borderRadius: 0 }}
-                    onClick={() => addBlock('paragraph')}
-                  >
-                    + Paragraph
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-secondary"
-                    style={{ borderRadius: 0 }}
-                    onClick={() => addBlock('heading_para')}
-                  >
-                    + Heading + paragraph
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-secondary"
-                    style={{ borderRadius: 0 }}
-                    onClick={() => addBlock('image')}
-                  >
-                    + Image
-                  </button>
-                </div>
-                <p className="small text-muted mb-3">
-                  On desktop, blocks sit in a 12-column grid. Choose how many
-                  columns (of 12) each block uses — e.g. 6 = half width.
-                </p>
-
-                {blocks.map((b, i) => (
-                  <div
-                    key={b.id}
-                    className="border mb-3 p-3"
-                    style={{
-                      borderColor: '#dee2e6',
-                      backgroundColor: '#fafafa',
-                    }}
-                  >
+              {blocks.map((b, i) => (
+                  <div key={b.id} className="admin-notice mb-3">
                     <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                       <span className="small fw-semibold text-secondary text-uppercase">
                         {b.type === 'heading_para'
@@ -647,7 +625,7 @@ export function SubCategoryAdminPostBlogPanel({
                         </button>
                         <button
                           type="button"
-                          className="btn btn-sm btn-outline-danger border-0"
+                          className="admin-btn-secondary admin-btn-sm"
                           onClick={() => removeBlock(i)}
                           disabled={blocks.length <= 1}
                         >
@@ -658,8 +636,7 @@ export function SubCategoryAdminPostBlogPanel({
                     {b.type === 'heading' && (
                       <input
                         type="text"
-                        className="form-control"
-                        style={{ borderRadius: 0 }}
+                        className="form-control admin-form-control"
                         placeholder="Heading text"
                         value={b.value}
                         onChange={(e) =>
@@ -669,8 +646,8 @@ export function SubCategoryAdminPostBlogPanel({
                     )}
                     {b.type === 'paragraph' && (
                       <textarea
-                        className="form-control"
-                        style={{ borderRadius: 0, minHeight: 100 }}
+                        className="form-control admin-form-control"
+                        style={{ minHeight: 100 }}
                         placeholder="Paragraph…"
                         value={b.value}
                         onChange={(e) =>
@@ -682,8 +659,7 @@ export function SubCategoryAdminPostBlogPanel({
                       <>
                         <input
                           type="text"
-                          className="form-control mb-2"
-                          style={{ borderRadius: 0 }}
+                          className="form-control admin-form-control mb-2"
                           placeholder="Heading"
                           value={b.heading}
                           onChange={(e) =>
@@ -691,8 +667,8 @@ export function SubCategoryAdminPostBlogPanel({
                           }
                         />
                         <textarea
-                          className="form-control"
-                          style={{ borderRadius: 0, minHeight: 100 }}
+                          className="form-control admin-form-control"
+                          style={{ minHeight: 100 }}
                           placeholder="Paragraph…"
                           value={b.paragraph}
                           onChange={(e) =>
@@ -706,8 +682,7 @@ export function SubCategoryAdminPostBlogPanel({
                         <input
                           type="file"
                           accept={ALLOWED_IMAGE_TYPES.join(',')}
-                          className="form-control mb-2"
-                          style={{ borderRadius: 0 }}
+                          className="form-control admin-form-control mb-2"
                           onChange={(e) =>
                             handleImageBlockFile(
                               i,
@@ -717,8 +692,7 @@ export function SubCategoryAdminPostBlogPanel({
                         />
                         <input
                           type="text"
-                          className="form-control mb-2"
-                          style={{ borderRadius: 0 }}
+                          className="form-control admin-form-control mb-2"
                           placeholder="Alt text (optional)"
                           value={b.alt}
                           onChange={(e) =>
@@ -738,135 +712,84 @@ export function SubCategoryAdminPostBlogPanel({
                       </>
                     )}
                   </div>
-                ))}
-
-                <button
-                  type="submit"
-                  className="btn text-white mt-2"
-                  style={{ backgroundColor: '#1a1f2e', borderRadius: 0 }}
-                  disabled={submitting}
-                >
-                  {submitting ? 'Submitting…' : 'Submit for approval'}
-                </button>
-              </div>
+              ))}
             </div>
-          </div>
+          </section>
+        </form>
 
-          <div
-            className={`col-lg-5 ${activeTab === 'edit' ? 'd-none d-lg-block' : ''}`}
-          >
-            <div
-              className="card border-0 shadow-sm sticky-lg-top"
-              style={{ top: '1rem', borderRadius: 0, maxHeight: 'calc(100vh - 2rem)', overflowY: 'auto' }}
-            >
-              <div
-                className="card-header py-2 px-3 fw-semibold"
-                style={{
-                  backgroundColor: '#1a1f2e',
-                  color: '#fff',
-                  borderRadius: 0,
-                }}
+        <aside className="admin-create-post-preview-col">
+          <div className="admin-create-post-preview-card">
+            <h2 className="admin-panel__title mb-2" style={{ fontSize: '1rem' }}>Live Preview</h2>
+            <div className="admin-create-post-preview-toggle" role="tablist" aria-label="Preview size">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={previewMode === 'mobile'}
+                className={previewMode === 'mobile' ? 'is-active' : ''}
+                onClick={() => setPreviewMode('mobile')}
               >
-                Preview (as on public page)
-              </div>
-              <div className="card-body p-0">
-                <section
-                  className="w-100 position-relative d-flex align-items-center justify-content-center"
-                  style={{
-                    minHeight: 200,
-                    maxHeight: 260,
-                    overflow: 'hidden',
-                    backgroundColor: '#1a1f2e',
-                  }}
-                >
-                  {coverPreview && (
-                    <img
-                      src={coverPreview}
-                      alt=""
-                      className="position-absolute start-0 top-0 w-100 h-100"
-                      style={{ objectFit: 'cover' }}
-                    />
-                  )}
-                  <div
-                    className="position-absolute start-0 top-0 w-100 h-100"
-                    style={{
-                      background:
-                        'linear-gradient(to bottom, rgba(26,31,46,0.45) 0%, rgba(26,31,46,0.88) 100%)',
-                      pointerEvents: 'none',
-                    }}
-                  />
-                  <div
-                    className="position-relative text-center text-white px-3 py-4"
-                    style={{ maxWidth: '100%', zIndex: 1 }}
-                  >
-                    <h2
-                      className="h5 fw-bold mb-2"
-                      style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}
-                    >
-                      {previewHeroTitle}
-                    </h2>
-                    <p
-                      className="small mb-0 opacity-90"
-                      style={{
-                        lineHeight: 1.4,
-                        textShadow: '0 1px 2px rgba(0,0,0,0.4)',
-                      }}
-                    >
-                      {previewHeroPara}
-                    </p>
-                  </div>
-                </section>
-                <div className="p-3">
-                  <div className="row g-3">
-                    {previewBlocks.length === 0 ? (
-                      <p className="small text-muted mb-0">
-                        Add blocks to see them here.
-                      </p>
-                    ) : (
-                      previewBlocks.map((block, idx) => (
-                        <BlogBlockRenderer
-                          key={idx}
-                          block={block}
-                          imageSrcFn={(u) =>
-                            u.startsWith('data:') ? u : imageSrc(u)
-                          }
-                        />
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
+                Mobile
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={previewMode === 'tablet'}
+                className={previewMode === 'tablet' ? 'is-active' : ''}
+                onClick={() => setPreviewMode('tablet')}
+              >
+                Tablet
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={previewMode === 'web'}
+                className={previewMode === 'web' ? 'is-active' : ''}
+                onClick={() => setPreviewMode('web')}
+              >
+                Web
+              </button>
+            </div>
+            <CreateBlogLivePreview
+              heroTitle={previewHeroTitle}
+              heroParagraph={previewHeroPara}
+              coverSrc={coverPreview}
+              heroButtonText={heroButtonText}
+              heroButtonLink={heroButtonLink}
+              blocks={previewBlocks}
+              previewMode={previewMode}
+              imageSrcFn={(u) => (u.startsWith('data:') ? u : imageSrc(u))}
+            />
+            <div className="admin-create-post-tip">
+              <i className="bi bi-lightbulb" aria-hidden />
+              Use a strong title, cover image, and clear blocks so students engage with your blog.
             </div>
           </div>
+        </aside>
+      </div>
+
+      <div className="admin-create-post-footer" style={panelStyle}>
+        <div className="admin-create-post-footer__actions ms-auto">
+          <button
+            type="submit"
+            form="subcategory-admin-blog-form"
+            className="admin-btn-primary"
+            disabled={submitting}
+          >
+            <i className="bi bi-send me-2" aria-hidden />
+            {submitting ? 'Submitting…' : 'Submit for approval'}
+          </button>
         </div>
-      </form>
-    </>
+      </div>
+    </div>
   );
+
+  if (embedded) return page;
+  return <SubCategoryAdminLayout>{page}</SubCategoryAdminLayout>;
 };
 
 export const SubCategoryAdminPostBlog = () => {
   const location = useLocation();
   const resubmitBlog = (location.state as { resubmitBlog?: ResubmitBlog })?.resubmitBlog;
 
-  return (
-    <SubCategoryAdminLayout>
-      <div className="mb-4">
-        <h1
-          style={{
-            fontSize: '2rem',
-            fontWeight: 'normal',
-            color: '#1a1f2e',
-            marginBottom: '0.5rem',
-          }}
-        >
-          Post blog
-        </h1>
-        <p style={{ color: '#6c757d', fontSize: '1rem', marginBottom: 0 }}>
-          Build your article with blocks, set column width per block (12 = full
-          width), then preview before submitting for approval.
-        </p>
-      </div>
-      <SubCategoryAdminPostBlogPanel resubmitBlog={resubmitBlog} />
-    </SubCategoryAdminLayout>
-  );
+  return <SubCategoryAdminPostBlogPanel resubmitBlog={resubmitBlog} />;
 };

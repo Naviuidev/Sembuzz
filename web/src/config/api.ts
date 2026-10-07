@@ -17,6 +17,7 @@ const TOKEN_KEYS = {
   CATEGORY_ADMIN: 'category-admin-token', // Category Admin token
   SUBCATEGORY_ADMIN: 'subcategory-admin-token', // Subcategory Admin token
   ADS_ADMIN: 'ads-admin-token', // Ads Admin token
+  EXTERNAL_ADMIN: 'external-admin-token', // External Admin token
   USER: 'user-token', // Public user (student/parent) token
 } as const;
 
@@ -54,6 +55,7 @@ api.interceptors.request.use((config) => {
   const isSubCategoryAdminRoute = pathname === '/subcategory-admin' || pathname.startsWith('/subcategory-admin/');
   const isCategoryAdminRoute = pathname === '/category-admin' || pathname.startsWith('/category-admin/');
   const isAdsAdminRoute = pathname === '/ads-admin' || pathname.startsWith('/ads-admin/');
+  const isExternalAdminRoute = pathname === '/external-admin' || pathname.startsWith('/external-admin/');
 
   let token: string | null = null;
   if (isPublicApiRoute) {
@@ -72,6 +74,8 @@ api.interceptors.request.use((config) => {
     token = localStorage.getItem(TOKEN_KEYS.CATEGORY_ADMIN);
   } else if (isAdsAdminRoute) {
     token = localStorage.getItem(TOKEN_KEYS.ADS_ADMIN);
+  } else if (isExternalAdminRoute) {
+    token = localStorage.getItem(TOKEN_KEYS.EXTERNAL_ADMIN);
   } else {
     token = localStorage.getItem(TOKEN_KEYS.USER);
   }
@@ -121,6 +125,7 @@ api.interceptors.response.use(
     const isSubCategoryAdminRoute = pathname === '/subcategory-admin' || pathname.startsWith('/subcategory-admin/');
     const isCategoryAdminRoute = pathname === '/category-admin' || pathname.startsWith('/category-admin/');
     const isAdsAdminRoute = pathname === '/ads-admin' || pathname.startsWith('/ads-admin/');
+    const isExternalAdminRoute = pathname === '/external-admin' || pathname.startsWith('/external-admin/');
 
     // Only clear token and redirect when the user is currently on that admin's section.
     // This avoids logging out when switching dashboards (e.g. Category Admin → back to Subcategory Admin).
@@ -129,6 +134,8 @@ api.interceptors.response.use(
     const onSubCategoryAdmin = currentPath.startsWith('/subcategory-admin') && currentPath !== '/subcategory-admin/login';
     const onCategoryAdmin = currentPath.startsWith('/category-admin') && currentPath !== '/category-admin/login';
     const onAdsAdmin = currentPath.startsWith('/ads-admin') && currentPath !== '/ads-admin/login';
+    const onExternalAdmin =
+      currentPath.startsWith('/external-admin') && currentPath !== '/external-admin/login';
 
     if (isSuperAdminRoute && onSuperAdmin) {
       localStorage.removeItem(TOKEN_KEYS.SUPER_ADMIN);
@@ -151,12 +158,19 @@ api.interceptors.response.use(
     } else if (isAdsAdminRoute && onAdsAdmin) {
       localStorage.removeItem(TOKEN_KEYS.ADS_ADMIN);
       setTimeout(() => { window.location.href = '/ads-admin/login'; }, 100);
+    } else if (isExternalAdminRoute && onExternalAdmin) {
+      localStorage.removeItem(TOKEN_KEYS.EXTERNAL_ADMIN);
+      setTimeout(() => { window.location.href = '/external-admin/login'; }, 100);
     } else if (pathname.startsWith('/user/') && !currentPath.startsWith('/login') && !currentPath.startsWith('/register')) {
       // On public pages (e.g. /events), allow 401 for /user/ routes so guests can still view content; only redirect when on a user-specific page
-      const onPublicEventsPage = currentPath === '/events' || currentPath.startsWith('/events?');
+      const onPublicEventsPage =
+        currentPath === '/' ||
+        currentPath.startsWith('/?') ||
+        currentPath === '/events' ||
+        currentPath.startsWith('/events?');
       if (!onPublicEventsPage) {
         localStorage.removeItem(TOKEN_KEYS.USER);
-        setTimeout(() => { window.location.href = '/events?openAuth=login'; }, 100);
+        setTimeout(() => { window.location.href = '/?openAuth=login'; }, 100);
       }
     }
 
