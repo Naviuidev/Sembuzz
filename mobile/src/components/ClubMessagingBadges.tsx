@@ -17,6 +17,7 @@ import {
 import { getDirectChatAvailability, getDirectChatUnreadCount } from '../services/directChat';
 import { DirectChatPanel } from './DirectChatPanel';
 import { imageSrc, isImageIconValue } from '../utils/image';
+import { authModalTheme } from '../styles/authModalTheme';
 
 const TEXT_DARK = '#1a1f2e';
 const TEXT_MUTED = '#6c757d';
@@ -188,15 +189,16 @@ export function ClubMessagingBadges({ isAuthenticated, currentUserId, onRequireL
                 ) : joinable.length === 0 ? (
                   <Text style={styles.body}>No club group chats available yet.</Text>
                 ) : (
-                  <ScrollView style={{ maxHeight: 320 }}>
+                  <ScrollView style={styles.clubListScroll} contentContainerStyle={styles.clubListContent}>
                     {joinable.map((chat) => (
                       <TouchableOpacity
                         key={chat.id}
-                        style={styles.clubRow}
+                        style={styles.clubRowPill}
                         onPress={() => selectGroup(chat)}
+                        activeOpacity={0.85}
                       >
                         <ClubIcon icon={chat.icon} name={chat.pageName} />
-                        <View style={{ flex: 1 }}>
+                        <View style={styles.clubRowTextWrap}>
                           <Text style={styles.clubName}>{chat.pageName || 'Club'}</Text>
                           <MembershipStatus status={chat.membershipStatus} />
                         </View>
@@ -303,27 +305,30 @@ const styles = StyleSheet.create({
   badgeRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     gap: 10,
-    marginBottom: 20,
+    marginBottom: 0,
     width: '100%',
   },
   badge: {
-    backgroundColor: TEXT_DARK,
+    backgroundColor: '#DDFBE2',
+    borderWidth: 1,
+    borderColor: '#86D9A0',
     paddingVertical: 10,
     paddingHorizontal: 18,
-    borderRadius: 999,
+    borderRadius: authModalTheme.pillRadius,
   },
-  badgeText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  badgeText: { color: authModalTheme.successDark, fontWeight: '700', fontSize: 14 },
   badgeOutline: {
     borderWidth: 1,
-    borderColor: TEXT_DARK,
+    borderColor: '#cfe2ff',
+    backgroundColor: '#f4f8fc',
     paddingVertical: 10,
     paddingHorizontal: 18,
-    borderRadius: 999,
+    borderRadius: authModalTheme.pillRadius,
     position: 'relative',
   },
-  badgeOutlineText: { color: TEXT_DARK, fontWeight: '600', fontSize: 14 },
+  badgeOutlineText: { color: '#334155', fontWeight: '600', fontSize: 14 },
   chatBadge: {
     position: 'absolute',
     top: -6,
@@ -347,12 +352,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     padding: 20,
     maxHeight: '80%',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e8ecf0',
+  },
+  clubListScroll: {
+    maxHeight: 320,
+  },
+  clubListContent: {
+    gap: 8,
+    paddingBottom: 4,
   },
   sheetTitle: { fontSize: 20, fontWeight: '600', color: TEXT_DARK, marginBottom: 12 },
   body: { fontSize: 14, color: TEXT_MUTED, lineHeight: 20, marginBottom: 16 },
   primaryBtn: {
     backgroundColor: TEXT_DARK,
     paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: authModalTheme.pillRadius,
     alignItems: 'center',
     marginTop: 12,
   },
@@ -360,14 +377,20 @@ const styles = StyleSheet.create({
   primaryBtnText: { color: '#fff', fontWeight: '600' },
   backLink: { marginBottom: 8 },
   backLinkText: { color: TEXT_MUTED, fontSize: 13 },
-  clubRow: {
+  clubRowPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    padding: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: '#dee2e6',
-    marginBottom: 8,
+    borderColor: '#cfe2ff',
+    backgroundColor: '#f4f8fc',
+    borderRadius: authModalTheme.pillRadius,
+  },
+  clubRowTextWrap: {
+    flex: 1,
+    minWidth: 0,
   },
   detailCard: {
     flexDirection: 'row',
@@ -375,7 +398,9 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#dee2e6',
+    borderColor: '#86D9A0',
+    backgroundColor: '#DDFBE2',
+    borderRadius: 16,
     marginBottom: 12,
   },
   clubIcon: {

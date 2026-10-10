@@ -63,7 +63,7 @@ export default function ViewProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: 'transparent' },
   content: { paddingHorizontal: 18, paddingTop: 4, paddingBottom: 32 },
   title: {
     fontSize: 22,

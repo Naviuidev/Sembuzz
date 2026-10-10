@@ -417,7 +417,7 @@ export default function EditProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
+  container: { flex: 1, backgroundColor: 'transparent' },
   keyboardWrap: { flex: 1 },
   content: { paddingHorizontal: 18, paddingTop: 4, paddingBottom: 140, flexGrow: 1 },
   title: {

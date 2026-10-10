@@ -15,14 +15,21 @@ import {
   DeviceEventEmitter,
   InteractionManager,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MAIN_TAB_BAR_BODY_HEIGHT } from '../navigation/tabBarMetrics';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import FunnelIcon from 'react-native-bootstrap-icons/icons/funnel';
+import FunnelFillIcon from 'react-native-bootstrap-icons/icons/funnel-fill';
+import CalendarEventIcon from 'react-native-bootstrap-icons/icons/calendar-event';
+import CalendarEventFillIcon from 'react-native-bootstrap-icons/icons/calendar-event-fill';
+import SearchIcon from 'react-native-bootstrap-icons/icons/search';
 import NewspaperIcon from 'react-native-bootstrap-icons/icons/newspaper';
 import BuildingIcon from 'react-native-bootstrap-icons/icons/building';
+import { GuestSignInStrip } from '../components/GuestSignInStrip';
 import {
   getApprovedEvents,
   getCategoriesBySchool,
@@ -34,7 +41,9 @@ import {
   getScheduledEvents,
   buildGoogleCalendarAddAuthUrl,
   imageSrc,
+  schoolLogoSrc,
   getSchoolFilterSettings,
+  getSchoolExternalEnabled,
   ApprovedEventPublic,
   CategoryPublic,
   SponsoredAdPublic,
@@ -49,10 +58,14 @@ import type { MainTabParamList } from '../navigation/types';
 import { useAuth } from '../contexts/AuthContext';
 import { buildPublicFeedItems, type PublicFeedItem } from '../utils/publicFeed';
 import {
+  collectFeedDatesByMode,
   eventMatchesCalendarDateYmd,
   filterEventsByViewByDate,
   getFeedDateFilterTzOffsetMinutes,
 } from '../utils/eventFeedDate';
+import { FeedCalendarMonthGrid } from '../components/FeedCalendarMonthGrid';
+import { FirstLoginCategoriesModal } from '../components/FirstLoginCategoriesModal';
+import { ExternalPublicFeedPanel } from '../components/ExternalPublicFeedPanel';
 import { InshortsPagedFeed } from '../components/InshortsPagedFeed';
 import { SchoolLogo } from '../components/SchoolLogo';
 import { userEventsService } from '../services/userEvents';
@@ -65,8 +78,10 @@ import {
 import { userNotificationsService } from '../services/userNotifications';
 import { CATEGORY_PREFS_CHANGED, READY_FOR_PUSH_PERMISSION } from '../constants/appEvents';
 import { getSchools, type SchoolOption } from '../services/userAuth';
+import { authModalTheme } from '../styles/authModalTheme';
 
 type EventsRoute = RouteProp<MainTabParamList, 'Events'>;
+type HomeFeedMode = 'mySchool' | 'external' | 'allSchools';
 
 function toYmd(d: Date): string {
   const y = d.getFullYear();
@@ -84,26 +99,55 @@ function formatUpcomingHeader(dateYmd: string): string {
   });
 }
 
+function formatCalendarDraftLabel(d: Date): string {
+  return d.toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function isSameCalendarDay(a: Date, b: Date): boolean {
+  return toYmd(a) === toYmd(b);
+}
+
+function getTomorrowDate(): Date {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d;
+}
+
 export default function EventsScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList, 'Events'>>();
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const route = useRoute<EventsRoute>();
   const focusEventId = route.params?.focusEventId;
   const { user } = useAuth();
-  const [showAllSchools, setShowAllSchools] = useState(false);
+  const [homeFeedMode, setHomeFeedMode] = useState<HomeFeedMode>('mySchool');
+  const showAllSchools = homeFeedMode === 'allSchools';
+  const showExternalHomeFeed = homeFeedMode === 'external';
+  const [schoolExternalEnabled, setSchoolExternalEnabled] = useState(false);
   const [events, setEvents] = useState<ApprovedEventPublic[]>([]);
   const [categories, setCategories] = useState<CategoryPublic[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [selectedSubCategoryIds, setSelectedSubCategoryIds] = useState<string[]>([]);
   const [feedSort, setFeedSort] = useState<'latest' | 'popular'>('latest');
   const [loggedInFeedDateFilter, setLoggedInFeedDateFilter] = useState<string | null>(null);
   const [loggedInFeedPostTypeFilter, setLoggedInFeedPostTypeFilter] = useState<'event' | 'posted' | null>(
     null,
   );
-  const [showLoggedInDatePicker, setShowLoggedInDatePicker] = useState(false);
-  const [loggedInDatePickerDraft, setLoggedInDatePickerDraft] = useState(() => new Date());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [feedListHeight, setFeedListHeight] = useState(0);
+  const feedPageHeight = useMemo(() => {
+    if (feedListHeight > 0) return feedListHeight;
+    const reserved =
+      insets.top + MAIN_TAB_BAR_BODY_HEIGHT + insets.bottom + 220;
+    return Math.max(360, windowHeight - reserved);
+  }, [feedListHeight, windowHeight, insets.top, insets.bottom]);
   const [homeFilterMenuOpen, setHomeFilterMenuOpen] = useState(false);
   const [showFirstLoginCategories, setShowFirstLoginCategories] = useState(false);
   const [categoryModalSelectedIds, setCategoryModalSelectedIds] = useState<string[]>([]);
@@ -131,6 +175,18 @@ export default function EventsScreen() {
   const [allSchoolsFilterSchoolId, setAllSchoolsFilterSchoolId] = useState<string | null>(null);
   const [calendarFilterSchoolId, setCalendarFilterSchoolId] = useState<string | null>(null);
   const [calendarFilterStep, setCalendarFilterStep] = useState<'date' | 'school'>('date');
+  const [guestFeedDateFilter, setGuestFeedDateFilter] = useState<string | null>(null);
+  const [guestFeedPostTypeFilter, setGuestFeedPostTypeFilter] = useState<'event' | 'posted' | null>(null);
+  const [calendarModalPostTypeDraft, setCalendarModalPostTypeDraft] = useState<'event' | 'posted' | null>(
+    null,
+  );
+  const [calendarModalSchoolDraft, setCalendarModalSchoolDraft] = useState<string | null>(null);
+  const [loggedInCalendarSchoolId, setLoggedInCalendarSchoolId] = useState<string | null>(null);
+  const [calendarVisibleMonth, setCalendarVisibleMonth] = useState(() => new Date());
+  const [calendarMarkerEvents, setCalendarMarkerEvents] = useState<ApprovedEventPublic[]>([]);
+  const [calendarMarkersLoading, setCalendarMarkersLoading] = useState(false);
+  const [calendarSchoolPickerOpen, setCalendarSchoolPickerOpen] = useState(false);
+  const [calendarGuestAppliedMessage, setCalendarGuestAppliedMessage] = useState(false);
 
   const schoolId = user?.schoolId ?? null;
   const [schoolFilterSettings, setSchoolFilterSettings] = useState<SchoolFilterSettings>({
@@ -156,16 +212,42 @@ export default function EventsScreen() {
     };
   }, [user?.schoolId, guestSchoolId, user]);
 
+  useEffect(() => {
+    if (!schoolId) {
+      setSchoolExternalEnabled(false);
+      return;
+    }
+    void getSchoolExternalEnabled(schoolId)
+      .then(setSchoolExternalEnabled)
+      .catch(() => setSchoolExternalEnabled(false));
+  }, [schoolId]);
+
+  useEffect(() => {
+    if (!schoolExternalEnabled && homeFeedMode === 'external') {
+      setHomeFeedMode('mySchool');
+    }
+  }, [schoolExternalEnabled, homeFeedMode]);
+
+  useEffect(() => {
+    if (route.params?.homeFeedMode === 'allSchools') {
+      setHomeFeedMode('allSchools');
+      const { homeFeedMode: _consumed, ...rest } = route.params ?? {};
+      navigation.setParams(rest);
+    }
+  }, [route.params, navigation]);
+
   const showSchoolFilterUi = shouldShowSchoolFilterUi(
     schoolFilterSettings.filtersEnabled,
     schoolFilterSettings.filtersVisibility,
     !!user,
   );
 
-  const showCategories = !!user && !showAllSchools && showSchoolFilterUi;
+  const showCategories = !!user && homeFeedMode === 'mySchool' && showSchoolFilterUi;
   /** Logged-in All schools tab: Latest/Popular pills in the strip (guest uses funnel dropdown only). */
   const showSortPillsInline = !!user && showAllSchools;
-  const isMySchoolFeed = !!user && !showAllSchools && !!schoolId;
+  const isMySchoolFeed = !!user && homeFeedMode === 'mySchool' && !!schoolId;
+  /** Logged-in All schools: date/post-type filters live on the calendar icon only. */
+  const showHomeFunnel = showSchoolFilterUi && (!user || homeFeedMode === 'mySchool');
 
   const clearSubCategoryFilter = useCallback(() => setSelectedSubCategoryIds([]), []);
 
@@ -209,6 +291,10 @@ export default function EventsScreen() {
     });
   }, [navigation]);
 
+  const openSearch = useCallback(() => {
+    (navigation as { navigate: (name: string) => void }).navigate('Search');
+  }, [navigation]);
+
   useEffect(() => {
     if (user?.id) setGuestSchoolId(null);
   }, [user?.id]);
@@ -245,6 +331,7 @@ export default function EventsScreen() {
 
   const isGuestSchoolFeed = !user && !!guestSchoolId;
   const isAllSchoolsFiltered = !!user && showAllSchools && !!allSchoolsFilterSchoolId;
+  const isAllSchoolsBrowseMode = !!user && showAllSchools && !allSchoolsFilterSchoolId;
   const isSchoolScopedFeed = isMySchoolFeed || isGuestSchoolFeed || isAllSchoolsFiltered;
 
   const loggedInPostTypeDateFilterActive =
@@ -253,20 +340,36 @@ export default function EventsScreen() {
     !!loggedInFeedDateFilter &&
     !!loggedInFeedPostTypeFilter;
 
+  const guestPostTypeDateFilterActive =
+    !user &&
+    !upcomingDateFilter &&
+    !!guestFeedDateFilter &&
+    !!guestFeedPostTypeFilter;
+
   const fetchEvents = useCallback(async () => {
     const school = !user
       ? guestSchoolId
-      : showAllSchools
-        ? allSchoolsFilterSchoolId
-        : schoolId ?? null;
+      : loggedInPostTypeDateFilterActive && loggedInCalendarSchoolId
+        ? loggedInCalendarSchoolId
+        : showAllSchools
+          ? allSchoolsFilterSchoolId
+          : schoolId ?? null;
     const subIds = showCategories && selectedSubCategoryIds.length > 0 ? selectedSubCategoryIds : undefined;
-    const dateFilterActive =
-      user &&
-      !upcomingDateFilter &&
-      loggedInFeedDateFilter &&
-      loggedInFeedPostTypeFilter;
-    const dateFilter = dateFilterActive ? loggedInFeedDateFilter : undefined;
-    const dateMode = dateFilterActive ? loggedInFeedPostTypeFilter : undefined;
+    const guestDateFilterActive =
+      !user && !upcomingDateFilter && guestFeedDateFilter && guestFeedPostTypeFilter;
+    const loggedInDateFilterActive =
+      !!user && !upcomingDateFilter && loggedInFeedDateFilter && loggedInFeedPostTypeFilter;
+    const dateFilterActive = guestDateFilterActive || loggedInDateFilterActive;
+    const dateFilter = dateFilterActive
+      ? guestDateFilterActive
+        ? guestFeedDateFilter
+        : loggedInFeedDateFilter
+      : undefined;
+    const dateMode = dateFilterActive
+      ? guestDateFilterActive
+        ? guestFeedPostTypeFilter
+        : loggedInFeedPostTypeFilter
+      : undefined;
     try {
       let list = await getApprovedEvents(
         school,
@@ -333,16 +436,35 @@ export default function EventsScreen() {
     allSchoolsFilterSchoolId,
     loggedInFeedDateFilter,
     loggedInFeedPostTypeFilter,
+    guestFeedDateFilter,
+    guestFeedPostTypeFilter,
+    loggedInCalendarSchoolId,
+    loggedInPostTypeDateFilterActive,
     upcomingDateFilter,
   ]);
 
   useEffect(() => {
-    if (showCategories && schoolId) {
-      getCategoriesBySchool(schoolId).then(setCategories).catch(() => setCategories([]));
-    } else {
+    if (!(showCategories || showFirstLoginCategories) || !schoolId) {
       setCategories([]);
+      setCategoriesLoading(false);
+      return;
     }
-  }, [showCategories, schoolId]);
+    let cancelled = false;
+    setCategoriesLoading(true);
+    getCategoriesBySchool(schoolId)
+      .then((rows) => {
+        if (!cancelled) setCategories(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setCategories([]);
+      })
+      .finally(() => {
+        if (!cancelled) setCategoriesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showCategories, showFirstLoginCategories, schoolId]);
 
   useEffect(() => {
     if (!showSchoolFilterUi) {
@@ -542,14 +664,60 @@ export default function EventsScreen() {
 
   const openCalendarFilter = useCallback(() => {
     setCalendarFilterStep('date');
-    setCalendarDraftDate(new Date());
+    const initialDate =
+      !user && guestFeedDateFilter
+        ? new Date(`${guestFeedDateFilter}T12:00:00`)
+        : user && loggedInFeedDateFilter
+          ? new Date(`${loggedInFeedDateFilter}T12:00:00`)
+          : new Date();
+    setCalendarDraftDate(initialDate);
+    setCalendarVisibleMonth(new Date(initialDate.getFullYear(), initialDate.getMonth(), 1));
+    setCalendarModalPostTypeDraft(
+      user ? loggedInFeedPostTypeFilter : null,
+    );
+    setCalendarModalSchoolDraft(user ? loggedInCalendarSchoolId ?? schoolId ?? null : null);
+    setCalendarGuestAppliedMessage(false);
+    setCalendarSchoolPickerOpen(false);
     setShowCalendarModal(true);
     setHomeFilterMenuOpen(false);
-    void fetchGuestSchools();
-  }, [fetchGuestSchools]);
+    if (user) void fetchGuestSchools();
+  }, [
+    fetchGuestSchools,
+    user,
+    guestFeedDateFilter,
+    loggedInFeedDateFilter,
+    loggedInFeedPostTypeFilter,
+    loggedInCalendarSchoolId,
+    schoolId,
+  ]);
 
-  const applyCalendarDate = useCallback(() => {
-    setCalendarFilterStep('school');
+  const applyGuestCalendarFilter = useCallback(() => {
+    if (!calendarModalPostTypeDraft) return;
+    setGuestFeedDateFilter(toYmd(calendarDraftDate));
+    setGuestFeedPostTypeFilter(calendarModalPostTypeDraft);
+    setCalendarGuestAppliedMessage(true);
+  }, [calendarDraftDate, calendarModalPostTypeDraft]);
+
+  const applyLoggedInCalendarFilter = useCallback(() => {
+    if (!calendarModalPostTypeDraft || !calendarModalSchoolDraft) return;
+    setLoggedInFeedDateFilter(toYmd(calendarDraftDate));
+    setLoggedInFeedPostTypeFilter(calendarModalPostTypeDraft);
+    setLoggedInCalendarSchoolId(calendarModalSchoolDraft);
+    setShowCalendarModal(false);
+    setCalendarGuestAppliedMessage(false);
+    setCalendarSchoolPickerOpen(false);
+  }, [calendarDraftDate, calendarModalPostTypeDraft, calendarModalSchoolDraft]);
+
+  const closeCalendarModal = useCallback(() => {
+    setShowCalendarModal(false);
+    setCalendarGuestAppliedMessage(false);
+    setCalendarFilterStep('date');
+    setCalendarSchoolPickerOpen(false);
+  }, []);
+
+  const clearGuestDateFilter = useCallback(() => {
+    setGuestFeedDateFilter(null);
+    setGuestFeedPostTypeFilter(null);
   }, []);
 
   const applyCalendarSchool = useCallback((schoolIdForCalendar: string) => {
@@ -586,6 +754,48 @@ export default function EventsScreen() {
     return guestSchools.find((s) => s.id === calendarFilterSchoolId)?.name ?? null;
   }, [calendarFilterSchoolId, guestSchools]);
 
+  const loggedInCalendarSchoolName = useMemo(() => {
+    if (!loggedInCalendarSchoolId) return null;
+    return (
+      guestSchools.find((s) => s.id === loggedInCalendarSchoolId)?.name
+      ?? events.find((e) => e.schoolId === loggedInCalendarSchoolId)?.school?.name
+      ?? null
+    );
+  }, [loggedInCalendarSchoolId, guestSchools, events]);
+
+  const calendarModalSchoolName = useMemo(() => {
+    if (!calendarModalSchoolDraft) return null;
+    return guestSchools.find((s) => s.id === calendarModalSchoolDraft)?.name ?? null;
+  }, [calendarModalSchoolDraft, guestSchools]);
+
+  const calendarMarkedDates = useMemo(() => {
+    if (!calendarModalPostTypeDraft) return new Set<string>();
+    return collectFeedDatesByMode(calendarMarkerEvents, calendarModalPostTypeDraft);
+  }, [calendarMarkerEvents, calendarModalPostTypeDraft]);
+
+  useEffect(() => {
+    if (!showCalendarModal || !calendarModalPostTypeDraft) {
+      setCalendarMarkerEvents([]);
+      return;
+    }
+    const schoolForMarkers = user ? calendarModalSchoolDraft : guestSchoolId;
+    if (user && !schoolForMarkers) {
+      setCalendarMarkerEvents([]);
+      return;
+    }
+    setCalendarMarkersLoading(true);
+    getApprovedEvents(schoolForMarkers ?? undefined)
+      .then((list) => setCalendarMarkerEvents(Array.isArray(list) ? list : []))
+      .catch(() => setCalendarMarkerEvents([]))
+      .finally(() => setCalendarMarkersLoading(false));
+  }, [
+    showCalendarModal,
+    calendarModalPostTypeDraft,
+    calendarModalSchoolDraft,
+    guestSchoolId,
+    user,
+  ]);
+
   const addUpcomingToGoogleCalendar = useCallback((post: UpcomingPostPublic) => {
     const returnUrl = `${getFrontendBaseUrl().replace(/\/$/, '')}/events`;
     const url = buildGoogleCalendarAddAuthUrl(post, returnUrl);
@@ -596,6 +806,8 @@ export default function EventsScreen() {
 
   const [calendarExtrasModalVisible, setCalendarExtrasModalVisible] = useState(false);
   const [calendarFeedListHeight, setCalendarFeedListHeight] = useState(0);
+  const calendarFeedPageHeight =
+    calendarFeedListHeight > 0 ? calendarFeedListHeight : feedPageHeight;
   const [calendarEngagementCounts, setCalendarEngagementCounts] = useState<{
     likes: Record<string, number>;
     commentCounts: Record<string, number>;
@@ -1013,7 +1225,7 @@ export default function EventsScreen() {
   const switchToMySchool = useCallback(() => {
     setExpandedCategoryId(null);
     setHomeFilterMenuOpen(false);
-    setShowAllSchools(false);
+    setHomeFeedMode('mySchool');
     setAllSchoolsFilterSchoolId(null);
     clearUpcomingView();
   }, [clearUpcomingView]);
@@ -1021,16 +1233,37 @@ export default function EventsScreen() {
   const switchToAllSchools = useCallback(() => {
     setExpandedCategoryId(null);
     setHomeFilterMenuOpen(false);
-    setShowAllSchools(true);
+    setHomeFeedMode('allSchools');
     clearUpcomingView();
   }, [clearUpcomingView]);
 
+  const switchToExternal = useCallback(() => {
+    setExpandedCategoryId(null);
+    setHomeFilterMenuOpen(false);
+    setHomeFeedMode('external');
+    clearUpcomingView();
+  }, [clearUpcomingView]);
+
+  /** Home tab + badges: feed school image first, then profile `schoolImage` (matches web). */
+  const mySchoolTabSchool = useMemo(() => {
+    const sid = user?.schoolId ?? schoolId;
+    const hit =
+      sid
+        ? events.find((e) => e.schoolId === sid && e.school?.image?.trim())
+        : undefined;
+    const image = hit?.school?.image?.trim() || user?.schoolImage?.trim() || '';
+    const name =
+      user?.schoolName?.trim() ||
+      hit?.school?.name?.trim() ||
+      user?.name?.trim() ||
+      'My school';
+    return { name, image };
+  }, [events, schoolId, user?.schoolId, user?.schoolImage, user?.schoolName, user?.name]);
+
   const mySchoolLogo = useMemo(() => {
-    if (user?.schoolImage?.trim()) return imageSrc(user.schoolImage);
-    if (!schoolId) return '';
-    const hit = events.find((e) => e.schoolId === schoolId && e.school?.image?.trim());
-    return hit?.school?.image ? imageSrc(hit.school.image) : '';
-  }, [events, schoolId, user?.schoolImage]);
+    const raw = mySchoolTabSchool.image?.trim();
+    return raw ? schoolLogoSrc(raw) : '';
+  }, [mySchoolTabSchool.image]);
 
   const selectedSubCategoryMeta = useMemo(() => {
     if (!selectedSubCategoryIds.length || !categories.length) return [];
@@ -1127,8 +1360,131 @@ export default function EventsScreen() {
     </View>
   );
 
+  const showGuestSchoolPicker = showSchoolFilterUi && !user;
+  const showAllSchoolsPicker = showSchoolFilterUi && !!user && showAllSchools;
+  const schoolPickerActiveId = showGuestSchoolPicker ? guestSchoolId : allSchoolsFilterSchoolId;
+  const schoolPickerLabel = showGuestSchoolPicker
+    ? guestSchoolName ?? 'Select school'
+    : allSchoolsFilterSchoolName ?? 'Select school';
+
+  const mySchoolReturnBadgeLabel =
+    user?.schoolName?.trim() || user?.name?.trim() || 'My school';
+
+  const schoolFilterBadgeLabel = isGuestSchoolFeed
+    ? guestSchoolName
+    : isAllSchoolsFiltered
+      ? allSchoolsFilterSchoolName
+      : isAllSchoolsBrowseMode
+        ? mySchoolReturnBadgeLabel
+        : null;
+
+  const showSchoolFilterBadge =
+    !upcomingDateFilter &&
+    !selectedUpcomingPost &&
+    !!schoolFilterBadgeLabel &&
+    (isGuestSchoolFeed || isAllSchoolsFiltered || isAllSchoolsBrowseMode);
+
+  const onSchoolFilterBadgePress = () => {
+    if (isGuestSchoolFeed) {
+      clearGuestSchoolFilter();
+      return;
+    }
+    if (isAllSchoolsFiltered) {
+      clearAllSchoolsFilter();
+      return;
+    }
+    if (isAllSchoolsBrowseMode) {
+      switchToMySchool();
+    }
+  };
+
+  const renderSchoolFilterBadge = (placement: 'guestHeader' | 'feed') => {
+    if (!showSchoolFilterBadge || !schoolFilterBadgeLabel) return null;
+    if (placement === 'guestHeader' && user) return null;
+    if (placement === 'feed' && !user) return null;
+    const badgeHint = isAllSchoolsBrowseMode
+      ? 'Tap to return to your school feed'
+      : 'Clear filter to choose another school';
+    const a11yLabel = isAllSchoolsBrowseMode
+      ? `Return to ${schoolFilterBadgeLabel} feed`
+      : `Clear school filter for ${schoolFilterBadgeLabel}`;
+    return (
+      <View
+        style={[
+          styles.schoolFilterAboveFeed,
+          placement === 'guestHeader' && styles.schoolFilterAboveFeedGuestHeader,
+        ]}
+      >
+        {isAllSchoolsBrowseMode ? (
+          <Text style={styles.schoolFilterBrowseContext} numberOfLines={1}>
+            Browsing all schools
+          </Text>
+        ) : null}
+        <TouchableOpacity
+          style={styles.schoolFilterClearBadge}
+          onPress={onSchoolFilterBadgePress}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={a11yLabel}
+        >
+          {isAllSchoolsBrowseMode && mySchoolLogo ? (
+            <Image source={{ uri: mySchoolLogo }} style={styles.schoolFilterBadgeLogo} />
+          ) : (
+            <BuildingIcon width={14} height={14} fill="#14532D" />
+          )}
+          <Text style={styles.schoolFilterClearBadgeLabel} numberOfLines={1}>
+            {schoolFilterBadgeLabel}
+          </Text>
+          <View style={styles.schoolFilterClearBadgeClose}>
+            <Text style={styles.schoolFilterClearBadgeCloseText}>×</Text>
+          </View>
+        </TouchableOpacity>
+        <Text style={styles.schoolFilterAboveFeedHint}>{badgeHint}</Text>
+      </View>
+    );
+  };
+
   const homeFilterRow = (
-    <View style={[styles.homeFilterRow, !user ? styles.guestHomeFilterRow : null]}>
+    <View
+      style={[
+        styles.homeFilterRow,
+        !user ? styles.guestHomeFilterRow : null,
+        user ? styles.loggedInHomeFilterRow : null,
+      ]}
+    >
+      {showGuestSchoolPicker || showAllSchoolsPicker ? (
+        <>
+          <TouchableOpacity
+            style={[
+              styles.guestSchoolSelectBtn,
+              schoolPickerActiveId ? styles.guestSchoolSelectBtnActive : null,
+            ]}
+            onPress={() => openSchoolPicker(showGuestSchoolPicker ? 'guest' : 'allSchools')}
+            activeOpacity={0.85}
+          >
+            <BuildingIcon
+              width={16}
+              height={16}
+              fill={schoolPickerActiveId ? '#14532D' : '#166534'}
+            />
+            <Text
+              style={[
+                styles.guestSchoolSelectBtnText,
+                schoolPickerActiveId ? styles.guestSchoolSelectBtnTextActive : null,
+              ]}
+              numberOfLines={1}
+            >
+              {schoolPickerLabel}
+            </Text>
+            <Ionicons
+              name="chevron-down"
+              size={14}
+              color={schoolPickerActiveId ? '#14532D' : '#4B5563'}
+            />
+          </TouchableOpacity>
+        </>
+      ) : null}
+      {showCategories || showSortPillsInline ? (
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -1213,37 +1569,31 @@ export default function EventsScreen() {
             </>
           )}
         </ScrollView>
+      ) : (
+        <View style={styles.homeFilterRowSpacer} />
+      )}
         {showSchoolFilterUi ? (
           <View style={styles.homeFilterActions}>
+            {showHomeFunnel ? (
             <View style={styles.filterFunnelWrap}>
             <TouchableOpacity
               style={[
                 styles.homeFilterBtn,
                 (homeFilterMenuOpen ||
                   feedSort !== 'latest' ||
-                  isGuestSchoolFeed ||
-                  isAllSchoolsFiltered ||
-                  !!loggedInFeedDateFilter ||
-                  !!loggedInFeedPostTypeFilter) &&
+                  (!user && isGuestSchoolFeed)) &&
                   styles.homeFilterBtnActive,
               ]}
               onPress={() => setHomeFilterMenuOpen((o) => !o)}
               accessibilityLabel="Filter"
             >
-              <FunnelIcon
-                width={22}
-                height={22}
-                fill={
-                  homeFilterMenuOpen ||
-                  isGuestSchoolFeed ||
-                  isAllSchoolsFiltered ||
-                  feedSort !== 'latest' ||
-                  !!loggedInFeedDateFilter ||
-                  !!loggedInFeedPostTypeFilter
-                    ? '#087990'
-                    : '#6c757d'
-                }
-              />
+              {homeFilterMenuOpen ||
+              feedSort !== 'latest' ||
+              (!user && isGuestSchoolFeed) ? (
+                <FunnelFillIcon width={24} height={24} fill="#087990" />
+              ) : (
+                <FunnelIcon width={24} height={24} fill="#6c757d" />
+              )}
             </TouchableOpacity>
             {homeFilterMenuOpen ? (
               <ScrollView
@@ -1292,143 +1642,38 @@ export default function EventsScreen() {
                     </View>
                   </>
                 ) : null}
-                {user && showSchoolFilterUi ? (
-                  <>
-                    <Text style={[styles.sortDropdownSubLabel, styles.sortDropdownSchoolLabel]}>
-                      View by post type
-                    </Text>
-                    <View style={styles.postTypeBadgeColumn}>
-                      <TouchableOpacity
-                        style={[
-                          styles.postTypeBadge,
-                          loggedInFeedPostTypeFilter === 'event' && styles.postTypeBadgeActive,
-                        ]}
-                        onPress={() =>
-                          setLoggedInFeedPostTypeFilter((m) => (m === 'event' ? null : 'event'))
-                        }
-                      >
-                        <Text
-                          style={[
-                            styles.postTypeBadgeText,
-                            loggedInFeedPostTypeFilter === 'event' && styles.postTypeBadgeTextActive,
-                          ]}
-                        >
-                          Filter by event date details
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[
-                          styles.postTypeBadge,
-                          loggedInFeedPostTypeFilter === 'posted' && styles.postTypeBadgeActive,
-                        ]}
-                        onPress={() =>
-                          setLoggedInFeedPostTypeFilter((m) => (m === 'posted' ? null : 'posted'))
-                        }
-                      >
-                        <Text
-                          style={[
-                            styles.postTypeBadgeText,
-                            loggedInFeedPostTypeFilter === 'posted' && styles.postTypeBadgeTextActive,
-                          ]}
-                        >
-                          Filter by post date
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                    {loggedInFeedPostTypeFilter ? (
-                      <>
-                        <TouchableOpacity
-                          style={styles.guestSchoolFilterBtn}
-                          onPress={() => {
-                            setLoggedInDatePickerDraft(
-                              loggedInFeedDateFilter
-                                ? new Date(`${loggedInFeedDateFilter}T12:00:00`)
-                                : new Date(),
-                            );
-                            setShowLoggedInDatePicker((v) => !v);
-                          }}
-                          activeOpacity={0.85}
-                        >
-                          <Ionicons name="calendar-outline" size={16} color="#1a1f2e" />
-                          <Text style={styles.guestSchoolFilterBtnText}>
-                            {loggedInFeedDateFilter
-                              ? formatUpcomingHeader(loggedInFeedDateFilter)
-                              : 'Pick a date'}
-                          </Text>
-                        </TouchableOpacity>
-                        {showLoggedInDatePicker ? (
-                          <DateTimePicker
-                            value={loggedInDatePickerDraft}
-                            mode="date"
-                            display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                            onChange={(_event, selected) => {
-                              if (selected) {
-                                setLoggedInDatePickerDraft(selected);
-                                setLoggedInFeedDateFilter(toYmd(selected));
-                              }
-                              if (Platform.OS === 'android') setShowLoggedInDatePicker(false);
-                            }}
-                          />
-                        ) : null}
-                        <View style={styles.loggedInDateRow}>
-                          <TouchableOpacity
-                            style={styles.loggedInDateQuickBtn}
-                            onPress={() => setLoggedInFeedDateFilter(toYmd(new Date()))}
-                          >
-                            <Text style={styles.loggedInDateQuickBtnText}>Today</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={styles.loggedInDateQuickBtn}
-                            onPress={() => {
-                              const d = new Date();
-                              d.setDate(d.getDate() + 1);
-                              setLoggedInFeedDateFilter(toYmd(d));
-                            }}
-                          >
-                            <Text style={styles.loggedInDateQuickBtnText}>Tomorrow</Text>
-                          </TouchableOpacity>
-                          {loggedInFeedDateFilter || loggedInFeedPostTypeFilter ? (
-                            <TouchableOpacity
-                              onPress={() => {
-                                setLoggedInFeedDateFilter(null);
-                                setLoggedInFeedPostTypeFilter(null);
-                              }}
-                              hitSlop={8}
-                            >
-                              <Text style={styles.guestSchoolChipAction}>Clear</Text>
-                            </TouchableOpacity>
-                          ) : null}
-                        </View>
-                        {loggedInFeedDateFilter && loggedInFeedPostTypeFilter ? (
-                          <Text style={styles.sortDropdownHint}>
-                            Active:{' '}
-                            {loggedInFeedPostTypeFilter === 'event' ? 'Event date' : 'Post date'} ·{' '}
-                            {formatUpcomingHeader(loggedInFeedDateFilter)}
-                          </Text>
-                        ) : null}
-                      </>
-                    ) : (
-                      <Text style={styles.sortDropdownHint}>Choose a post type, then pick a date.</Text>
-                    )}
-                  </>
-                ) : null}
               </View>
               </ScrollView>
             ) : null}
             </View>
+            ) : null}
             <TouchableOpacity
               style={[
                 styles.homeFilterBtn,
-                (showCalendarModal || !!upcomingDateFilter) && styles.homeFilterBtnActive,
+                (showCalendarModal ||
+                  !!upcomingDateFilter ||
+                  guestPostTypeDateFilterActive ||
+                  loggedInPostTypeDateFilterActive) &&
+                  styles.homeFilterBtnActive,
               ]}
               onPress={openCalendarFilter}
               accessibilityLabel="Upcoming news by date"
             >
-              <Ionicons
-                name="calendar-outline"
-                size={22}
-                color={showCalendarModal || upcomingDateFilter ? '#087990' : '#6c757d'}
-              />
+              {showCalendarModal ||
+              upcomingDateFilter ||
+              guestPostTypeDateFilterActive ||
+              loggedInPostTypeDateFilterActive ? (
+                <CalendarEventFillIcon width={24} height={24} fill="#087990" />
+              ) : (
+                <CalendarEventIcon width={24} height={24} fill="#6c757d" />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.homeFilterBtn}
+              onPress={openSearch}
+              accessibilityLabel="Search"
+            >
+              <SearchIcon width={24} height={24} fill="#6c757d" />
             </TouchableOpacity>
           </View>
         ) : null}
@@ -1436,135 +1681,150 @@ export default function EventsScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView
+      style={[styles.container, { paddingBottom: MAIN_TAB_BAR_BODY_HEIGHT + insets.bottom }]}
+      edges={['top']}
+    >
       {!user ? (
         <View style={styles.guestHomeHeader}>
-          <View style={styles.guestLoginBanner}>
-            <Ionicons name="information-circle" size={16} color="#997404" style={styles.guestLoginBannerIcon} />
-            <Text style={styles.guestLoginBannerText}>
-              Sign in to customize your school feed and join school chat groups.
-            </Text>
-            <TouchableOpacity onPress={openGuestLogin} hitSlop={8}>
-              <Text style={styles.guestLoginBannerAction}>Sign in</Text>
-            </TouchableOpacity>
-          </View>
-          {showSchoolFilterUi ? (
-            <View style={styles.guestSchoolFilterBar}>
-              <TouchableOpacity
-                style={[
-                  styles.guestSchoolSelectBtn,
-                  guestSchoolId ? styles.guestSchoolSelectBtnActive : null,
-                ]}
-                onPress={() => openSchoolPicker('guest')}
-                activeOpacity={0.85}
-              >
-                <BuildingIcon width={16} height={16} fill={guestSchoolId ? '#fff' : '#1a1f2e'} />
-                <Text
-                  style={[
-                    styles.guestSchoolSelectBtnText,
-                    guestSchoolId ? styles.guestSchoolSelectBtnTextActive : null,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {guestSchoolName ?? 'Select school'}
-                </Text>
-                <Ionicons name="chevron-down" size={14} color={guestSchoolId ? '#fff' : '#6c757d'} />
-              </TouchableOpacity>
-              {guestSchoolId ? (
-                <TouchableOpacity onPress={clearGuestSchoolFilter} hitSlop={8}>
-                  <Text style={styles.guestSchoolChipAction}>Clear</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-          ) : null}
+          <GuestSignInStrip onSignInPress={openGuestLogin} />
+          {renderSchoolFilterBadge('guestHeader')}
           {homeFilterRow}
         </View>
       ) : (
         <>
+          <View style={styles.homeStickyHeader}>
           <View style={styles.tabBar}>
             <TouchableOpacity
-              style={[styles.tab, showAllSchools ? null : styles.tabActive]}
+              style={styles.tab}
               onPress={switchToMySchool}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: homeFeedMode === 'mySchool' }}
             >
-              <View style={styles.tabContent}>
-                {mySchoolLogo ? (
-                  <Image source={{ uri: mySchoolLogo }} style={styles.tabSchoolLogo} />
-                ) : (
-                  <View style={styles.tabSchoolLogoFallback}>
-                    <Text style={styles.tabSchoolLogoFallbackText}>
-                      {(user?.schoolName?.trim()?.charAt(0) || user?.name?.trim()?.charAt(0) || 'S').toUpperCase()}
-                    </Text>
-                  </View>
-                )}
-                <Text style={[styles.tabText, showAllSchools ? styles.tabTextInactive : styles.tabTextActive]}>
-                  My school
-                </Text>
-              </View>
-              {!showAllSchools && <View style={styles.tabUnderline} />}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, showAllSchools ? styles.tabActive : null]}
-              onPress={switchToAllSchools}
-            >
-              <View style={styles.tabContent}>
-                <View style={styles.tabSchoolLogoFallback}>
-                  <BuildingIcon width={14} height={14} fill="#4b5563" />
-                </View>
-                <Text style={[styles.tabText, showAllSchools ? styles.tabTextActive : styles.tabTextInactive]}>
-                  All schools
-                </Text>
-              </View>
-              {showAllSchools && <View style={styles.tabUnderline} />}
-            </TouchableOpacity>
-          </View>
-          {showAllSchools && showSchoolFilterUi ? (
-            <View style={styles.guestSchoolFilterBar}>
-              <TouchableOpacity
+              <View
                 style={[
-                  styles.guestSchoolSelectBtn,
-                  allSchoolsFilterSchoolId ? styles.guestSchoolSelectBtnActive : null,
+                  styles.tabPill,
+                  homeFeedMode === 'mySchool' ? styles.tabPillMySchoolActive : styles.tabPillOutlineDark,
                 ]}
-                onPress={() => openSchoolPicker('allSchools')}
-                activeOpacity={0.85}
               >
-                <BuildingIcon width={16} height={16} fill={allSchoolsFilterSchoolId ? '#fff' : '#1a1f2e'} />
+                <SchoolLogo
+                  school={mySchoolTabSchool}
+                  size={22}
+                  borderRadius={11}
+                  style={styles.tabSchoolLogoWrap}
+                />
                 <Text
                   style={[
-                    styles.guestSchoolSelectBtnText,
-                    allSchoolsFilterSchoolId ? styles.guestSchoolSelectBtnTextActive : null,
+                    styles.tabText,
+                    homeFeedMode === 'mySchool' ? styles.tabTextMySchoolActive : styles.tabTextOutlineDark,
                   ]}
                   numberOfLines={1}
                 >
-                  {allSchoolsFilterSchoolName ?? 'Select school'}
+                  My school
                 </Text>
-                <Ionicons name="chevron-down" size={14} color={allSchoolsFilterSchoolId ? '#fff' : '#6c757d'} />
+              </View>
+            </TouchableOpacity>
+            {schoolExternalEnabled ? (
+              <TouchableOpacity
+                style={styles.tab}
+                onPress={switchToExternal}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: homeFeedMode === 'external' }}
+              >
+                <View
+                  style={[
+                    styles.tabPill,
+                    homeFeedMode === 'external' ? styles.tabPillExternalActive : styles.tabPillOutlineDark,
+                  ]}
+                >
+                  <View style={styles.tabSchoolLogoFallback}>
+                    <Ionicons
+                      name="log-in-outline"
+                      size={14}
+                      color={homeFeedMode === 'external' ? authModalTheme.primaryDark : '#1a1f2e'}
+                    />
+                  </View>
+                  <Text
+                    style={[
+                      styles.tabText,
+                      homeFeedMode === 'external' ? styles.tabTextExternalActive : styles.tabTextOutlineDark,
+                    ]}
+                  >
+                    External
+                  </Text>
+                </View>
               </TouchableOpacity>
-              {allSchoolsFilterSchoolId ? (
-                <TouchableOpacity onPress={clearAllSchoolsFilter} hitSlop={8}>
-                  <Text style={styles.guestSchoolChipAction}>Clear</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-          ) : null}
-          {homeFilterRow}
+            ) : (
+              <TouchableOpacity
+                style={styles.tab}
+                onPress={switchToAllSchools}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: showAllSchools }}
+              >
+                <View
+                  style={[
+                    styles.tabPill,
+                    showAllSchools ? styles.tabPillExternalActive : styles.tabPillOutlineDark,
+                  ]}
+                >
+                  <View style={styles.tabSchoolLogoFallback}>
+                    <BuildingIcon
+                      width={14}
+                      height={14}
+                      fill={showAllSchools ? authModalTheme.primaryDark : '#1a1f2e'}
+                    />
+                  </View>
+                  <Text
+                    style={[
+                      styles.tabText,
+                      showAllSchools ? styles.tabTextExternalActive : styles.tabTextOutlineDark,
+                    ]}
+                  >
+                    All schools
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          </View>
+          {!showExternalHomeFeed ? homeFilterRow : null}
+          </View>
         </>
       )}
 
       {user && loggedInPostTypeDateFilterActive ? (
         <View style={styles.activeDateFilterBar}>
-          <Text style={styles.activeDateFilterText} numberOfLines={2}>
-            Showing news by {loggedInFeedPostTypeFilter === 'event' ? 'event date' : 'post date'} for{' '}
+          <Text style={styles.activeDateFilterText} numberOfLines={3}>
+            {loggedInFeedPostTypeFilter === 'event' ? 'Event date' : 'Posted date'} ·{' '}
             {formatUpcomingHeader(loggedInFeedDateFilter!)}
+            {loggedInCalendarSchoolName ? ` · ${loggedInCalendarSchoolName}` : ''}
           </Text>
           <TouchableOpacity
             onPress={() => {
               setLoggedInFeedDateFilter(null);
               setLoggedInFeedPostTypeFilter(null);
+              setLoggedInCalendarSchoolId(null);
             }}
             hitSlop={8}
           >
             <Text style={styles.guestSchoolChipAction}>Clear</Text>
           </TouchableOpacity>
+        </View>
+      ) : null}
+
+      {guestPostTypeDateFilterActive ? (
+        <View style={styles.guestDateFilterBlock}>
+          <View style={styles.activeDateFilterBar}>
+            <Text style={styles.activeDateFilterText} numberOfLines={2}>
+              {guestFeedPostTypeFilter === 'event' ? 'Event date' : 'Posted date'} ·{' '}
+              {formatUpcomingHeader(guestFeedDateFilter!)}
+            </Text>
+            <TouchableOpacity onPress={clearGuestDateFilter} hitSlop={8}>
+              <Text style={styles.guestSchoolChipAction}>Clear</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.guestDateFilterSignInHint}>
+            Sign in to filter news by your selected school and use more filters.
+          </Text>
         </View>
       ) : null}
 
@@ -1664,11 +1924,11 @@ export default function EventsScreen() {
                   if (h > 0 && Math.abs(h - calendarFeedListHeight) > 1) setCalendarFeedListHeight(h);
                 }}
               >
-                {calendarFeedListHeight > 0 ? (
+                {calendarFeedPageHeight > 0 ? (
                   <InshortsPagedFeed
                     key={`calendar-${upcomingDateFilter}-${calendarFilterSchoolId ?? ''}`}
                     feedItems={calendarFeedItems}
-                    pageHeight={calendarFeedListHeight}
+                    pageHeight={calendarFeedPageHeight}
                     onRefresh={refreshCalendarFeed}
                     refreshing={upcomingLoading}
                     userId={user?.id ?? null}
@@ -1715,7 +1975,26 @@ export default function EventsScreen() {
         </View>
       ) : null}
 
-      {!upcomingDateFilter && !selectedUpcomingPost && (loading ? (
+      {!upcomingDateFilter && !selectedUpcomingPost ? (
+        <View style={styles.feedWithFilterColumn}>
+          {!showExternalHomeFeed ? renderSchoolFilterBadge('feed') : null}
+          {showExternalHomeFeed && user ? (
+            <View
+              style={styles.inshortsFeedHost}
+              onLayout={(e) => {
+                const h = e.nativeEvent.layout.height;
+                if (h > 0 && Math.abs(h - feedListHeight) > 1) setFeedListHeight(h);
+              }}
+            >
+              {feedPageHeight > 0 ? (
+                <ExternalPublicFeedPanel pageHeight={feedPageHeight} />
+              ) : (
+                <View style={styles.centered}>
+                  <ActivityIndicator size="large" color="#1a1f2e" />
+                </View>
+              )}
+            </View>
+          ) : loading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#1a1f2e" />
         </View>
@@ -1763,12 +2042,12 @@ export default function EventsScreen() {
             if (h > 0 && Math.abs(h - feedListHeight) > 1) setFeedListHeight(h);
           }}
         >
-          {feedListHeight > 0 ? (
+          {feedPageHeight > 0 ? (
             <InshortsPagedFeed
               key={showAllSchools ? 'inshorts-all' : 'inshorts-my'}
               feedItems={feedItems}
-              pageHeight={feedListHeight}
-              alignTop={isMySchoolFeed && selectedSubCategoryMeta.length > 0}
+              pageHeight={feedPageHeight}
+              alignTop
               onRefresh={onRefresh}
               refreshing={refreshing}
               userId={user?.id ?? null}
@@ -1785,7 +2064,9 @@ export default function EventsScreen() {
             </View>
           )}
         </View>
-      ))}
+      )}
+        </View>
+      ) : null}
 
       {calendarExtrasModalVisible ? (
         <Modal
@@ -1874,104 +2155,429 @@ export default function EventsScreen() {
           visible
           transparent
           animationType="fade"
-          onRequestClose={() => setShowCalendarModal(false)}
+          onRequestClose={closeCalendarModal}
         >
-          <Pressable style={styles.modalOverlay} onPress={() => setShowCalendarModal(false)}>
-            <Pressable style={styles.calendarModalBox} onPress={(e) => e.stopPropagation()}>
+          <Pressable style={styles.calendarModalOverlay} onPress={closeCalendarModal}>
+            <Pressable style={styles.calendarModalSheet} onPress={(e) => e.stopPropagation()}>
               <View style={styles.calendarModalHeader}>
                 <Text style={styles.calendarModalTitle}>
-                  {calendarFilterStep === 'date' ? 'Pick a date' : 'Select a school'}
+                  {!user
+                    ? calendarGuestAppliedMessage
+                      ? 'Filter applied'
+                      : 'Filter by date'
+                    : 'Filter by date'}
                 </Text>
-                <TouchableOpacity onPress={() => setShowCalendarModal(false)}>
-                  <Text style={styles.calendarModalClose}>×</Text>
+                <TouchableOpacity onPress={closeCalendarModal} hitSlop={12} accessibilityLabel="Close">
+                  <Ionicons name="close" size={22} color="#6c757d" />
                 </TouchableOpacity>
               </View>
-              {calendarFilterStep === 'date' ? (
-                <>
-                  <Text style={styles.calendarSchoolHint}>
-                    Pick a date to see events scheduled for that day (the date set when the post was created).
-                  </Text>
-                  <View style={styles.whatsHappeningRow}>
-                    <View style={styles.whatsHappeningBox}>
-                      <Text style={styles.whatsHappeningTitle}>Quick pick</Text>
+
+              <ScrollView
+                style={styles.calendarModalScroll}
+                contentContainerStyle={styles.calendarModalScrollContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                {!user && calendarGuestAppliedMessage ? (
+                  <View style={styles.calendarGuestAppliedBlock}>
+                    <Text style={styles.calendarGuestAppliedLead}>
+                      Showing news by{' '}
+                      {calendarModalPostTypeDraft === 'event' ? 'event date' : 'posted date'} for{' '}
+                      {formatUpcomingHeader(toYmd(calendarDraftDate))}.
+                    </Text>
+                    <Text style={styles.calendarGuestAppliedHint}>
+                      Sign in to filter news by your selected school and access more filter options.
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.calendarApplyFilterBtn}
+                      onPress={closeCalendarModal}
+                      activeOpacity={0.88}
+                    >
+                      <Text style={styles.calendarApplyFilterBtnText}>Done</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : !user ? (
+                  <>
+                    <Text style={styles.calendarModalSubtitle}>
+                      {calendarModalPostTypeDraft
+                        ? 'Pick a day for your filter.'
+                        : 'Choose how you want to filter news by date.'}
+                    </Text>
+                    <View style={styles.calendarGuestPostTypeColumn}>
                       <TouchableOpacity
-                        style={styles.calendarQuickBtn}
-                        onPress={() => setCalendarDraftDate(new Date())}
+                        style={[
+                          styles.calendarGuestPostTypeBadge,
+                          calendarModalPostTypeDraft === 'event' && styles.calendarGuestPostTypeBadgeActive,
+                        ]}
+                        onPress={() => setCalendarModalPostTypeDraft('event')}
+                        activeOpacity={0.85}
                       >
-                        <Text style={styles.calendarQuickBtnText}>Today</Text>
+                        <Text
+                          style={[
+                            styles.calendarGuestPostTypeBadgeText,
+                            calendarModalPostTypeDraft === 'event' && styles.calendarGuestPostTypeBadgeTextActive,
+                          ]}
+                        >
+                          Filter via event date
+                        </Text>
+                        <Text
+                          style={[
+                            styles.calendarGuestPostTypeHint,
+                            calendarModalPostTypeDraft === 'event' && styles.calendarGuestPostTypeHintActive,
+                          ]}
+                        >
+                          Uses the event date fields set when the news was posted.
+                        </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
-                        style={styles.calendarQuickBtn}
-                        onPress={() => {
-                          const d = new Date();
-                          d.setDate(d.getDate() + 1);
-                          setCalendarDraftDate(d);
-                        }}
+                        style={[
+                          styles.calendarGuestPostTypeBadge,
+                          calendarModalPostTypeDraft === 'posted' && styles.calendarGuestPostTypeBadgeActive,
+                        ]}
+                        onPress={() => setCalendarModalPostTypeDraft('posted')}
+                        activeOpacity={0.85}
                       >
-                        <Text style={styles.calendarQuickBtnText}>Tomorrow</Text>
+                        <Text
+                          style={[
+                            styles.calendarGuestPostTypeBadgeText,
+                            calendarModalPostTypeDraft === 'posted' && styles.calendarGuestPostTypeBadgeTextActive,
+                          ]}
+                        >
+                          Filter via posted date
+                        </Text>
+                        <Text
+                          style={[
+                            styles.calendarGuestPostTypeHint,
+                            calendarModalPostTypeDraft === 'posted' && styles.calendarGuestPostTypeHintActive,
+                          ]}
+                        >
+                          Shows news that was posted on the selected day.
+                        </Text>
                       </TouchableOpacity>
                     </View>
-                  </View>
-                  {Platform.OS === 'android' && !showNativeDatePicker ? (
-                    <TouchableOpacity
-                      style={styles.dateFieldBtn}
-                      onPress={() => setShowNativeDatePicker(true)}
-                    >
-                      <Text style={styles.dateFieldLabel}>{toYmd(calendarDraftDate)}</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                  {(Platform.OS === 'ios' || showNativeDatePicker) ? (
-                    <DateTimePicker
-                      value={calendarDraftDate}
-                      mode="date"
-                      display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                      onChange={(_event, date) => {
-                        if (date) setCalendarDraftDate(date);
-                        if (Platform.OS === 'android') setShowNativeDatePicker(false);
-                      }}
-                    />
-                  ) : null}
-                  <View style={styles.calendarOkRow}>
-                    <TouchableOpacity style={styles.calendarOkBtn} onPress={applyCalendarDate}>
-                      <Text style={styles.calendarOkBtnText}>Next — choose school</Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.calendarSchoolHint}>
-                    Events on {formatUpcomingHeader(toYmd(calendarDraftDate))}
-                  </Text>
-                  <TouchableOpacity onPress={() => setCalendarFilterStep('date')} style={styles.calendarBackBtn}>
-                    <Text style={styles.guestSchoolChipAction}>← Change date</Text>
-                  </TouchableOpacity>
-                  {guestSchoolsLoading ? (
-                    <ActivityIndicator size="small" color="#1a1f2e" style={{ marginVertical: 24 }} />
-                  ) : guestSchools.length === 0 ? (
-                    <Text style={styles.schoolPickerEmpty}>No schools found.</Text>
-                  ) : (
-                    <ScrollView style={styles.schoolPickerList}>
-                      {guestSchools.map((s) => (
+
+                    {calendarModalPostTypeDraft ? (
+                      <>
                         <TouchableOpacity
-                          key={s.id}
-                          style={styles.schoolPickerItem}
-                          onPress={() => applyCalendarSchool(s.id)}
+                          onPress={() => {
+                            setCalendarModalPostTypeDraft(null);
+                            setShowNativeDatePicker(Platform.OS === 'ios');
+                          }}
+                          style={styles.calendarChangeDateLink}
                           activeOpacity={0.85}
                         >
-                          {s.image ? (
-                            <Image source={{ uri: imageSrc(s.image) }} style={styles.schoolPickerLogo} />
-                          ) : (
-                            <View style={styles.schoolPickerLogoPlaceholder}>
-                              <Text style={styles.schoolPickerLogoLetter}>{s.name?.charAt(0) ?? '?'}</Text>
-                            </View>
-                          )}
-                          <Text style={styles.schoolPickerName}>{s.name}</Text>
+                          <Ionicons name="arrow-back" size={16} color={authModalTheme.primary} />
+                          <Text style={styles.calendarChangeDateLinkText}>Change filter type</Text>
                         </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  )}
-                </>
-              )}
+
+                        <View style={styles.calendarQuickPickRow}>
+                          <TouchableOpacity
+                            style={[
+                              styles.calendarQuickPill,
+                              isSameCalendarDay(calendarDraftDate, new Date()) && styles.calendarQuickPillActive,
+                            ]}
+                            onPress={() => setCalendarDraftDate(new Date())}
+                            activeOpacity={0.85}
+                          >
+                            <Text
+                              style={[
+                                styles.calendarQuickPillText,
+                                isSameCalendarDay(calendarDraftDate, new Date()) && styles.calendarQuickPillTextActive,
+                              ]}
+                            >
+                              Today
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[
+                              styles.calendarQuickPill,
+                              isSameCalendarDay(calendarDraftDate, getTomorrowDate()) &&
+                                styles.calendarQuickPillActive,
+                            ]}
+                            onPress={() => setCalendarDraftDate(getTomorrowDate())}
+                            activeOpacity={0.85}
+                          >
+                            <Text
+                              style={[
+                                styles.calendarQuickPillText,
+                                isSameCalendarDay(calendarDraftDate, getTomorrowDate()) &&
+                                  styles.calendarQuickPillTextActive,
+                              ]}
+                            >
+                              Tomorrow
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.calendarSelectedDateRow}>
+                          <Ionicons name="calendar-outline" size={17} color={authModalTheme.primary} />
+                          <Text style={styles.calendarSelectedDateText} numberOfLines={2}>
+                            {formatCalendarDraftLabel(calendarDraftDate)}
+                          </Text>
+                        </View>
+
+                        <View style={styles.calendarPickerCard}>
+                          {calendarMarkersLoading ? (
+                            <ActivityIndicator
+                              size="small"
+                              color="#1a1f2e"
+                              style={styles.calendarMarkersLoading}
+                            />
+                          ) : null}
+                          <FeedCalendarMonthGrid
+                            variant="guest"
+                            visibleMonth={calendarVisibleMonth}
+                            selectedDate={calendarDraftDate}
+                            markedDates={calendarMarkedDates}
+                            onSelectDate={(date) => {
+                              setCalendarDraftDate(date);
+                              setCalendarVisibleMonth(
+                                new Date(date.getFullYear(), date.getMonth(), 1),
+                              );
+                            }}
+                            onChangeMonth={(next) => setCalendarVisibleMonth(next)}
+                          />
+                        </View>
+                      </>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.calendarModalSubtitle}>
+                      {calendarModalPostTypeDraft
+                        ? 'Choose a school, then pick a day.'
+                        : 'Choose how you want to filter news by date.'}
+                    </Text>
+                    <View style={styles.calendarGuestPostTypeColumn}>
+                      <TouchableOpacity
+                        style={[
+                          styles.calendarGuestPostTypeBadge,
+                          calendarModalPostTypeDraft === 'event' && styles.calendarGuestPostTypeBadgeActive,
+                        ]}
+                        onPress={() => setCalendarModalPostTypeDraft('event')}
+                        activeOpacity={0.85}
+                      >
+                        <Text
+                          style={[
+                            styles.calendarGuestPostTypeBadgeText,
+                            calendarModalPostTypeDraft === 'event' && styles.calendarGuestPostTypeBadgeTextActive,
+                          ]}
+                        >
+                          Filter via event date
+                        </Text>
+                        <Text
+                          style={[
+                            styles.calendarGuestPostTypeHint,
+                            calendarModalPostTypeDraft === 'event' && styles.calendarGuestPostTypeHintActive,
+                          ]}
+                        >
+                          Uses the event date fields set when the news was posted.
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.calendarGuestPostTypeBadge,
+                          calendarModalPostTypeDraft === 'posted' && styles.calendarGuestPostTypeBadgeActive,
+                        ]}
+                        onPress={() => setCalendarModalPostTypeDraft('posted')}
+                        activeOpacity={0.85}
+                      >
+                        <Text
+                          style={[
+                            styles.calendarGuestPostTypeBadgeText,
+                            calendarModalPostTypeDraft === 'posted' && styles.calendarGuestPostTypeBadgeTextActive,
+                          ]}
+                        >
+                          Filter via posted date
+                        </Text>
+                        <Text
+                          style={[
+                            styles.calendarGuestPostTypeHint,
+                            calendarModalPostTypeDraft === 'posted' && styles.calendarGuestPostTypeHintActive,
+                          ]}
+                        >
+                          Shows news that was posted on the selected day.
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {calendarModalPostTypeDraft ? (
+                      <>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setCalendarModalPostTypeDraft(null);
+                            setCalendarSchoolPickerOpen(false);
+                          }}
+                          style={styles.calendarChangeDateLink}
+                          activeOpacity={0.85}
+                        >
+                          <Ionicons name="arrow-back" size={16} color={authModalTheme.primary} />
+                          <Text style={styles.calendarChangeDateLinkText}>Change filter type</Text>
+                        </TouchableOpacity>
+
+                        <Text style={styles.calendarModalSchoolLabel}>School</Text>
+                        <TouchableOpacity
+                          style={[
+                            styles.calendarModalSchoolBtn,
+                            calendarModalSchoolDraft ? styles.calendarModalSchoolBtnActive : null,
+                          ]}
+                          onPress={() => setCalendarSchoolPickerOpen((open) => !open)}
+                          activeOpacity={0.85}
+                        >
+                          <BuildingIcon width={16} height={16} fill="#14532D" />
+                          <Text style={styles.calendarModalSchoolBtnText} numberOfLines={1}>
+                            {calendarModalSchoolName ?? 'Select school'}
+                          </Text>
+                          <Ionicons
+                            name={calendarSchoolPickerOpen ? 'chevron-up' : 'chevron-down'}
+                            size={16}
+                            color="#6c757d"
+                          />
+                        </TouchableOpacity>
+                        {calendarSchoolPickerOpen ? (
+                          guestSchoolsLoading ? (
+                            <ActivityIndicator size="small" color="#1a1f2e" style={styles.calendarSchoolLoading} />
+                          ) : (
+                            <View style={styles.calendarSchoolListCard}>
+                              {guestSchools.map((s) => {
+                                const selected = calendarModalSchoolDraft === s.id;
+                                return (
+                                  <TouchableOpacity
+                                    key={s.id}
+                                    style={[
+                                      styles.calendarSchoolRow,
+                                      selected && styles.calendarSchoolRowSelected,
+                                    ]}
+                                    onPress={() => {
+                                      setCalendarModalSchoolDraft(s.id);
+                                      setCalendarSchoolPickerOpen(false);
+                                    }}
+                                    activeOpacity={0.85}
+                                  >
+                                    {s.image ? (
+                                      <Image source={{ uri: imageSrc(s.image) }} style={styles.schoolPickerLogo} />
+                                    ) : (
+                                      <View style={styles.schoolPickerLogoPlaceholder}>
+                                        <Text style={styles.schoolPickerLogoLetter}>
+                                          {s.name?.charAt(0) ?? '?'}
+                                        </Text>
+                                      </View>
+                                    )}
+                                    <Text style={styles.schoolPickerName} numberOfLines={2}>
+                                      {s.name}
+                                    </Text>
+                                    {selected ? (
+                                      <Ionicons name="checkmark-circle" size={20} color={authModalTheme.successDark} />
+                                    ) : (
+                                      <Ionicons name="chevron-forward" size={18} color="#adb5bd" />
+                                    )}
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </View>
+                          )
+                        ) : null}
+
+                        <View style={styles.calendarQuickPickRow}>
+                          <TouchableOpacity
+                            style={[
+                              styles.calendarQuickPill,
+                              isSameCalendarDay(calendarDraftDate, new Date()) && styles.calendarQuickPillActive,
+                            ]}
+                            onPress={() => setCalendarDraftDate(new Date())}
+                            activeOpacity={0.85}
+                          >
+                            <Text
+                              style={[
+                                styles.calendarQuickPillText,
+                                isSameCalendarDay(calendarDraftDate, new Date()) && styles.calendarQuickPillTextActive,
+                              ]}
+                            >
+                              Today
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[
+                              styles.calendarQuickPill,
+                              isSameCalendarDay(calendarDraftDate, getTomorrowDate()) &&
+                                styles.calendarQuickPillActive,
+                            ]}
+                            onPress={() => setCalendarDraftDate(getTomorrowDate())}
+                            activeOpacity={0.85}
+                          >
+                            <Text
+                              style={[
+                                styles.calendarQuickPillText,
+                                isSameCalendarDay(calendarDraftDate, getTomorrowDate()) &&
+                                  styles.calendarQuickPillTextActive,
+                              ]}
+                            >
+                              Tomorrow
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.calendarSelectedDateRow}>
+                          <Ionicons name="calendar-outline" size={17} color={authModalTheme.primary} />
+                          <Text style={styles.calendarSelectedDateText} numberOfLines={2}>
+                            {formatCalendarDraftLabel(calendarDraftDate)}
+                          </Text>
+                        </View>
+
+                        <View style={styles.calendarPickerCard}>
+                          {calendarMarkersLoading ? (
+                            <ActivityIndicator
+                              size="small"
+                              color="#1a1f2e"
+                              style={styles.calendarMarkersLoading}
+                            />
+                          ) : null}
+                          {!calendarModalSchoolDraft ? (
+                            <Text style={styles.calendarMarkersHint}>
+                              Select a school to highlight days with news on the calendar.
+                            </Text>
+                          ) : null}
+                          <FeedCalendarMonthGrid
+                            variant="loggedIn"
+                            visibleMonth={calendarVisibleMonth}
+                            selectedDate={calendarDraftDate}
+                            markedDates={calendarMarkedDates}
+                            onSelectDate={(date) => {
+                              setCalendarDraftDate(date);
+                              setCalendarVisibleMonth(
+                                new Date(date.getFullYear(), date.getMonth(), 1),
+                              );
+                            }}
+                            onChangeMonth={(next) => setCalendarVisibleMonth(next)}
+                          />
+                        </View>
+                      </>
+                    ) : null}
+                  </>
+                )}
+              </ScrollView>
+
+              {!user && !calendarGuestAppliedMessage && calendarModalPostTypeDraft ? (
+                <View style={styles.calendarModalFooter}>
+                  <TouchableOpacity
+                    style={styles.calendarApplyFilterBtn}
+                    onPress={applyGuestCalendarFilter}
+                    activeOpacity={0.88}
+                  >
+                    <Text style={styles.calendarApplyFilterBtnText}>Apply filter</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : user && calendarModalPostTypeDraft && calendarModalSchoolDraft ? (
+                <View style={styles.calendarModalFooter}>
+                  <TouchableOpacity
+                    style={styles.calendarApplyFilterBtn}
+                    onPress={applyLoggedInCalendarFilter}
+                    activeOpacity={0.88}
+                  >
+                    <Text style={styles.calendarApplyFilterBtnText}>Apply filter</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
             </Pressable>
           </Pressable>
         </Modal>
@@ -1991,23 +2597,37 @@ export default function EventsScreen() {
               {(expandedCategory.subcategories ?? []).length === 0 ? (
                 <Text style={styles.subCatDropdownEmpty}>No subcategories</Text>
               ) : (
-                <ScrollView style={styles.subCatDropdownScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                  {(expandedCategory.subcategories ?? []).map((sub) => {
-                    const checked = selectedSubCategoryIds.includes(sub.id);
-                    return (
-                      <TouchableOpacity
-                        key={sub.id}
-                        style={styles.subCatDropdownRow}
-                        onPress={() => toggleSubCategory(sub.id)}
-                        activeOpacity={0.7}
-                      >
-                        <View style={[styles.checkbox, checked && styles.checkboxOn]}>
-                          {checked ? <Text style={styles.checkboxTick}>✓</Text> : null}
-                        </View>
-                        <Text style={styles.subCatDropdownRowText}>{sub.name}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+                <ScrollView
+                  style={styles.subCatDropdownScroll}
+                  contentContainerStyle={styles.subCatDropdownScrollContent}
+                  nestedScrollEnabled
+                  keyboardShouldPersistTaps="handled"
+                >
+                  <View style={styles.subCatDropdownPillRow}>
+                    {(expandedCategory.subcategories ?? []).map((sub) => {
+                      const checked = selectedSubCategoryIds.includes(sub.id);
+                      return (
+                        <TouchableOpacity
+                          key={sub.id}
+                          style={[
+                            styles.subCatDropdownPill,
+                            checked ? styles.subCatDropdownPillOn : styles.subCatDropdownPillOff,
+                          ]}
+                          onPress={() => toggleSubCategory(sub.id)}
+                          activeOpacity={0.85}
+                        >
+                          <Text
+                            style={[
+                              styles.subCatDropdownPillText,
+                              checked && styles.subCatDropdownPillTextOn,
+                            ]}
+                          >
+                            {sub.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                 </ScrollView>
               )}
             </Pressable>
@@ -2015,91 +2635,17 @@ export default function EventsScreen() {
         </Modal>
       ) : null}
 
-      {/* First login — unmount Modal when dismissed (visible={false} alone can leave a ghost window on iPad that blocks the tab bar until cold start). */}
       {showFirstLoginCategories && !!user?.schoolId && prefsLoaded ? (
-        <Modal
+        <FirstLoginCategoriesModal
           visible
-          animationType="fade"
-          transparent
-          presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
-          onRequestClose={() => {
-            if (!categoryModalSaving) saveCategorySelectionMobile(true);
-          }}
-        >
-          <Pressable
-            style={styles.categorySelectOverlay}
-            onPress={() => {
-              if (!categoryModalSaving) saveCategorySelectionMobile(true);
-            }}
-          >
-            <Pressable style={styles.categorySelectCard} onPress={(e) => e.stopPropagation()}>
-              <Text style={styles.categorySelectTitle} accessibilityRole="header">
-                Select your categories
-              </Text>
-              <Text style={styles.categorySelectDesc}>
-                Choose the categories and subcategories for your school. Your home feed will show news from your selections. You can skip and see all school news, or change this later in Settings.
-              </Text>
-
-              <ScrollView
-                style={styles.categorySelectList}
-                contentContainerStyle={styles.categorySelectListContent}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-              >
-                {categories.length === 0 ? (
-                  <ActivityIndicator color="#1a1f2e" style={{ marginVertical: 18 }} />
-                ) : (
-                  categories.map((cat) => (
-                    <View key={cat.id} style={styles.categorySelectBlock}>
-                      <Text style={styles.categorySelectCatTitle}>{cat.name}</Text>
-                      <View style={styles.categorySelectSubRow}>
-                        {(cat.subcategories ?? []).map((sub) => {
-                          const isSelected = categoryModalSelectedIds.includes(sub.id);
-                          return (
-                            <TouchableOpacity
-                              key={sub.id}
-                              style={[styles.subCatBtn, isSelected ? styles.subCatBtnDark : styles.subCatBtnOutline]}
-                              onPress={() => !categoryModalSaving && toggleCategoryModalSub(sub.id)}
-                              activeOpacity={0.85}
-                              disabled={categoryModalSaving}
-                            >
-                              <Text style={[styles.subCatBtnText, isSelected && styles.subCatBtnTextOnDark]}>
-                                {sub.name}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    </View>
-                  ))
-                )}
-              </ScrollView>
-
-              <View style={styles.categorySelectActions}>
-                <TouchableOpacity
-                  style={[styles.catModalBtnOutline, categoryModalSaving && styles.catModalBtnDisabled]}
-                  onPress={() => saveCategorySelectionMobile(true)}
-                  activeOpacity={0.85}
-                  disabled={categoryModalSaving}
-                >
-                  <Text style={styles.catModalBtnOutlineText}>
-                    {categoryModalSaving ? 'Please wait…' : 'Skip'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.catModalBtnDark, categoryModalSaving && styles.catModalBtnDisabled]}
-                  onPress={() => saveCategorySelectionMobile(false)}
-                  activeOpacity={0.85}
-                  disabled={categoryModalSaving}
-                >
-                  <Text style={styles.catModalBtnDarkText}>
-                    {categoryModalSaving ? 'Saving…' : 'Next'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </Pressable>
-          </Pressable>
-        </Modal>
+          categories={categories}
+          categoriesLoading={categoriesLoading}
+          selectedSubCategoryIds={categoryModalSelectedIds}
+          saving={categoryModalSaving}
+          onToggleSubCategory={toggleCategoryModalSub}
+          onSkip={() => saveCategorySelectionMobile(true)}
+          onNext={() => saveCategorySelectionMobile(false)}
+        />
       ) : null}
 
     </SafeAreaView>
@@ -2109,83 +2655,43 @@ export default function EventsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f7fb',
+    backgroundColor: 'transparent',
     position: 'relative',
   },
   guestHomeHeader: {
-    backgroundColor: '#fff',
-    marginBottom: 8,
+    backgroundColor: 'transparent',
+    marginBottom: 2,
   },
   guestHomeFilterRow: {
     borderBottomWidth: 0,
-  },
-  guestLoginBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    marginHorizontal: 4,
-    marginTop: 4,
-    marginBottom: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#fff8e6',
-    borderWidth: 1,
-    borderColor: '#ffe8a3',
-  },
-  guestLoginBannerIcon: {
-    marginTop: 2,
-    flexShrink: 0,
-  },
-  guestLoginBannerText: {
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 19,
-    color: '#664d03',
-  },
-  guestLoginBannerAction: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#664d03',
-    flexShrink: 0,
-  },
-  guestSchoolFilterBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginHorizontal: 4,
-    marginBottom: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.08)',
+    paddingTop: 2,
+    paddingBottom: 4,
   },
   guestSchoolSelectBtn: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    alignSelf: 'center',
+    flexShrink: 1,
+    gap: 6,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#343a40',
+    borderColor: '#A7D9B4',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#fff',
+    backgroundColor: '#DDFBE2',
   },
   guestSchoolSelectBtnActive: {
-    backgroundColor: '#212529',
-    borderColor: '#212529',
+    backgroundColor: '#C6F6D5',
+    borderColor: '#86D9A0',
   },
   guestSchoolSelectBtnText: {
-    flex: 1,
+    flexShrink: 0,
     fontSize: 14,
     fontWeight: '500',
-    color: '#212529',
+    color: '#166534',
   },
   guestSchoolSelectBtnTextActive: {
-    color: '#fff',
+    color: '#14532D',
     fontWeight: '600',
   },
   calendarSchoolHint: {
@@ -2281,24 +2787,42 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 6,
   },
+  homeStickyHeader: {
+    flexShrink: 0,
+    zIndex: 30,
+    backgroundColor: 'transparent',
+  },
+  loggedInHomeFilterRow: {
+    paddingTop: 10,
+  },
   homeFilterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    gap: 8,
+    backgroundColor: 'transparent',
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#eee',
-    paddingRight: 8,
-    paddingLeft: 4,
+    borderBottomColor: 'rgba(0,0,0,0.06)',
+    paddingRight: 10,
+    paddingLeft: 10,
+    paddingVertical: 6,
     zIndex: 20,
+  },
+  homeFilterRowSpacer: {
+    flex: 1,
+    minWidth: 8,
   },
   homeFilterActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'center',
     flexShrink: 0,
+    gap: 2,
   },
   filterFunnelWrap: {
     position: 'relative',
     zIndex: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sortDropdownScroll: {
     position: 'absolute',
@@ -2329,17 +2853,95 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#eee',
   },
+  guestDateFilterBlock: {
+    paddingBottom: 4,
+  },
+  guestDateFilterSignInHint: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#6c757d',
+    paddingHorizontal: 14,
+    paddingBottom: 6,
+  },
+  feedWithFilterColumn: {
+    flex: 1,
+    minHeight: 0,
+  },
+  schoolFilterAboveFeed: {
+    paddingHorizontal: 12,
+    paddingTop: 6,
+    paddingBottom: 4,
+    gap: 4,
+  },
+  schoolFilterAboveFeedGuestHeader: {
+    paddingTop: 6,
+    paddingBottom: 2,
+    marginTop: -2,
+  },
+  schoolFilterBrowseContext: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748b',
+    marginLeft: 4,
+  },
+  schoolFilterBadgeLogo: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#eef1f6',
+  },
+  schoolFilterClearBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 8,
+    maxWidth: '100%',
+    backgroundColor: '#d1e7dd',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#86D9A0',
+    paddingVertical: 8,
+    paddingLeft: 12,
+    paddingRight: 10,
+  },
+  schoolFilterClearBadgeLabel: {
+    flexShrink: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#14532D',
+  },
+  schoolFilterClearBadgeClose: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(15, 81, 50, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  schoolFilterClearBadgeCloseText: {
+    fontSize: 16,
+    lineHeight: 18,
+    fontWeight: '600',
+    color: '#0f5132',
+    marginTop: -1,
+  },
+  schoolFilterAboveFeedHint: {
+    fontSize: 12,
+    color: '#6c757d',
+    paddingLeft: 2,
+  },
   activeDateFilterText: {
     flex: 1,
     fontSize: 12,
     color: '#6c757d',
   },
   homeFilterBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    alignSelf: 'center',
     backgroundColor: 'transparent',
   },
   homeFilterBtnActive: {
@@ -2671,26 +3273,43 @@ const styles = StyleSheet.create({
   subCatDropdownScroll: {
     maxHeight: 360,
   },
+  subCatDropdownScrollContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
   subCatDropdownEmpty: {
     fontSize: 13,
     color: '#0f2b52',
     paddingHorizontal: 18,
     paddingVertical: 12,
   },
-  subCatDropdownRow: {
+  subCatDropdownPillRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 11,
-    paddingHorizontal: 18,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(176,190,215,0.42)',
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  subCatDropdownRowText: {
-    fontSize: 15,
-    color: '#0b1f3f',
-    flex: 1,
-    fontWeight: '600',
+  subCatDropdownPill: {
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  subCatDropdownPillOff: {
+    borderColor: '#cfe2ff',
+    backgroundColor: '#f4f8fc',
+  },
+  subCatDropdownPillOn: {
+    borderColor: '#86D9A0',
+    backgroundColor: '#DDFBE2',
+  },
+  subCatDropdownPillText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#475569',
+  },
+  subCatDropdownPillTextOn: {
+    fontWeight: '700',
+    color: '#0f5132',
   },
   checkbox: {
     width: 18,
@@ -2821,23 +3440,45 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#000',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'transparent',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0,0,0,0.06)',
     position: 'relative',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 8,
   },
   tab: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    alignSelf: 'stretch',
+  },
+  tabPill: {
+    flex: 1,
+    width: '100%',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    minHeight: 44,
   },
-  tabActive: {},
+  tabPillOutlineDark: {
+    backgroundColor: 'rgba(255, 255, 255, 0.42)',
+  },
+  tabPillMySchoolActive: {
+    backgroundColor: authModalTheme.successLight,
+  },
+  tabPillExternalActive: {
+    backgroundColor: authModalTheme.primaryLight,
+  },
   tabContent: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  tabSchoolLogoWrap: {
+    backgroundColor: '#fff',
   },
   tabSchoolLogo: {
     width: 20,
@@ -2865,6 +3506,19 @@ const styles = StyleSheet.create({
   tabTextActive: {
     color: '#fff',
   },
+  tabTextMySchoolActive: {
+    color: authModalTheme.successDark,
+    fontWeight: '700',
+  },
+  tabTextExternalActive: {
+    color: authModalTheme.primaryDark,
+    fontWeight: '700',
+  },
+  tabTextOutlineDark: {
+    color: '#1a1f2e',
+    fontWeight: '600',
+    opacity: 0.88,
+  },
   tabTextInactive: {
     color: '#8e8e8e',
   },
@@ -2877,13 +3531,14 @@ const styles = StyleSheet.create({
   },
   categoriesStrip: {
     minHeight: 50,
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
     flex: 1,
     minWidth: 0,
   },
   categoriesStripContent: {
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingTop: 6,
+    paddingBottom: 4,
     gap: 8,
     flexDirection: 'row',
     alignItems: 'center',
@@ -2941,13 +3596,291 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
-  calendarModalBox: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
+  calendarModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  calendarModalSheet: {
     width: '100%',
-    maxWidth: 360,
-    maxHeight: '80%',
+    maxWidth: 380,
+    maxHeight: '88%',
+    flexDirection: 'column',
+    backgroundColor: authModalTheme.loginPanelBg,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.15,
+    shadowRadius: 28,
+    elevation: 12,
+  },
+  calendarModalScroll: {
+    flexShrink: 1,
+  },
+  calendarModalScrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+  },
+  calendarModalSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#6c757d',
+    marginBottom: 14,
+  },
+  calendarQuickPickRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  calendarQuickPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: authModalTheme.pillRadius,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    backgroundColor: '#fff',
+  },
+  calendarQuickPillActive: {
+    backgroundColor: authModalTheme.primaryLight,
+    borderColor: authModalTheme.primary,
+  },
+  calendarQuickPillText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#495057',
+  },
+  calendarQuickPillTextActive: {
+    color: authModalTheme.primaryDark,
+    fontWeight: '600',
+  },
+  calendarSelectedDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: authModalTheme.primaryLight,
+    borderWidth: 1,
+    borderColor: 'rgba(52, 104, 249, 0.35)',
+  },
+  calendarSelectedDateText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: authModalTheme.primaryDark,
+  },
+  calendarPickerCard: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#e8ecf0',
+    overflow: 'hidden',
+  },
+  calendarPickerIosHost: {
+    height: 328,
+    justifyContent: 'center',
+  },
+  calendarAndroidDateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    gap: 8,
+  },
+  calendarAndroidDateBtnLabel: {
+    fontSize: 12,
+    color: '#6c757d',
+    flex: 1,
+  },
+  calendarAndroidDateBtnValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1a1f2e',
+  },
+  calendarModalFooter: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 18,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(0, 0, 0, 0.08)',
+    backgroundColor: authModalTheme.loginPanelBg,
+  },
+  calendarNextBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: authModalTheme.primaryLight,
+    borderWidth: 1,
+    borderColor: authModalTheme.primary,
+    borderRadius: authModalTheme.pillRadius,
+    paddingVertical: 14,
+  },
+  calendarNextBtnText: {
+    color: authModalTheme.primaryDark,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  calendarGuestPostTypeColumn: {
+    gap: 10,
+    marginBottom: 14,
+  },
+  calendarGuestPostTypeBadge: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#212529',
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  calendarGuestPostTypeBadgeActive: {
+    backgroundColor: '#212529',
+    borderColor: '#212529',
+  },
+  calendarGuestPostTypeBadgeText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#212529',
+    marginBottom: 4,
+  },
+  calendarGuestPostTypeBadgeTextActive: {
+    color: '#fff',
+  },
+  calendarGuestPostTypeHint: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#6c757d',
+  },
+  calendarGuestPostTypeHintActive: {
+    color: 'rgba(255, 255, 255, 0.82)',
+  },
+  calendarApplyFilterBtn: {
+    backgroundColor: '#212529',
+    borderRadius: authModalTheme.pillRadius,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  calendarApplyFilterBtnDisabled: {
+    opacity: 0.45,
+  },
+  calendarApplyFilterBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  calendarGuestAppliedBlock: {
+    gap: 14,
+    paddingBottom: 8,
+  },
+  calendarGuestAppliedLead: {
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '600',
+    color: '#1a1f2e',
+  },
+  calendarGuestAppliedHint: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#6c757d',
+  },
+  calendarSchoolStepDateChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: authModalTheme.primaryLight,
+    borderWidth: 1,
+    borderColor: 'rgba(52, 104, 249, 0.35)',
+    marginBottom: 10,
+  },
+  calendarSchoolStepDateText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: authModalTheme.primaryDark,
+  },
+  calendarChangeDateLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+    paddingVertical: 4,
+  },
+  calendarChangeDateLinkText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: authModalTheme.primary,
+  },
+  calendarSchoolLoading: {
+    marginVertical: 28,
+  },
+  calendarSchoolListCard: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#e8ecf0',
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  calendarSchoolRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    gap: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#eee',
+  },
+  calendarSchoolRowSelected: {
+    backgroundColor: authModalTheme.successLight,
+  },
+  calendarModalSchoolLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1a1f2e',
+    marginBottom: 6,
+    marginTop: 4,
+  },
+  calendarModalSchoolBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+    backgroundColor: '#fff',
+  },
+  calendarModalSchoolBtnActive: {
+    borderColor: authModalTheme.successDark,
+    backgroundColor: authModalTheme.successLight,
+  },
+  calendarModalSchoolBtnText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a1f2e',
+  },
+  calendarMarkersLoading: {
+    marginVertical: 12,
+  },
+  calendarMarkersHint: {
+    fontSize: 12,
+    color: '#6c757d',
+    textAlign: 'center',
+    marginBottom: 8,
+    paddingHorizontal: 8,
   },
   categoryFilterModalBox: {
     backgroundColor: '#fff',
@@ -3043,17 +3976,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 10,
   },
   calendarModalTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     color: '#1a1f2e',
-  },
-  calendarModalClose: {
-    fontSize: 28,
-    color: '#6c757d',
-    padding: 4,
   },
   calendarQuickBtn: {
     paddingVertical: 12,
@@ -3306,7 +4236,7 @@ const styles = StyleSheet.create({
   },
   inshortsFeedHost: {
     flex: 1,
-    backgroundColor: '#f5f7fb',
+    backgroundColor: 'transparent',
     borderRadius: 12,
     overflow: 'hidden',
   },
@@ -3467,117 +4397,5 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 120,
     backgroundColor: '#e9ecef',
-  },
-  categorySelectOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.72)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  categorySelectCard: {
-    width: '100%',
-    maxWidth: 520,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    maxHeight: '85%',
-    borderWidth: 1,
-    borderColor: '#eee',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
-    elevation: 8,
-  },
-  categorySelectList: {
-    marginTop: 4,
-    flexGrow: 0,
-    maxHeight: 420,
-  },
-  categorySelectListContent: {
-    paddingBottom: 6,
-  },
-  categorySelectTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1a1f2e',
-    marginBottom: 8,
-  },
-  categorySelectDesc: {
-    fontSize: 14,
-    color: '#6c757d',
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  categorySelectBlock: {
-    marginBottom: 14,
-  },
-  categorySelectCatTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#212529',
-    marginBottom: 8,
-  },
-  categorySelectSubRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  subCatBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  subCatBtnOutline: {
-    borderColor: '#212529',
-    backgroundColor: 'transparent',
-  },
-  subCatBtnDark: {
-    borderColor: '#212529',
-    backgroundColor: '#212529',
-  },
-  subCatBtnText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#212529',
-  },
-  subCatBtnTextOnDark: {
-    color: '#fff',
-  },
-  categorySelectActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 10,
-    marginTop: 20,
-    flexWrap: 'wrap',
-  },
-  catModalBtnOutline: {
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#212529',
-    backgroundColor: '#fff',
-  },
-  catModalBtnOutlineText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#212529',
-  },
-  catModalBtnDark: {
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 10,
-    backgroundColor: '#212529',
-  },
-  catModalBtnDarkText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  catModalBtnDisabled: {
-    opacity: 0.7,
   },
 });

@@ -109,7 +109,7 @@ export default function BlogDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   errorText: { color: '#b42318', textAlign: 'center' },
   scroll: { padding: 20, paddingBottom: 40 },

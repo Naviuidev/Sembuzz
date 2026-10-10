@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, DeviceEventEmitter, Platform, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, DeviceEventEmitter, TextInput, View } from 'react-native';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, CommonActions } from '@react-navigation/native';
-import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Image, Pressable, StyleSheet, Text, TextInput, useWindowDimensions } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StyleSheet, Text } from 'react-native';
 import { useFonts, Poppins_400Regular, Poppins_600SemiBold } from '@expo-google-fonts/poppins';
 import * as Notifications from 'expo-notifications';
 import { AuthProvider } from './src/contexts/AuthContext';
@@ -11,15 +12,12 @@ import AppNavigator from './src/navigation/AppNavigator';
 import type { MainTabParamList } from './src/navigation/types';
 import { useRegisterPushToken } from './src/hooks/useRegisterPushToken';
 import { NATIVE_UI_TOUCH_RECOVERY } from './src/constants/appEvents';
+import { WelcomeScreen } from './src/screens/WelcomeScreen';
+import { appNavigationTheme } from './src/styles/appTheme';
 
-/**
- * Background illustration ONLY (no phone chrome, no mockup UI).
- * Replace `mobile/assets/onboarding-bg.webp` with your exported art — tagline/body stay in <Text> below.
- */
-const ONBOARDING_BG = require('./assets/onboarding-bg.webp');
-
-/** Opaque warm peach — must not use alpha or Android tints body text and shows seams. */
-const ONBOARDING_BG_SOLID = '#F2D4A2';
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* Splash may already be hidden in dev reloads. */
+});
 
 function PushNotificationBootstrap() {
   /** Force a subtree re-render after the system notification sheet dismisses (mitigates iPad stuck touches). */
@@ -37,54 +35,27 @@ function PushNotificationBootstrap() {
   return null;
 }
 
-function StartScreen({ onStart }: { onStart: () => void }) {
-  const insets = useSafeAreaInsets();
-  const { height: screenH } = useWindowDimensions();
-  const isAndroid = Platform.OS === 'android';
-  const heroHeight = Math.round(screenH * (isAndroid ? 0.44 : 0.48));
-
-  return (
-    <SafeAreaView style={styles.startRoot} edges={['top', 'bottom']}>
-      <StatusBar style="dark" backgroundColor={ONBOARDING_BG_SOLID} />
-
-      <View style={[styles.heroContainer, { height: heroHeight }]}>
-        <Image source={ONBOARDING_BG} style={styles.heroImage} resizeMode="cover" />
-        <View style={styles.heroBottomFade} pointerEvents="none" />
-      </View>
-
-      <View style={styles.startContent}>
-        <View style={styles.startTextBlock}>
-          <Text style={styles.startTagline}>
-            Welcome{'\n'}to Your Campus
-          </Text>
-          <Text style={[styles.startPara, isAndroid && styles.startParaAndroid]}>
-            Explore everything happening on campus — events, updates, and opportunities — all in one place.
-          </Text>
-        </View>
-
-        <View style={[styles.startButtonWrap, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-          <Pressable
-            style={({ pressed }) => [styles.startButton, pressed && styles.startButtonPressed]}
-            onPress={onStart}
-            accessibilityRole="button"
-            accessibilityLabel="Start"
-          >
-            <Text style={styles.startButtonText}>Start</Text>
-          </Pressable>
-        </View>
-      </View>
-    </SafeAreaView>
-  );
-}
-
 export default function App() {
   const navRef = useRef<any>(null);
   const [showStartScreen, setShowStartScreen] = useState(true);
+  const [welcomeFollowUp, setWelcomeFollowUp] = useState<'login' | 'signup' | null>(null);
 
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
     Poppins_600SemiBold,
   });
+
+  const onWelcomeLayoutReady = useCallback(() => {
+    if (fontsLoaded) {
+      void SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
+
+  useEffect(() => {
+    if (fontsLoaded && !showStartScreen) {
+      void SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, showStartScreen]);
 
   useEffect(() => {
     const TextAny = Text as typeof Text & { defaultProps?: Record<string, unknown> };
@@ -112,6 +83,37 @@ export default function App() {
       }),
     );
   };
+
+  useEffect(() => {
+    if (showStartScreen || !welcomeFollowUp) return;
+
+    const timer = setTimeout(() => {
+      if (welcomeFollowUp === 'login') {
+        navRef.current?.dispatch(
+          CommonActions.navigate({
+            name: 'MainTabs',
+            params: {
+              screen: 'Settings',
+              params: { screen: 'SettingsMain', params: { openLogin: true } },
+            },
+          }),
+        );
+      } else if (welcomeFollowUp === 'signup') {
+        navRef.current?.dispatch(
+          CommonActions.navigate({
+            name: 'MainTabs',
+            params: {
+              screen: 'Settings',
+              params: { screen: 'SettingsMain', params: { openSignUp: true } },
+            },
+          }),
+        );
+      }
+      setWelcomeFollowUp(null);
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [showStartScreen, welcomeFollowUp]);
 
   useEffect(() => {
     const openFromPush = (response: Notifications.NotificationResponse | null) => {
@@ -142,7 +144,7 @@ export default function App() {
   if (!fontsLoaded) {
     return (
       <View style={styles.fontLoading}>
-        <ActivityIndicator size="large" color="#1a1f2e" />
+        <ActivityIndicator size="large" color="#F9FAFB" />
       </View>
     );
   }
@@ -151,11 +153,22 @@ export default function App() {
     <SafeAreaProvider>
       <AuthProvider>
         {showStartScreen ? (
-          <StartScreen onStart={() => setShowStartScreen(false)} />
+          <WelcomeScreen
+            onLayoutReady={onWelcomeLayoutReady}
+            onLogin={() => {
+              setWelcomeFollowUp('login');
+              setShowStartScreen(false);
+            }}
+            onSignUp={() => {
+              setWelcomeFollowUp('signup');
+              setShowStartScreen(false);
+            }}
+            onContinueAsGuest={() => setShowStartScreen(false)}
+          />
         ) : (
           <>
             <PushNotificationBootstrap />
-            <NavigationContainer ref={navRef}>
+            <NavigationContainer ref={navRef} theme={appNavigationTheme}>
               <StatusBar style="auto" />
               <AppNavigator onNavigate={handleNavigate} />
             </NavigationContainer>
@@ -169,89 +182,8 @@ export default function App() {
 const styles = StyleSheet.create({
   fontLoading: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#1F2937',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  startRoot: {
-    flex: 1,
-    backgroundColor: ONBOARDING_BG_SOLID,
-  },
-  heroContainer: {
-    width: '100%',
-    overflow: 'hidden',
-    backgroundColor: ONBOARDING_BG_SOLID,
-  },
-  heroImage: {
-    width: '100%',
-    height: '100%',
-  },
-  heroBottomFade: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 48,
-    backgroundColor: ONBOARDING_BG_SOLID,
-    opacity: 0.85,
-  },
-  startContent: {
-    flex: 1,
-    backgroundColor: ONBOARDING_BG_SOLID,
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    justifyContent: 'space-between',
-  },
-  startTextBlock: {
-    alignItems: 'center',
-    paddingTop: 4,
-  },
-  startTagline: {
-    fontSize: 32,
-    fontFamily: 'Poppins_600SemiBold',
-    color: '#111827',
-    textAlign: 'center',
-    lineHeight: 40,
-    marginBottom: 16,
-    paddingHorizontal: 4,
-    ...(Platform.OS === 'android' ? { includeFontPadding: false } : {}),
-  },
-  startPara: {
-    fontSize: 17,
-    fontFamily: 'Poppins_400Regular',
-    color: '#1f2937',
-    textAlign: 'center',
-    lineHeight: 26,
-    maxWidth: 340,
-    ...(Platform.OS === 'android' ? { includeFontPadding: false } : {}),
-  },
-  startParaAndroid: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#374151',
-  },
-  startButtonWrap: {
-    alignItems: 'center',
-    width: '100%',
-    paddingTop: 16,
-  },
-  startButton: {
-    minWidth: 220,
-    paddingVertical: 16,
-    paddingHorizontal: 48,
-    borderRadius: 999,
-    backgroundColor: '#111827',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  startButtonPressed: {
-    opacity: 0.88,
-  },
-  startButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontFamily: 'Poppins_600SemiBold',
-    letterSpacing: 0.5,
-    ...(Platform.OS === 'android' ? { includeFontPadding: false } : {}),
   },
 });

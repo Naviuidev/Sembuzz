@@ -16,6 +16,8 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 
+import { SignUpModalGradient } from './auth/SignUpModalGradient';
+import { authModalTheme } from '../styles/authModalTheme';
 import {
   getSchools,
   registerUser,
@@ -307,7 +309,11 @@ export default function SignUpModal({ visible, onClose, onCompleteGoToLogin }: P
         keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0}
       >
         <Pressable style={styles.overlayPress} onPress={onClose}>
-          <Pressable style={styles.box} onPress={(e) => e.stopPropagation()}>
+          <Pressable
+            style={[styles.box, step !== 'method' && styles.boxPlain]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            {step === 'method' ? <SignUpModalGradient /> : null}
             <View style={styles.headerRow}>
               {(step === 'form' || step === 'otp' || step === 'pending') && (
                 <TouchableOpacity onPress={goBack} hitSlop={12}>
@@ -581,7 +587,7 @@ const styles = StyleSheet.create({
   },
   overlayPress: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: authModalTheme.overlay,
     justifyContent: 'center',
     padding: 16,
     paddingBottom: 48,
@@ -590,15 +596,20 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 420,
     alignSelf: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: authModalTheme.successLight,
     borderRadius: 16,
     padding: 20,
     maxHeight: '90%',
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
     shadowRadius: 24,
     elevation: 8,
+  },
+  boxPlain: {
+    backgroundColor: '#fff',
+    overflow: 'visible',
   },
   headerRow: {
     flexDirection: 'row',
@@ -666,17 +677,18 @@ const styles = StyleSheet.create({
     color: '#1a1f2e',
   },
   optionPrimary: {
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#212529',
-    borderRadius: 12,
+    borderColor: authModalTheme.successDark,
+    borderRadius: 14,
     padding: 16,
     marginBottom: 12,
   },
   optionOutline: {
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#212529',
-    borderRadius: 12,
+    borderColor: authModalTheme.primary,
+    borderRadius: 14,
     padding: 16,
     marginBottom: 8,
   },

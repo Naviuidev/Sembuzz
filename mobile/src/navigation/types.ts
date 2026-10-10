@@ -8,7 +8,10 @@ export type SettingsStackParamList = {
 
 export type MainTabParamList = {
   Search: undefined;
-  Events: { focusEventId?: string } | undefined;
+  Events: {
+    focusEventId?: string;
+    homeFeedMode?: 'allSchools';
+  };
   Settings: NavigatorScreenParams<SettingsStackParamList> | undefined;
   Apps: undefined;
   Chat: undefined;

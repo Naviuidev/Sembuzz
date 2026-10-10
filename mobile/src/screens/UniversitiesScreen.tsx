@@ -192,7 +192,7 @@ export default function UniversitiesScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fafafa' },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   header: { paddingHorizontal: 16, paddingBottom: 12 },
   titleRow: {
     flexDirection: 'row',

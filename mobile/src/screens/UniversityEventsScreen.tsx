@@ -225,7 +225,7 @@ export default function UniversityEventsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fafafa' },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   header: { paddingHorizontal: 16, paddingBottom: 8 },
   uniMeta: { fontSize: 13, color: TEXT_MUTED, marginBottom: 10 },
   searchWrap: {

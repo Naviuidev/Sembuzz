@@ -24,6 +24,8 @@ import {
 } from '../utils/userCategoryPrefs';
 import { userNotificationsService } from '../services/userNotifications';
 import { CATEGORY_PREFS_CHANGED } from '../constants/appEvents';
+import { categoryPillTheme } from '../styles/categoryPillTheme';
+import { authModalTheme } from '../styles/authModalTheme';
 
 export default function ChangeCategoriesScreen() {
   const insets = useSafeAreaInsets();
@@ -99,7 +101,7 @@ export default function ChangeCategoriesScreen() {
       DeviceEventEmitter.emit(CATEGORY_PREFS_CHANGED);
       navigation.popToTop();
       const tabNav = navigation.getParent() as BottomTabNavigationProp<MainTabParamList> | undefined;
-      tabNav?.navigate('Events');
+      tabNav?.navigate('Events', {});
     } catch {
       Alert.alert('Error', 'Could not save. Try again.');
     } finally {
@@ -143,17 +145,25 @@ export default function ChangeCategoriesScreen() {
               categories.map((cat) => (
                 <View key={cat.id} style={styles.categoryBlock}>
                   <Text style={styles.categoryBlockTitle}>{cat.name}</Text>
-                  <View style={styles.categorySubRow}>
+                  <View style={categoryPillTheme.subRow}>
                     {(cat.subcategories ?? []).map((sub) => {
                       const isSelected = selectedIds.includes(sub.id);
                       return (
                         <TouchableOpacity
                           key={sub.id}
-                          style={[styles.subCatPill, isSelected ? styles.subCatPillOn : styles.subCatPillOff]}
+                          style={[
+                            categoryPillTheme.subPill,
+                            isSelected ? categoryPillTheme.subPillOn : categoryPillTheme.subPillOff,
+                          ]}
                           onPress={() => toggleSub(sub.id)}
                           activeOpacity={0.85}
                         >
-                          <Text style={[styles.subCatPillText, isSelected && styles.subCatPillTextOn]}>
+                          <Text
+                            style={[
+                              categoryPillTheme.subPillText,
+                              isSelected && categoryPillTheme.subPillTextOn,
+                            ]}
+                          >
                             {sub.name}
                           </Text>
                         </TouchableOpacity>
@@ -197,7 +207,7 @@ export default function ChangeCategoriesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fafafa',
+    backgroundColor: 'transparent',
   },
   flex: {
     flex: 1,
@@ -231,39 +241,15 @@ const styles = StyleSheet.create({
   },
   categoryBlock: {
     marginBottom: 16,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: authModalTheme.loginPanelBg,
   },
   categoryBlockTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: '#212529',
     marginBottom: 8,
-  },
-  categorySubRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  subCatPill: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  subCatPillOff: {
-    borderColor: '#212529',
-    backgroundColor: 'transparent',
-  },
-  subCatPillOn: {
-    borderColor: '#212529',
-    backgroundColor: '#212529',
-  },
-  subCatPillText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#212529',
-  },
-  subCatPillTextOn: {
-    color: '#fff',
   },
   footerBar: {
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -279,9 +265,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   btnOutlineDark: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 999,
+    paddingVertical: 11,
+    paddingHorizontal: 22,
+    borderRadius: authModalTheme.pillRadius,
     borderWidth: 1,
     borderColor: '#212529',
     backgroundColor: '#fff',
@@ -292,9 +278,9 @@ const styles = StyleSheet.create({
     color: '#212529',
   },
   btnDark: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 999,
+    paddingVertical: 11,
+    paddingHorizontal: 22,
+    borderRadius: authModalTheme.pillRadius,
     backgroundColor: '#212529',
   },
   btnDarkText: {

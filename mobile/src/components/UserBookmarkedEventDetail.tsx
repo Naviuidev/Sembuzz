@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Pressable } from 'react-native';
 import type { LikedEventItem, SavedEventItem } from '../services/userEvents';
 import type { ApprovedEventPublic } from '../services/events';
-import { EventPostDetailBody } from './EventPostPublicContent';
+import { FeedStyleEventPostFull } from './FeedStyleEventPostFull';
 
 type BookmarkedEvent = LikedEventItem | SavedEventItem | ApprovedEventPublic;
 
@@ -27,7 +27,7 @@ export function UserBookmarkedEventDetailModal({ visible, event, onClose }: Prop
             </TouchableOpacity>
           </View>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollInner}>
-            <EventPostDetailBody event={event} showHero />
+            <FeedStyleEventPostFull event={event as ApprovedEventPublic} />
           </ScrollView>
         </View>
       </View>
@@ -60,5 +60,5 @@ const styles = StyleSheet.create({
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   backArrow: { fontSize: 20, color: '#1a1f2e' },
   backText: { fontSize: 16, fontWeight: '500', color: '#1a1f2e' },
-  scrollInner: { paddingHorizontal: 16, paddingVertical: 16 },
+  scrollInner: { paddingBottom: 24 },
 });

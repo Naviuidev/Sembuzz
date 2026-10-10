@@ -15,7 +15,8 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MAIN_TAB_BAR_BODY_HEIGHT } from '../navigation/tabBarMetrics';
 import PersonPlusIcon from 'react-native-bootstrap-icons/icons/person-plus';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,12 +25,18 @@ import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainTabParamList, RootStackParamList, SettingsStackParamList } from '../navigation/types';
 import { useAuth } from '../contexts/AuthContext';
-import { getApprovedEvents, imageSrc, ApprovedEventPublic } from '../services/events';
+import {
+  getApprovedEvents,
+  getSchoolExternalEnabled,
+  imageSrc,
+  ApprovedEventPublic,
+} from '../services/events';
 import { getFrontendBaseUrl } from '../config/env';
 import { userHelpService, type UserHelpQueryItem } from '../services/userHelp';
 import { userNotificationsService } from '../services/userNotifications';
 import { useMessagesUnreadCount } from '../hooks/useMessagesUnreadCount';
 import SignUpModal from '../components/SignUpModal';
+import { authModalTheme } from '../styles/authModalTheme';
 import { UserForgotPasswordPanel } from '../components/UserForgotPasswordPanel';
 import Svg, { Circle } from 'react-native-svg';
 import { UserBookmarkedEventDetailModal } from '../components/UserBookmarkedEventDetail';
@@ -60,6 +67,8 @@ function getEventThumbUrl(ev: ApprovedEventPublic): string {
 }
 
 export default function SettingsScreen() {
+  const insets = useSafeAreaInsets();
+  const scrollBottomPad = MAIN_TAB_BAR_BODY_HEIGHT + insets.bottom;
   const navigation = useNavigation<NativeStackNavigationProp<SettingsStackParamList, 'SettingsMain'>>();
   const route = useRoute<RouteProp<SettingsStackParamList, 'SettingsMain'>>();
   const { user, token, login, logout, loading: authLoading, refreshMe } = useAuth();
@@ -99,6 +108,17 @@ export default function SettingsScreen() {
   const [showSignUpModal, setShowSignUpModal] = useState(false);
   const [loginInfoMessage, setLoginInfoMessage] = useState<string | null>(null);
   const [profileImageFailed, setProfileImageFailed] = useState(false);
+  const [schoolExternalEnabled, setSchoolExternalEnabled] = useState(false);
+
+  useEffect(() => {
+    if (!user?.schoolId) {
+      setSchoolExternalEnabled(false);
+      return;
+    }
+    void getSchoolExternalEnabled(user.schoolId)
+      .then(setSchoolExternalEnabled)
+      .catch(() => setSchoolExternalEnabled(false));
+  }, [user?.schoolId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -265,7 +285,18 @@ export default function SettingsScreen() {
     }
   }, [helpMessage, loadHelpQueries]);
 
-  const handleActionPress = useCallback((action: 'categories' | 'messages' | 'liked' | 'notifications' | 'saved' | 'help' | 'blogs' | 'universities') => {
+  const handleActionPress = useCallback((
+    action:
+      | 'categories'
+      | 'messages'
+      | 'liked'
+      | 'notifications'
+      | 'saved'
+      | 'allSchools'
+      | 'help'
+      | 'blogs'
+      | 'universities',
+  ) => {
     if (action === 'categories') {
       if (!user?.schoolId) {
         Alert.alert('School required', 'Your account must be linked to a school to change categories.');
@@ -288,6 +319,10 @@ export default function SettingsScreen() {
     }
     if (action === 'saved') {
       navigateRoot('SavedNews');
+      return;
+    }
+    if (action === 'allSchools') {
+      navigateTab('Events', { homeFeedMode: 'allSchools' });
       return;
     }
     if (action === 'notifications') {
@@ -314,65 +349,90 @@ export default function SettingsScreen() {
     [],
   );
 
-  const settingsActions = useMemo(
-    () => [
+  const settingsActions = useMemo(() => {
+    const items: {
+      key:
+        | 'categories'
+        | 'messages'
+        | 'liked'
+        | 'notifications'
+        | 'saved'
+        | 'allSchools'
+        | 'blogs'
+        | 'universities'
+        | 'help';
+      title: string;
+      subtitle: string;
+      icon: keyof typeof Ionicons.glyphMap;
+      badge?: number;
+    }[] = [
       {
-        key: 'categories' as const,
+        key: 'categories',
         title: 'Change categories',
         subtitle: 'Update your preferred categories and subcategories.',
-        icon: 'folder-outline' as const,
+        icon: 'folder-outline',
       },
       {
-        key: 'messages' as const,
+        key: 'messages',
         title: 'Messages',
         subtitle: 'Chat with classmates and join group conversations.',
-        icon: 'chatbubbles-outline' as const,
+        icon: 'chatbubbles-outline',
         badge: messagesUnreadCount,
       },
       {
-        key: 'liked' as const,
+        key: 'liked',
         title: 'Liked posts',
         subtitle: 'Review news posts you have liked.',
-        icon: 'heart-outline' as const,
+        icon: 'heart-outline',
       },
       {
-        key: 'notifications' as const,
+        key: 'notifications',
         title: 'Notifications',
         subtitle: 'Review updates for your selected categories.',
-        icon: 'notifications-outline' as const,
+        icon: 'notifications-outline',
         badge: unreadCount,
       },
       {
-        key: 'saved' as const,
+        key: 'saved',
         title: 'Bookmarks',
         subtitle: 'Open your saved news collection.',
-        icon: 'bookmark-outline' as const,
+        icon: 'bookmark-outline',
       },
+    ];
+    if (schoolExternalEnabled) {
+      items.push({
+        key: 'allSchools',
+        title: 'All schools',
+        subtitle: 'Browse approved news from every school on Sembuzz.',
+        icon: 'business-outline',
+      });
+    }
+    items.push(
       {
-        key: 'blogs' as const,
+        key: 'blogs',
         title: 'Blogs',
         subtitle: 'Read published blog posts from schools and clubs.',
-        icon: 'newspaper-outline' as const,
+        icon: 'newspaper-outline',
       },
       {
-        key: 'universities' as const,
+        key: 'universities',
         title: 'Universities',
         subtitle: 'Browse events synced from university calendar feeds.',
-        icon: 'school-outline' as const,
+        icon: 'school-outline',
       },
       {
-        key: 'help' as const,
+        key: 'help',
         title: 'Feedback/Query/Ask your School Admin',
         subtitle: 'Send feedback or ask questions directly to your school admin.',
-        icon: 'help-circle-outline' as const,
+        icon: 'help-circle-outline',
       },
-    ],
-    [unreadCount, messagesUnreadCount],
-  );
+    );
+    return items;
+  }, [unreadCount, messagesUnreadCount, schoolExternalEnabled]);
 
   if (authLoading || (token && !user)) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#1a1f2e" />
         </View>
@@ -382,8 +442,8 @@ export default function SettingsScreen() {
 
   if (user) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPad }]}>
           <View style={styles.profileRow}>
             <TouchableOpacity
               onPress={() => navigateRoot('Profile')}
@@ -644,8 +704,8 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPad }]}>
         <View style={styles.card}>
           <View style={styles.loginPromptRow}>
             <View style={styles.personIconWrap}>
@@ -680,7 +740,7 @@ export default function SettingsScreen() {
 
         <View style={styles.sectionDivider} />
         <TouchableOpacity
-          style={styles.actionListItem}
+          style={[styles.actionListItem, styles.actionListItemOutlined]}
           activeOpacity={0.85}
           onPress={() => navigateRoot('Blogs')}
         >
@@ -697,7 +757,7 @@ export default function SettingsScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.actionListItem}
+          style={[styles.actionListItem, styles.actionListItemOutlined]}
           activeOpacity={0.85}
           onPress={() => navigateTab('Universities')}
         >
@@ -848,7 +908,11 @@ export default function SettingsScreen() {
                   onPress={handleLogin}
                   disabled={loading}
                 >
-                  {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalSignInText}>Sign in</Text>}
+                  {loading ? (
+                    <ActivityIndicator color={authModalTheme.successPillText} />
+                  ) : (
+                    <Text style={styles.modalSignInText}>Sign in</Text>
+                  )}
                 </TouchableOpacity>
               </KeyboardAvoidingView>
               <Text style={styles.modalSignUpPrompt}>
@@ -887,7 +951,7 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
   },
   keyboard: {
     flex: 1,
@@ -895,7 +959,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 24,
     paddingTop: 8,
-    paddingBottom: 100,
   },
   centered: {
     flex: 1,
@@ -903,15 +966,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
     borderRadius: 16,
     padding: 24,
     marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(15, 23, 42, 0.1)',
   },
   loginPromptRow: {
     flexDirection: 'row',
@@ -950,7 +1010,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   signUpButton: {
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: '#212529',
     borderRadius: 25,
@@ -1118,9 +1178,9 @@ const styles = StyleSheet.create({
   },
   actionListCard: {
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#e4e7ee',
-    backgroundColor: '#fff',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(15, 23, 42, 0.1)',
+    backgroundColor: 'transparent',
     marginBottom: 8,
     overflow: 'hidden',
   },
@@ -1130,7 +1190,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
+  },
+  actionListItemOutlined: {
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(15, 23, 42, 0.1)',
+    marginBottom: 8,
   },
   actionListItemDivider: {
     borderBottomWidth: 1,
@@ -1167,9 +1233,9 @@ const styles = StyleSheet.create({
   },
   selectedActionPanel: {
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#e4e7ee',
-    backgroundColor: '#f9fbff',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(15, 23, 42, 0.1)',
+    backgroundColor: 'transparent',
     padding: 14,
     marginBottom: 4,
   },
@@ -1245,7 +1311,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginBottom: 10,
     borderRadius: 20,
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(15, 23, 42, 0.1)',
   },
   recentLogo: {
     width: 44,
@@ -1300,7 +1368,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.5)',
+    backgroundColor: authModalTheme.overlay,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -1308,7 +1376,7 @@ const styles = StyleSheet.create({
   modalBox: {
     width: '100%',
     maxWidth: 420,
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    backgroundColor: authModalTheme.loginPanelBg,
     borderRadius: 16,
     padding: 24,
     shadowColor: '#000',
@@ -1360,7 +1428,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     fontSize: 16,
     marginBottom: 12,
-    backgroundColor: '#fff',
+    backgroundColor: authModalTheme.loginInputBg,
     /** Required on many Android devices or password bullets render white/invisible. */
     color: '#1a1f2e',
   },
@@ -1370,16 +1438,16 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   modalSignInBtn: {
-    backgroundColor: '#212529',
-    borderRadius: 10,
+    backgroundColor: authModalTheme.successPillBg,
+    borderRadius: authModalTheme.pillRadius,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 4,
   },
   modalSignInText: {
-    color: '#fff',
+    color: authModalTheme.successPillText,
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   modalSignUpPrompt: {
     fontSize: 14,
@@ -1388,8 +1456,8 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   modalSignUpLink: {
-    color: '#0d6efd',
-    fontWeight: '500',
+    color: authModalTheme.primary,
+    fontWeight: '600',
   },
   modalLegalRow: {
     flexDirection: 'row',

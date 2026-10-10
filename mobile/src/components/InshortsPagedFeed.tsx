@@ -12,12 +12,15 @@ import {
   Modal,
   ScrollView,
   ActivityIndicator,
+  Alert,
+  Pressable,
   type ListRenderItem,
 } from 'react-native';
 import { assignBannersToEventSlides, type PublicFeedItem } from '../utils/publicFeed';
 import type { ApprovedEventPublic, SponsoredAdPublic, BannerAdPublic } from '../services/events';
 import { canPrefetchImage, imageSrc } from '../utils/image';
 import { SchoolLogo } from './SchoolLogo';
+import { UserBookmarkedEventDetailModal } from './UserBookmarkedEventDetail';
 import {
   recordBannerAdView,
   recordBannerAdClick,
@@ -26,10 +29,22 @@ import {
 } from '../services/events';
 import { userEventsService, type EventCommentResponse } from '../services/userEvents';
 import {
-  EventPostPublicActionButtons,
   EventPostPublicDescriptionRow,
   EventPostPublicMeta,
 } from './EventPostPublicContent';
+import {
+  parseEventActionButtonsPublic,
+  INSHORTS_FEED_DESCRIPTION_MAX_WORDS,
+  truncateWords,
+} from '../utils/eventPostPublic';
+import { feedActionPillColors } from '../utils/feedActionPills';
+import {
+  formatPostedDateDisplay,
+  formatRelativeTime,
+  getPostedDateIso,
+} from '../utils/formatRelativeTime';
+
+export { formatRelativeTime };
 import HeartIcon from 'react-native-bootstrap-icons/icons/heart';
 import HeartFillIcon from 'react-native-bootstrap-icons/icons/heart-fill';
 import BookmarkIcon from 'react-native-bootstrap-icons/icons/bookmark';
@@ -37,12 +52,8 @@ import BookmarkFillIcon from 'react-native-bootstrap-icons/icons/bookmark-fill';
 import ChatIcon from 'react-native-bootstrap-icons/icons/chat';
 
 const SPONSORED_AD_BG = '#f1f7ff';
-
-function truncateWords(text: string, maxWords: number): string {
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  if (words.length <= maxWords) return text;
-  return `${words.slice(0, maxWords).join(' ')}…`;
-}
+const INFO_PILL_BG = '#cff4fc';
+const INFO_PILL_TEXT = '#055160';
 
 function parseImageUrlsJson(value: string | null | undefined): string[] {
   if (!value) return [];
@@ -54,22 +65,26 @@ function parseImageUrlsJson(value: string | null | undefined): string[] {
   }
 }
 
-export function formatRelativeTime(iso: string): string {
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return '';
-  const diff = Date.now() - t;
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return 'Just now';
-  if (m < 60) return `${m} min ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  if (d < 7) return `${d}d ago`;
-  try {
-    return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-  } catch {
-    return '';
-  }
+/** Vertical padding on `pageRoot` (paddingVertical: 4). */
+const FEED_PAGE_ROOT_PAD_Y = 8;
+
+function feedPageInnerHeight(pageHeight: number): number {
+  return Math.max(160, pageHeight - FEED_PAGE_ROOT_PAD_Y);
+}
+
+/** Shrink hero when the card has CTAs + posted date so the bottom meta is not clipped in a fixed page. */
+function computeFeedHeroHeight(
+  pageHeight: number,
+  actionButtonCount: number,
+  hasPostedDate: boolean,
+): number {
+  const textBudget = 52 + 96 + 132 + 20;
+  const actionBudget = actionButtonCount > 0 ? 10 + Math.ceil(actionButtonCount / 2) * 46 : 0;
+  const dateBudget = hasPostedDate ? 34 : 0;
+  const reserved = textBudget + actionBudget + dateBudget;
+  const maxByRatio = Math.round(pageHeight * 0.42);
+  const maxByPage = pageHeight - reserved;
+  return Math.max(100, Math.min(maxByRatio, maxByPage));
 }
 
 function InshortsEventPage({
@@ -103,7 +118,14 @@ function InshortsEventPage({
 }) {
   const images = event.imageUrls ? parseImageUrlsJson(event.imageUrls) : [];
   const firstImage = images[0];
-  const imgH = Math.max(160, Math.round(pageHeight * 0.42));
+  const actionButtons = parseEventActionButtonsPublic(event.actionButtons);
+  const postedDisplay = formatPostedDateDisplay(getPostedDateIso(event));
+  const innerPageHeight = feedPageInnerHeight(pageHeight);
+  const imgH = computeFeedHeroHeight(innerPageHeight, actionButtons.length, !!postedDisplay);
+  const bodyScrollMaxHeight = Math.max(120, innerPageHeight - imgH - 54);
+  const [knowMoreChooserVisible, setKnowMoreChooserVisible] = React.useState(false);
+  const [inAppPostVisible, setInAppPostVisible] = React.useState(false);
+  const sourceUrl = event.externalLink?.trim() ?? '';
   const [commentsOpen, setCommentsOpen] = React.useState(false);
   const [comments, setComments] = React.useState<EventCommentResponse[]>([]);
   const [commentsLoading, setCommentsLoading] = React.useState(false);
@@ -174,15 +196,44 @@ function InshortsEventPage({
     }
   };
 
+  const schoolHeroImg = event.school?.image?.trim();
+  const heroFallbackLogoSize = Math.min(128, Math.round(imgH * 0.4));
+
+  const openKnowMoreChooser = React.useCallback(() => {
+    setKnowMoreChooserVisible(true);
+  }, []);
+
+  const openSourceUrl = React.useCallback(() => {
+    setKnowMoreChooserVisible(false);
+    if (!sourceUrl) {
+      Alert.alert('No source link', 'This post does not have an external source URL.');
+      return;
+    }
+    Linking.openURL(sourceUrl).catch(() => {
+      Alert.alert('Could not open link', 'Please try again later.');
+    });
+  }, [sourceUrl]);
+
+  const openPostWithinApp = React.useCallback(() => {
+    setKnowMoreChooserVisible(false);
+    setInAppPostVisible(true);
+  }, []);
+
   return (
-    <View style={[styles.pageRoot, alignTop && styles.pageRootTopAligned, { minHeight: pageHeight }]}>
+    <View style={[styles.pageRoot, alignTop && styles.pageRootTopAligned]}>
       <View style={styles.card}>
         <View style={styles.heroWrap}>
           {firstImage ? (
             <Image source={{ uri: imageSrc(firstImage) }} style={[styles.heroImage, { height: imgH }]} resizeMode="cover" />
+          ) : schoolHeroImg ? (
+            <Image
+              source={{ uri: imageSrc(schoolHeroImg) }}
+              style={[styles.heroImage, { height: imgH }]}
+              resizeMode="cover"
+            />
           ) : (
             <View style={[styles.heroPlaceholder, { height: imgH }]}>
-              <Text style={styles.heroPlaceholderText}>SemBuzz</Text>
+              <SchoolLogo school={event.school} size={heroFallbackLogoSize} borderRadius={16} />
             </View>
           )}
           <View style={styles.engagePill} pointerEvents="box-none">
@@ -237,32 +288,123 @@ function InshortsEventPage({
             {event.school?.name ?? 'School'}
           </Text>
         </View>
-        <View style={styles.textBlock}>
-          <Text style={styles.headline} numberOfLines={4}>
-            {event.title}
-          </Text>
-          <EventPostPublicMeta event={event} compact />
-          <EventPostPublicDescriptionRow event={event} compact />
-          <EventPostPublicActionButtons event={event} compact />
-          <Text style={styles.timeAgo}>{formatRelativeTime(event.updatedAt || event.createdAt)}</Text>
-          {banner ? (
-            <TouchableOpacity
-              style={styles.inlineBannerBlock}
-              onPress={() => onBannerClick(banner)}
-              activeOpacity={0.9}
-              accessibilityRole="button"
-              accessibilityLabel="Open banner ad"
-            >
-              <Text style={styles.inlineBannerTag}>Ad Banner</Text>
-              <Image
-                source={{ uri: imageSrc(banner.imageUrl) }}
-                style={styles.inlineBannerImg}
-                resizeMode="cover"
-              />
-            </TouchableOpacity>
-          ) : null}
-        </View>
+        <ScrollView
+          style={[styles.cardBodyScroll, { maxHeight: bodyScrollMaxHeight }]}
+          contentContainerStyle={styles.cardBodyScrollContent}
+          nestedScrollEnabled
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          <View style={styles.cardBody}>
+            <View style={styles.textBlock}>
+              <Text style={styles.headline} numberOfLines={4}>
+                {event.title}
+              </Text>
+              <View style={styles.postFieldsSection}>
+                <EventPostPublicMeta event={event} compact metaChips />
+                <EventPostPublicDescriptionRow
+                  event={event}
+                  compact
+                  hideKnowMore
+                  inlineKnowMorePill
+                  onInlineKnowMorePress={openKnowMoreChooser}
+                  descriptionMaxWords={INSHORTS_FEED_DESCRIPTION_MAX_WORDS}
+                />
+                {actionButtons.length > 0 ? (
+                  <View style={styles.feedActionButtonsRow}>
+                    {actionButtons.map((b, index) => {
+                      const colors = feedActionPillColors(b.label, index);
+                      return (
+                        <TouchableOpacity
+                          key={`${b.label}-${b.url}`}
+                          style={[styles.footerActionPill, { backgroundColor: colors.bg }]}
+                          onPress={() => Linking.openURL(b.url).catch(() => {})}
+                          activeOpacity={0.85}
+                          accessibilityRole="button"
+                        >
+                          <Text style={[styles.footerActionPillText, { color: colors.text }]} numberOfLines={1}>
+                            {b.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                ) : null}
+                {postedDisplay ? (
+                  <Text style={styles.postedDateText}>{postedDisplay}</Text>
+                ) : null}
+              </View>
+              {banner ? (
+              <TouchableOpacity
+                style={styles.inlineBannerBlock}
+                onPress={() => onBannerClick(banner)}
+                activeOpacity={0.9}
+                accessibilityRole="button"
+                accessibilityLabel="Open banner ad"
+              >
+                <Text style={styles.inlineBannerTag}>Ad Banner</Text>
+                <Image
+                  source={{ uri: imageSrc(banner.imageUrl) }}
+                  style={styles.inlineBannerImg}
+                  resizeMode="cover"
+                />
+              </TouchableOpacity>
+            ) : null}
+            </View>
+          </View>
+        </ScrollView>
       </View>
+
+      <Modal
+        visible={knowMoreChooserVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setKnowMoreChooserVisible(false)}
+      >
+        <View style={styles.knowMoreModalRoot}>
+          <Pressable style={styles.knowMoreModalBackdrop} onPress={() => setKnowMoreChooserVisible(false)} />
+          <View style={styles.knowMoreModalCard}>
+            <Text style={styles.knowMoreModalTitle}>Read this post</Text>
+            <Text style={styles.knowMoreModalSubtitle}>Choose how you would like to continue.</Text>
+            <View style={styles.knowMoreModalPillStack}>
+              <TouchableOpacity
+                style={[styles.knowMoreModalPill, styles.knowMoreModalPillSuccess]}
+                onPress={openSourceUrl}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+              >
+                <Text style={styles.knowMoreModalPillSuccessText} numberOfLines={2}>
+                  Open source link
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.knowMoreModalPill, styles.knowMoreModalPillInfo]}
+                onPress={openPostWithinApp}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+              >
+                <Text style={styles.knowMoreModalPillInfoText} numberOfLines={2}>
+                  Show within app
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <Pressable
+              onPress={() => setKnowMoreChooserVisible(false)}
+              hitSlop={8}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.knowMoreModalCancel, pressed && styles.knowMoreModalCancelPressed]}
+            >
+              <Text style={styles.knowMoreModalCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <UserBookmarkedEventDetailModal
+        visible={inAppPostVisible}
+        event={event}
+        onClose={() => setInAppPostVisible(false)}
+      />
 
       <Modal visible={commentsOpen} animationType="slide" transparent onRequestClose={() => setCommentsOpen(false)}>
         <View style={styles.modalOverlay}>
@@ -338,7 +480,8 @@ function InshortsEventPage({
 function InshortsSponsoredPage({ ad, pageHeight, alignTop }: { ad: SponsoredAdPublic; pageHeight: number; alignTop: boolean }) {
   const images = parseImageUrlsJson(ad.imageUrls);
   const firstImage = images[0];
-  const imgH = Math.max(160, Math.round(pageHeight * 0.42));
+  const innerPageHeight = feedPageInnerHeight(pageHeight);
+  const imgH = Math.max(160, Math.round(innerPageHeight * 0.42));
   const schoolName = ad.school?.name ?? 'School';
 
   React.useEffect(() => {
@@ -358,7 +501,7 @@ function InshortsSponsoredPage({ ad, pageHeight, alignTop }: { ad: SponsoredAdPu
   };
 
   return (
-    <View style={[styles.pageRoot, alignTop && styles.pageRootTopAligned, { minHeight: pageHeight }]}>
+    <View style={[styles.pageRoot, alignTop && styles.pageRootTopAligned]}>
       <View style={[styles.card, { backgroundColor: SPONSORED_AD_BG }]}>
         <View style={styles.adRow}>
           <View style={styles.adBadge}>
@@ -385,7 +528,7 @@ function InshortsSponsoredPage({ ad, pageHeight, alignTop }: { ad: SponsoredAdPu
           {ad.title?.trim() ? <Text style={styles.headline}>{ad.title}</Text> : null}
           {ad.description?.trim() ? (
             <Text style={styles.summary} numberOfLines={6}>
-              {truncateWords(ad.description, 40)}
+              {truncateWords(ad.description, 40).text}
             </Text>
           ) : null}
           <Text style={styles.timeAgo}>{formatRelativeTime(ad.createdAt || ad.startAt)}</Text>
@@ -420,7 +563,7 @@ type Props = {
 export function InshortsPagedFeed({
   feedItems,
   pageHeight,
-  alignTop = false,
+  alignTop = true,
   onRefresh,
   refreshing,
   userId,
@@ -501,7 +644,7 @@ export function InshortsPagedFeed({
 
   const renderItem: ListRenderItem<Exclude<PublicFeedItem, { type: 'banner' }>> = useCallback(
     ({ item, index }) => (
-      <View style={{ height: pageHeight, justifyContent: alignTop ? 'flex-start' : 'center' }}>
+      <View style={[styles.feedSlide, { height: pageHeight }]}>
         {item.type === 'event' ? (
           <InshortsEventPage
             event={item.event}
@@ -564,7 +707,7 @@ export function InshortsPagedFeed({
       initialNumToRender={2}
       maxToRenderPerBatch={2}
       windowSize={3}
-      removeClippedSubviews
+      removeClippedSubviews={false}
     />
   );
 }
@@ -573,11 +716,18 @@ const styles = StyleSheet.create({
   feedList: {
     flex: 1,
   },
-  pageRoot: {
+  feedSlide: {
     width: '100%',
-    justifyContent: 'center',
+    overflow: 'hidden',
+    justifyContent: 'flex-start',
+  },
+  pageRoot: {
+    flex: 1,
+    width: '100%',
+    overflow: 'hidden',
+    justifyContent: 'flex-start',
     paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingVertical: 4,
   },
   pageRootTopAligned: {
     justifyContent: 'flex-start',
@@ -586,10 +736,49 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#eef2f7',
-    borderWidth: 1,
-    borderColor: '#e5e9f0',
-    maxHeight: '100%',
+    backgroundColor: 'transparent',
+    alignSelf: 'stretch',
+  },
+  cardBody: {
+    alignSelf: 'stretch',
+  },
+  cardBodyScroll: {
+    alignSelf: 'stretch',
+  },
+  cardBodyScrollContent: {
+    flexGrow: 1,
+    paddingBottom: 4,
+  },
+  feedActionButtonsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  infoActionPill: {
+    backgroundColor: INFO_PILL_BG,
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  infoActionPillText: {
+    color: INFO_PILL_TEXT,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  footerActionPill: {
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    maxWidth: '100%',
+  },
+  footerActionPillText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   heroImage: {
     width: '100%',
@@ -666,9 +855,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
-    paddingTop: 8,
-    paddingBottom: 0,
-    gap: 10,
+    paddingTop: 10,
+    paddingBottom: 8,
+    gap: 12,
   },
   smallLogo: {
     width: 28,
@@ -696,9 +885,12 @@ const styles = StyleSheet.create({
   },
   textBlock: {
     paddingHorizontal: 14,
-    paddingTop: 0,
-    paddingBottom: 8,
-    flexGrow: 1,
+    paddingTop: 4,
+    paddingBottom: 12,
+  },
+  postFieldsSection: {
+    marginTop: 6,
+    gap: 10,
   },
   titleRow: {
     flexDirection: 'row',
@@ -712,17 +904,18 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   knowMorePill: {
-    backgroundColor: '#212529',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    backgroundColor: INFO_PILL_BG,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     borderRadius: 999,
     flexShrink: 0,
-    alignSelf: 'flex-start',
+    alignSelf: 'flex-end',
   },
   knowMorePillText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+    color: INFO_PILL_TEXT,
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   headline: {
     color: '#111827',
@@ -776,6 +969,13 @@ const styles = StyleSheet.create({
     color: '#64748b',
     fontSize: 12,
   },
+  postedDateText: {
+    marginTop: 10,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#334155',
+    lineHeight: 20,
+  },
   tapMore: {
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -826,6 +1026,91 @@ const styles = StyleSheet.create({
   adLabel: {
     color: '#4e6a8a',
     fontSize: 12,
+  },
+  knowMoreModalRoot: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 28,
+  },
+  knowMoreModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  knowMoreModalCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  knowMoreModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1a1f2e',
+    marginBottom: 6,
+  },
+  knowMoreModalSubtitle: {
+    fontSize: 14,
+    color: '#64748b',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  knowMoreModalPillStack: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    width: '100%',
+    gap: 8,
+    marginBottom: 6,
+  },
+  knowMoreModalPill: {
+    flex: 1,
+    borderRadius: 999,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  knowMoreModalPillSuccess: {
+    backgroundColor: '#d1e7dd',
+  },
+  knowMoreModalPillSuccessText: {
+    color: '#0f5132',
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  knowMoreModalPillInfo: {
+    backgroundColor: '#cff4fc',
+  },
+  knowMoreModalPillInfoText: {
+    color: '#055160',
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  knowMoreModalCancel: {
+    alignSelf: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+  },
+  knowMoreModalCancelPressed: {
+    opacity: 0.75,
+  },
+  knowMoreModalCancelText: {
+    fontSize: 15,
+    color: '#64748b',
+    textAlign: 'center',
+    letterSpacing: 0.15,
+    textDecorationLine: 'underline',
   },
   modalOverlay: {
     flex: 1,

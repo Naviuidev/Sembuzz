@@ -9,7 +9,13 @@ const Stack = createNativeStackNavigator<SettingsStackParamList>();
 
 export default function SettingsStackNavigator() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false, freezeOnBlur: false }}>
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        freezeOnBlur: false,
+        contentStyle: { backgroundColor: 'transparent' },
+      }}
+    >
       <Stack.Screen name="SettingsMain" component={SettingsScreen} />
       <Stack.Screen
         name="ChangeCategories"

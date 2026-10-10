@@ -941,12 +941,12 @@ export const PublicEvents = () => {
     isLoggedInHome && showAllSchoolsFeed
       ? allSchoolsFilterSchoolId
       : isLoggedInHome && showExternalHomeFeed
-        ? null
-        : isLoggedInHome && homeFeedSchoolId
-          ? homeFeedSchoolId
+      ? null
+      : isLoggedInHome && homeFeedSchoolId
+        ? homeFeedSchoolId
           : guestHome && showExternalHomeFeed
             ? null
-            : schoolId;
+        : schoolId;
   /** Match mobile EventsScreen: subcategories only when logged-in + My school + user picked subs (not for guests / all-schools). */
   const effectiveSubCategoryIds =
     showSchoolFilterUi &&
@@ -1498,7 +1498,7 @@ export const PublicEvents = () => {
         const next = new URLSearchParams(searchParams);
         next.delete('tab');
         setSearchParams(next, { replace: true });
-      }
+    }
     }
   }, [location.state, searchParams, setSearchParams]);
 
@@ -2531,15 +2531,15 @@ export const PublicEvents = () => {
             recentNewsContent={renderSettingsRecentNewsList()}
             guestRecentEvents={settingsRecentSorted}
             onGuestRecentEventClick={(e) => {
-              setBottomNavActive('home');
-              if (e.schoolId) {
-                setSearchParams((prev) => {
-                  const next = new URLSearchParams(prev);
-                  next.set('schoolId', e.schoolId);
-                  return next;
-                });
-              }
-              setSelectedSettingsEvent(e);
+                            setBottomNavActive('home');
+                            if (e.schoolId) {
+                              setSearchParams((prev) => {
+                                const next = new URLSearchParams(prev);
+                                next.set('schoolId', e.schoolId);
+                                return next;
+                              });
+                            }
+                            setSelectedSettingsEvent(e);
               navigate('/', { replace: true });
             }}
             onDeleteAccount={() => setShowDeleteAccountModal(true)}
@@ -2659,15 +2659,15 @@ export const PublicEvents = () => {
             <div className="home-feed-tabs-shell">
             <div className="home-feed-tabs-row">
               {user ? (
-                <button
-                  type="button"
-                  className="home-feed-tabs-gear"
-                  onClick={() => setBottomNavActive('settings')}
-                  aria-label="Settings"
-                  title="Settings"
-                >
-                  <i className="bi bi-gear-fill" aria-hidden />
-                </button>
+              <button
+                type="button"
+                className="home-feed-tabs-gear"
+                onClick={() => setBottomNavActive('settings')}
+                aria-label="Settings"
+                title="Settings"
+              >
+                <i className="bi bi-gear-fill" aria-hidden />
+              </button>
               ) : (
                 <div className="home-feed-tabs-gear" aria-hidden style={{ pointerEvents: 'none', opacity: 0 }} />
               )}
@@ -2698,9 +2698,9 @@ export const PublicEvents = () => {
                   </span>
                 </button>
                 {schoolExternalEnabled ? (
-                  <button
-                    type="button"
-                    role="tab"
+                <button
+                  type="button"
+                  role="tab"
                     className={`home-feed-tab ${homeFeedMode === 'external' ? 'active' : ''}`}
                     onClick={() => {
                       setHomeFeedMode('external');
@@ -2708,18 +2708,18 @@ export const PublicEvents = () => {
                       setSelectedUpcomingPost(null);
                     }}
                     aria-pressed={homeFeedMode === 'external'}
-                  >
-                    <span className="home-feed-tab-inner">
+                >
+                  <span className="home-feed-tab-inner">
                       <i className="bi bi-box-arrow-in-right home-feed-tab-icon" aria-hidden />
                       <span>External</span>
-                    </span>
-                  </button>
+                  </span>
+                </button>
                 ) : (
-                  <button
-                    type="button"
+                        <button
+                          type="button"
                     role="tab"
                     className={`home-feed-tab ${showAllSchoolsFeed ? 'active' : ''}`}
-                    onClick={() => {
+                            onClick={() => {
                       setHomeFeedMode('allSchools');
                       setUpcomingDateFilter(null);
                       setSelectedUpcomingPost(null);
@@ -2730,10 +2730,10 @@ export const PublicEvents = () => {
                       <i className="bi bi-building home-feed-tab-icon" aria-hidden />
                       <span>All schools</span>
                     </span>
-                  </button>
-                )}
-              </div>
+                          </button>
+              )}
             </div>
+                    </div>
             </div>
           )}
           {user && isLoggedInHome && loggedInPostTypeDateFilterActive ? (
@@ -2743,17 +2743,17 @@ export const PublicEvents = () => {
                 {loggedInFeedPostTypeFilter === 'event' ? 'event date' : 'post date'} for{' '}
                 {formatYmdLabel(loggedInFeedDateFilter!)}
               </span>
-              <button
-                type="button"
+                      <button
+                        type="button"
                 className="btn btn-sm btn-link text-decoration-none p-0"
-                onClick={() => {
+                        onClick={() => {
                   setLoggedInFeedDateFilter(null);
                   setLoggedInFeedPostTypeFilter(null);
                 }}
               >
                 Clear
-              </button>
-            </div>
+                      </button>
+                    </div>
           ) : null}
 
           {user && homeFeedMode === 'mySchool' && showSchoolFilterUi && selectedSubCategoryMeta.length > 0 && (
@@ -3456,10 +3456,10 @@ export const PublicEvents = () => {
               <button type="button" className="btn btn-sm btn-outline-secondary" onClick={clearCalendarFilter}>Show regular feed</button>
             </div>
             {calendarApprovedLoading || calendarScheduledLoading || upcomingPostsLoading ? (
-              <div className="text-center py-5">
-                <div className="spinner-border text-secondary" role="status" />
+          <div className="text-center py-5">
+            <div className="spinner-border text-secondary" role="status" />
                 <p className="mt-2 mb-0 small text-muted">Loading news for this date…</p>
-              </div>
+          </div>
             ) : calendarFeedItems.length === 0 && calendarScheduledEvents.length === 0 && upcomingPostsByDate.length === 0 ? (
               <p className="text-muted text-center py-4">
                 {calendarFilterSchoolName
@@ -3530,10 +3530,10 @@ export const PublicEvents = () => {
                         <div className="small text-muted">
                           {event.publishAt ? formatDate(event.publishAt) : 'Scheduled'}
                           {event.subCategory?.name ? ` · ${event.subCategory.name}` : ''}
-                        </div>
-                      </div>
+            </div>
+          </div>
                       <span className="badge text-bg-warning" style={{ flexShrink: 0 }}>Scheduled</span>
-                    </div>
+            </div>
                   ))}
                 </div>
               </div>

@@ -9,20 +9,20 @@ import {
   Linking,
   ActivityIndicator,
   RefreshControl,
-  Animated,
   Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { FontAwesome5 } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontAwesome5, Ionicons } from '@expo/vector-icons';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { getSchoolSocialAccounts, SchoolSocialAccountPublic } from '../services/userSchoolSocial';
-import Link45degIcon from 'react-native-bootstrap-icons/icons/link-45deg';
 import { imageSrc, isImageIconValue } from '../utils/image';
 import { ClubMessagingBadges } from '../components/ClubMessagingBadges';
 import { ClubGroupChatWidget } from '../components/ClubGroupChatWidget';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { MainTabParamList } from '../navigation/types';
+import { authModalTheme } from '../styles/authModalTheme';
+import { MAIN_TAB_BAR_BODY_HEIGHT } from '../navigation/tabBarMetrics';
 
 const PLATFORM_COLORS: Record<string, string> = {
   facebook: '#1877F2',
@@ -41,7 +41,6 @@ const PLATFORM_COLORS: Record<string, string> = {
   weebly: '#1cb0a1',
 };
 
-/** FontAwesome5 brand icon names (subset aligned with web platform ids). */
 const PLATFORM_FA5_BRANDS: Record<string, string> = {
   facebook: 'facebook',
   linkedin: 'linkedin',
@@ -55,7 +54,6 @@ const PLATFORM_FA5_BRANDS: Record<string, string> = {
   telegram: 'telegram',
   reddit: 'reddit',
   snapchat: 'snapchat',
-  /** FA5 solid “link” — Linktree has no stable FA5 brand glyph in all builds */
   linktree: 'link',
   weebly: 'weebly',
 };
@@ -110,105 +108,68 @@ function PlatformIconButton({
   const faName = PLATFORM_FA5_BRANDS[platformId] ?? 'link';
   const useBrand = faName !== 'link';
 
-  const onPress = () => {
-    if (link) Linking.openURL(link);
-  };
-
   return (
     <TouchableOpacity
-      style={[styles.platformPill, { backgroundColor: `${color}18` }]}
-      onPress={onPress}
+      style={[styles.platformIconBtn, { backgroundColor: `${color}14` }]}
+      onPress={() => link && Linking.openURL(link)}
       activeOpacity={0.85}
       accessibilityRole="link"
       accessibilityLabel={platformName}
     >
-      <FontAwesome5 name={faName} size={22} color={color} brand={useBrand} />
+      <FontAwesome5 name={faName} size={15} color={color} brand={useBrand} />
     </TouchableOpacity>
-  );
-}
-
-function AnimatedTitle({ text }: { text: string }) {
-  const letters = useMemo(() => text.split(''), [text]);
-  const animatedValues = useMemo(() => letters.map(() => new Animated.Value(0)), [text]);
-
-  useEffect(() => {
-    animatedValues.forEach((v) => v.setValue(0));
-    Animated.stagger(
-      60,
-      animatedValues.map((v) =>
-        Animated.timing(v, {
-          toValue: 1,
-          duration: 350,
-          useNativeDriver: true,
-        }),
-      ),
-    ).start();
-  }, [text, animatedValues]);
-
-  return (
-    <View style={styles.titleRow}>
-      {letters.map((letter, i) => {
-        const opacity = animatedValues[i].interpolate({
-          inputRange: [0, 1],
-          outputRange: [0, 1],
-        });
-        const translateX = animatedValues[i].interpolate({
-          inputRange: [0, 1],
-          outputRange: [-6, 0],
-        });
-        return (
-          <Animated.Text
-            key={`${text}-${i}`}
-            style={[
-              styles.letter,
-              {
-                opacity,
-                transform: [{ translateX }],
-              },
-            ]}
-          >
-            {letter === ' ' ? '\u00A0' : letter}
-          </Animated.Text>
-        );
-      })}
-    </View>
   );
 }
 
 export default function AppsScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
-  const { user } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { user, loading: authLoading } = useAuth();
   const [accounts, setAccounts] = useState<SchoolSocialAccountPublic[]>([]);
-  const [loading, setLoading] = useState(!!user);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
+  const scrollBottomPad = MAIN_TAB_BAR_BODY_HEIGHT + insets.bottom + 16;
+
   const fetchAccounts = useCallback(async () => {
-    if (!user) {
+    if (authLoading) return;
+    if (!user?.id) {
       setAccounts([]);
       setLoading(false);
+      setError(null);
       return;
     }
     setLoading(true);
     try {
       const list = await getSchoolSocialAccounts();
-      setAccounts(list);
+      setAccounts(Array.isArray(list) ? list : []);
       setError(null);
     } catch {
-      setAccounts([]);
       setError('Unable to load social accounts right now.');
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user?.id, authLoading]);
 
   useEffect(() => {
-    fetchAccounts();
+    void fetchAccounts();
   }, [fetchAccounts]);
 
-  const groups = groupAccountsByPage(accounts);
+  useFocusEffect(
+    useCallback(() => {
+      void fetchAccounts();
+    }, [fetchAccounts]),
+  );
+
+  const groups = useMemo(() => {
+    const list = groupAccountsByPage(accounts);
+    return list.sort((a, b) => (a.pageName || '').localeCompare(b.pageName || ''));
+  }, [accounts]);
+
   const showSchoolAccounts = !!(user && groups.length > 0);
+  const accountsLoading = authLoading || (loading && groups.length === 0);
   const filteredGroups = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return groups;
@@ -222,7 +183,8 @@ export default function AppsScreen() {
       return inName || inPlatforms;
     });
   }, [groups, searchQuery]);
-  const displayTitle = user?.schoolName?.trim() || 'Sembuzz';
+
+  const schoolTitle = user?.schoolName?.trim() || 'Sembuzz';
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -234,140 +196,165 @@ export default function AppsScreen() {
     if (!user) setSearchQuery('');
   }, [user?.id]);
 
+  const openLogin = () => {
+    navigation.navigate('Settings', {
+      screen: 'SettingsMain',
+      params: { openLogin: true },
+    });
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPad }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1a1f2e" />}
+        keyboardShouldPersistTaps="handled"
       >
+        <View style={styles.pageHeader}>
+          <Text style={styles.pageTitle}>Apps</Text>
+          <Text style={styles.pageSubtitle}>
+            {user
+              ? `Clubs, messaging, and social links for ${schoolTitle}.`
+              : 'Follow Sembuzz and sign in for your school’s clubs and chats.'}
+          </Text>
+        </View>
+
         {!user ? (
-          <View style={styles.authPromptCard}>
-            <View style={styles.authPromptTopRow}>
-              <View style={styles.authPromptIconWrap}>
-                <FontAwesome5 name="user" size={14} color="#6c757d" />
+          <View style={styles.card}>
+            <View style={styles.guestRow}>
+              <View style={styles.guestIconCircle}>
+                <Ionicons name="school-outline" size={22} color={authModalTheme.primary} />
               </View>
-              <Text style={styles.authPromptDesc}>Sign up to filter by your school and get personalized social links.</Text>
+              <Text style={styles.guestText}>
+                Sign in to see your school’s club pages, group chats, and social links.
+              </Text>
             </View>
-            <View style={styles.authPromptActions}>
-              <TouchableOpacity
-                style={styles.authLoginBtn}
-                onPress={() => (navigation as { navigate: (name: string) => void }).navigate('Settings')}
-                activeOpacity={0.85}
-              >
-                <FontAwesome5 name="sign-in-alt" size={13} color="#fff" />
-                <Text style={styles.authLoginBtnText}>Login</Text>
+            <View style={styles.guestActions}>
+              <TouchableOpacity style={styles.btnPrimary} onPress={openLogin} activeOpacity={0.88}>
+                <Text style={styles.btnPrimaryText}>Sign in</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.authSignupBtn}
-                onPress={() => (navigation as { navigate: (name: string) => void }).navigate('Settings')}
-                activeOpacity={0.85}
-              >
-                <FontAwesome5 name="user-plus" size={13} color="#1a1f2e" />
-                <Text style={styles.authSignupBtnText}>Sign up</Text>
+              <TouchableOpacity style={styles.btnOutline} onPress={openLogin} activeOpacity={0.88}>
+                <Text style={styles.btnOutlineText}>Create account</Text>
               </TouchableOpacity>
             </View>
           </View>
         ) : null}
 
-        {user && !loading ? (
+        {user && !accountsLoading ? (
           <View style={styles.searchWrap}>
-            <FontAwesome5 name="search" size={14} color="#6c757d" />
+            <Ionicons name="search" size={18} color="#94a3b8" />
             <TextInput
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholder="Search clubs"
-              placeholderTextColor="#8e8e8e"
+              placeholder="Search clubs or platforms"
+              placeholderTextColor="#94a3b8"
               style={styles.searchInput}
               autoCapitalize="none"
               autoCorrect={false}
+              clearButtonMode="while-editing"
             />
           </View>
         ) : null}
 
-        <View style={[styles.mainContentWrap, !showSchoolAccounts && !loading ? styles.mainContentCentered : null]}>
-          <AnimatedTitle text={displayTitle} />
-
-          <Text style={styles.followTitle}>Follow us</Text>
-
+        <View style={styles.section}>
+          <Text style={styles.cardTitle}>Messaging</Text>
+          <Text style={styles.cardDesc}>Group chats and direct messages for your school.</Text>
           <ClubMessagingBadges
             isAuthenticated={!!user}
             currentUserId={user?.id}
-            onRequireLogin={() =>
-              navigation.navigate('Settings', {
-                screen: 'SettingsMain',
-                params: { openLogin: true },
-              })
-            }
+            onRequireLogin={openLogin}
           />
+        </View>
 
-          {user && loading ? (
-            <ActivityIndicator size="small" color="#1a1f2e" style={styles.loader} />
-          ) : error ? (
-            <Text style={styles.errorText}>{error}</Text>
+        <View style={styles.section}>
+          <Text style={styles.cardTitle}>{showSchoolAccounts ? 'School clubs' : 'Follow Sembuzz'}</Text>
+          <Text style={styles.cardDesc}>
+            {showSchoolAccounts
+              ? 'Tap a platform to open your club’s page.'
+              : 'Official Sembuzz channels when your school has no links yet.'}
+          </Text>
+
+          {user && accountsLoading ? (
+            <ActivityIndicator size="small" color={authModalTheme.primary} style={styles.loader} />
+          ) : null}
+
+          {error ? (
+            <View style={styles.errorBanner}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
+          {user && !accountsLoading && !showSchoolAccounts && !error ? (
+            <Text style={styles.emptyText}>No club pages for your school yet.</Text>
           ) : null}
 
           {showSchoolAccounts ? (
             <>
               {filteredGroups.length === 0 ? (
-                <Text style={styles.emptySearchText}>No matching groups found.</Text>
-              ) : null}
-              {filteredGroups.map((g) => (
-              <View key={g.key} style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <View style={styles.clubIconWrap}>
-                    {isImageIconValue(g.icon) ? (
-                      <Image source={{ uri: imageSrc(g.icon) }} style={styles.clubIconImg} resizeMode="contain" />
-                    ) : (
-                      <Link45degIcon width={22} height={22} fill="#1a1f2e" />
-                    )}
+                <Text style={styles.emptyText}>No clubs match your search.</Text>
+              ) : (
+                filteredGroups.map((g) => (
+                  <View key={g.key} style={styles.clubBlock}>
+                    <View style={styles.clubRow}>
+                      <View style={styles.clubAvatar}>
+                        {isImageIconValue(g.icon) ? (
+                          <Image
+                            source={{ uri: imageSrc(g.icon) }}
+                            style={styles.clubAvatarImg}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <Text style={styles.clubAvatarLetter}>
+                            {(g.pageName || 'C').charAt(0).toUpperCase()}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.clubTextCol}>
+                        <Text style={styles.clubName} numberOfLines={2}>
+                          {g.pageName || 'Club'}
+                        </Text>
+                        <View style={styles.platformRowBelowName}>
+                          {g.accounts.map((acc) => (
+                            <PlatformIconButton
+                              key={acc.id}
+                              platformId={acc.platformId}
+                              platformName={acc.platformName}
+                              link={acc.link}
+                            />
+                          ))}
+                        </View>
+                      </View>
+                    </View>
                   </View>
-                  <Text style={styles.sectionName}>{g.pageName || 'Club'}</Text>
-                </View>
-                <View style={styles.linksRow}>
-                  {g.accounts.map((acc) => (
-                    <PlatformIconButton
-                      key={acc.id}
-                      platformId={acc.platformId}
-                      platformName={acc.platformName}
-                      link={acc.link}
-                    />
-                  ))}
-                </View>
-              </View>
-              ))}
+                ))
+              )}
             </>
-          ) : !loading || !user ? (
-            <View style={styles.defaultSocialRow}>
+          ) : !accountsLoading || !user ? (
+            <View style={styles.defaultSocialGrid}>
               {DEFAULT_SOCIAL.map((s) => (
                 <TouchableOpacity
                   key={s.key}
-                  style={styles.defaultSocialBtn}
+                  style={[styles.defaultSocialCard, { borderColor: `${s.color}40` }]}
                   onPress={() => Linking.openURL(s.url)}
                   activeOpacity={0.85}
                   accessibilityRole="link"
                   accessibilityLabel={s.label}
                 >
-                  <FontAwesome5 name={s.icon} size={32} color={s.color} brand />
+                  <FontAwesome5 name={s.icon} size={28} color={s.color} brand />
+                  <Text style={styles.defaultSocialLabel}>{s.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
           ) : null}
-
-          <Text style={styles.footerHint}>
-            {showSchoolAccounts ? "Your school's social accounts." : 'Connect with us on social media.'}
-          </Text>
         </View>
       </ScrollView>
+
       <ClubGroupChatWidget
         visible={!!user}
         isAuthenticated={!!user}
         currentUserId={user?.id}
-        onRequireLogin={() =>
-          navigation.navigate('Settings', {
-            screen: 'SettingsMain',
-            params: { openLogin: true },
-          })
-        }
+        onRequireLogin={openLogin}
       />
     </SafeAreaView>
   );
@@ -376,229 +363,225 @@ export default function AppsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
   },
   scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 120,
-    alignItems: 'center',
-    width: '100%',
+    paddingHorizontal: 20,
+    paddingTop: 8,
   },
-  mainContentWrap: {
-    width: '100%',
-    alignItems: 'center',
+  pageHeader: {
+    marginBottom: 20,
   },
-  mainContentCentered: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingTop: 24,
-    paddingBottom: 24,
+  pageTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1a1f2e',
+    letterSpacing: -0.5,
   },
-  authPromptCard: {
+  pageSubtitle: {
+    marginTop: 6,
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#64748b',
+  },
+  card: {
     width: '100%',
-    maxWidth: 600,
-    backgroundColor: '#fff',
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#e8edf5',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderColor: '#e8ecf0',
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    marginBottom: 14,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  section: {
+    width: '100%',
+    backgroundColor: 'transparent',
     marginBottom: 14,
   },
-  authPromptTopRow: {
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1a1f2e',
+    marginBottom: 4,
+  },
+  cardDesc: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#64748b',
+    marginBottom: 14,
+  },
+  guestRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 14,
+    gap: 12,
     marginBottom: 14,
   },
-  authPromptIconWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 999,
-    backgroundColor: '#f1f4f8',
+  guestIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: authModalTheme.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  authPromptDesc: {
-    fontSize: 13,
-    color: '#1a1f2e',
-    lineHeight: 17,
+  guestText: {
     flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#334155',
   },
-  authPromptActions: {
+  guestActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
-    marginLeft: 44,
   },
-  authLoginBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+  btnPrimary: {
+    paddingVertical: 11,
+    paddingHorizontal: 20,
+    borderRadius: authModalTheme.pillRadius,
     backgroundColor: '#1a1f2e',
-    borderRadius: 999,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    minWidth: 118,
-    gap: 8,
   },
-  authLoginBtnText: {
+  btnPrimaryText: {
     color: '#fff',
     fontSize: 15,
     fontWeight: '600',
   },
-  authSignupBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 999,
+  btnOutline: {
+    paddingVertical: 11,
+    paddingHorizontal: 20,
+    borderRadius: authModalTheme.pillRadius,
     borderWidth: 1,
     borderColor: '#1a1f2e',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    minWidth: 118,
-    gap: 8,
+    backgroundColor: '#fff',
   },
-  authSignupBtnText: {
+  btnOutlineText: {
     color: '#1a1f2e',
     fontSize: 15,
     fontWeight: '600',
   },
-  titleRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    width: '100%',
-    marginBottom: 24,
-    maxWidth: 600,
-  },
-  letter: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#1a1f2e',
-  },
-  followTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1a1f2e',
-    textAlign: 'center',
-    alignSelf: 'center',
-    marginBottom: 20,
-    width: '100%',
-  },
-  loader: {
-    marginVertical: 16,
-  },
   searchWrap: {
-    width: '100%',
-    maxWidth: 420,
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    paddingHorizontal: 12,
-    minHeight: 50,
-    paddingVertical: 12,
+    paddingHorizontal: 14,
+    minHeight: 48,
     marginBottom: 14,
-    gap: 8,
+    gap: 10,
   },
   searchInput: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 15,
     color: '#1a1f2e',
-    paddingVertical: 0,
+    paddingVertical: 10,
   },
-  emptySearchText: {
-    fontSize: 13,
-    color: '#6c757d',
+  loader: {
+    marginVertical: 12,
+  },
+  errorBanner: {
+    backgroundColor: '#fef2f2',
+    borderRadius: 12,
+    padding: 12,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#fecaca',
   },
-  section: {
-    marginBottom: 24,
-    width: '100%',
-    maxWidth: 400,
-    alignItems: 'center',
+  errorText: {
+    fontSize: 14,
+    color: '#b91c1c',
+    textAlign: 'center',
   },
-  sectionHeader: {
+  emptyText: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+    paddingVertical: 8,
+  },
+  clubBlock: {
+    paddingTop: 16,
+    paddingBottom: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(15, 23, 42, 0.08)',
+  },
+  clubRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  clubTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  platformRowBelowName: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 4,
+    marginTop: 4,
   },
-  clubIconWrap: {
+  clubAvatar: {
     width: 44,
     height: 44,
-    borderRadius: 8,
+    borderRadius: 10,
+    backgroundColor: authModalTheme.loginPanelBg,
     borderWidth: 1,
-    borderColor: '#eee',
-    backgroundColor: '#fff',
+    borderColor: '#e2e8f0',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  clubIconImg: {
+  clubAvatarImg: {
     width: '100%',
     height: '100%',
   },
-  sectionName: {
-    fontSize: 18,
+  clubAvatarLetter: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1a1f2e',
+  },
+  clubName: {
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: '600',
     color: '#1a1f2e',
   },
-  linksRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  platformPill: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  defaultSocialRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    width: '100%',
-    gap: 20,
-    marginTop: 4,
-    maxWidth: 600,
-  },
-  defaultSocialBtn: {
-    width: 72,
-    height: 72,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-  },
-  footerHint: {
-    fontSize: 13,
-    color: '#8e8e8e',
-    textAlign: 'center',
-    alignSelf: 'center',
-    marginTop: 16,
-    width: '100%',
-    paddingHorizontal: 16,
-  },
-  errorText: {
-    fontSize: 14,
-    color: '#842029',
-    backgroundColor: '#f8d7da',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+  platformIconBtn: {
+    width: 28,
+    height: 28,
     borderRadius: 8,
-    marginBottom: 12,
-    textAlign: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  defaultSocialGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'center',
+  },
+  defaultSocialCard: {
+    width: '30%',
+    minWidth: 96,
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    backgroundColor: '#f8fafc',
+    gap: 8,
+  },
+  defaultSocialLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
   },
 });

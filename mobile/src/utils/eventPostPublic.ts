@@ -1,4 +1,6 @@
 export const EVENT_DESCRIPTION_MAX_WORDS = 60;
+/** Inshorts home feed card teaser length before “Know more”. */
+export const INSHORTS_FEED_DESCRIPTION_MAX_WORDS = 20;
 
 export function splitEventDescription(text: string): { teaser: string; about: string | null } {
   const trimmed = text.trim();
@@ -122,6 +124,13 @@ export function eventPostHasScheduleMeta(event: {
     formatEventTimeRange(event.eventStartTime, event.eventEndTime) ||
     event.eventLocation?.trim()
   );
+}
+
+export function isEventPrimaryActionLabel(label: string): boolean {
+  const l = label.toLowerCase();
+  if (l.includes('google calendar') || l.includes('apple calendar')) return false;
+  if (l.includes('calendar') && !l.includes('rsvp')) return false;
+  return true;
 }
 
 export function eventPostHasActionButtons(event: { actionButtons?: string | null }): boolean {

@@ -105,7 +105,7 @@ export default function LikedNewsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fafafa',
+    backgroundColor: 'transparent',
   },
   centered: {
     flex: 1,

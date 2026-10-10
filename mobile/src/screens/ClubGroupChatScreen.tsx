@@ -282,7 +282,7 @@ export default function ClubGroupChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   flex: { flex: 1 },
   header: {
     flexDirection: 'row',

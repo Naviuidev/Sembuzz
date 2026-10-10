@@ -9,6 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import { requestPasswordResetOtp, resetPassword } from '../services/userAuth';
+import { authModalTheme } from '../styles/authModalTheme';
 
 type ForgotStep = 'email' | 'reset';
 
@@ -136,7 +137,7 @@ export function UserForgotPasswordPanel({
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={authModalTheme.successPillText} />
             ) : (
               <Text style={styles.modalSignInText}>Send OTP</Text>
             )}
@@ -194,7 +195,7 @@ export function UserForgotPasswordPanel({
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={authModalTheme.successPillText} />
             ) : (
               <Text style={styles.modalSignInText}>Reset password</Text>
             )}

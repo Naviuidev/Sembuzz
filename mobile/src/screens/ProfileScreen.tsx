@@ -176,7 +176,7 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: 16, paddingBottom: 40 },
   heading: { fontSize: 22, fontWeight: '700', color: '#1a1f2e' },
   subheading: { marginTop: 6, marginBottom: 16, fontSize: 14, color: '#6c757d' },

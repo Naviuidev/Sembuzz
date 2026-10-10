@@ -297,7 +297,7 @@ export default function BlogsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fafafa' },
+  container: { flex: 1, backgroundColor: 'transparent' },
   header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, gap: 8 },
   headerTitleRow: {
     flexDirection: 'row',

@@ -30,6 +30,13 @@ export interface CategoryPublic {
   subcategories: { id: string; name: string }[];
 }
 
+export interface ExternalCategoryPublic {
+  id: string;
+  name: string;
+  description?: string | null;
+  sortOrder?: number;
+}
+
 export interface UpcomingPostPublic {
   id: string;
   schoolId: string;
@@ -167,6 +174,20 @@ export async function getSchoolFilterSettings(schoolId?: string | null): Promise
   if (sid) params.schoolId = sid;
   const response = await api.get<SchoolFilterSettings>('/events/school-filter-settings', { params });
   return response.data ?? { filtersEnabled: false, filtersVisibility: null };
+}
+
+export async function getSchoolExternalEnabled(schoolId: string): Promise<boolean> {
+  const sid = String(schoolId ?? '').trim();
+  if (!sid) return false;
+  const response = await api.get<{ enabled?: boolean }>('/events/school-external-enabled', {
+    params: { schoolId: sid },
+  });
+  return Boolean(response.data?.enabled);
+}
+
+export async function getExternalCategories(): Promise<ExternalCategoryPublic[]> {
+  const response = await api.get<ExternalCategoryPublic[]>('/events/external-categories');
+  return Array.isArray(response.data) ? response.data : [];
 }
 
 export async function getScheduledEvents(schoolId: string): Promise<ApprovedEventPublic[]> {
