@@ -34,10 +34,15 @@ import {
 } from './EventPostPublicContent';
 import {
   parseEventActionButtonsPublic,
-  INSHORTS_FEED_DESCRIPTION_MAX_WORDS,
+  computeInshortsFeedDescriptionMaxLines,
+  computeInshortsFeedDescriptionMaxWords,
   truncateWords,
 } from '../utils/eventPostPublic';
 import { feedActionPillColors } from '../utils/feedActionPills';
+import { TOOLBAR_ICON_SIZE } from '../navigation/tabBarMetrics';
+
+/** Overlay on post hero — icon matches tabs; slightly smaller hit than full toolbar slot. */
+const FEED_ENGAGE_BTN_SIZE = TOOLBAR_ICON_SIZE + 8;
 import {
   formatPostedDateDisplay,
   formatRelativeTime,
@@ -45,11 +50,7 @@ import {
 } from '../utils/formatRelativeTime';
 
 export { formatRelativeTime };
-import HeartIcon from 'react-native-bootstrap-icons/icons/heart';
-import HeartFillIcon from 'react-native-bootstrap-icons/icons/heart-fill';
-import BookmarkIcon from 'react-native-bootstrap-icons/icons/bookmark';
-import BookmarkFillIcon from 'react-native-bootstrap-icons/icons/bookmark-fill';
-import ChatIcon from 'react-native-bootstrap-icons/icons/chat';
+import { Ionicons } from '@expo/vector-icons';
 
 const SPONSORED_AD_BG = '#f1f7ff';
 const INFO_PILL_BG = '#cff4fc';
@@ -65,26 +66,30 @@ function parseImageUrlsJson(value: string | null | undefined): string[] {
   }
 }
 
-/** Vertical padding on `pageRoot` (paddingVertical: 4). */
-const FEED_PAGE_ROOT_PAD_Y = 8;
+/** Vertical padding on `pageRoot` (top only; bottom flush with feed slide). */
+const FEED_PAGE_ROOT_PAD_TOP = 4;
+const FEED_PAGE_ROOT_PAD_BOTTOM = 0;
+const FEED_PAGE_ROOT_PAD_Y = FEED_PAGE_ROOT_PAD_TOP + FEED_PAGE_ROOT_PAD_BOTTOM;
+/** School row under hero (`metaRow` padding + logo). */
+const FEED_META_ROW_BUDGET = 54;
+/** Minimum body under hero for title, meta, know more, posted date (footer pills are separate). */
+const FEED_POST_DETAILS_MIN = 176;
 
 function feedPageInnerHeight(pageHeight: number): number {
   return Math.max(160, pageHeight - FEED_PAGE_ROOT_PAD_Y);
 }
 
-/** Shrink hero when the card has CTAs + posted date so the bottom meta is not clipped in a fixed page. */
-function computeFeedHeroHeight(
-  pageHeight: number,
-  actionButtonCount: number,
-  hasPostedDate: boolean,
-): number {
-  const textBudget = 52 + 96 + 132 + 20;
-  const actionBudget = actionButtonCount > 0 ? 10 + Math.ceil(actionButtonCount / 2) * 46 : 0;
-  const dateBudget = hasPostedDate ? 34 : 0;
-  const reserved = textBudget + actionBudget + dateBudget;
-  const maxByRatio = Math.round(pageHeight * 0.42);
+/**
+ * Hero height — action pills are pinned in `feedCardFooter` (not in the scroll view).
+ * Description fills remaining flex; word limit is computed from the description slot height.
+ */
+function computeFeedHeroHeight(pageHeight: number, actionButtonCount: number): number {
+  const footerBudget =
+    actionButtonCount > 0 ? 12 + Math.ceil(actionButtonCount / 2) * 50 + 12 : 0;
+  const reserved = FEED_META_ROW_BUDGET + footerBudget + FEED_POST_DETAILS_MIN;
+  const maxByRatio = Math.round(pageHeight * 0.4);
   const maxByPage = pageHeight - reserved;
-  return Math.max(100, Math.min(maxByRatio, maxByPage));
+  return Math.max(112, Math.min(maxByRatio, maxByPage));
 }
 
 function InshortsEventPage({
@@ -121,8 +126,7 @@ function InshortsEventPage({
   const actionButtons = parseEventActionButtonsPublic(event.actionButtons);
   const postedDisplay = formatPostedDateDisplay(getPostedDateIso(event));
   const innerPageHeight = feedPageInnerHeight(pageHeight);
-  const imgH = computeFeedHeroHeight(innerPageHeight, actionButtons.length, !!postedDisplay);
-  const bodyScrollMaxHeight = Math.max(120, innerPageHeight - imgH - 54);
+  const imgH = computeFeedHeroHeight(innerPageHeight, actionButtons.length);
   const [knowMoreChooserVisible, setKnowMoreChooserVisible] = React.useState(false);
   const [inAppPostVisible, setInAppPostVisible] = React.useState(false);
   const sourceUrl = event.externalLink?.trim() ?? '';
@@ -134,6 +138,21 @@ function InshortsEventPage({
   const [deleteId, setDeleteId] = React.useState<string | null>(null);
   const [authHintVisible, setAuthHintVisible] = React.useState(false);
   const authHintTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [descSlotHeight, setDescSlotHeight] = React.useState(0);
+  const [descSlotWidth, setDescSlotWidth] = React.useState(0);
+  const trimmedDesc = (event.description ?? '').trim();
+  const descriptionMaxWords = React.useMemo(
+    () => computeInshortsFeedDescriptionMaxWords(descSlotHeight, descSlotWidth || undefined),
+    [descSlotHeight, descSlotWidth],
+  );
+  const descriptionMaxLines = React.useMemo(
+    () => computeInshortsFeedDescriptionMaxLines(descSlotHeight),
+    [descSlotHeight],
+  );
+  const { truncated: descNeedsKnowMore } = React.useMemo(
+    () => truncateWords(trimmedDesc, descriptionMaxWords),
+    [trimmedDesc, descriptionMaxWords],
+  );
 
   React.useEffect(() => {
     if (banner?.id) recordBannerAdView(banner.id).catch(() => {});
@@ -244,11 +263,11 @@ function InshortsEventPage({
                 hitSlop={8}
                 accessibilityLabel={isLiked ? 'Unlike' : 'Like'}
               >
-                {isLiked ? (
-                  <HeartFillIcon width={20} height={20} fill="#ff4d6a" />
-                ) : (
-                  <HeartIcon width={20} height={20} fill="#475569" />
-                )}
+                <Ionicons
+                  name={isLiked ? 'heart' : 'heart-outline'}
+                  size={TOOLBAR_ICON_SIZE}
+                  color={isLiked ? '#ff4d6a' : '#475569'}
+                />
               </TouchableOpacity>
               <Text style={styles.engagePillCount}>{likeCount}</Text>
             </View>
@@ -259,11 +278,11 @@ function InshortsEventPage({
                 hitSlop={8}
                 accessibilityLabel={isSaved ? 'Unsave' : 'Save'}
               >
-                {isSaved ? (
-                  <BookmarkFillIcon width={19} height={19} fill="#111827" />
-                ) : (
-                  <BookmarkIcon width={19} height={19} fill="#475569" />
-                )}
+                <Ionicons
+                  name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                  size={TOOLBAR_ICON_SIZE}
+                  color={isSaved ? '#111827' : '#475569'}
+                />
               </TouchableOpacity>
             </View>
             {event.commentsEnabled ? (
@@ -274,7 +293,7 @@ function InshortsEventPage({
                   hitSlop={8}
                   accessibilityLabel="Comments"
                 >
-                  <ChatIcon width={19} height={19} fill="#475569" />
+                  <Ionicons name="chatbubble-ellipses-outline" size={TOOLBAR_ICON_SIZE} color="#475569" />
                 </TouchableOpacity>
                 <Text style={styles.engagePillCount}>{commentCount}</Text>
               </View>
@@ -288,71 +307,90 @@ function InshortsEventPage({
             {event.school?.name ?? 'School'}
           </Text>
         </View>
-        <ScrollView
-          style={[styles.cardBodyScroll, { maxHeight: bodyScrollMaxHeight }]}
-          contentContainerStyle={styles.cardBodyScrollContent}
-          nestedScrollEnabled
-          showsVerticalScrollIndicator={false}
-          bounces={false}
-        >
-          <View style={styles.cardBody}>
+        <View style={styles.cardBodyColumn}>
+          <View style={styles.cardBodyFill}>
             <View style={styles.textBlock}>
-              <Text style={styles.headline} numberOfLines={4}>
+              <Text style={styles.headline} numberOfLines={3}>
                 {event.title}
               </Text>
               <View style={styles.postFieldsSection}>
                 <EventPostPublicMeta event={event} compact metaChips />
-                <EventPostPublicDescriptionRow
-                  event={event}
-                  compact
-                  hideKnowMore
-                  inlineKnowMorePill
-                  onInlineKnowMorePress={openKnowMoreChooser}
-                  descriptionMaxWords={INSHORTS_FEED_DESCRIPTION_MAX_WORDS}
-                />
-                {actionButtons.length > 0 ? (
-                  <View style={styles.feedActionButtonsRow}>
-                    {actionButtons.map((b, index) => {
-                      const colors = feedActionPillColors(b.label, index);
-                      return (
-                        <TouchableOpacity
-                          key={`${b.label}-${b.url}`}
-                          style={[styles.footerActionPill, { backgroundColor: colors.bg }]}
-                          onPress={() => Linking.openURL(b.url).catch(() => {})}
-                          activeOpacity={0.85}
-                          accessibilityRole="button"
-                        >
-                          <Text style={[styles.footerActionPillText, { color: colors.text }]} numberOfLines={1}>
-                            {b.label}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                ) : null}
-                {postedDisplay ? (
-                  <Text style={styles.postedDateText}>{postedDisplay}</Text>
-                ) : null}
+                <View
+                  style={styles.descSlotFlex}
+                  onLayout={(e) => {
+                    const { height, width } = e.nativeEvent.layout;
+                    setDescSlotHeight(height);
+                    setDescSlotWidth(width);
+                  }}
+                >
+                  {trimmedDesc ? (
+                    <EventPostPublicDescriptionRow
+                      event={event}
+                      compact
+                      hideKnowMore
+                      stackedFeedDescription
+                      descriptionMaxWords={descriptionMaxWords}
+                      descriptionMaxLines={descriptionMaxLines}
+                    />
+                  ) : null}
+                </View>
+                <View style={styles.postFieldsTail}>
+                  {descNeedsKnowMore ? (
+                    <TouchableOpacity
+                      style={styles.feedKnowMorePill}
+                      onPress={openKnowMoreChooser}
+                      activeOpacity={0.85}
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.feedKnowMorePillText}>Know more</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  {postedDisplay ? (
+                    <Text style={styles.postedDateText}>{postedDisplay}</Text>
+                  ) : null}
+                </View>
               </View>
               {banner ? (
-              <TouchableOpacity
-                style={styles.inlineBannerBlock}
-                onPress={() => onBannerClick(banner)}
-                activeOpacity={0.9}
-                accessibilityRole="button"
-                accessibilityLabel="Open banner ad"
-              >
-                <Text style={styles.inlineBannerTag}>Ad Banner</Text>
-                <Image
-                  source={{ uri: imageSrc(banner.imageUrl) }}
-                  style={styles.inlineBannerImg}
-                  resizeMode="cover"
-                />
-              </TouchableOpacity>
-            ) : null}
+                <TouchableOpacity
+                  style={styles.inlineBannerBlock}
+                  onPress={() => onBannerClick(banner)}
+                  activeOpacity={0.9}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open banner ad"
+                >
+                  <Text style={styles.inlineBannerTag}>Ad Banner</Text>
+                  <Image
+                    source={{ uri: imageSrc(banner.imageUrl) }}
+                    style={styles.inlineBannerImg}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              ) : null}
             </View>
           </View>
-        </ScrollView>
+          {actionButtons.length > 0 ? (
+            <View style={styles.feedCardFooter}>
+              <View style={styles.feedActionButtonsRow}>
+                {actionButtons.map((b, index) => {
+                  const colors = feedActionPillColors(b.label, index);
+                  return (
+                    <TouchableOpacity
+                      key={`${b.label}-${b.url}`}
+                      style={[styles.footerActionPill, { backgroundColor: colors.bg }]}
+                      onPress={() => Linking.openURL(b.url).catch(() => {})}
+                      activeOpacity={0.85}
+                      accessibilityRole="button"
+                    >
+                      <Text style={[styles.footerActionPillText, { color: colors.text }]} numberOfLines={1}>
+                        {b.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          ) : null}
+        </View>
       </View>
 
       <Modal
@@ -727,27 +765,61 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     justifyContent: 'flex-start',
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingTop: FEED_PAGE_ROOT_PAD_TOP,
+    paddingBottom: FEED_PAGE_ROOT_PAD_BOTTOM,
   },
   pageRootTopAligned: {
     justifyContent: 'flex-start',
   },
   card: {
     flex: 1,
+    flexDirection: 'column',
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: 'transparent',
     alignSelf: 'stretch',
   },
-  cardBody: {
+  cardBodyFill: {
+    flex: 1,
+    minHeight: 0,
     alignSelf: 'stretch',
   },
-  cardBodyScroll: {
+  cardBodyColumn: {
+    flex: 1,
+    minHeight: 0,
+    flexDirection: 'column',
+  },
+  descSlotFlex: {
+    flex: 1,
+    minHeight: 0,
     alignSelf: 'stretch',
   },
-  cardBodyScrollContent: {
-    flexGrow: 1,
-    paddingBottom: 4,
+  postFieldsTail: {
+    flexShrink: 0,
+    gap: 8,
+    alignItems: 'flex-start',
+  },
+  feedKnowMorePill: {
+    backgroundColor: '#212529',
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    alignSelf: 'flex-end',
+  },
+  feedKnowMorePillText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  feedCardFooter: {
+    flexShrink: 0,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(0, 0, 0, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+    zIndex: 2,
   },
   feedActionButtonsRow: {
     flexDirection: 'row',
@@ -755,7 +827,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     alignItems: 'center',
     gap: 8,
-    marginTop: 8,
+    marginTop: 0,
   },
   infoActionPill: {
     backgroundColor: INFO_PILL_BG,
@@ -812,7 +884,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.9)',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(15,23,42,0.12)',
-    gap: 2,
+    gap: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.16,
@@ -820,26 +892,25 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   engagePillBtn: {
-    paddingHorizontal: 4,
-    paddingVertical: 2,
+    width: FEED_ENGAGE_BTN_SIZE,
+    height: FEED_ENGAGE_BTN_SIZE,
     justifyContent: 'center',
     alignItems: 'center',
   },
   engageActionGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    gap: 0,
   },
   engagePillCount: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
     color: '#1a1f2e',
-    lineHeight: 12,
-    marginRight: 4,
-    minWidth: 14,
-    textAlignVertical: 'center',
+    lineHeight: TOOLBAR_ICON_SIZE,
+    marginRight: 2,
+    minWidth: 16,
+    textAlign: 'center',
     includeFontPadding: false,
-    marginTop: 0,
   },
   authHintBubble: {
     marginLeft: 6,
@@ -884,13 +955,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   textBlock: {
+    flex: 1,
+    minHeight: 0,
     paddingHorizontal: 14,
     paddingTop: 4,
-    paddingBottom: 12,
+    paddingBottom: 8,
   },
   postFieldsSection: {
+    flex: 1,
+    minHeight: 0,
     marginTop: 6,
-    gap: 10,
+    gap: 8,
   },
   titleRow: {
     flexDirection: 'row',
@@ -970,7 +1045,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   postedDateText: {
-    marginTop: 10,
+    marginTop: 0,
     fontSize: 14,
     fontWeight: '600',
     color: '#334155',

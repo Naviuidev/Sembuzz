@@ -32,6 +32,10 @@ type Props = {
   metaChips?: boolean;
   /** Truncated teaser + “....” + info pill on the same row (feed cards). */
   inlineKnowMorePill?: boolean;
+  /** Description only; parent renders Know more / date below (no inner scroll). */
+  stackedFeedDescription?: boolean;
+  /** Hard cap on description lines when `stackedFeedDescription` is set. */
+  descriptionMaxLines?: number;
   /** Feed “Know more” opens chooser instead of expanding inline. */
   onInlineKnowMorePress?: () => void;
 };
@@ -56,6 +60,8 @@ export function EventPostPublicDescriptionRow({
   onDescExpand,
   descriptionMaxWords,
   inlineKnowMorePill,
+  stackedFeedDescription,
+  descriptionMaxLines,
   onInlineKnowMorePress,
 }: Props) {
   return (
@@ -69,6 +75,8 @@ export function EventPostPublicDescriptionRow({
       onDescExpand={onDescExpand}
       descriptionMaxWords={descriptionMaxWords}
       inlineKnowMorePill={inlineKnowMorePill}
+      stackedFeedDescription={stackedFeedDescription}
+      descriptionMaxLines={descriptionMaxLines}
       onInlineKnowMorePress={onInlineKnowMorePress}
     />
   );
@@ -91,6 +99,8 @@ export function EventPostDetailBody({
   descriptionMaxWords,
   metaChips,
   inlineKnowMorePill,
+  stackedFeedDescription,
+  descriptionMaxLines,
   onInlineKnowMorePress,
 }: Props & { metaOnly?: boolean; descOnly?: boolean; actionsOnly?: boolean }) {
   const [descExpandedLocal, setDescExpandedLocal] = useState(false);
@@ -139,36 +149,41 @@ export function EventPostDetailBody({
 
       {showMeta ? (
         metaChips ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.metaChipsRow}
-          >
-            {dateLabel ? (
-              <View style={[styles.metaChip, styles.metaChipSuccess]}>
-                <Ionicons name="calendar-outline" size={14} color="#0f5132" />
-                <Text style={[styles.metaChipText, styles.metaChipTextSuccess]} numberOfLines={1}>
-                  {dateLabel}
-                </Text>
-              </View>
-            ) : null}
-            {timeLabel ? (
-              <View style={[styles.metaChip, styles.metaChipWarning]}>
-                <Ionicons name="time-outline" size={14} color="#664d03" />
-                <Text style={[styles.metaChipText, styles.metaChipTextWarning]} numberOfLines={1}>
-                  {timeLabel}
-                </Text>
-              </View>
+          <View style={styles.metaChipsWrap}>
+            {dateLabel || timeLabel ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.metaChipsScroll}
+                contentContainerStyle={styles.metaChipsRow}
+              >
+                {dateLabel ? (
+                  <View style={[styles.metaChip, styles.metaChipSuccess]}>
+                    <Ionicons name="calendar-outline" size={14} color="#0f5132" />
+                    <Text style={[styles.metaChipText, styles.metaChipTextSuccess]} numberOfLines={1}>
+                      {dateLabel}
+                    </Text>
+                  </View>
+                ) : null}
+                {timeLabel ? (
+                  <View style={[styles.metaChip, styles.metaChipWarning]}>
+                    <Ionicons name="time-outline" size={14} color="#664d03" />
+                    <Text style={[styles.metaChipText, styles.metaChipTextWarning]} numberOfLines={1}>
+                      {timeLabel}
+                    </Text>
+                  </View>
+                ) : null}
+              </ScrollView>
             ) : null}
             {location ? (
-              <View style={[styles.metaChip, styles.metaChipInfo]}>
-                <Ionicons name="location-outline" size={14} color="#055160" />
-                <Text style={[styles.metaChipText, styles.metaChipTextInfo]} numberOfLines={1}>
+              <View style={[styles.metaChip, styles.metaChipInfo, styles.metaChipLocation]}>
+                <Ionicons name="location-outline" size={14} color="#055160" style={styles.metaChipLocationIcon} />
+                <Text style={[styles.metaChipText, styles.metaChipTextInfo, styles.metaChipLocationText]}>
                   {location}
                 </Text>
               </View>
             ) : null}
-          </ScrollView>
+          </View>
         ) : (
           <View style={styles.metaBlock}>
             {dateLabel ? (
@@ -200,14 +215,21 @@ export function EventPostDetailBody({
       ) : null}
 
       {showDesc ? (
-        inlineKnowMorePill && descTruncated && !descExpanded ? (
-          <View style={styles.descKnowMoreRow}>
-            <Text style={styles.teaserFlex}>
+        stackedFeedDescription && !descExpanded ? (
+          <Text
+            style={[styles.teaser, styles.teaserFeedBlock, styles.teaserStackedFeed]}
+            numberOfLines={descriptionMaxLines}
+          >
+            {descPreviewRaw}
+          </Text>
+        ) : inlineKnowMorePill && descTruncated && !descExpanded ? (
+          <View style={styles.descKnowMoreBlock}>
+            <Text style={styles.teaserBlock}>
               {descPreview}
               <Text style={styles.teaserEllipsis}>....</Text>
             </Text>
             <TouchableOpacity
-              style={styles.inlineKnowMorePill}
+              style={styles.inlineKnowMorePillEnd}
               onPress={onInlineKnowMorePress ?? expandDesc}
               activeOpacity={0.85}
               accessibilityRole="button"
@@ -216,7 +238,7 @@ export function EventPostDetailBody({
             </TouchableOpacity>
           </View>
         ) : (
-          <Text style={styles.teaser}>
+          <Text style={[styles.teaser, inlineKnowMorePill && styles.teaserFeedBlock]}>
             {descExpanded ? trimmedDesc : descPreviewRaw}
             {!descExpanded && descTruncated && !inlineKnowMorePill ? '…' : null}
           </Text>
@@ -280,6 +302,13 @@ const styles = StyleSheet.create({
   schoolBadgeText: { fontSize: 11, fontWeight: '800', color: TEXT },
   title: { fontSize: 18, fontWeight: '700', color: TEXT, lineHeight: 24, marginBottom: 12 },
   metaBlock: { gap: 8, marginBottom: 12 },
+  metaChipsWrap: {
+    gap: 8,
+    marginBottom: 8,
+  },
+  metaChipsScroll: {
+    flexGrow: 0,
+  },
   metaChipsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -298,6 +327,18 @@ const styles = StyleSheet.create({
   metaChipSuccess: { backgroundColor: '#d1e7dd' },
   metaChipWarning: { backgroundColor: '#fff3cd' },
   metaChipInfo: { backgroundColor: '#cff4fc' },
+  metaChipLocation: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    alignItems: 'flex-start',
+    flexShrink: 1,
+  },
+  metaChipLocationIcon: {
+    marginTop: 2,
+  },
+  metaChipLocationText: {
+    flexShrink: 1,
+  },
   metaChipText: { fontSize: 12, fontWeight: '600', flexShrink: 1 },
   metaChipTextSuccess: { color: '#0f5132' },
   metaChipTextWarning: { color: '#664d03' },
@@ -316,11 +357,27 @@ const styles = StyleSheet.create({
   },
   categoryText: { fontSize: 13, fontWeight: '600', color: '#1d4ed8' },
   teaser: { fontSize: 14, lineHeight: 22, color: MUTED, marginBottom: 6 },
+  teaserFeedBlock: {
+    marginBottom: 8,
+  },
+  teaserStackedFeed: {
+    marginBottom: 0,
+  },
   descKnowMoreRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     width: '100%',
     marginBottom: 4,
+  },
+  descKnowMoreBlock: {
+    width: '100%',
+    marginBottom: 8,
+    gap: 8,
+  },
+  teaserBlock: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: MUTED,
   },
   teaserFlex: {
     flex: 1,
@@ -341,6 +398,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     flexShrink: 0,
     marginBottom: 1,
+  },
+  inlineKnowMorePillEnd: {
+    backgroundColor: '#212529',
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    alignSelf: 'flex-end',
   },
   inlineKnowMorePillText: {
     color: '#fff',

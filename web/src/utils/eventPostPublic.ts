@@ -1,8 +1,38 @@
 import type { ApprovedEventPublic } from '../services/public-events.service';
 import type { EventActionButtonStored } from '../types/event-post';
 import { imageSrc } from './image';
+import { eventDateToYmd } from './eventFeedDate';
 
 export const EVENT_DESCRIPTION_MAX_WORDS = 60;
+
+/** Posted-on label for feed cards (publish / created time, not event date). */
+export function getPostedDateIso(event: {
+  publishedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}): string {
+  return (
+    event.publishedAt?.trim() ||
+    event.createdAt?.trim() ||
+    event.updatedAt?.trim() ||
+    ''
+  );
+}
+
+export function formatPostedDateDisplay(iso: string): string {
+  if (!iso) return '';
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return '';
+  try {
+    return new Date(iso).toLocaleDateString(undefined, {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  } catch {
+    return '';
+  }
+}
 
 export function parseEventImageUrls(imageUrls: string | null | undefined): string[] {
   if (!imageUrls) return [];
@@ -78,12 +108,18 @@ function formatHmDisplay(hm: string): string {
   return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
+function normalizeEventTimeHm(raw: string | null | undefined): string {
+  if (raw == null || String(raw).trim() === '') return '';
+  const m = String(raw).trim().match(/^([01]\d|2[0-3]):([0-5]\d)/);
+  return m ? `${m[1]}:${m[2]}` : '';
+}
+
 export function formatEventTimeRange(
   start: string | null | undefined,
   end: string | null | undefined,
 ): string | null {
-  const s = typeof start === 'string' && /^([01]\d|2[0-3]):([0-5]\d)$/.test(start.trim()) ? start.trim() : '';
-  const e = typeof end === 'string' && /^([01]\d|2[0-3]):([0-5]\d)$/.test(end.trim()) ? end.trim() : '';
+  const s = normalizeEventTimeHm(start);
+  const e = normalizeEventTimeHm(end);
   if (s && e) return `${formatHmDisplay(s)} – ${formatHmDisplay(e)}`;
   if (s) return formatHmDisplay(s);
   if (e) return formatHmDisplay(e);
@@ -91,9 +127,8 @@ export function formatEventTimeRange(
 }
 
 export function formatEventOccurrenceDate(iso: string | null | undefined): string | null {
-  if (!iso?.trim()) return null;
-  const ymd = iso.slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+  const ymd = eventDateToYmd(iso);
+  if (!ymd) return null;
   const d = new Date(`${ymd}T12:00:00.000Z`);
   if (Number.isNaN(d.getTime())) return null;
   return d.toLocaleDateString(undefined, {
@@ -106,9 +141,8 @@ export function formatEventOccurrenceDate(iso: string | null | undefined): strin
 
 /** Card-style date e.g. Apr 24, 2026 */
 export function formatEventOccurrenceDateShort(iso: string | null | undefined): string | null {
-  if (!iso?.trim()) return null;
-  const ymd = iso.slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+  const ymd = eventDateToYmd(iso);
+  if (!ymd) return null;
   const d = new Date(`${ymd}T12:00:00.000Z`);
   if (Number.isNaN(d.getTime())) return null;
   return d.toLocaleDateString(undefined, {
@@ -211,5 +245,6 @@ export function approvedEventToCreatePostPreview(event: ApprovedEventPublic) {
     coverSrc,
     previewMode: 'web' as const,
     commentsEnabled: event.commentsEnabled,
+    postedDateLabel: formatPostedDateDisplay(getPostedDateIso(event)),
   };
 }

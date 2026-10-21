@@ -1,6 +1,38 @@
+import { eventDateToYmd } from './eventFeedDate';
+
 export const EVENT_DESCRIPTION_MAX_WORDS = 60;
-/** Inshorts home feed card teaser length before “Know more”. */
+/** Fallback teaser length before layout measures the description slot. */
 export const INSHORTS_FEED_DESCRIPTION_MAX_WORDS = 20;
+/** Matches `EventPostPublicContent` feed teaser line height. */
+export const INSHORTS_FEED_DESC_LINE_HEIGHT = 22;
+const INSHORTS_FEED_DESC_MIN_WORDS = 8;
+const INSHORTS_FEED_DESC_MAX_WORDS = 120;
+
+/** Max visible description lines for a measured slot height (no inner scroll). */
+export function computeInshortsFeedDescriptionMaxLines(descAreaHeight: number): number {
+  if (!Number.isFinite(descAreaHeight) || descAreaHeight < 8) return 3;
+  return Math.max(1, Math.floor(descAreaHeight / INSHORTS_FEED_DESC_LINE_HEIGHT));
+}
+
+/**
+ * Word budget for the feed description slot from onLayout height (and optional content width).
+ */
+export function computeInshortsFeedDescriptionMaxWords(
+  descAreaHeight: number,
+  contentWidth = 340,
+): number {
+  if (!Number.isFinite(descAreaHeight) || descAreaHeight < INSHORTS_FEED_DESC_LINE_HEIGHT) {
+    return INSHORTS_FEED_DESCRIPTION_MAX_WORDS;
+  }
+  const maxLines = computeInshortsFeedDescriptionMaxLines(descAreaHeight);
+  const approxCharsPerLine = Math.max(28, Math.floor(contentWidth / 7));
+  const wordsPerLine = Math.max(5, Math.floor(approxCharsPerLine / 5));
+  const words = maxLines * wordsPerLine;
+  return Math.min(
+    INSHORTS_FEED_DESC_MAX_WORDS,
+    Math.max(INSHORTS_FEED_DESC_MIN_WORDS, words),
+  );
+}
 
 export function splitEventDescription(text: string): { teaser: string; about: string | null } {
   const trimmed = text.trim();
@@ -43,6 +75,12 @@ export function parseEventActionButtonsPublic(
   }
 }
 
+function normalizeEventTimeHm(raw: string | null | undefined): string {
+  if (raw == null || String(raw).trim() === '') return '';
+  const m = String(raw).trim().match(/^([01]\d|2[0-3]):([0-5]\d)/);
+  return m ? `${m[1]}:${m[2]}` : '';
+}
+
 function formatHmDisplay(hm: string): string {
   const [hStr, mStr] = hm.split(':');
   const h = Number(hStr);
@@ -57,8 +95,8 @@ export function formatEventTimeRange(
   start: string | null | undefined,
   end: string | null | undefined,
 ): string | null {
-  const s = typeof start === 'string' && /^([01]\d|2[0-3]):([0-5]\d)$/.test(start.trim()) ? start.trim() : '';
-  const e = typeof end === 'string' && /^([01]\d|2[0-3]):([0-5]\d)$/.test(end.trim()) ? end.trim() : '';
+  const s = normalizeEventTimeHm(start);
+  const e = normalizeEventTimeHm(end);
   if (s && e) return `${formatHmDisplay(s)} – ${formatHmDisplay(e)}`;
   if (s) return formatHmDisplay(s);
   if (e) return formatHmDisplay(e);
@@ -66,9 +104,8 @@ export function formatEventTimeRange(
 }
 
 export function formatEventOccurrenceDate(iso: string | null | undefined): string | null {
-  if (!iso?.trim()) return null;
-  const ymd = iso.slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+  const ymd = eventDateToYmd(iso);
+  if (!ymd) return null;
   const d = new Date(`${ymd}T12:00:00.000Z`);
   if (Number.isNaN(d.getTime())) return null;
   return d.toLocaleDateString(undefined, {
@@ -80,9 +117,8 @@ export function formatEventOccurrenceDate(iso: string | null | undefined): strin
 }
 
 export function formatEventOccurrenceDateShort(iso: string | null | undefined): string | null {
-  if (!iso?.trim()) return null;
-  const ymd = iso.slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+  const ymd = eventDateToYmd(iso);
+  if (!ymd) return null;
   const d = new Date(`${ymd}T12:00:00.000Z`);
   if (Number.isNaN(d.getTime())) return null;
   return d.toLocaleDateString(undefined, {
@@ -138,6 +174,7 @@ export function eventPostHasActionButtons(event: { actionButtons?: string | null
 }
 
 export type EventPostPublicFields = {
+  title?: string;
   eventDate?: string | null;
   eventStartTime?: string | null;
   eventEndTime?: string | null;
@@ -145,4 +182,10 @@ export type EventPostPublicFields = {
   actionButtons?: string | null;
   externalLink?: string | null;
   description?: string | null;
+  imageUrls?: string | null;
+  school?: { name?: string | null; image?: string | null } | null;
+  subCategory?: { name?: string | null; id?: string } | null;
+  publishedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 };

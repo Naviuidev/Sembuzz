@@ -22,7 +22,7 @@ import { ClubGroupChatWidget } from '../components/ClubGroupChatWidget';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { MainTabParamList } from '../navigation/types';
 import { authModalTheme } from '../styles/authModalTheme';
-import { MAIN_TAB_BAR_BODY_HEIGHT } from '../navigation/tabBarMetrics';
+import { MAIN_TAB_BAR_BODY_HEIGHT, TOOLBAR_ICON_SIZE } from '../navigation/tabBarMetrics';
 
 const PLATFORM_COLORS: Record<string, string> = {
   facebook: '#1877F2',
@@ -131,7 +131,7 @@ export default function AppsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const scrollBottomPad = MAIN_TAB_BAR_BODY_HEIGHT + insets.bottom + 16;
+  const scrollBottomPad = MAIN_TAB_BAR_BODY_HEIGHT + 16;
 
   const fetchAccounts = useCallback(async () => {
     if (authLoading) return;
@@ -224,7 +224,7 @@ export default function AppsScreen() {
           <View style={styles.card}>
             <View style={styles.guestRow}>
               <View style={styles.guestIconCircle}>
-                <Ionicons name="school-outline" size={22} color={authModalTheme.primary} />
+                <Ionicons name="school-outline" size={TOOLBAR_ICON_SIZE} color={authModalTheme.primary} />
               </View>
               <Text style={styles.guestText}>
                 Sign in to see your school’s club pages, group chats, and social links.

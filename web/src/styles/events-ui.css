@@ -293,6 +293,168 @@
   scrollbar-color: rgba(99, 102, 241, 0.25) transparent;
 }
 
+/* Mobile home row — matches mobile EventsScreen (categories + layers tools) */
+.home-feed-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: transparent;
+}
+
+.home-feed-filter-school {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 1;
+  max-width: 42%;
+  border-radius: 999px;
+  border: 1px solid #a7d9b4;
+  background: #ddfbe2;
+  color: #166534;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 8px 12px;
+}
+
+.home-feed-filter-school.is-active {
+  background: #c6f6d5;
+  border-color: #86efac;
+  color: #14532d;
+}
+
+.home-feed-filter-categories {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 8px;
+  overflow-x: auto;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.home-feed-filter-spacer {
+  flex: 1;
+  min-width: 8px;
+}
+
+.home-feed-filter-pill {
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 7px 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.home-feed-filter-pill.is-selected {
+  border-color: #212529;
+  background: #fff;
+  color: #212529;
+  font-weight: 600;
+}
+
+.home-feed-filter-pill.is-emphasis {
+  border-color: #212529;
+  background: #fff;
+  color: #212529;
+  font-weight: 600;
+}
+
+.home-feed-filter-pill.is-active {
+  border-color: #212529;
+  background: #212529;
+  color: #fff;
+  font-weight: 600;
+}
+
+.home-feed-filter-reset {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: #087990;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 6px 4px;
+}
+
+.home-feed-filter-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+.home-feed-filter-icon-btn {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #6c757d;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+}
+
+.home-feed-filter-icon-btn.is-active {
+  background: rgba(13, 202, 240, 0.15);
+  color: #087990;
+}
+
+.home-feed-filter-funnel-wrap {
+  position: relative;
+}
+
+.home-feed-filter-dropdown {
+  position: absolute;
+  top: 46px;
+  right: 0;
+  z-index: 1050;
+  min-width: 260px;
+  max-width: min(92vw, 320px);
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  padding: 12px;
+}
+
+.home-feed-filter-dropdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.home-feed-filter-dropdown-close {
+  border: none;
+  background: transparent;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: #6c757d;
+}
+
+.home-feed-filter-dropdown-label {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6c757d;
+}
+
+.home-feed-filter-dropdown-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .feed-tab-slide {
   animation: feedTabSlide 0.35s var(--events-ease);
 }

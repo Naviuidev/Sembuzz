@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { EventPostDetailLayout } from './EventPostDetailLayout';
+import { formatPostedDateDisplay } from '../utils/eventPostPublic';
 
 function PreviewBody({
   title,
@@ -19,6 +20,7 @@ function PreviewBody({
   layoutVariant,
   liveFeed,
   belowHero,
+  postedDateLabel,
 }: {
   title: string;
   description: string;
@@ -38,6 +40,7 @@ function PreviewBody({
   /** Public home feed: real CTAs, no decorative preview chrome */
   liveFeed?: boolean;
   belowHero?: ReactNode;
+  postedDateLabel?: string;
 }) {
   const devicePreview = layoutVariant === 'device';
   return (
@@ -60,6 +63,14 @@ function PreviewBody({
         accentColor={accentColor}
         className={devicePreview ? 'event-post-detail--device-preview' : 'event-post-detail--web-preview'}
         belowHero={belowHero}
+        metaChips={liveFeed || devicePreview}
+        postedDateLabel={
+          liveFeed
+            ? postedDateLabel
+            : devicePreview
+              ? postedDateLabel || formatPostedDateDisplay(new Date().toISOString())
+              : undefined
+        }
       />
       {commentsEnabled && !liveFeed ? (
         <div className="admin-create-post-preview-comments" aria-hidden>
@@ -92,6 +103,7 @@ export function CreatePostLivePreview({
   commentsEnabled,
   liveFeed,
   belowHero,
+  postedDateLabel,
 }: {
   title: string;
   description: string;
@@ -110,6 +122,7 @@ export function CreatePostLivePreview({
   commentsEnabled?: boolean;
   liveFeed?: boolean;
   belowHero?: ReactNode;
+  postedDateLabel?: string;
 }) {
   const layoutVariant = previewMode === 'web' ? 'web' : 'device';
   const body = (
@@ -131,8 +144,13 @@ export function CreatePostLivePreview({
       layoutVariant={layoutVariant}
       liveFeed={liveFeed}
       belowHero={belowHero}
+      postedDateLabel={postedDateLabel}
     />
   );
+
+  if (liveFeed) {
+    return body;
+  }
 
   if (previewMode === 'web') {
     return (

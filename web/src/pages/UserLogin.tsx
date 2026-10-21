@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { UserForgotPasswordPanel } from '../components/UserForgotPasswordPanel';
+import { PasswordInput } from '../components/PasswordInput';
 import { useUserAuth } from '../contexts/UserAuthContext';
 import { isMobileBrowser, openSembuzzAppWithToken } from '../utils/openSembuzzApp';
 
@@ -107,14 +108,12 @@ export const UserLogin = () => {
                     <label htmlFor="password" className="form-label" style={{ fontWeight: '500' }}>
                       Password
                     </label>
-                    <input
-                      type="password"
-                      className="form-control"
+                    <PasswordInput
                       id="password"
                       required
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      style={{ borderRadius: '8px', padding: '0.75rem' }}
+                      onChange={setPassword}
+                      style={{ borderRadius: '8px' }}
                       placeholder="••••••••"
                     />
                   </div>

@@ -38,6 +38,10 @@ export type EventPostDetailLayoutProps = {
   style?: CSSProperties;
   /** e.g. like / save / comment row directly under the hero (public feed) */
   belowHero?: ReactNode;
+  /** Home feed: colored date / time / location pills (matches mobile). */
+  metaChips?: boolean;
+  /** When post was published (shown under description on live feed). */
+  postedDateLabel?: string;
 };
 
 function schoolBadgeLabel(name: string): string {
@@ -97,6 +101,8 @@ export function EventPostDetailLayout({
   className = '',
   style,
   belowHero,
+  metaChips,
+  postedDateLabel,
 }: EventPostDetailLayoutProps) {
   const [descExpanded, setDescExpanded] = useState(false);
 
@@ -127,7 +133,7 @@ export function EventPostDetailLayout({
 
   return (
     <div
-      className={`event-post-detail${compact ? ' event-post-detail--compact' : ''}${className ? ` ${className}` : ''}`}
+      className={`event-post-detail${compact ? ' event-post-detail--compact' : ''}${metaChips ? ' event-post-detail--meta-chips' : ''}${className ? ` ${className}` : ''}`}
       style={{ '--event-post-accent': accentColor, ...style } as CSSProperties}
     >
       {showHero ? (
@@ -165,26 +171,55 @@ export function EventPostDetailLayout({
       <h2 className="event-post-detail__title">{displayTitle}</h2>
 
       {dateLabel || timeLabel || location ? (
-        <ul className="event-post-detail__meta">
-          {dateLabel ? (
-            <li>
-              <i className="bi bi-calendar3" aria-hidden />
-              {dateLabel}
-            </li>
-          ) : null}
-          {timeLabel ? (
-            <li>
-              <i className="bi bi-clock" aria-hidden />
-              {timeLabel}
-            </li>
-          ) : null}
-          {location ? (
-            <li>
-              <i className="bi bi-geo-alt" aria-hidden />
-              {location}
-            </li>
-          ) : null}
-        </ul>
+        metaChips ? (
+          <div className="event-post-detail__meta-chips-wrap">
+            {dateLabel || timeLabel ? (
+              <div className="event-post-detail__meta-chips-scroll">
+                <div className="event-post-detail__meta-chips-row">
+                  {dateLabel ? (
+                    <span className="event-post-detail__meta-chip event-post-detail__meta-chip--date">
+                      <i className="bi bi-calendar3" aria-hidden />
+                      {dateLabel}
+                    </span>
+                  ) : null}
+                  {timeLabel ? (
+                    <span className="event-post-detail__meta-chip event-post-detail__meta-chip--time">
+                      <i className="bi bi-clock" aria-hidden />
+                      {timeLabel}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+            {location ? (
+              <span className="event-post-detail__meta-chip event-post-detail__meta-chip--location event-post-detail__meta-chip--location-block">
+                <i className="bi bi-geo-alt" aria-hidden />
+                <span>{location}</span>
+              </span>
+            ) : null}
+          </div>
+        ) : (
+          <ul className="event-post-detail__meta">
+            {dateLabel ? (
+              <li>
+                <i className="bi bi-calendar3" aria-hidden />
+                {dateLabel}
+              </li>
+            ) : null}
+            {timeLabel ? (
+              <li>
+                <i className="bi bi-clock" aria-hidden />
+                {timeLabel}
+              </li>
+            ) : null}
+            {location ? (
+              <li>
+                <i className="bi bi-geo-alt" aria-hidden />
+                {location}
+              </li>
+            ) : null}
+          </ul>
+        )
       ) : null}
 
       {categoryLabel ? <span className="event-post-detail__category">{categoryLabel}</span> : null}
@@ -263,6 +298,10 @@ export function EventPostDetailLayout({
             );
           })}
         </div>
+      ) : null}
+
+      {postedDateLabel ? (
+        <p className="event-post-detail__posted-date">{postedDateLabel}</p>
       ) : null}
     </div>
   );

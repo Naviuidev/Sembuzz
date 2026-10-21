@@ -21,10 +21,14 @@ import {
 } from '../services/public-events.service';
 import { buildPublicFeedItems } from '../utils/publicFeed';
 import {
+  collectFeedDatesByMode,
   eventMatchesCalendarDateYmd,
   filterEventsByViewByDate,
   getFeedDateFilterTzOffsetMinutes,
 } from '../utils/eventFeedDate';
+import { FeedCalendarMonthGrid } from '../components/FeedCalendarMonthGrid';
+import { FeedCalendarPostTypePicker } from '../components/FeedCalendarPostTypePicker';
+import { PasswordInput } from '../components/PasswordInput';
 import { InshortsHomeFeed } from '../components/InshortsHomeFeed';
 import { ExternalPublicFeedPanel } from '../components/ExternalPublicFeedPanel';
 import { EventsSearchScreen } from '../components/EventsSearchScreen';
@@ -54,7 +58,8 @@ import {
 import { USER_STUDENT_CHAT_GROUPS_UNREAD_QUERY_KEY, userStudentChatGroupsService } from '../services/user-student-chat-groups.service';
 import { UserForgotPasswordPanel } from '../components/UserForgotPasswordPanel';
 import { EventPostPublicContent } from '../components/EventPostPublicContent';
-import { shouldShowSchoolFilterUi } from '../constants/messagingFeatures';
+import { resolveShowSchoolFilterUi } from '../constants/messagingFeatures';
+import { HomeFeedFilterRow } from '../components/HomeFeedFilterRow';
 
 function formatDate(iso: string) {
   try {
@@ -777,7 +782,7 @@ function SponsoredAdCard({ ad }: { ad: SponsoredAdPublic }) {
 type FilterMode = 'none' | 'search' | 'school' | 'category';
 
 export const PublicEvents = () => {
-  const { user, logout, login } = useUserAuth();
+  const { user, logout, login, loading: authLoading } = useUserAuth();
   const { openChat } = useChatPopup();
   const navigate = useNavigate();
   const eventsFilter = useEventsFilter();
@@ -848,6 +853,43 @@ export const PublicEvents = () => {
   const [loggedInFeedPostTypeFilter, setLoggedInFeedPostTypeFilter] = useState<'event' | 'posted' | null>(
     null,
   );
+  const [feedCalendarVisibleMonth, setFeedCalendarVisibleMonth] = useState(
+    () => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+  );
+  const [calendarModalVisibleMonth, setCalendarModalVisibleMonth] = useState(
+    () => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+  );
+  const [calendarModalPostTypeDraft, setCalendarModalPostTypeDraft] = useState<'event' | 'posted' | null>(
+    null,
+  );
+
+  const feedCalendarMarkerSchoolId = useMemo(() => {
+    if (!user) return schoolId;
+    if (!showAllSchoolsFeed) return schoolId;
+    return allSchoolsFilterSchoolId;
+  }, [user, showAllSchoolsFeed, schoolId, allSchoolsFilterSchoolId]);
+
+  const { data: feedCalendarMarkerEvents = [] } = useQuery({
+    queryKey: ['public', 'events', 'calendar-markers', 'sidebar', feedCalendarMarkerSchoolId ?? 'all'],
+    queryFn: () => publicEventsService.getApproved(feedCalendarMarkerSchoolId ?? undefined),
+    enabled: !!user && !!loggedInFeedPostTypeFilter,
+  });
+
+  const feedCalendarMarkedDates = useMemo(() => {
+    if (!loggedInFeedPostTypeFilter) return new Set<string>();
+    return collectFeedDatesByMode(feedCalendarMarkerEvents, loggedInFeedPostTypeFilter);
+  }, [feedCalendarMarkerEvents, loggedInFeedPostTypeFilter]);
+
+  const { data: guestCalendarMarkerEvents = [] } = useQuery({
+    queryKey: ['public', 'events', 'calendar-markers', 'guest-modal'],
+    queryFn: () => publicEventsService.getApproved(undefined),
+    enabled: calendarFilterOpen && calendarFilterStep === 'date' && !!calendarModalPostTypeDraft,
+  });
+
+  const guestCalendarMarkedDates = useMemo(() => {
+    if (!calendarModalPostTypeDraft) return new Set<string>();
+    return collectFeedDatesByMode(guestCalendarMarkerEvents, calendarModalPostTypeDraft);
+  }, [guestCalendarMarkerEvents, calendarModalPostTypeDraft]);
 
   useEffect(() => {
     if (user && showAllSchoolsFeed) setFilterDropdownOpen(false);
@@ -877,11 +919,23 @@ export const PublicEvents = () => {
       publicEventsService.getSchoolFilterSettings(filterSettingsSchoolId ?? ''),
     enabled: bottomNavActive === 'home' && (!!filterSettingsSchoolId || !user),
   });
-  const showSchoolFilterUi = shouldShowSchoolFilterUi(
-    schoolFilterSettings?.filtersEnabled ?? false,
-    schoolFilterSettings?.filtersVisibility ?? null,
-    !!user,
+  const showSchoolFilterUi = useMemo(
+    () =>
+      resolveShowSchoolFilterUi(
+        schoolFilterSettings?.filtersEnabled ?? false,
+        schoolFilterSettings?.filtersVisibility ?? null,
+        !!user,
+        user?.schoolId ?? schoolId,
+        homeFeedMode,
+      ),
+    [schoolFilterSettings, user, user?.schoolId, schoolId, homeFeedMode],
   );
+
+  const showHomeCategories = !!user && homeFeedMode === 'mySchool' && !!user.schoolId;
+  const showHomeSortPillsInline = !!user && showAllSchoolsFeed;
+  const showHomeFunnel = showSchoolFilterUi && (!user || homeFeedMode === 'mySchool');
+  const showGuestSchoolPicker = showSchoolFilterUi && !user;
+  const showAllSchoolsPicker = showSchoolFilterUi && !!user && showAllSchoolsFeed;
 
   // When user returns from Google OAuth: read success/error from URL and show result
   useEffect(() => {
@@ -1112,7 +1166,7 @@ export const PublicEvents = () => {
   const { data: homeCategories = [] } = useQuery({
     queryKey: ['public', 'events', 'categories', 'content', user?.schoolId ?? ''],
     queryFn: () => publicEventsService.getCategoriesBySchool(user!.schoolId),
-    enabled: bottomNavActive === 'home' && !!user?.schoolId && showSchoolFilterUi,
+    enabled: bottomNavActive === 'home' && showHomeCategories,
   });
 
   const { data: externalCategories = [] } = useQuery({
@@ -1121,12 +1175,14 @@ export const PublicEvents = () => {
     enabled: bottomNavActive === 'home',
   });
   const userSavedSubIds = user?.id ? getUserSubCategoryIds(user.id) : [];
-  const homeContentCategories =
-    userSavedSubIds.length > 0
-      ? homeCategories.filter((cat: CategoryPublic) =>
+  const homeContentCategories = useMemo(() => {
+    if (!homeCategories.length) return [];
+    if (userSavedSubIds.length === 0) return homeCategories;
+    const filtered = homeCategories.filter((cat: CategoryPublic) =>
           cat.subcategories.some((s: { id: string }) => userSavedSubIds.includes(s.id)),
-        )
-      : homeCategories;
+    );
+    return filtered.length > 0 ? filtered : homeCategories;
+  }, [homeCategories, userSavedSubIds]);
 
   const selectedSubCategoryMeta = useMemo(() => {
     if (!selectedSubCategoryIds.length || !homeCategories.length) return [];
@@ -1516,32 +1572,52 @@ export const PublicEvents = () => {
     }
   }, [bottomNavActive]);
 
-  // When navigating with openAuth (or ?openAuth=), open login or signup popup so only the popup UI is used everywhere
+  // When navigating with openAuth (or ?openAuth=), open login or signup popup (guests only).
   useEffect(() => {
+    if (authLoading) return;
     const fromState = (location.state as { openAuth?: 'login' | 'signup' })?.openAuth;
     const fromQuery = searchParams.get('openAuth');
     const openAuth = fromState ?? (fromQuery === 'login' || fromQuery === 'signup' ? fromQuery : null);
+    if (!openAuth) return;
+
+    if (user) {
+      if (fromQuery) {
+        const next = new URLSearchParams(searchParams);
+        next.delete('openAuth');
+        setSearchParams(next, { replace: true });
+      }
+      if (fromState) {
+        navigate({ pathname: location.pathname, search: location.search }, { replace: true, state: null });
+      }
+      return;
+    }
+
     if (openAuth === 'login') {
       setBottomNavActive('settings');
       setSettingsLoginView('login');
       setShowSettingsLoginPopup(true);
       setShowSignupPopup(false);
-      if (fromQuery) {
-        const next = new URLSearchParams(searchParams);
-        next.delete('openAuth');
-        setSearchParams(next, { replace: true });
-      }
     } else if (openAuth === 'signup') {
       setBottomNavActive('settings');
       setShowSignupPopup(true);
       setShowSettingsLoginPopup(false);
-      if (fromQuery) {
-        const next = new URLSearchParams(searchParams);
-        next.delete('openAuth');
-        setSearchParams(next, { replace: true });
-      }
     }
-  }, [location.state, searchParams]);
+
+    if (fromQuery) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('openAuth');
+      setSearchParams(next, { replace: true });
+    }
+    if (fromState) {
+      navigate({ pathname: location.pathname, search: location.search }, { replace: true, state: null });
+    }
+  }, [authLoading, user, location.pathname, location.search, location.state, searchParams, navigate]);
+
+  useEffect(() => {
+    if (!user) return;
+    setShowSettingsLoginPopup(false);
+    setShowSignupPopup(false);
+  }, [user]);
 
   // First-time login: show category selection if user has not completed it
   useEffect(() => {
@@ -1914,10 +1990,24 @@ export const PublicEvents = () => {
   };
 
   const openCalendarFilter = () => {
-    setCalendarFilterDraftDate(toYmd(new Date()));
+    const initial = toYmd(new Date());
+    setCalendarFilterDraftDate(initial);
+    const initialDate = new Date(`${initial}T12:00:00`);
+    setCalendarModalVisibleMonth(new Date(initialDate.getFullYear(), initialDate.getMonth(), 1));
     setCalendarFilterStep('date');
+    setCalendarModalPostTypeDraft(user ? loggedInFeedPostTypeFilter : null);
     setCalendarFilterOpen(true);
     setFilterDropdownOpen(false);
+  };
+
+  const applyLoggedInCalendarModalFilter = () => {
+    if (!calendarModalPostTypeDraft || !calendarFilterDraftDate) return;
+    setLoggedInFeedDateFilter(calendarFilterDraftDate);
+    setLoggedInFeedPostTypeFilter(calendarModalPostTypeDraft);
+    setUpcomingDateFilter(null);
+    setCalendarFilterSchoolId(null);
+    setSelectedUpcomingPost(null);
+    setCalendarFilterOpen(false);
   };
 
   const applyCalendarFilter = (schoolIdForCalendar: string) => {
@@ -1963,7 +2053,7 @@ export const PublicEvents = () => {
       setSettingsLoginEmail('');
       setSettingsLoginPassword('');
       setBottomNavActive('home');
-      navigate('/', { replace: true });
+      navigate('/', { replace: true, state: null });
     } catch (err: unknown) {
       const ax = err as { response?: { status?: number; data?: { message?: string | string[] } } };
       const msg = ax.response?.data?.message;
@@ -2056,6 +2146,9 @@ export const PublicEvents = () => {
           toYmd={toYmd}
           calendarActive={calendarFilterOpen || !!upcomingDateFilter}
           onOpenCalendarFilter={openCalendarFilter}
+          feedCalendarVisibleMonth={feedCalendarVisibleMonth}
+          onFeedCalendarVisibleMonthChange={setFeedCalendarVisibleMonth}
+          feedCalendarMarkedDates={feedCalendarMarkedDates}
           homeContentCategories={homeContentCategories}
           selectedSubCategoryIds={selectedSubCategoryIds}
           contentExpandedCategoryId={contentExpandedCategoryId}
@@ -2512,6 +2605,11 @@ export const PublicEvents = () => {
             externalLoading={searchExternalPostsLoading}
           />
         ) : bottomNavActive === 'settings' ? (
+          authLoading ? (
+            <div className="d-flex justify-content-center py-5">
+              <div className="spinner-border text-secondary" role="status" aria-label="Loading account" />
+            </div>
+          ) : (
           <StudentProfileHub
             user={user ? { name: user.name, email: user.email, schoolName: user.schoolName } : null}
             profilePicUrl={settingsProfilePicUrl}
@@ -2544,6 +2642,7 @@ export const PublicEvents = () => {
             }}
             onDeleteAccount={() => setShowDeleteAccountModal(true)}
           />
+          )
         ) : bottomNavActive === 'liked' ? (
           /* Liked news — same as Saved: list + full post detail when item selected */
           <div style={{ maxWidth: '600px', margin: '0 auto', paddingBottom: '1rem' }}>
@@ -2736,6 +2835,48 @@ export const PublicEvents = () => {
                     </div>
             </div>
           )}
+          {bottomNavActive === 'home' && !showExternalHomeFeed && showSchoolFilterUi ? (
+            <HomeFeedFilterRow
+              showGuestSchoolPicker={showGuestSchoolPicker}
+              showAllSchoolsPicker={showAllSchoolsPicker}
+              schoolPickerLabel={
+                showGuestSchoolPicker
+                  ? selectedGuestSchoolName ?? 'Select school'
+                  : selectedAllSchoolsFilterName ?? 'Filter by school'
+              }
+              schoolPickerActive={
+                showGuestSchoolPicker ? !!schoolId : !!allSchoolsFilterSchoolId
+              }
+              onOpenSchoolPicker={openSchoolPicker}
+              showCategories={showHomeCategories}
+              showSortPillsInline={showHomeSortPillsInline}
+              homeContentCategories={homeContentCategories}
+              selectedSubCategoryIds={selectedSubCategoryIds}
+              contentExpandedCategoryId={contentExpandedCategoryId}
+              onCategoryClick={(categoryId, categoryName, isOpen) => {
+                const next = isOpen ? null : categoryId;
+                setContentExpandedCategoryId(next);
+                if (next) eventsFilter?.setSelectedCategory(categoryId, categoryName);
+              }}
+              onClearContentCategoryFilter={clearContentCategoryFilter}
+              feedSort={feedSort}
+              onFeedSortChange={handleFeedSortChange}
+              showHomeFunnel={showHomeFunnel}
+              filterDropdownOpen={filterDropdownOpen}
+              onToggleFilterDropdown={() => setFilterDropdownOpen((o) => !o)}
+              filterPanelActive={
+                filterDropdownOpen ||
+                feedSort !== 'latest' ||
+                (!user && !!schoolId) ||
+                !!loggedInFeedDateFilter ||
+                !!loggedInFeedPostTypeFilter ||
+                !!(user && showAllSchoolsFeed && allSchoolsFilterSchoolId)
+              }
+              calendarActive={calendarFilterOpen || !!upcomingDateFilter || loggedInPostTypeDateFilterActive}
+              onOpenCalendarFilter={openCalendarFilter}
+              onOpenSearch={() => setBottomNavActive('search')}
+            />
+          ) : null}
           {user && isLoggedInHome && loggedInPostTypeDateFilterActive ? (
             <div className="d-flex align-items-center justify-content-between gap-2 px-2 py-2 small">
               <span className="text-muted">
@@ -2749,14 +2890,14 @@ export const PublicEvents = () => {
                         onClick={() => {
                   setLoggedInFeedDateFilter(null);
                   setLoggedInFeedPostTypeFilter(null);
-                }}
-              >
+                        }}
+                      >
                 Clear
                       </button>
                     </div>
           ) : null}
 
-          {user && homeFeedMode === 'mySchool' && showSchoolFilterUi && selectedSubCategoryMeta.length > 0 && (
+          {user && homeFeedMode === 'mySchool' && showHomeCategories && selectedSubCategoryMeta.length > 0 && (
             <div
               className="d-flex flex-wrap gap-2 px-2 py-2"
               style={{
@@ -3009,42 +3150,79 @@ export const PublicEvents = () => {
                 </button>
               </div>
               {calendarFilterStep === 'date' ? (
-                <div className="p-3">
-                  <p className="small text-muted mb-3">
-                    Choose a date to see news for that day — event date when set on the post, otherwise the published date.
+                <div className="p-3 overflow-auto" style={{ maxHeight: 'calc(78vh - 56px)' }}>
+                  <p className="small text-muted mb-2">
+                    {calendarModalPostTypeDraft
+                      ? 'Pick a day for your filter.'
+                      : 'Choose how you want to filter news by date.'}
                   </p>
-                  <label htmlFor="calendar-filter-date" className="form-label small fw-semibold">Date</label>
-                  <input
-                    id="calendar-filter-date"
-                    type="date"
-                    className="form-control mb-3"
-                    value={calendarFilterDraftDate}
-                    onChange={(e) => setCalendarFilterDraftDate(e.target.value)}
+                  <FeedCalendarPostTypePicker
+                    value={calendarModalPostTypeDraft}
+                    onChange={setCalendarModalPostTypeDraft}
                   />
-                  <div className="d-flex gap-2 flex-wrap">
-                    <button type="button" className="btn btn-sm btn-outline-dark rounded-pill" onClick={() => setCalendarFilterDraftDate(toYmd(new Date()))}>
-                      Today
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-outline-dark rounded-pill"
-                      onClick={() => {
-                        const d = new Date();
-                        d.setDate(d.getDate() + 1);
-                        setCalendarFilterDraftDate(toYmd(d));
-                      }}
-                    >
-                      Tomorrow
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-dark w-100 rounded-pill mt-3"
-                    disabled={!calendarFilterDraftDate}
-                    onClick={() => setCalendarFilterStep('school')}
-                  >
-                    Next — choose school
-                  </button>
+                  {calendarModalPostTypeDraft ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-link text-decoration-none mb-2 px-0"
+                        onClick={() => setCalendarModalPostTypeDraft(null)}
+                      >
+                        ← Change filter type
+                      </button>
+                      <FeedCalendarMonthGrid
+                        variant="guest"
+                        visibleMonth={calendarModalVisibleMonth}
+                        selectedDate={new Date(`${calendarFilterDraftDate}T12:00:00`)}
+                        markedDates={guestCalendarMarkedDates}
+                        onSelectDate={(date) => setCalendarFilterDraftDate(toYmd(date))}
+                        onChangeMonth={setCalendarModalVisibleMonth}
+                      />
+                      <div className="d-flex gap-2 flex-wrap mt-3">
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-dark rounded-pill"
+                          onClick={() => {
+                            const d = new Date();
+                            setCalendarFilterDraftDate(toYmd(d));
+                            setCalendarModalVisibleMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+                          }}
+                        >
+                          Today
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-dark rounded-pill"
+                          onClick={() => {
+                            const d = new Date();
+                            d.setDate(d.getDate() + 1);
+                            setCalendarFilterDraftDate(toYmd(d));
+                            setCalendarModalVisibleMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+                          }}
+                        >
+                          Tomorrow
+                        </button>
+                      </div>
+                      {user ? (
+                        <button
+                          type="button"
+                          className="btn btn-dark w-100 rounded-pill mt-3"
+                          disabled={!calendarFilterDraftDate}
+                          onClick={applyLoggedInCalendarModalFilter}
+                        >
+                          Apply filter
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-dark w-100 rounded-pill mt-3"
+                          disabled={!calendarFilterDraftDate}
+                          onClick={() => setCalendarFilterStep('school')}
+                        >
+                          Next — choose school
+                        </button>
+                      )}
+                    </>
+                  ) : null}
                 </div>
               ) : (
                 <div className="overflow-auto p-2">
@@ -3759,7 +3937,7 @@ export const PublicEvents = () => {
       </div>
 
       {/* Login / sign-up — global so guests can auth from Events home (e.g. club group chat) */}
-      {showSettingsLoginPopup && (
+      {showSettingsLoginPopup && !user && (
         <div
           role="dialog"
           aria-modal="true"
@@ -3838,14 +4016,16 @@ export const PublicEvents = () => {
                     />
                   </div>
                   <div className="mb-1">
-                    <input
-                      type="password"
-                      className="form-control"
+                    <PasswordInput
                       placeholder="Password"
                       value={settingsLoginPassword}
-                      onChange={(e) => { setSettingsLoginPassword(e.target.value); setSettingsLoginError(null); }}
+                      onChange={(value) => {
+                        setSettingsLoginPassword(value);
+                        setSettingsLoginError(null);
+                      }}
                       autoComplete="current-password"
-                      style={{ borderRadius: '10px', border: '1px solid #dee2e6' }}
+                      style={{ borderRadius: '10px' }}
+                      className="form-control"
                     />
                   </div>
                   <div className="text-end mb-3">
@@ -3904,7 +4084,7 @@ export const PublicEvents = () => {
           </div>
         </div>
       )}
-      {showSignupPopup && (
+      {showSignupPopup && !user && (
         <div
           role="dialog"
           aria-modal="true"

@@ -32,9 +32,9 @@ import {
   EventPostPublicDescriptionRow,
   EventPostPublicMeta,
 } from '../components/EventPostPublicContent';
+import { formatPostedDateDisplay, getPostedDateIso } from '../utils/formatRelativeTime';
 import { useAuth } from '../contexts/AuthContext';
-
-const FILTER_ICON_SIZE = 20;
+import { TOOLBAR_BTN_SIZE, TOOLBAR_ICON_SIZE } from '../navigation/tabBarMetrics';
 
 /** Renders school logo (image or initial letter). Handles image load error so the logo area always shows. */
 function CompactSchoolLogo({
@@ -207,18 +207,6 @@ export default function SearchScreen() {
       )
     : events;
 
-  const formatDate = (dateStr: string) => {
-    try {
-      return new Date(dateStr).toLocaleDateString(undefined, {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      });
-    } catch {
-      return dateStr;
-    }
-  };
-
   const clearSchoolFilter = () => {
     setSelectedSchoolId(null);
     setFilterModalVisible(false);
@@ -272,6 +260,7 @@ export default function SearchScreen() {
         })()
       : [];
     const firstImage = images[0];
+    const postedDisplay = formatPostedDateDisplay(getPostedDateIso(item));
 
     return (
       <View style={styles.card}>
@@ -297,10 +286,10 @@ export default function SearchScreen() {
         ) : null}
         <View style={styles.cardBody}>
           <Text style={styles.title}>{item.title}</Text>
-          <EventPostPublicMeta event={item} compact />
+          <EventPostPublicMeta event={item} compact metaChips />
           <EventPostPublicDescriptionRow event={item} compact />
+          {postedDisplay ? <Text style={styles.postedDate}>{postedDisplay}</Text> : null}
           <EventPostPublicActionButtons event={item} compact />
-          <Text style={styles.date}>{formatDate(item.updatedAt)}</Text>
         </View>
       </View>
     );
@@ -328,7 +317,7 @@ export default function SearchScreen() {
           accessibilityLabel="Filter options"
         >
           <View style={styles.headerFilterIconWrap}>
-            <FunnelIcon width={FILTER_ICON_SIZE} height={FILTER_ICON_SIZE} fill="#1a1f2e" />
+            <FunnelIcon width={TOOLBAR_ICON_SIZE} height={TOOLBAR_ICON_SIZE} fill="#1a1f2e" />
           </View>
         </TouchableOpacity>
       </View>
@@ -431,7 +420,7 @@ export default function SearchScreen() {
                 onPress={handleSearchNews}
                 activeOpacity={0.8}
               >
-                <SearchIcon width={20} height={20} fill="#fff" />
+                <SearchIcon width={TOOLBAR_ICON_SIZE} height={TOOLBAR_ICON_SIZE} fill="#fff" />
                 <Text style={styles.filterPopupBtnText}>Search news</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -439,7 +428,7 @@ export default function SearchScreen() {
                 onPress={handleFilterBySchool}
                 activeOpacity={0.8}
               >
-                <BuildingIcon width={20} height={20} fill="#fff" />
+                <BuildingIcon width={TOOLBAR_ICON_SIZE} height={TOOLBAR_ICON_SIZE} fill="#fff" />
                 <Text style={styles.filterPopupBtnText}>Filter by school</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -447,7 +436,7 @@ export default function SearchScreen() {
                 onPress={handleFilterViaCategories}
                 activeOpacity={0.8}
               >
-                <TagsIcon width={20} height={20} fill="#fff" />
+                <TagsIcon width={TOOLBAR_ICON_SIZE} height={TOOLBAR_ICON_SIZE} fill="#fff" />
                 <Text style={styles.filterPopupBtnText}>Filter via categories</Text>
               </TouchableOpacity>
               {categoryLoginMessage && (
@@ -585,8 +574,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   headerFilterBtn: {
-    minWidth: 44,
-    minHeight: 44,
+    minWidth: TOOLBAR_BTN_SIZE,
+    minHeight: TOOLBAR_BTN_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -848,9 +837,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  date: {
-    fontSize: 12,
-    color: '#8e8e8e',
+  postedDate: {
+    marginTop: 4,
+    marginBottom: 8,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#334155',
+    lineHeight: 20,
   },
   modalOverlay: {
     flex: 1,

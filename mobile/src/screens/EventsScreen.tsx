@@ -18,7 +18,16 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MAIN_TAB_BAR_BODY_HEIGHT } from '../navigation/tabBarMetrics';
+import {
+  MAIN_TAB_BAR_BODY_HEIGHT,
+  TOOLBAR_BTN_SIZE,
+  TOOLBAR_ICON_SIZE,
+} from '../navigation/tabBarMetrics';
+
+/** Feed mode tab school logo — slightly smaller than toolbar glyphs. */
+const HOME_FEED_TAB_LOGO_SIZE = 26;
+/** Icons inside the small circle beside My school / External / All schools. */
+const HOME_FEED_TAB_BADGE_ICON = 18;
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,10 +35,11 @@ import FunnelIcon from 'react-native-bootstrap-icons/icons/funnel';
 import FunnelFillIcon from 'react-native-bootstrap-icons/icons/funnel-fill';
 import CalendarEventIcon from 'react-native-bootstrap-icons/icons/calendar-event';
 import CalendarEventFillIcon from 'react-native-bootstrap-icons/icons/calendar-event-fill';
-import SearchIcon from 'react-native-bootstrap-icons/icons/search';
 import NewspaperIcon from 'react-native-bootstrap-icons/icons/newspaper';
 import BuildingIcon from 'react-native-bootstrap-icons/icons/building';
 import { GuestSignInStrip } from '../components/GuestSignInStrip';
+import { HomeHeaderProfileButton } from '../components/HomeHeaderProfileButton';
+import { BootstrapToolbarIcon } from '../components/BootstrapToolbarIcon';
 import {
   getApprovedEvents,
   getCategoriesBySchool,
@@ -51,7 +61,7 @@ import {
   UpcomingPostPublic,
   type SchoolFilterSettings,
 } from '../services/events';
-import { shouldShowSchoolFilterUi } from '../utils/filtersVisibility';
+import { resolveShowSchoolFilterUi } from '../utils/filtersVisibility';
 import { parseImageUrls } from '../services/publicBlogs';
 import { getFrontendBaseUrl } from '../config/env';
 import type { MainTabParamList } from '../navigation/types';
@@ -64,6 +74,10 @@ import {
   getFeedDateFilterTzOffsetMinutes,
 } from '../utils/eventFeedDate';
 import { FeedCalendarMonthGrid } from '../components/FeedCalendarMonthGrid';
+import {
+  FEED_CALENDAR_FILTER_EVENT_LABEL,
+  FEED_CALENDAR_FILTER_POSTED_LABEL,
+} from '../utils/feedCalendarFilterCopy';
 import { FirstLoginCategoriesModal } from '../components/FirstLoginCategoriesModal';
 import { ExternalPublicFeedPanel } from '../components/ExternalPublicFeedPanel';
 import { InshortsPagedFeed } from '../components/InshortsPagedFeed';
@@ -82,6 +96,9 @@ import { authModalTheme } from '../styles/authModalTheme';
 
 type EventsRoute = RouteProp<MainTabParamList, 'Events'>;
 type HomeFeedMode = 'mySchool' | 'external' | 'allSchools';
+
+/** Set false after verifying tab-bar clearance — tints reserved bottom inset red. */
+const DEBUG_HIGHLIGHT_TAB_BAR_CLEARANCE = false;
 
 function toYmd(d: Date): string {
   const y = d.getFullYear();
@@ -144,11 +161,11 @@ export default function EventsScreen() {
   const [feedListHeight, setFeedListHeight] = useState(0);
   const feedPageHeight = useMemo(() => {
     if (feedListHeight > 0) return feedListHeight;
-    const reserved =
-      insets.top + MAIN_TAB_BAR_BODY_HEIGHT + insets.bottom + 220;
+    const reserved = insets.top + MAIN_TAB_BAR_BODY_HEIGHT + 220;
     return Math.max(360, windowHeight - reserved);
-  }, [feedListHeight, windowHeight, insets.top, insets.bottom]);
+  }, [feedListHeight, windowHeight, insets.top]);
   const [homeFilterMenuOpen, setHomeFilterMenuOpen] = useState(false);
+  const [homeToolsExpanded, setHomeToolsExpanded] = useState(false);
   const [showFirstLoginCategories, setShowFirstLoginCategories] = useState(false);
   const [categoryModalSelectedIds, setCategoryModalSelectedIds] = useState<string[]>([]);
   const [categoryModalSaving, setCategoryModalSaving] = useState(false);
@@ -236,20 +253,29 @@ export default function EventsScreen() {
     }
   }, [route.params, navigation]);
 
-  const showSchoolFilterUi = shouldShowSchoolFilterUi(
-    schoolFilterSettings.filtersEnabled,
-    schoolFilterSettings.filtersVisibility,
-    !!user,
+  const showSchoolFilterUi = useMemo(
+    () =>
+      resolveShowSchoolFilterUi(
+        schoolFilterSettings.filtersEnabled,
+        schoolFilterSettings.filtersVisibility,
+        !!user,
+        schoolId,
+        homeFeedMode,
+      ),
+    [schoolFilterSettings, user, schoolId, homeFeedMode],
   );
 
-  const showCategories = !!user && homeFeedMode === 'mySchool' && showSchoolFilterUi;
+  const showCategories = !!user && homeFeedMode === 'mySchool' && !!schoolId;
   /** Logged-in All schools tab: Latest/Popular pills in the strip (guest uses funnel dropdown only). */
   const showSortPillsInline = !!user && showAllSchools;
   const isMySchoolFeed = !!user && homeFeedMode === 'mySchool' && !!schoolId;
   /** Logged-in All schools: date/post-type filters live on the calendar icon only. */
   const showHomeFunnel = showSchoolFilterUi && (!user || homeFeedMode === 'mySchool');
 
-  const clearSubCategoryFilter = useCallback(() => setSelectedSubCategoryIds([]), []);
+  const clearSubCategoryFilter = useCallback(() => {
+    setSelectedSubCategoryIds([]);
+    setExpandedCategoryId(null);
+  }, []);
 
   /** Open URL immediately; record click in background (same redirect URL as API; avoids network delay). */
   const onBannerAdPress = useCallback((banner: BannerAdPublic) => {
@@ -289,10 +315,6 @@ export default function EventsScreen() {
       screen: 'SettingsMain',
       params: { openLogin: true },
     });
-  }, [navigation]);
-
-  const openSearch = useCallback(() => {
-    (navigation as { navigate: (name: string) => void }).navigate('Search');
   }, [navigation]);
 
   useEffect(() => {
@@ -590,9 +612,11 @@ export default function EventsScreen() {
   const homeContentCategories = useMemo(() => {
     if (!categories.length) return [];
     if (persistedPrefSubIds.length === 0) return categories;
-    return categories.filter((cat) =>
+    const filtered = categories.filter((cat) =>
       (cat.subcategories ?? []).some((s) => persistedPrefSubIds.includes(s.id)),
     );
+    // Stale or empty prefs should not hide every category pill.
+    return filtered.length > 0 ? filtered : categories;
   }, [categories, persistedPrefSubIds]);
 
   const expandedCategory = useMemo(
@@ -1444,6 +1468,23 @@ export default function EventsScreen() {
     );
   };
 
+  const homeToolsFilterActive =
+    homeFilterMenuOpen || feedSort !== 'latest' || (!user && isGuestSchoolFeed);
+  const homeToolsCalendarActive =
+    showCalendarModal ||
+    !!upcomingDateFilter ||
+    guestPostTypeDateFilterActive ||
+    loggedInPostTypeDateFilterActive;
+  const homeToolsLayerHighlighted =
+    homeToolsExpanded || homeToolsFilterActive || homeToolsCalendarActive;
+
+  const toggleHomeTools = () => {
+    setHomeToolsExpanded((expanded) => {
+      if (expanded) setHomeFilterMenuOpen(false);
+      return !expanded;
+    });
+  };
+
   const homeFilterRow = (
     <View
       style={[
@@ -1530,33 +1571,60 @@ export default function EventsScreen() {
             </>
           ) : (
             <>
-              {showCategories && homeContentCategories.length > 0 && selectedSubCategoryIds.length > 0 ? (
-                <TouchableOpacity onPress={clearSubCategoryFilter} style={styles.clearCatsBtn}>
-                  <Text style={styles.clearCatsText}>Reset All</Text>
-                </TouchableOpacity>
-              ) : null}
-              {showCategories && homeContentCategories.length > 0
-                ? homeContentCategories.map((cat) => {
+              {showCategories && homeContentCategories.length > 0 ? (
+                <>
+                  <TouchableOpacity
+                    onPress={clearSubCategoryFilter}
+                    style={[
+                      styles.categoryMainPill,
+                      selectedSubCategoryIds.length === 0 &&
+                        expandedCategoryId === null &&
+                        styles.categoryMainPillSelected,
+                    ]}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityState={{
+                      selected:
+                        selectedSubCategoryIds.length === 0 && expandedCategoryId === null,
+                    }}
+                    accessibilityLabel="All categories"
+                  >
+                    <Text
+                      style={[
+                        styles.categoryMainPillText,
+                        selectedSubCategoryIds.length === 0 &&
+                          expandedCategoryId === null &&
+                          styles.categoryMainPillTextSelected,
+                      ]}
+                    >
+                      All
+                    </Text>
+                  </TouchableOpacity>
+                  {homeContentCategories.map((cat) => {
                     const hasSelection = selectedSubCategoryIds.some((id) =>
                       (cat.subcategories ?? []).some((s) => s.id === id),
                     );
                     const isOpen = expandedCategoryId === cat.id;
+                    const isSelected = hasSelection || isOpen;
                     return (
                       <TouchableOpacity
                         key={cat.id}
                         style={[
                           styles.categoryMainPill,
-                          (hasSelection || isOpen) && styles.categoryMainPillEmphasis,
+                          isSelected && styles.categoryMainPillSelected,
                         ]}
                         onPress={() => {
                           setExpandedCategoryId((prev) => (prev === cat.id ? null : cat.id));
                         }}
+                        activeOpacity={0.85}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: isSelected, expanded: isOpen }}
                         accessibilityLabel={`Category ${cat.name}`}
                       >
                         <Text
                           style={[
                             styles.categoryMainPillText,
-                            (hasSelection || isOpen) && styles.categoryMainPillTextEmphasis,
+                            isSelected && styles.categoryMainPillTextSelected,
                           ]}
                           numberOfLines={1}
                         >
@@ -1564,8 +1632,9 @@ export default function EventsScreen() {
                         </Text>
                       </TouchableOpacity>
                     );
-                  })
-                : null}
+                  })}
+                </>
+              ) : null}
             </>
           )}
         </ScrollView>
@@ -1574,107 +1643,108 @@ export default function EventsScreen() {
       )}
         {showSchoolFilterUi ? (
           <View style={styles.homeFilterActions}>
-            {showHomeFunnel ? (
-            <View style={styles.filterFunnelWrap}>
             <TouchableOpacity
-              style={[
-                styles.homeFilterBtn,
-                (homeFilterMenuOpen ||
-                  feedSort !== 'latest' ||
-                  (!user && isGuestSchoolFeed)) &&
-                  styles.homeFilterBtnActive,
-              ]}
-              onPress={() => setHomeFilterMenuOpen((o) => !o)}
-              accessibilityLabel="Filter"
+              style={[styles.homeFilterBtn, homeToolsLayerHighlighted && styles.homeFilterBtnActive]}
+              onPress={toggleHomeTools}
+              accessibilityLabel={homeToolsExpanded ? 'Hide filter tools' : 'Show filter tools'}
+              accessibilityState={{ expanded: homeToolsExpanded }}
             >
-              {homeFilterMenuOpen ||
-              feedSort !== 'latest' ||
-              (!user && isGuestSchoolFeed) ? (
-                <FunnelFillIcon width={24} height={24} fill="#087990" />
-              ) : (
-                <FunnelIcon width={24} height={24} fill="#6c757d" />
-              )}
+              <Ionicons
+                name={homeToolsExpanded ? 'layers' : 'layers-outline'}
+                size={TOOLBAR_ICON_SIZE}
+                color={homeToolsLayerHighlighted ? '#087990' : '#6c757d'}
+              />
             </TouchableOpacity>
-            {homeFilterMenuOpen ? (
-              <ScrollView
-                style={styles.sortDropdownScroll}
-                contentContainerStyle={styles.sortDropdownScrollContent}
-                nestedScrollEnabled
-                keyboardShouldPersistTaps="handled"
-              >
-              <View style={styles.sortDropdown} pointerEvents="box-none">
-                <View style={styles.sortDropdownHeaderRow}>
-                  <Text style={styles.sortDropdownLabel}>Filter</Text>
-                  <TouchableOpacity
-                    onPress={() => setHomeFilterMenuOpen(false)}
-                    hitSlop={8}
-                    accessibilityLabel="Close filter"
-                  >
-                    <Text style={styles.sortDropdownClose}>×</Text>
-                  </TouchableOpacity>
-                </View>
-                {!showSortPillsInline ? (
-                  <>
-                    <Text style={styles.sortDropdownSubLabel}>Sort</Text>
-                    <View style={styles.sortPillRow}>
-                      <TouchableOpacity
-                        style={[styles.sortPillSm, feedSort === 'latest' && styles.sortPillSmActive]}
-                        onPress={() => {
-                          setFeedSort('latest');
-                          setHomeFilterMenuOpen(false);
-                        }}
+            {homeToolsExpanded ? (
+              <>
+                {showHomeFunnel ? (
+                  <View style={styles.filterFunnelWrap}>
+                    <TouchableOpacity
+                      style={[styles.homeFilterBtn, homeToolsFilterActive && styles.homeFilterBtnActive]}
+                      onPress={() => setHomeFilterMenuOpen((o) => !o)}
+                      accessibilityLabel="Filter"
+                    >
+                      {homeToolsFilterActive ? (
+                        <BootstrapToolbarIcon Icon={FunnelFillIcon} fill="#087990" />
+                      ) : (
+                        <BootstrapToolbarIcon Icon={FunnelIcon} fill="#6c757d" />
+                      )}
+                    </TouchableOpacity>
+                    {homeFilterMenuOpen ? (
+                      <ScrollView
+                        style={styles.sortDropdownScroll}
+                        contentContainerStyle={styles.sortDropdownScrollContent}
+                        nestedScrollEnabled
+                        keyboardShouldPersistTaps="handled"
                       >
-                        <Text style={[styles.sortPillSmText, feedSort === 'latest' && styles.sortPillSmTextActive]}>
-                          Latest
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.sortPillSm, feedSort === 'popular' && styles.sortPillSmActive]}
-                        onPress={() => {
-                          setFeedSort('popular');
-                          setHomeFilterMenuOpen(false);
-                        }}
-                      >
-                        <Text style={[styles.sortPillSmText, feedSort === 'popular' && styles.sortPillSmTextActive]}>
-                          Popular
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </>
+                        <View style={styles.sortDropdown} pointerEvents="box-none">
+                          <View style={styles.sortDropdownHeaderRow}>
+                            <Text style={styles.sortDropdownLabel}>Filter</Text>
+                            <TouchableOpacity
+                              onPress={() => setHomeFilterMenuOpen(false)}
+                              hitSlop={8}
+                              accessibilityLabel="Close filter"
+                            >
+                              <Text style={styles.sortDropdownClose}>×</Text>
+                            </TouchableOpacity>
+                          </View>
+                          {!showSortPillsInline ? (
+                            <>
+                              <Text style={styles.sortDropdownSubLabel}>Sort</Text>
+                              <View style={styles.sortPillRow}>
+                                <TouchableOpacity
+                                  style={[styles.sortPillSm, feedSort === 'latest' && styles.sortPillSmActive]}
+                                  onPress={() => {
+                                    setFeedSort('latest');
+                                    setHomeFilterMenuOpen(false);
+                                  }}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.sortPillSmText,
+                                      feedSort === 'latest' && styles.sortPillSmTextActive,
+                                    ]}
+                                  >
+                                    Latest
+                                  </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={[styles.sortPillSm, feedSort === 'popular' && styles.sortPillSmActive]}
+                                  onPress={() => {
+                                    setFeedSort('popular');
+                                    setHomeFilterMenuOpen(false);
+                                  }}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.sortPillSmText,
+                                      feedSort === 'popular' && styles.sortPillSmTextActive,
+                                    ]}
+                                  >
+                                    Popular
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
+                            </>
+                          ) : null}
+                        </View>
+                      </ScrollView>
+                    ) : null}
+                  </View>
                 ) : null}
-              </View>
-              </ScrollView>
+                <TouchableOpacity
+                  style={[styles.homeFilterBtn, homeToolsCalendarActive && styles.homeFilterBtnActive]}
+                  onPress={openCalendarFilter}
+                  accessibilityLabel="Upcoming news by date"
+                >
+                  {homeToolsCalendarActive ? (
+                    <BootstrapToolbarIcon Icon={CalendarEventFillIcon} fill="#087990" />
+                  ) : (
+                    <BootstrapToolbarIcon Icon={CalendarEventIcon} fill="#6c757d" />
+                  )}
+                </TouchableOpacity>
+              </>
             ) : null}
-            </View>
-            ) : null}
-            <TouchableOpacity
-              style={[
-                styles.homeFilterBtn,
-                (showCalendarModal ||
-                  !!upcomingDateFilter ||
-                  guestPostTypeDateFilterActive ||
-                  loggedInPostTypeDateFilterActive) &&
-                  styles.homeFilterBtnActive,
-              ]}
-              onPress={openCalendarFilter}
-              accessibilityLabel="Upcoming news by date"
-            >
-              {showCalendarModal ||
-              upcomingDateFilter ||
-              guestPostTypeDateFilterActive ||
-              loggedInPostTypeDateFilterActive ? (
-                <CalendarEventFillIcon width={24} height={24} fill="#087990" />
-              ) : (
-                <CalendarEventIcon width={24} height={24} fill="#6c757d" />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.homeFilterBtn}
-              onPress={openSearch}
-              accessibilityLabel="Search"
-            >
-              <SearchIcon width={24} height={24} fill="#6c757d" />
-            </TouchableOpacity>
           </View>
         ) : null}
     </View>
@@ -1682,19 +1752,27 @@ export default function EventsScreen() {
 
   return (
     <SafeAreaView
-      style={[styles.container, { paddingBottom: MAIN_TAB_BAR_BODY_HEIGHT + insets.bottom }]}
+      style={[styles.container, { paddingBottom: MAIN_TAB_BAR_BODY_HEIGHT }]}
       edges={['top']}
     >
       {!user ? (
         <View style={styles.guestHomeHeader}>
-          <GuestSignInStrip onSignInPress={openGuestLogin} />
+          <View style={styles.homeFeedModeRow}>
+            <View style={styles.homeFeedModeRowMain}>
+              <GuestSignInStrip onSignInPress={openGuestLogin} />
+            </View>
+            <View style={styles.homeFeedModeProfileSlot}>
+              <HomeHeaderProfileButton onGuestPress={openGuestLogin} />
+            </View>
+          </View>
           {renderSchoolFilterBadge('guestHeader')}
           {homeFilterRow}
         </View>
       ) : (
         <>
           <View style={styles.homeStickyHeader}>
-          <View style={styles.tabBar}>
+          <View style={styles.homeFeedModeRow}>
+          <View style={[styles.tabBar, styles.homeFeedModeTabs]}>
             <TouchableOpacity
               style={styles.tab}
               onPress={switchToMySchool}
@@ -1709,8 +1787,8 @@ export default function EventsScreen() {
               >
                 <SchoolLogo
                   school={mySchoolTabSchool}
-                  size={22}
-                  borderRadius={11}
+                  size={HOME_FEED_TAB_LOGO_SIZE}
+                  borderRadius={HOME_FEED_TAB_LOGO_SIZE / 2}
                   style={styles.tabSchoolLogoWrap}
                 />
                 <Text
@@ -1740,7 +1818,7 @@ export default function EventsScreen() {
                   <View style={styles.tabSchoolLogoFallback}>
                     <Ionicons
                       name="log-in-outline"
-                      size={14}
+                      size={HOME_FEED_TAB_BADGE_ICON}
                       color={homeFeedMode === 'external' ? authModalTheme.primaryDark : '#1a1f2e'}
                     />
                   </View>
@@ -1769,8 +1847,8 @@ export default function EventsScreen() {
                 >
                   <View style={styles.tabSchoolLogoFallback}>
                     <BuildingIcon
-                      width={14}
-                      height={14}
+                      width={HOME_FEED_TAB_BADGE_ICON}
+                      height={HOME_FEED_TAB_BADGE_ICON}
                       fill={showAllSchools ? authModalTheme.primaryDark : '#1a1f2e'}
                     />
                   </View>
@@ -1785,6 +1863,10 @@ export default function EventsScreen() {
                 </View>
               </TouchableOpacity>
             )}
+          </View>
+          <View style={styles.homeFeedModeProfileSlot}>
+            <HomeHeaderProfileButton />
+          </View>
           </View>
           {!showExternalHomeFeed ? homeFilterRow : null}
           </View>
@@ -2168,7 +2250,7 @@ export default function EventsScreen() {
                     : 'Filter by date'}
                 </Text>
                 <TouchableOpacity onPress={closeCalendarModal} hitSlop={12} accessibilityLabel="Close">
-                  <Ionicons name="close" size={22} color="#6c757d" />
+                  <Ionicons name="close" size={TOOLBAR_ICON_SIZE} color="#6c757d" />
                 </TouchableOpacity>
               </View>
 
@@ -2218,15 +2300,7 @@ export default function EventsScreen() {
                             calendarModalPostTypeDraft === 'event' && styles.calendarGuestPostTypeBadgeTextActive,
                           ]}
                         >
-                          Filter via event date
-                        </Text>
-                        <Text
-                          style={[
-                            styles.calendarGuestPostTypeHint,
-                            calendarModalPostTypeDraft === 'event' && styles.calendarGuestPostTypeHintActive,
-                          ]}
-                        >
-                          Uses the event date fields set when the news was posted.
+                          {FEED_CALENDAR_FILTER_EVENT_LABEL}
                         </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
@@ -2243,15 +2317,7 @@ export default function EventsScreen() {
                             calendarModalPostTypeDraft === 'posted' && styles.calendarGuestPostTypeBadgeTextActive,
                           ]}
                         >
-                          Filter via posted date
-                        </Text>
-                        <Text
-                          style={[
-                            styles.calendarGuestPostTypeHint,
-                            calendarModalPostTypeDraft === 'posted' && styles.calendarGuestPostTypeHintActive,
-                          ]}
-                        >
-                          Shows news that was posted on the selected day.
+                          {FEED_CALENDAR_FILTER_POSTED_LABEL}
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -2276,7 +2342,11 @@ export default function EventsScreen() {
                               styles.calendarQuickPill,
                               isSameCalendarDay(calendarDraftDate, new Date()) && styles.calendarQuickPillActive,
                             ]}
-                            onPress={() => setCalendarDraftDate(new Date())}
+                            onPress={() => {
+                              const d = new Date();
+                              setCalendarDraftDate(d);
+                              setCalendarVisibleMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+                            }}
                             activeOpacity={0.85}
                           >
                             <Text
@@ -2294,7 +2364,11 @@ export default function EventsScreen() {
                               isSameCalendarDay(calendarDraftDate, getTomorrowDate()) &&
                                 styles.calendarQuickPillActive,
                             ]}
-                            onPress={() => setCalendarDraftDate(getTomorrowDate())}
+                            onPress={() => {
+                              const d = getTomorrowDate();
+                              setCalendarDraftDate(d);
+                              setCalendarVisibleMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+                            }}
                             activeOpacity={0.85}
                           >
                             <Text
@@ -2331,9 +2405,6 @@ export default function EventsScreen() {
                             markedDates={calendarMarkedDates}
                             onSelectDate={(date) => {
                               setCalendarDraftDate(date);
-                              setCalendarVisibleMonth(
-                                new Date(date.getFullYear(), date.getMonth(), 1),
-                              );
                             }}
                             onChangeMonth={(next) => setCalendarVisibleMonth(next)}
                           />
@@ -2363,15 +2434,7 @@ export default function EventsScreen() {
                             calendarModalPostTypeDraft === 'event' && styles.calendarGuestPostTypeBadgeTextActive,
                           ]}
                         >
-                          Filter via event date
-                        </Text>
-                        <Text
-                          style={[
-                            styles.calendarGuestPostTypeHint,
-                            calendarModalPostTypeDraft === 'event' && styles.calendarGuestPostTypeHintActive,
-                          ]}
-                        >
-                          Uses the event date fields set when the news was posted.
+                          {FEED_CALENDAR_FILTER_EVENT_LABEL}
                         </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
@@ -2388,15 +2451,7 @@ export default function EventsScreen() {
                             calendarModalPostTypeDraft === 'posted' && styles.calendarGuestPostTypeBadgeTextActive,
                           ]}
                         >
-                          Filter via posted date
-                        </Text>
-                        <Text
-                          style={[
-                            styles.calendarGuestPostTypeHint,
-                            calendarModalPostTypeDraft === 'posted' && styles.calendarGuestPostTypeHintActive,
-                          ]}
-                        >
-                          Shows news that was posted on the selected day.
+                          {FEED_CALENDAR_FILTER_POSTED_LABEL}
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -2484,7 +2539,11 @@ export default function EventsScreen() {
                               styles.calendarQuickPill,
                               isSameCalendarDay(calendarDraftDate, new Date()) && styles.calendarQuickPillActive,
                             ]}
-                            onPress={() => setCalendarDraftDate(new Date())}
+                            onPress={() => {
+                              const d = new Date();
+                              setCalendarDraftDate(d);
+                              setCalendarVisibleMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+                            }}
                             activeOpacity={0.85}
                           >
                             <Text
@@ -2502,7 +2561,11 @@ export default function EventsScreen() {
                               isSameCalendarDay(calendarDraftDate, getTomorrowDate()) &&
                                 styles.calendarQuickPillActive,
                             ]}
-                            onPress={() => setCalendarDraftDate(getTomorrowDate())}
+                            onPress={() => {
+                              const d = getTomorrowDate();
+                              setCalendarDraftDate(d);
+                              setCalendarVisibleMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+                            }}
                             activeOpacity={0.85}
                           >
                             <Text
@@ -2544,9 +2607,6 @@ export default function EventsScreen() {
                             markedDates={calendarMarkedDates}
                             onSelectDate={(date) => {
                               setCalendarDraftDate(date);
-                              setCalendarVisibleMonth(
-                                new Date(date.getFullYear(), date.getMonth(), 1),
-                              );
                             }}
                             onChangeMonth={(next) => setCalendarVisibleMonth(next)}
                           />
@@ -2648,6 +2708,17 @@ export default function EventsScreen() {
         />
       ) : null}
 
+      {DEBUG_HIGHLIGHT_TAB_BAR_CLEARANCE ? (
+        <View
+          pointerEvents="none"
+          style={[styles.tabBarClearanceDebugBand, { height: MAIN_TAB_BAR_BODY_HEIGHT }]}
+        >
+          <Text style={styles.tabBarClearanceDebugLabel}>
+            Reserved above tab bar ({MAIN_TAB_BAR_BODY_HEIGHT}px)
+          </Text>
+        </View>
+      ) : null}
+
     </SafeAreaView>
   );
 }
@@ -2657,6 +2728,25 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
     position: 'relative',
+  },
+  tabBarClearanceDebugBand: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(220, 38, 38, 0.42)',
+    borderTopWidth: 2,
+    borderTopColor: '#b91c1c',
+    zIndex: 500,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  tabBarClearanceDebugLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#7f1d1d',
+    textAlign: 'center',
   },
   guestHomeHeader: {
     backgroundColor: 'transparent',
@@ -2792,6 +2882,28 @@ const styles = StyleSheet.create({
     zIndex: 30,
     backgroundColor: 'transparent',
   },
+  homeFeedModeRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0,0,0,0.06)',
+  },
+  homeFeedModeRowMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  homeFeedModeTabs: {
+    flex: 1,
+    minWidth: 0,
+    borderBottomWidth: 0,
+  },
+  homeFeedModeProfileSlot: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingLeft: 2,
+    paddingRight: 10,
+  },
   loggedInHomeFilterRow: {
     paddingTop: 10,
   },
@@ -2804,7 +2916,8 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(0,0,0,0.06)',
     paddingRight: 10,
     paddingLeft: 10,
-    paddingVertical: 6,
+    paddingVertical: 8,
+    minHeight: TOOLBAR_BTN_SIZE + 16,
     zIndex: 20,
   },
   homeFilterRowSpacer: {
@@ -2814,9 +2927,8 @@ const styles = StyleSheet.create({
   homeFilterActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'center',
     flexShrink: 0,
-    gap: 2,
+    gap: 0,
   },
   filterFunnelWrap: {
     position: 'relative',
@@ -2826,7 +2938,7 @@ const styles = StyleSheet.create({
   },
   sortDropdownScroll: {
     position: 'absolute',
-    top: 42,
+    top: TOOLBAR_BTN_SIZE + 4,
     right: 0,
     maxHeight: 420,
     minWidth: 260,
@@ -2936,8 +3048,8 @@ const styles = StyleSheet.create({
     color: '#6c757d',
   },
   homeFilterBtn: {
-    width: 44,
-    height: 44,
+    width: TOOLBAR_BTN_SIZE,
+    height: TOOLBAR_BTN_SIZE,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
@@ -3202,40 +3314,28 @@ const styles = StyleSheet.create({
   sortPillSmTextActive: {
     color: '#fff',
   },
-  clearCatsBtn: {
-    marginRight: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#212529',
-    backgroundColor: '#fff',
-  },
-  clearCatsText: {
-    fontSize: 13,
-    color: '#212529',
-    fontWeight: '600',
-  },
-  /** Web `btn-sm rounded-pill btn-outline-dark` category chip */
+  /** Outline pills — unselected reads as tappable; selected matches feed header reference. */
   categoryMainPill: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#343a40',
-    backgroundColor: 'transparent',
+    borderColor: '#cbd5e1',
+    backgroundColor: '#f8fafc',
     marginRight: 8,
     maxWidth: 260,
   },
-  categoryMainPillEmphasis: {
+  categoryMainPillSelected: {
     borderColor: '#212529',
+    backgroundColor: '#fff',
   },
   categoryMainPillText: {
     fontSize: 14,
-    color: '#212529',
-    fontWeight: '400',
+    color: '#334155',
+    fontWeight: '500',
   },
-  categoryMainPillTextEmphasis: {
+  categoryMainPillTextSelected: {
+    color: '#212529',
     fontWeight: '600',
   },
   inlineSortPillActive: {
@@ -3461,7 +3561,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    minHeight: 44,
+    minHeight: TOOLBAR_BTN_SIZE,
   },
   tabPillOutlineDark: {
     backgroundColor: 'rgba(255, 255, 255, 0.42)',
@@ -3487,8 +3587,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   tabSchoolLogoFallback: {
-    width: 20,
-    height: 20,
+    width: HOME_FEED_TAB_LOGO_SIZE,
+    height: HOME_FEED_TAB_LOGO_SIZE,
     borderRadius: 999,
     backgroundColor: '#e5e7eb',
     alignItems: 'center',
@@ -3744,10 +3844,10 @@ const styles = StyleSheet.create({
     borderColor: '#212529',
   },
   calendarGuestPostTypeBadgeText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
+    lineHeight: 18,
     color: '#212529',
-    marginBottom: 4,
   },
   calendarGuestPostTypeBadgeTextActive: {
     color: '#fff',

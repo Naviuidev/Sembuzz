@@ -38,6 +38,7 @@ import { useMessagesUnreadCount } from '../hooks/useMessagesUnreadCount';
 import SignUpModal from '../components/SignUpModal';
 import { authModalTheme } from '../styles/authModalTheme';
 import { UserForgotPasswordPanel } from '../components/UserForgotPasswordPanel';
+import { PasswordTextInput } from '../components/PasswordTextInput';
 import Svg, { Circle } from 'react-native-svg';
 import { UserBookmarkedEventDetailModal } from '../components/UserBookmarkedEventDetail';
 
@@ -68,7 +69,7 @@ function getEventThumbUrl(ev: ApprovedEventPublic): string {
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const scrollBottomPad = MAIN_TAB_BAR_BODY_HEIGHT + insets.bottom;
+  const scrollBottomPad = MAIN_TAB_BAR_BODY_HEIGHT;
   const navigation = useNavigation<NativeStackNavigationProp<SettingsStackParamList, 'SettingsMain'>>();
   const route = useRoute<RouteProp<SettingsStackParamList, 'SettingsMain'>>();
   const { user, token, login, logout, loading: authLoading, refreshMe } = useAuth();
@@ -877,8 +878,8 @@ export default function SettingsScreen() {
                   keyboardType="email-address"
                   autoComplete="email"
                 />
-                <TextInput
-                  style={styles.modalInput}
+                <PasswordTextInput
+                  inputStyle={styles.modalInput}
                   placeholder="Password"
                   placeholderTextColor="#8e8e8e"
                   value={password}
@@ -887,7 +888,6 @@ export default function SettingsScreen() {
                     setError(null);
                     setLoginInfoMessage(null);
                   }}
-                  secureTextEntry
                   autoComplete="password"
                   autoCapitalize="none"
                   autoCorrect={false}

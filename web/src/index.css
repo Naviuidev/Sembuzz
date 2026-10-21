@@ -1361,6 +1361,27 @@ html.admin-portal-document #root,
   color: #fff;
 }
 
+.feed-calendar-post-type-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid var(--events-border, #e5e7eb);
+  border-radius: 12px;
+  background: #fafafa;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--events-ink, #1a1f2e);
+  cursor: pointer;
+}
+
+.feed-calendar-post-type-option.is-active {
+  border-color: #1a1f2e;
+  background: #1a1f2e;
+  color: #fff;
+}
+
 .events-feed-secondary-tool {
   display: flex;
   align-items: center;

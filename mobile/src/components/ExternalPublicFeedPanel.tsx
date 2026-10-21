@@ -15,8 +15,6 @@ import {
   type ListRenderItem,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import BookmarkIcon from 'react-native-bootstrap-icons/icons/bookmark';
-import BookmarkFillIcon from 'react-native-bootstrap-icons/icons/bookmark-fill';
 import type { ExternalCategoryPublic } from '../services/events';
 import {
   getExternalFeedCategories,
@@ -28,10 +26,12 @@ import {
 import { imageSrc } from '../utils/image';
 import { feedActionPillColors } from '../utils/feedActionPills';
 import {
-  INSHORTS_FEED_DESCRIPTION_MAX_WORDS,
+  computeInshortsFeedDescriptionMaxLines,
+  computeInshortsFeedDescriptionMaxWords,
   truncateWords,
 } from '../utils/eventPostPublic';
 import { authModalTheme } from '../styles/authModalTheme';
+import { TOOLBAR_ICON_SIZE } from '../navigation/tabBarMetrics';
 
 const CATEGORY_BAR_TOP_PAD = 18;
 const CATEGORY_BAR_BOTTOM_PAD = 10;
@@ -99,13 +99,15 @@ function isHeroActionLabel(label: string): boolean {
   return /^(apply|save\s*job|save)$/i.test(label.trim());
 }
 
+const FEED_META_ROW_BUDGET = 54;
+const FEED_POST_DETAILS_MIN = 176;
+
 function computeExternalHeroHeight(pageHeight: number, actionCount: number): number {
-  const textBudget = 52 + 96 + 120 + 20;
-  const actionBudget = actionCount > 0 ? 10 + Math.ceil(actionCount / 2) * 46 : 0;
-  const reserved = textBudget + actionBudget;
-  const maxByRatio = Math.round(pageHeight * 0.42);
+  const footerBudget = actionCount > 0 ? 12 + Math.ceil(actionCount / 2) * 50 + 12 : 0;
+  const reserved = FEED_META_ROW_BUDGET + footerBudget + FEED_POST_DETAILS_MIN;
+  const maxByRatio = Math.round(pageHeight * 0.4);
   const maxByPage = pageHeight - reserved;
-  return Math.max(100, Math.min(maxByRatio, maxByPage));
+  return Math.max(112, Math.min(maxByRatio, maxByPage));
 }
 
 function ExternalActionButtons({ actions }: { actions: { label: string; url: string }[] }) {
@@ -165,15 +167,22 @@ function ExternalPostPage({
   }
   const showHeroEngage = showOfferSave || showJobApply || showJobSave;
   const descRaw = post.description?.trim() ?? '';
-  const { text: descPreview, truncated: descTruncated } = truncateWords(
-    descRaw,
-    INSHORTS_FEED_DESCRIPTION_MAX_WORDS,
+  const [descSlotHeight, setDescSlotHeight] = useState(0);
+  const [descSlotWidth, setDescSlotWidth] = useState(0);
+  const descriptionMaxWords = useMemo(
+    () => computeInshortsFeedDescriptionMaxWords(descSlotHeight, descSlotWidth || undefined),
+    [descSlotHeight, descSlotWidth],
   );
-  const descPreviewTeaser = descTruncated ? descPreview.replace(/…\s*$/, '').trimEnd() : descPreview;
+  const descriptionMaxLines = useMemo(
+    () => computeInshortsFeedDescriptionMaxLines(descSlotHeight),
+    [descSlotHeight],
+  );
+  const { text: descPreview, truncated: descTruncated } = useMemo(
+    () => truncateWords(descRaw, descriptionMaxWords),
+    [descRaw, descriptionMaxWords],
+  );
   const innerPageHeight = feedPageInnerHeight(pageHeight);
   const imgH = computeExternalHeroHeight(innerPageHeight, footerActions.length);
-  const bodyScrollMaxHeight = Math.max(120, innerPageHeight - imgH - 54);
-
   return (
     <View style={styles.pageRoot}>
       <View style={styles.card}>
@@ -211,11 +220,11 @@ function ExternalPostPage({
                   activeOpacity={0.88}
                   accessibilityLabel={isSaved ? (isJob ? 'Unsave job' : 'Unsave') : isJob ? 'Save job' : 'Save'}
                 >
-                  {isSaved ? (
-                    <BookmarkFillIcon width={19} height={19} fill={authModalTheme.primaryDark} />
-                  ) : (
-                    <BookmarkIcon width={19} height={19} fill={authModalTheme.primaryDark} />
-                  )}
+                  <Ionicons
+                    name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                    size={TOOLBAR_ICON_SIZE}
+                    color={authModalTheme.primaryDark}
+                  />
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -229,41 +238,47 @@ function ExternalPostPage({
             {post.externalCategory?.name ?? 'External'}
           </Text>
         </View>
-        <ScrollView
-          style={[styles.cardBodyScroll, { maxHeight: bodyScrollMaxHeight }]}
-          contentContainerStyle={styles.cardBodyScrollContent}
-          nestedScrollEnabled
-          showsVerticalScrollIndicator={false}
-          bounces={false}
-        >
-          <View style={styles.textBlock}>
-            <Text style={styles.headline} numberOfLines={4}>{post.title}</Text>
-            {post.companyName ? (
-              <Text style={styles.companyLine} numberOfLines={2}>{post.companyName}</Text>
-            ) : null}
-            {descRaw ? (
-              descTruncated ? (
-                <View style={styles.descKnowMoreRow}>
-                  <Text style={styles.teaserFlex}>
-                    {descPreviewTeaser}
-                    <Text style={styles.teaserEllipsis}>....</Text>
-                  </Text>
+        <View style={styles.cardBodyColumn}>
+          <View style={styles.cardBodyFill}>
+            <View style={styles.textBlock}>
+              <Text style={styles.headline} numberOfLines={3}>{post.title}</Text>
+              {post.companyName ? (
+                <Text style={styles.companyLine} numberOfLines={1}>{post.companyName}</Text>
+              ) : null}
+              <View style={styles.postBodySection}>
+                {descRaw ? (
+                  <View
+                    style={styles.descSlotFlex}
+                    onLayout={(e) => {
+                      const { height, width } = e.nativeEvent.layout;
+                      setDescSlotHeight(height);
+                      setDescSlotWidth(width);
+                    }}
+                  >
+                    <Text style={styles.summary} numberOfLines={descriptionMaxLines}>
+                      {descPreview}
+                    </Text>
+                  </View>
+                ) : null}
+                {descTruncated ? (
                   <TouchableOpacity
-                    style={styles.inlineKnowMorePill}
+                    style={styles.feedKnowMorePill}
                     onPress={() => setKnowMoreOpen(true)}
                     activeOpacity={0.85}
                     accessibilityRole="button"
                   >
-                    <Text style={styles.inlineKnowMorePillText}>Know more</Text>
+                    <Text style={styles.feedKnowMorePillText}>Know more</Text>
                   </TouchableOpacity>
-                </View>
-              ) : (
-                <Text style={styles.summary}>{descRaw}</Text>
-              )
-            ) : null}
-            <ExternalActionButtons actions={footerActions} />
+                ) : null}
+              </View>
+            </View>
           </View>
-        </ScrollView>
+          {footerActions.length > 0 ? (
+            <View style={styles.feedCardFooter}>
+              <ExternalActionButtons actions={footerActions} />
+            </View>
+          ) : null}
+        </View>
       </View>
 
       <Modal visible={knowMoreOpen} transparent animationType="fade" onRequestClose={() => setKnowMoreOpen(false)}>
@@ -547,6 +562,7 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
+    flexDirection: 'column',
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: 'transparent',
@@ -601,13 +617,12 @@ const styles = StyleSheet.create({
   engageSaveBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 11,
+    width: TOOLBAR_ICON_SIZE + 16,
+    height: TOOLBAR_ICON_SIZE + 16,
     borderRadius: authModalTheme.pillRadius,
     backgroundColor: authModalTheme.primaryLight,
     borderWidth: 1,
     borderColor: '#b6d4fe',
-    minWidth: 40,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -640,12 +655,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  cardBodyScroll: { alignSelf: 'stretch' },
-  cardBodyScrollContent: { flexGrow: 1, paddingBottom: 4 },
+  cardBodyColumn: {
+    flex: 1,
+    minHeight: 0,
+    flexDirection: 'column',
+  },
+  cardBodyFill: { flex: 1, minHeight: 0, alignSelf: 'stretch' },
+  postBodySection: { flex: 1, minHeight: 0, gap: 8 },
+  descSlotFlex: { flex: 1, minHeight: 0, alignSelf: 'stretch' },
+  feedKnowMorePill: {
+    backgroundColor: '#212529',
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    alignSelf: 'flex-end',
+    flexShrink: 0,
+  },
+  feedKnowMorePillText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  feedCardFooter: {
+    flexShrink: 0,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(0, 0, 0, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+    zIndex: 2,
+  },
   textBlock: {
+    flex: 1,
+    minHeight: 0,
     paddingHorizontal: 14,
     paddingTop: 4,
-    paddingBottom: 12,
+    paddingBottom: 8,
   },
   headline: {
     color: '#111827',
@@ -716,6 +762,16 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 4,
   },
+  descKnowMoreBlock: {
+    width: '100%',
+    marginBottom: 8,
+    gap: 8,
+  },
+  teaserBlock: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#475569',
+  },
   teaserFlex: {
     flex: 1,
     flexShrink: 1,
@@ -735,6 +791,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     flexShrink: 0,
     marginBottom: 1,
+  },
+  inlineKnowMorePillEnd: {
+    backgroundColor: '#212529',
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    alignSelf: 'flex-end',
   },
   inlineKnowMorePillText: {
     color: '#fff',

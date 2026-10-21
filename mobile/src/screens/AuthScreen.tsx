@@ -16,6 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { getFrontendBaseUrl } from '../config/env';
 import { UserForgotPasswordPanel } from '../components/UserForgotPasswordPanel';
+import { PasswordTextInput } from '../components/PasswordTextInput';
 
 const REGISTER_URL = getFrontendBaseUrl();
 
@@ -119,13 +120,12 @@ export default function AuthScreen() {
               keyboardType="email-address"
               autoComplete="email"
             />
-            <TextInput
-              style={styles.input}
+            <PasswordTextInput
+              inputStyle={styles.input}
               placeholder="Password"
               placeholderTextColor="#8e8e8e"
               value={password}
               onChangeText={setPassword}
-              secureTextEntry
               autoComplete="password"
               autoCapitalize="none"
               autoCorrect={false}

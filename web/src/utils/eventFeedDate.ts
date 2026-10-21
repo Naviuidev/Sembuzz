@@ -95,6 +95,19 @@ export function eventMatchesFeedDateByMode(
   return eventMatchesViewByDateYmd(event, ymd);
 }
 
+/** Distinct YYYY-MM-DD values that have at least one post for the given filter mode. */
+export function collectFeedDatesByMode(
+  events: EventViewByDateFields[],
+  mode: 'event' | 'posted',
+): Set<string> {
+  const dates = new Set<string>();
+  for (const event of events) {
+    const ymd = mode === 'event' ? eventDateToYmd(event.eventDate) : getPostedDateYmd(event);
+    if (ymd) dates.add(ymd);
+  }
+  return dates;
+}
+
 export function filterEventsByViewByDate<T extends EventViewByDateFields>(
   events: T[],
   ymd: string | null | undefined,

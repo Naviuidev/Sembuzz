@@ -1,5 +1,10 @@
 import { useState } from 'react';
 import type { CategoryPublic, ExternalCategoryPublic } from '../services/public-events.service';
+import { FeedCalendarMonthGrid } from './FeedCalendarMonthGrid';
+import {
+  FEED_CALENDAR_FILTER_EVENT_LABEL,
+  FEED_CALENDAR_FILTER_POSTED_LABEL,
+} from '../utils/feedCalendarFilterCopy';
 
 type FeedSort = 'latest' | 'popular';
 type LoggedInPostTypeFilter = 'event' | 'posted' | null;
@@ -43,6 +48,9 @@ export type EventsFeedSecondarySidebarProps = {
   allSchoolsFeedActive?: boolean;
   onOpenBookmarks?: () => void;
   onActivateAllSchoolsFeed?: () => void;
+  feedCalendarVisibleMonth?: Date;
+  onFeedCalendarVisibleMonthChange?: (monthStart: Date) => void;
+  feedCalendarMarkedDates?: Set<string>;
 };
 
 export function EventsFeedSecondarySidebar({
@@ -84,6 +92,9 @@ export function EventsFeedSecondarySidebar({
   allSchoolsFeedActive = false,
   onOpenBookmarks,
   onActivateAllSchoolsFeed,
+  feedCalendarVisibleMonth,
+  onFeedCalendarVisibleMonthChange,
+  feedCalendarMarkedDates,
 }: EventsFeedSecondarySidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(true);
 
@@ -290,7 +301,7 @@ export function EventsFeedSecondarySidebar({
                           onLoggedInFeedPostTypeFilter((m) => (m === 'event' ? null : 'event'))
                         }
                       >
-                        Event date
+                        {FEED_CALENDAR_FILTER_EVENT_LABEL}
                       </button>
                       <button
                         type="button"
@@ -299,26 +310,38 @@ export function EventsFeedSecondarySidebar({
                           onLoggedInFeedPostTypeFilter((m) => (m === 'posted' ? null : 'posted'))
                         }
                       >
-                        Post date
+                        {FEED_CALENDAR_FILTER_POSTED_LABEL}
                       </button>
                     </div>
                     {loggedInFeedPostTypeFilter ? (
                       <>
-                        <label className="events-feed-secondary-muted" htmlFor="events-sidebar-feed-date">
-                          Date
-                        </label>
-                        <input
-                          id="events-sidebar-feed-date"
-                          type="date"
-                          className="form-control form-control-sm mb-2"
-                          value={loggedInFeedDateFilter ?? ''}
-                          onChange={(e) => onLoggedInFeedDateFilter(e.target.value.trim() || null)}
-                        />
+                        <div className="mb-2">
+                          <FeedCalendarMonthGrid
+                            variant="loggedIn"
+                            visibleMonth={
+                              feedCalendarVisibleMonth ?? new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+                            }
+                            selectedDate={
+                              loggedInFeedDateFilter
+                                ? new Date(`${loggedInFeedDateFilter}T12:00:00`)
+                                : new Date()
+                            }
+                            markedDates={feedCalendarMarkedDates ?? new Set()}
+                            onSelectDate={(date) => onLoggedInFeedDateFilter(toYmd(date))}
+                            onChangeMonth={(next) => onFeedCalendarVisibleMonthChange?.(next)}
+                          />
+                        </div>
                         <div className="d-flex flex-wrap gap-2">
                           <button
                             type="button"
                             className="events-feed-secondary-chip-sm"
-                            onClick={() => onLoggedInFeedDateFilter(toYmd(new Date()))}
+                            onClick={() => {
+                              const d = new Date();
+                              onLoggedInFeedDateFilter(toYmd(d));
+                              onFeedCalendarVisibleMonthChange?.(
+                                new Date(d.getFullYear(), d.getMonth(), 1),
+                              );
+                            }}
                           >
                             Today
                           </button>
@@ -329,6 +352,9 @@ export function EventsFeedSecondarySidebar({
                               const d = new Date();
                               d.setDate(d.getDate() + 1);
                               onLoggedInFeedDateFilter(toYmd(d));
+                              onFeedCalendarVisibleMonthChange?.(
+                                new Date(d.getFullYear(), d.getMonth(), 1),
+                              );
                             }}
                           >
                             Tomorrow

@@ -3,12 +3,15 @@ import { LayoutChangeEvent, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { Ionicons } from '@expo/vector-icons';
 
 import { authModalTheme } from '../styles/authModalTheme';
+import { TOOLBAR_ICON_SIZE } from '../navigation/tabBarMetrics';
 import { toYmdLocal } from '../utils/eventFeedDate';
 
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const COLUMNS = 7;
-/** Circle diameter as a fraction of each square day cell (keeps a true circle, not a pill). */
-const CIRCLE_INSET_RATIO = 0.82;
+/** Space reserved under the day number for the event marker dot. */
+const EVENT_DOT_ROW = 10;
+/** Circle diameter as a fraction of the day cell width (leave room for the dot row). */
+const CIRCLE_INSET_RATIO = 0.68;
 
 type Props = {
   visibleMonth: Date;
@@ -16,7 +19,7 @@ type Props = {
   markedDates: Set<string>;
   onSelectDate: (date: Date) => void;
   onChangeMonth: (next: Date) => void;
-  /** Rich circles, today primary, and news markers — logged-in calendar only. */
+  /** Today/selection circles and dot markers for days with news — logged-in calendar only. */
   variant?: 'guest' | 'loggedIn';
 };
 
@@ -45,7 +48,10 @@ export function FeedCalendarMonthGrid({
 
   const cellSide = gridWidth > 0 ? gridWidth / COLUMNS : 0;
   const circleSize =
-    cellSide > 0 ? Math.max(28, Math.round(cellSide * CIRCLE_INSET_RATIO)) : 0;
+    cellSide > 0
+      ? Math.min(Math.round(cellSide * CIRCLE_INSET_RATIO), cellSide - 2, 36)
+      : 0;
+  const showMarkerLegend = markedDates.size > 0;
 
   const monthStart = useMemo(() => startOfMonth(visibleMonth), [visibleMonth]);
   const monthLabel = monthStart.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -71,7 +77,10 @@ export function FeedCalendarMonthGrid({
     }
   };
 
-  const dayCellStyle = cellSide > 0 ? { width: cellSide, height: cellSide } : styles.dayCellFallback;
+  const dayCellStyle =
+    cellSide > 0
+      ? { width: cellSide, height: cellSide + EVENT_DOT_ROW }
+      : styles.dayCellFallback;
 
   const circleBase =
     circleSize > 0
@@ -90,7 +99,7 @@ export function FeedCalendarMonthGrid({
           hitSlop={10}
           accessibilityLabel="Previous month"
         >
-          <Ionicons name="chevron-back" size={22} color={authModalTheme.primary} />
+          <Ionicons name="chevron-back" size={TOOLBAR_ICON_SIZE} color={authModalTheme.primary} />
         </TouchableOpacity>
         <Text style={styles.monthTitle}>{monthLabel}</Text>
         <TouchableOpacity
@@ -98,7 +107,7 @@ export function FeedCalendarMonthGrid({
           hitSlop={10}
           accessibilityLabel="Next month"
         >
-          <Ionicons name="chevron-forward" size={22} color={authModalTheme.primary} />
+          <Ionicons name="chevron-forward" size={TOOLBAR_ICON_SIZE} color={authModalTheme.primary} />
         </TouchableOpacity>
       </View>
 
@@ -116,7 +125,7 @@ export function FeedCalendarMonthGrid({
             return <View key={`empty-${index}`} style={dayCellStyle} />;
           }
           const ymd = toYmdLocal(date);
-          const hasNews = isLoggedIn && markedDates.has(ymd);
+          const hasNews = markedDates.has(ymd);
           const selected = isSameDay(date, selectedDate);
           const today = isLoggedIn && isSameDay(date, new Date());
 
@@ -127,15 +136,18 @@ export function FeedCalendarMonthGrid({
                 style={[styles.dayCell, dayCellStyle]}
                 onPress={() => onSelectDate(date)}
                 activeOpacity={0.85}
-                accessibilityLabel={date.toLocaleDateString()}
+                accessibilityLabel={`${date.toLocaleDateString()}${hasNews ? ', has news' : ''}`}
               >
-                {circleBase && selected ? (
-                  <View style={[styles.dayCircle, circleBase, styles.guestDayCircleSelected]}>
-                    <Text style={[styles.dayText, styles.guestDayTextSelected]}>{date.getDate()}</Text>
-                  </View>
-                ) : (
-                  <Text style={styles.dayText}>{date.getDate()}</Text>
-                )}
+                <View style={styles.dayCellInner}>
+                  {circleBase && selected ? (
+                    <View style={[styles.dayCircle, circleBase, styles.guestDayCircleSelected]}>
+                      <Text style={[styles.dayText, styles.guestDayTextSelected]}>{date.getDate()}</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.dayText}>{date.getDate()}</Text>
+                  )}
+                  {hasNews ? <View style={styles.eventMarkerDot} /> : <View style={styles.eventMarkerDotSpacer} />}
+                </View>
               </TouchableOpacity>
             );
           }
@@ -148,42 +160,53 @@ export function FeedCalendarMonthGrid({
               activeOpacity={0.85}
               accessibilityLabel={`${date.toLocaleDateString()}${hasNews ? ', has news' : ''}`}
             >
-              {circleBase ? (
-                <View
-                  style={[
-                    styles.dayCircle,
-                    circleBase,
-                    hasNews && !today && !selected && styles.dayCircleHasNews,
-                    selected && !today && styles.dayCircleSelected,
-                    today && styles.dayCircleToday,
-                    today && selected && styles.dayCircleTodaySelected,
-                  ]}
-                >
-                  <Text
+              <View style={styles.dayCellInner}>
+                {circleBase ? (
+                  <View
                     style={[
-                      styles.dayText,
-                      hasNews && !today && !selected && styles.dayTextHasNews,
-                      today && styles.dayTextToday,
-                      selected && !today && styles.dayTextSelected,
+                      styles.dayCircle,
+                      circleBase,
+                      selected && !today && styles.dayCircleSelected,
+                      today && styles.dayCircleToday,
+                      today && selected && styles.dayCircleTodaySelected,
                     ]}
                   >
-                    {date.getDate()}
-                  </Text>
-                </View>
-              ) : (
-                <Text style={styles.dayText}>{date.getDate()}</Text>
-              )}
+                    <Text
+                      style={[
+                        styles.dayText,
+                        today && styles.dayTextToday,
+                        selected && !today && styles.dayTextSelected,
+                      ]}
+                    >
+                      {date.getDate()}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.dayText}>{date.getDate()}</Text>
+                )}
+                {hasNews ? <View style={styles.eventMarkerDot} /> : (
+                  <View style={styles.eventMarkerDotSpacer} />
+                )}
+              </View>
             </TouchableOpacity>
           );
         })}
       </View>
 
-      {isLoggedIn ? (
+      {isLoggedIn || showMarkerLegend ? (
         <View style={styles.legendRow}>
-          <View style={styles.legendSwatchToday} />
-          <Text style={styles.legendText}>Today</Text>
-          <View style={styles.legendSwatchHasNews} />
-          <Text style={styles.legendText}>Days with news</Text>
+          {isLoggedIn ? (
+            <>
+              <View style={styles.legendSwatchToday} />
+              <Text style={styles.legendText}>Today</Text>
+            </>
+          ) : null}
+          {showMarkerLegend ? (
+            <>
+              <View style={styles.legendDotHasNews} />
+              <Text style={styles.legendText}>Days with news</Text>
+            </>
+          ) : null}
           <View style={styles.legendSwatchSelected} />
           <Text style={styles.legendText}>Selected day</Text>
         </View>
@@ -230,6 +253,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  dayCellInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   dayCellFallback: {
     width: `${100 / COLUMNS}%`,
     aspectRatio: 1,
@@ -241,9 +268,6 @@ const styles = StyleSheet.create({
     flexGrow: 0,
     flexShrink: 0,
     alignSelf: 'center',
-  },
-  dayCircleHasNews: {
-    backgroundColor: authModalTheme.successLight,
   },
   dayCircleSelected: {
     backgroundColor: authModalTheme.successPillBg,
@@ -267,9 +291,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     includeFontPadding: false,
   },
-  dayTextHasNews: {
-    fontWeight: '700',
-    color: authModalTheme.successDark,
+  eventMarkerDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    marginTop: 3,
+    backgroundColor: authModalTheme.successDark,
+  },
+  eventMarkerDotSpacer: {
+    height: 8,
   },
   dayTextToday: {
     fontWeight: '700',
@@ -297,13 +327,11 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: authModalTheme.primary,
   },
-  legendSwatchHasNews: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: authModalTheme.successLight,
-    borderWidth: 1,
-    borderColor: 'rgba(15, 81, 50, 0.2)',
+  legendDotHasNews: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: authModalTheme.successDark,
   },
   legendSwatchSelected: {
     width: 12,

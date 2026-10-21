@@ -55,6 +55,7 @@ export function FeedStyleEventPostFull({ event }: Props) {
         <View style={styles.postFieldsSection}>
           <EventPostPublicMeta event={event} compact metaChips />
           {description ? <Text style={styles.description}>{description}</Text> : null}
+          {postedDisplay ? <Text style={styles.postedDateText}>{postedDisplay}</Text> : null}
           {actionButtons.length > 0 ? (
             <View style={styles.actionRow}>
               {actionButtons.map((b, index) => {
@@ -75,7 +76,6 @@ export function FeedStyleEventPostFull({ event }: Props) {
               })}
             </View>
           ) : null}
-          {postedDisplay ? <Text style={styles.postedDateText}>{postedDisplay}</Text> : null}
         </View>
       </View>
     </View>
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   postedDateText: {
-    marginTop: 12,
+    marginTop: 4,
     fontSize: 14,
     fontWeight: '600',
     color: '#334155',
