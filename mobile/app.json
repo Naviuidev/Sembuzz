@@ -3,7 +3,7 @@
     "name": "SemBuzz",
     "slug": "sembuzz-mobile",
     "scheme": "sembuzz",
-    "version": "1.2.4",
+    "version": "1.2.5",
     "orientation": "portrait",
     "icon": "./assets/sembuzz-icon.png",
     "userInterfaceStyle": "light",
@@ -26,7 +26,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.sembuzz.mobile",
       "googleServicesFile": "./GoogleService-Info.plist",
-      "buildNumber": "32",
+      "buildNumber": "34",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -45,7 +45,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "versionCode": 26,
+      "versionCode": 28,
       "permissions": [
         "android.permission.RECORD_AUDIO"
       ]
