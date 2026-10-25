@@ -80,6 +80,34 @@ export function knowMoreActionDisplayLabel(_label: string): string {
   return 'Know more';
 }
 
+/** Open in browser — adds https:// when admins omit the scheme. */
+export function normalizeExternalUrlForOpen(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith('//')) return `https:${trimmed}`;
+  return `https://${trimmed.replace(/^\/+/, '')}`;
+}
+
+/** Source article URL from admin “Know more link” only (create/edit post). */
+export function getEventAdminSourceUrl(event: { externalLink?: string | null }): string | null {
+  const ext = event.externalLink?.trim();
+  return ext ? normalizeExternalUrlForOpen(ext) : null;
+}
+
+/** Article URL for the public Know more CTA (admin field, else legacy action button). */
+export function getEventKnowMoreUrl(event: {
+  externalLink?: string | null;
+  actionButtons?: string | null;
+}): string | null {
+  const ext = event.externalLink?.trim();
+  if (ext) return normalizeExternalUrlForOpen(ext);
+  const fromBtn = parseEventActionButtonsPublic(event.actionButtons).find((b) =>
+    isKnowMoreActionLabel(b.label),
+  )?.url?.trim();
+  return fromBtn ? normalizeExternalUrlForOpen(fromBtn) : null;
+}
+
 export function parseEventActionButtonsPublic(
   stored: string | null | undefined,
 ): EventActionButtonStored[] {
@@ -238,13 +266,16 @@ export function approvedEventToCreatePostPreview(event: ApprovedEventPublic) {
     eventStartTime: event.eventStartTime ?? '',
     eventEndTime: event.eventEndTime ?? '',
     eventLocation: event.eventLocation ?? '',
-    actionButtons: mergeEventActionButtonsWithExternalLink(
-      event.actionButtons,
-      event.externalLink,
+    actionButtons: parseEventActionButtonsPublic(event.actionButtons).filter(
+      (b) => !isKnowMoreActionLabel(b.label),
     ),
+    externalLink: getEventKnowMoreUrl(event) ?? '',
+    adminSourceLink: event.externalLink ?? '',
     coverSrc,
     previewMode: 'web' as const,
     commentsEnabled: event.commentsEnabled,
     postedDateLabel: formatPostedDateDisplay(getPostedDateIso(event)),
+    publishedAt: event.publishedAt ?? null,
+    createdAt: event.createdAt,
   };
 }

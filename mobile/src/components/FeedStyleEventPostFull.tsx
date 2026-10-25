@@ -1,9 +1,13 @@
 import React from 'react';
-import { View, Text, Image, TouchableOpacity, Linking, StyleSheet } from 'react-native';
+import { View, Text, Image, TouchableOpacity, Linking, StyleSheet, Alert } from 'react-native';
 import type { ApprovedEventPublic } from '../services/events';
 import { imageSrc } from '../utils/image';
 import { parseImageUrls } from '../services/publicBlogs';
-import { parseEventActionButtonsPublic } from '../utils/eventPostPublic';
+import {
+  parseEventActionButtonsPublic,
+  isKnowMoreActionLabel,
+  getEventAdminSourceUrl,
+} from '../utils/eventPostPublic';
 import { feedActionPillColors } from '../utils/feedActionPills';
 import { SchoolLogo } from './SchoolLogo';
 import { EventPostPublicMeta } from './EventPostPublicContent';
@@ -20,9 +24,23 @@ export function FeedStyleEventPostFull({ event }: Props) {
   const firstImage = images[0];
   const schoolHeroImg = event.school?.image?.trim();
   const heroFallbackLogoSize = Math.min(128, Math.round(FEED_HERO_HEIGHT * 0.4));
-  const actionButtons = parseEventActionButtonsPublic(event.actionButtons);
+  const actionButtons = parseEventActionButtonsPublic(event.actionButtons).filter(
+    (b) => !isKnowMoreActionLabel(b.label),
+  );
   const description = (event.description ?? '').trim();
+  const adminSourceUrl = getEventAdminSourceUrl(event) ?? '';
   const postedDisplay = formatPostedDateDisplay(getPostedDateIso(event));
+  const subCategoryName = event.subCategory?.name?.trim() ?? '';
+
+  const openAdminSource = () => {
+    if (!adminSourceUrl) {
+      Alert.alert('No source link', 'This post does not have an external source URL.');
+      return;
+    }
+    Linking.openURL(adminSourceUrl).catch(() => {
+      Alert.alert('Could not open link', 'Please try again later.');
+    });
+  };
 
   return (
     <View style={styles.root}>
@@ -52,9 +70,26 @@ export function FeedStyleEventPostFull({ event }: Props) {
 
         <Text style={styles.headline}>{event.title}</Text>
 
+        {subCategoryName ? (
+          <View style={styles.categoryPill}>
+            <Text style={styles.categoryText}>{subCategoryName}</Text>
+          </View>
+        ) : null}
+
         <View style={styles.postFieldsSection}>
           <EventPostPublicMeta event={event} compact metaChips />
           {description ? <Text style={styles.description}>{description}</Text> : null}
+          {adminSourceUrl ? (
+            <TouchableOpacity
+              style={styles.feedKnowMorePill}
+              onPress={openAdminSource}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Know more"
+            >
+              <Text style={styles.feedKnowMorePillText}>Know more</Text>
+            </TouchableOpacity>
+          ) : null}
           {postedDisplay ? <Text style={styles.postedDateText}>{postedDisplay}</Text> : null}
           {actionButtons.length > 0 ? (
             <View style={styles.actionRow}>
@@ -127,6 +162,19 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     marginBottom: 8,
   },
+  categoryPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginBottom: 8,
+  },
+  categoryText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
   postFieldsSection: {
     marginTop: 6,
     gap: 10,
@@ -135,6 +183,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
     color: '#64748b',
+  },
+  feedKnowMorePill: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#dcfce7',
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+  },
+  feedKnowMorePillText: {
+    color: '#166534',
+    fontSize: 13,
+    fontWeight: '700',
   },
   actionRow: {
     flexDirection: 'row',

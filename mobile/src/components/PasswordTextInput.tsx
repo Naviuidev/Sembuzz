@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   TextInput,
@@ -12,8 +12,47 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { TOOLBAR_ICON_SIZE } from '../navigation/tabBarMetrics';
 
+/** Applied to the TextInput — Android ignores `color` on the wrapper View for secureTextEntry. */
+const DEFAULT_PASSWORD_TEXT: TextStyle = {
+  color: '#1a1f2e',
+  fontSize: 16,
+};
+
+const TEXT_STYLE_KEYS = new Set([
+  'color',
+  'fontSize',
+  'fontWeight',
+  'fontFamily',
+  'fontStyle',
+  'lineHeight',
+  'letterSpacing',
+  'textAlign',
+  'textAlignVertical',
+  'includeFontPadding',
+  'writingDirection',
+]);
+
+function splitFieldStyles(style: StyleProp<ViewStyle>): {
+  container: ViewStyle;
+  text: TextStyle;
+} {
+  const flat = StyleSheet.flatten(style) ?? {};
+  const container: ViewStyle = {};
+  const text: TextStyle = {};
+  for (const key of Object.keys(flat) as (keyof typeof flat)[]) {
+    const value = flat[key];
+    if (value === undefined) continue;
+    if (TEXT_STYLE_KEYS.has(key) || key.startsWith('font')) {
+      (text as Record<string, unknown>)[key] = value;
+    } else {
+      (container as Record<string, unknown>)[key] = value;
+    }
+  }
+  return { container, text };
+}
+
 type Props = Omit<TextInputProps, 'secureTextEntry'> & {
-  /** Styles for the bordered field container (e.g. `styles.modalInput`). */
+  /** Border/background/padding (e.g. `styles.modalInput`). Text color is applied to the input. */
   inputStyle?: StyleProp<ViewStyle>;
   containerStyle?: StyleProp<ViewStyle>;
 };
@@ -22,16 +61,21 @@ export function PasswordTextInput({
   inputStyle,
   containerStyle,
   style,
+  placeholderTextColor = '#8e8e8e',
   ...rest
 }: Props) {
   const [visible, setVisible] = useState(false);
 
+  const { container, text } = useMemo(() => splitFieldStyles(inputStyle), [inputStyle]);
+
   return (
-    <View style={[styles.shell, inputStyle, containerStyle]}>
+    <View style={[styles.shell, container, containerStyle]}>
       <TextInput
         {...rest}
         secureTextEntry={!visible}
-        style={[styles.inner, style]}
+        placeholderTextColor={placeholderTextColor}
+        style={[styles.inner, DEFAULT_PASSWORD_TEXT, text, style]}
+        underlineColorAndroid="transparent"
       />
       <TouchableOpacity
         onPress={() => setVisible((v) => !v)}

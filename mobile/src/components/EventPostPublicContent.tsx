@@ -9,6 +9,8 @@ import {
   parseEventActionButtonsPublic,
   EVENT_DESCRIPTION_MAX_WORDS,
   isEventPrimaryActionLabel,
+  isKnowMoreActionLabel,
+  getEventKnowMoreUrl,
   truncateWords,
   type EventPostPublicFields,
 } from '../utils/eventPostPublic';
@@ -36,7 +38,6 @@ type Props = {
   stackedFeedDescription?: boolean;
   /** Hard cap on description lines when `stackedFeedDescription` is set. */
   descriptionMaxLines?: number;
-  /** Feed “Know more” opens chooser instead of expanding inline. */
   onInlineKnowMorePress?: () => void;
 };
 
@@ -119,11 +120,16 @@ export function EventPostDetailBody({
     : truncateWords(trimmedDesc, descWordLimit);
   const descPreview = descPreviewRaw.replace(/\u2026$/, '').replace(/…$/, '');
   const categoryLabel = event.subCategory?.name ?? '';
-  const buttons = parseEventActionButtonsPublic(event.actionButtons);
+  const buttons = parseEventActionButtonsPublic(event.actionButtons).filter(
+    (b) => !isKnowMoreActionLabel(b.label),
+  );
+  const externalKnowMoreUrl = getEventKnowMoreUrl(event) ?? '';
 
   const showMeta = !descOnly && !actionsOnly && eventPostHasScheduleMeta(event);
   const showDesc = !metaOnly && !actionsOnly && !!descPreview;
-  const showActions = !metaOnly && !descOnly && eventPostHasActionButtons(event);
+  const showActions = !metaOnly && !descOnly && buttons.length > 0;
+  const showExternalKnowMore =
+    !metaOnly && !descOnly && !actionsOnly && !hideKnowMore && !!externalKnowMoreUrl;
   const showTitle = !metaOnly && !descOnly && !actionsOnly;
 
   return (
@@ -222,21 +228,6 @@ export function EventPostDetailBody({
           >
             {descPreviewRaw}
           </Text>
-        ) : inlineKnowMorePill && descTruncated && !descExpanded ? (
-          <View style={styles.descKnowMoreBlock}>
-            <Text style={styles.teaserBlock}>
-              {descPreview}
-              <Text style={styles.teaserEllipsis}>....</Text>
-            </Text>
-            <TouchableOpacity
-              style={styles.inlineKnowMorePillEnd}
-              onPress={onInlineKnowMorePress ?? expandDesc}
-              activeOpacity={0.85}
-              accessibilityRole="button"
-            >
-              <Text style={styles.inlineKnowMorePillText}>Know more</Text>
-            </TouchableOpacity>
-          </View>
         ) : (
           <Text style={[styles.teaser, inlineKnowMorePill && styles.teaserFeedBlock]}>
             {descExpanded ? trimmedDesc : descPreviewRaw}
@@ -244,14 +235,14 @@ export function EventPostDetailBody({
           </Text>
         )
       ) : null}
-      {descTruncated &&
-      !descExpanded &&
-      !hideKnowMore &&
-      !inlineKnowMorePill &&
-      !metaOnly &&
-      !descOnly &&
-      !actionsOnly ? (
-        <TouchableOpacity onPress={expandDesc} activeOpacity={0.7} hitSlop={8}>
+      {showExternalKnowMore ? (
+        <TouchableOpacity
+          onPress={() => Linking.openURL(externalKnowMoreUrl).catch(() => {})}
+          activeOpacity={0.85}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Know more"
+        >
           <Text style={styles.knowMore}>Know more</Text>
         </TouchableOpacity>
       ) : null}

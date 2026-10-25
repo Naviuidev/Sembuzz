@@ -19,7 +19,9 @@ export interface PendingEventForCategoryAdmin {
   createdAt: string;
   updatedAt: string;
   subCategory: { id: string; name: string };
-  subCategoryAdmin: { id: string; name: string; email: string };
+  subCategoryAdmin: { id: string; name: string; email: string } | null;
+  schoolAdmin?: { id: string; name: string; email: string } | null;
+  resubmitFromEventId?: string | null;
 }
 
 export type ApprovedEventForCategoryAdmin = PendingEventForCategoryAdmin;

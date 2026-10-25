@@ -237,12 +237,17 @@ export function CategoryAdminPendingApprovalsPanel() {
                     <tr key={row.id}>
                       <td>
                         <span className="admin-table__strong">{row.title}</span>
+                        {row.resubmitFromEventId ? (
+                          <span className="d-block admin-form-hint">Edit of a live post</span>
+                        ) : null}
                       </td>
                       <td>{row.subCategory?.name ?? '—'}</td>
                       <td>
-                        {row.subCategoryAdmin?.name ?? '—'}
-                        {row.subCategoryAdmin?.email ? (
-                          <span className="d-block admin-form-hint">{row.subCategoryAdmin.email}</span>
+                        {row.subCategoryAdmin?.name ?? row.schoolAdmin?.name ?? '—'}
+                        {(row.subCategoryAdmin?.email ?? row.schoolAdmin?.email) ? (
+                          <span className="d-block admin-form-hint">
+                            {row.subCategoryAdmin?.email ?? row.schoolAdmin?.email}
+                          </span>
                         ) : null}
                       </td>
                       <td className="admin-table__details">{formatPublishAt(row.publishAt)}</td>

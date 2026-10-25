@@ -14,6 +14,7 @@ import {
   APPLE_CALENDAR_BUTTON_LABEL,
 } from '../components/EventPostDetailFields';
 import { CreatePostLivePreview } from '../components/CreatePostLivePreview';
+import { EventPostExternalLinkField } from '../components/EventPostExternalLinkField';
 import type { EventActionButton } from '../types/event-post';
 import { imageSrc } from '../utils/image';
 
@@ -44,8 +45,6 @@ export const SchoolAdminCreatePost = ({
   const [categories, setCategories] = useState<CategoryPublic[]>([]);
   const [activeStep, setActiveStep] = useState<StepId>('content');
   const [previewMode, setPreviewMode] = useState<'mobile' | 'tablet' | 'web'>('mobile');
-  const [showVirtualLink, setShowVirtualLink] = useState(false);
-
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [externalLink, setExternalLink] = useState('');
@@ -190,7 +189,6 @@ export const SchoolAdminCreatePost = ({
     setTitle('');
     setDescription('');
     setExternalLink('');
-    setShowVirtualLink(false);
     setEventDate('');
     setEventStartTime('');
     setEventEndTime('');
@@ -454,32 +452,11 @@ export const SchoolAdminCreatePost = ({
                     onActionButtonsChange={setActionButtons}
                   />
                 </div>
-                <div className="form-check mt-3">
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    id="virtual-link-toggle"
-                    checked={showVirtualLink || !!externalLink.trim()}
-                    onChange={(e) => {
-                      setShowVirtualLink(e.target.checked);
-                      if (!e.target.checked) setExternalLink('');
-                    }}
-                  />
-                  <label className="form-check-label" htmlFor="virtual-link-toggle">
-                    Add virtual event link (e.g. Zoom, Teams)
-                  </label>
-                </div>
-                {showVirtualLink || externalLink.trim() ? (
-                  <div className="mt-2">
-                    <input
-                      type="url"
-                      className="form-control admin-form-control"
-                      placeholder="https://"
-                      value={externalLink}
-                      onChange={(e) => setExternalLink(e.target.value)}
-                    />
-                  </div>
-                ) : null}
+                <EventPostExternalLinkField
+                  id="school-create-external-link"
+                  value={externalLink}
+                  onChange={setExternalLink}
+                />
               </div>
             </section>
 
@@ -621,6 +598,7 @@ export const SchoolAdminCreatePost = ({
                 eventEndTime={eventEndTime}
                 eventLocation={eventLocation}
                 actionButtons={previewButtons}
+                externalLink={externalLink}
                 coverSrc={previewCoverSrc}
                 previewMode={previewMode}
                 accentColor={ADMIN_PORTAL_ACCENTS.school}

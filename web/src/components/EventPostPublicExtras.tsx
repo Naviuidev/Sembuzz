@@ -5,7 +5,7 @@ import {
   formatEventTimeRange,
   parseEventActionButtonsPublic,
   eventPostHasScheduleMeta,
-  eventPostHasActionButtons,
+  isKnowMoreActionLabel,
 } from '../utils/eventPostPublic';
 import { eventActionBadgeStyle } from './eventPostPillButton';
 
@@ -111,8 +111,10 @@ export function EventPostPublicMeta({ event, compact }: { event: EventFields } &
 
 /** Admin-configured action buttons (after description). */
 export function EventPostPublicActionButtons({ event, compact }: { event: EventFields } & CompactProps) {
-  const buttons = parseEventActionButtonsPublic(event.actionButtons);
-  if (!eventPostHasActionButtons(event)) return null;
+  const buttons = parseEventActionButtonsPublic(event.actionButtons).filter(
+    (b) => !isKnowMoreActionLabel(b.label),
+  );
+  if (buttons.length === 0) return null;
 
   const badge = eventActionBadgeStyle(compact);
 

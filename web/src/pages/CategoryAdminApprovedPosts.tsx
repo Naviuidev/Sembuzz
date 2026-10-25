@@ -231,6 +231,7 @@ export function CategoryAdminApprovedPostsPanel() {
                   eventEndTime={eventTimeToInputValue(previewPost.eventEndTime ?? null)}
                   eventLocation={previewPost.eventLocation?.trim() ?? ''}
                   actionButtons={actionButtonsForApi(parseStoredActionButtons(previewPost.actionButtons))}
+                  externalLink={previewPost.externalLink ?? ''}
                   coverSrc={
                     parseImageUrls(previewPost.imageUrls)[0]
                       ? imageSrc(parseImageUrls(previewPost.imageUrls)[0])

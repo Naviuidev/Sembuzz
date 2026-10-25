@@ -21,6 +21,10 @@ function PreviewBody({
   liveFeed,
   belowHero,
   postedDateLabel,
+  externalLink,
+  adminSourceLink,
+  publishedAt,
+  createdAt,
 }: {
   title: string;
   description: string;
@@ -41,6 +45,10 @@ function PreviewBody({
   liveFeed?: boolean;
   belowHero?: ReactNode;
   postedDateLabel?: string;
+  externalLink?: string | null;
+  adminSourceLink?: string | null;
+  publishedAt?: string | null;
+  createdAt?: string | null;
 }) {
   const devicePreview = layoutVariant === 'device';
   return (
@@ -71,6 +79,12 @@ function PreviewBody({
               ? postedDateLabel || formatPostedDateDisplay(new Date().toISOString())
               : undefined
         }
+        externalLink={externalLink}
+        adminSourceLink={adminSourceLink}
+        showHeroDatePill={liveFeed}
+        publishedAt={publishedAt}
+        createdAt={createdAt}
+        knowMoreChooser={liveFeed}
       />
       {commentsEnabled && !liveFeed ? (
         <div className="admin-create-post-preview-comments" aria-hidden>
@@ -104,6 +118,10 @@ export function CreatePostLivePreview({
   liveFeed,
   belowHero,
   postedDateLabel,
+  externalLink,
+  adminSourceLink,
+  publishedAt,
+  createdAt,
 }: {
   title: string;
   description: string;
@@ -123,6 +141,10 @@ export function CreatePostLivePreview({
   liveFeed?: boolean;
   belowHero?: ReactNode;
   postedDateLabel?: string;
+  externalLink?: string | null;
+  adminSourceLink?: string | null;
+  publishedAt?: string | null;
+  createdAt?: string | null;
 }) {
   const layoutVariant = previewMode === 'web' ? 'web' : 'device';
   const body = (
@@ -145,6 +167,10 @@ export function CreatePostLivePreview({
       liveFeed={liveFeed}
       belowHero={belowHero}
       postedDateLabel={postedDateLabel}
+      externalLink={externalLink}
+      adminSourceLink={adminSourceLink}
+      publishedAt={publishedAt}
+      createdAt={createdAt}
     />
   );
 

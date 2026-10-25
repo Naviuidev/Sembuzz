@@ -16,6 +16,7 @@ import {
   InteractionManager,
   Platform,
   useWindowDimensions,
+  AppState,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -28,7 +29,7 @@ import {
 const HOME_FEED_TAB_LOGO_SIZE = 26;
 /** Icons inside the small circle beside My school / External / All schools. */
 const HOME_FEED_TAB_BADGE_ICON = 18;
-import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect, type RouteProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import FunnelIcon from 'react-native-bootstrap-icons/icons/funnel';
@@ -72,6 +73,9 @@ import {
   eventMatchesCalendarDateYmd,
   filterEventsByViewByDate,
   getFeedDateFilterTzOffsetMinutes,
+  sortEventsChronologicalByEventDate,
+  getTodayYmdLocal,
+  sortEventsForHomeFeed,
 } from '../utils/eventFeedDate';
 import { FeedCalendarMonthGrid } from '../components/FeedCalendarMonthGrid';
 import {
@@ -151,6 +155,7 @@ export default function EventsScreen() {
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [selectedSubCategoryIds, setSelectedSubCategoryIds] = useState<string[]>([]);
   const [feedSort, setFeedSort] = useState<'latest' | 'popular'>('latest');
+  const [feedTodayYmd, setFeedTodayYmd] = useState(() => getTodayYmdLocal());
   const [loggedInFeedDateFilter, setLoggedInFeedDateFilter] = useState<string | null>(null);
   const [loggedInFeedPostTypeFilter, setLoggedInFeedPostTypeFilter] = useState<'event' | 'posted' | null>(
     null,
@@ -851,9 +856,7 @@ export default function EventsScreen() {
 
   const calendarSortedEvents = useMemo(() => {
     if (feedSort === 'latest') {
-      return [...calendarApprovedEvents].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
+      return sortEventsChronologicalByEventDate(calendarApprovedEvents);
     }
     const { likes, commentCounts, savedCounts } = calendarEngagementCounts;
     return [...calendarApprovedEvents].sort((a, b) => {
@@ -1175,21 +1178,51 @@ export default function EventsScreen() {
       .catch(() => setEngagementCounts({ likes: {}, commentCounts: {}, savedCounts: {} }));
   }, [eventIds.join(','), feedSort]);
 
+  const isDefaultHomeFeed =
+    !upcomingDateFilter && !loggedInPostTypeDateFilterActive && !guestPostTypeDateFilterActive;
+
+  useFocusEffect(
+    useCallback(() => {
+      setFeedTodayYmd(getTodayYmdLocal());
+    }, []),
+  );
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') setFeedTodayYmd(getTodayYmdLocal());
+    });
+    return () => sub.remove();
+  }, []);
+
+  /** Default home: show all approved posts; sort puts today → upcoming → past (past still reachable without calendar). */
+  const homeFeedEvents = events;
+
   const sortedEvents = useMemo(() => {
+    const engagementScore = (id: string) => {
+      const { likes, commentCounts, savedCounts } = engagementCounts;
+      return (likes[id] ?? 0) + (commentCounts[id] ?? 0) + (savedCounts[id] ?? 0);
+    };
+
+    if (isDefaultHomeFeed) {
+      return sortEventsForHomeFeed(homeFeedEvents, {
+        feedSort,
+        todayYmd: feedTodayYmd,
+        engagementScore,
+      });
+    }
+
     if (feedSort === 'latest') {
-      return [...events].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
+      return sortEventsChronologicalByEventDate(homeFeedEvents, feedTodayYmd);
     }
     const { likes, commentCounts, savedCounts } = engagementCounts;
-    return [...events].sort((a, b) => {
+    return [...homeFeedEvents].sort((a, b) => {
       const scoreA = (likes[a.id] ?? 0) + (commentCounts[a.id] ?? 0) + (savedCounts[a.id] ?? 0);
       const scoreB = (likes[b.id] ?? 0) + (commentCounts[b.id] ?? 0) + (savedCounts[b.id] ?? 0);
       const diff = scoreB - scoreA;
       if (diff !== 0) return diff;
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
-  }, [events, feedSort, engagementCounts]);
+  }, [homeFeedEvents, feedSort, engagementCounts, isDefaultHomeFeed, feedTodayYmd]);
 
   const [activeBannerAds, setActiveBannerAds] = useState<BannerAdPublic[]>([]);
   const [activeSponsoredAds, setActiveSponsoredAds] = useState<SponsoredAdPublic[]>([]);

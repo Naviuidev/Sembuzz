@@ -1,5 +1,12 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { imageSrc } from '../utils/image';
+import {
+  eventDateToYmd,
+  formatEventDateHeroPillLabel,
+  getPostedDateYmd,
+  getTodayYmdLocal,
+} from '../utils/eventFeedDate';
 import {
   EVENT_DESCRIPTION_MAX_WORDS,
   formatEventOccurrenceDate,
@@ -7,12 +14,13 @@ import {
   parseEventActionButtonsPublic,
   truncateWords,
   isKnowMoreActionLabel,
-  knowMoreActionDisplayLabel,
+  normalizeExternalUrlForOpen,
 } from '../utils/eventPostPublic';
 import {
   APPLE_CALENDAR_BUTTON_LABEL,
   GOOGLE_CALENDAR_BUTTON_LABEL,
 } from './EventPostDetailFields';
+import { EventKnowMoreChooserModal } from './EventKnowMoreChooserModal';
 
 export type EventPostDetailLayoutProps = {
   title: string;
@@ -42,6 +50,20 @@ export type EventPostDetailLayoutProps = {
   metaChips?: boolean;
   /** When post was published (shown under description on live feed). */
   postedDateLabel?: string;
+  /** Public “Know more” CTA — shown only when this URL is set. */
+  externalLink?: string | null;
+  /** Admin “Know more link” from create/edit (used for Open source / in-app Know more). */
+  adminSourceLink?: string | null;
+  /** Light-green date pill on hero (public home feed). */
+  showHeroDatePill?: boolean;
+  publishedAt?: string | null;
+  createdAt?: string | null;
+  /** Home feed: Know more opens “source link” vs “within app” chooser. */
+  knowMoreChooser?: boolean;
+  /** In-app sheet: show full description (no teaser). */
+  showFullDescription?: boolean;
+  /** Full in-app view: Know more opens source URL directly (no chooser). */
+  knowMoreOpensSourceDirectly?: boolean;
 };
 
 function schoolBadgeLabel(name: string): string {
@@ -103,12 +125,43 @@ export function EventPostDetailLayout({
   belowHero,
   metaChips,
   postedDateLabel,
+  externalLink,
+  adminSourceLink,
+  showHeroDatePill,
+  publishedAt,
+  createdAt,
+  knowMoreChooser,
+  showFullDescription,
+  knowMoreOpensSourceDirectly,
 }: EventPostDetailLayoutProps) {
   const [descExpanded, setDescExpanded] = useState(false);
+  const [knowMoreChooserOpen, setKnowMoreChooserOpen] = useState(false);
+  const [inAppPostOpen, setInAppPostOpen] = useState(false);
 
   useEffect(() => {
     setDescExpanded(false);
   }, [description]);
+
+  const feedKnowMoreUrl = externalLink?.trim() ? normalizeExternalUrlForOpen(externalLink.trim()) : '';
+  const sourceOpenUrl = adminSourceLink?.trim()
+    ? normalizeExternalUrlForOpen(adminSourceLink.trim())
+    : feedKnowMoreUrl;
+  const showKnowMoreCta = knowMoreOpensSourceDirectly ? !!sourceOpenUrl : !!feedKnowMoreUrl;
+  const knowMoreHref = knowMoreOpensSourceDirectly ? sourceOpenUrl : feedKnowMoreUrl;
+
+  const openSourceUrl = () => {
+    setKnowMoreChooserOpen(false);
+    if (!sourceOpenUrl) {
+      window.alert('This post does not have an external source URL.');
+      return;
+    }
+    window.open(sourceOpenUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const openPostWithinApp = () => {
+    setKnowMoreChooserOpen(false);
+    setInAppPostOpen(true);
+  };
 
   const hero =
     coverImageUrl ||
@@ -118,20 +171,31 @@ export function EventPostDetailLayout({
   const timeLabel = formatEventTimeRange(eventStartTime, eventEndTime);
   const location = eventLocation?.trim() || '';
   const trimmedDesc = description.trim();
-  const { text: descPreview, truncated: descTruncated } = descExpanded
-    ? { text: trimmedDesc, truncated: false }
-    : truncateWords(trimmedDesc, EVENT_DESCRIPTION_MAX_WORDS);
+  const { text: descPreview, truncated: descTruncated } =
+    showFullDescription || descExpanded
+      ? { text: trimmedDesc, truncated: false }
+      : truncateWords(trimmedDesc, EVENT_DESCRIPTION_MAX_WORDS);
   const allButtons = sortActionButtons(
     actionButtons?.length
       ? actionButtons.filter((b) => b.label.trim())
       : parseEventActionButtonsPublic(actionButtonsJson),
   );
-  const linkPills = allButtons.filter((b) => isKnowMoreActionLabel(b.label));
   const buttons = allButtons.filter((b) => !isKnowMoreActionLabel(b.label));
   const categoryLabel = [categoryName, subCategoryName].filter(Boolean).join(' · ') || categoryName || '';
   const displayTitle = title.trim() || 'Your post title';
+  const heroDatePillYmd = showHeroDatePill
+    ? eventDateToYmd(eventDate) ??
+      getPostedDateYmd({
+        eventDate: null,
+        publishedAt: publishedAt ?? null,
+        createdAt: createdAt ?? '',
+      })
+    : null;
+  const heroDatePillLabel = heroDatePillYmd
+    ? formatEventDateHeroPillLabel(heroDatePillYmd, getTodayYmdLocal())
+    : null;
 
-  return (
+  const content = (
     <div
       className={`event-post-detail${compact ? ' event-post-detail--compact' : ''}${metaChips ? ' event-post-detail--meta-chips' : ''}${className ? ` ${className}` : ''}`}
       style={{ '--event-post-accent': accentColor, ...style } as CSSProperties}
@@ -154,6 +218,9 @@ export function EventPostDetailLayout({
                 <i className="bi bi-share" />
               </span>
             </div>
+          ) : null}
+          {heroDatePillLabel ? (
+            <span className="event-post-detail__hero-date-pill">{heroDatePillLabel}</span>
           ) : null}
           {schoolName || schoolLogoUrl ? (
             <div className="event-post-detail__school-badge">
@@ -230,38 +297,41 @@ export function EventPostDetailLayout({
           {!descExpanded && descTruncated ? '…' : null}
         </p>
       ) : null}
-      {descTruncated && !descExpanded ? (
+      {showKnowMoreCta ? (
         <div className="event-post-detail__know-more-wrap">
-          <button
-            type="button"
-            className="event-post-detail__know-more"
-            onClick={() => setDescExpanded(true)}
-          >
-            Know more
-          </button>
+          {preview ? (
+            <span className="event-post-detail__know-more">Know more</span>
+          ) : knowMoreChooser && !knowMoreOpensSourceDirectly ? (
+            <button
+              type="button"
+              className="event-post-detail__know-more"
+              onClick={(e) => {
+                e.stopPropagation();
+                setKnowMoreChooserOpen(true);
+              }}
+            >
+              Know more
+            </button>
+          ) : (
+            <a
+              href={knowMoreHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="event-post-detail__know-more"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                window.open(knowMoreHref, '_blank', 'noopener,noreferrer');
+              }}
+            >
+              Know more
+            </a>
+          )}
         </div>
       ) : null}
 
-      {linkPills.length > 0 ? (
-        <div className="event-post-detail__know-more-wrap">
-          {linkPills.map((btn) =>
-            preview || !btn.url.trim() ? (
-              <span key={`${btn.label}-${btn.url}`} className="event-post-detail__know-more">
-                {knowMoreActionDisplayLabel(btn.label)}
-              </span>
-            ) : (
-              <a
-                key={`${btn.label}-${btn.url}`}
-                href={btn.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="event-post-detail__know-more"
-              >
-                {knowMoreActionDisplayLabel(btn.label)}
-              </a>
-            ),
-          )}
-        </div>
+      {showFullDescription && postedDateLabel ? (
+        <p className="event-post-detail__posted-date">{postedDateLabel}</p>
       ) : null}
 
       {buttons.length > 0 ? (
@@ -300,9 +370,79 @@ export function EventPostDetailLayout({
         </div>
       ) : null}
 
-      {postedDateLabel ? (
+      {!showFullDescription && postedDateLabel ? (
         <p className="event-post-detail__posted-date">{postedDateLabel}</p>
       ) : null}
     </div>
+  );
+
+  const modals =
+    typeof document !== 'undefined'
+      ? createPortal(
+          <>
+            {knowMoreChooser && !knowMoreOpensSourceDirectly ? (
+              <EventKnowMoreChooserModal
+                open={knowMoreChooserOpen}
+                onClose={() => setKnowMoreChooserOpen(false)}
+                onOpenSource={openSourceUrl}
+                onShowInApp={openPostWithinApp}
+              />
+            ) : null}
+            {inAppPostOpen ? (
+              <div
+                className="event-post-in-app-overlay"
+                role="dialog"
+                aria-modal="true"
+                onClick={() => setInAppPostOpen(false)}
+              >
+                <div className="event-post-in-app-sheet" onClick={(e) => e.stopPropagation()}>
+                  <div className="event-post-in-app-header">
+                    <button type="button" className="event-post-in-app-back" onClick={() => setInAppPostOpen(false)}>
+                      <i className="bi bi-arrow-left" aria-hidden />
+                      Back
+                    </button>
+                  </div>
+                  <div className="event-post-in-app-scroll">
+                    <EventPostDetailLayout
+                      title={title}
+                      description={description}
+                      coverImageUrl={coverImageUrl}
+                      imageUrls={imageUrls}
+                      schoolName={schoolName}
+                      schoolLogoUrl={schoolLogoUrl}
+                      categoryName={categoryName}
+                      subCategoryName={subCategoryName}
+                      eventDate={eventDate}
+                      eventStartTime={eventStartTime}
+                      eventEndTime={eventEndTime}
+                      eventLocation={eventLocation}
+                      actionButtons={actionButtons}
+                      actionButtonsJson={actionButtonsJson}
+                      compact={compact}
+                      showHero={showHero}
+                      metaChips={metaChips}
+                      postedDateLabel={postedDateLabel}
+                      externalLink={feedKnowMoreUrl || null}
+                      adminSourceLink={adminSourceLink}
+                      showHeroDatePill={showHeroDatePill}
+                      publishedAt={publishedAt}
+                      createdAt={createdAt}
+                      showFullDescription
+                      knowMoreOpensSourceDirectly
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </>,
+          document.body,
+        )
+      : null;
+
+  return (
+    <>
+      {content}
+      {modals}
+    </>
   );
 }

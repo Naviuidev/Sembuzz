@@ -1,5 +1,5 @@
 import type { ApprovedEventPublic } from '../services/public-events.service';
-import { parseEventImageUrls } from '../utils/eventPostPublic';
+import { getEventKnowMoreUrl, parseEventImageUrls } from '../utils/eventPostPublic';
 import { EventPostDetailLayout } from './EventPostDetailLayout';
 
 type EventFields = Pick<
@@ -11,6 +11,7 @@ type EventFields = Pick<
   | 'eventEndTime'
   | 'eventLocation'
   | 'actionButtons'
+  | 'externalLink'
   | 'imageUrls'
   | 'school'
   | 'subCategory'
@@ -21,11 +22,13 @@ export function EventPostPublicContent({
   description,
   compact,
   showHero = false,
+  knowMoreChooser = false,
 }: {
   event: EventFields;
   description?: string;
   compact?: boolean;
   showHero?: boolean;
+  knowMoreChooser?: boolean;
 }) {
   const schoolName = event.school?.name ?? '';
   const schoolLogoUrl = event.school?.image ?? null;
@@ -44,8 +47,11 @@ export function EventPostPublicContent({
       eventEndTime={event.eventEndTime}
       eventLocation={event.eventLocation}
       actionButtonsJson={event.actionButtons}
+      externalLink={getEventKnowMoreUrl(event)}
+      adminSourceLink={event.externalLink}
       compact={compact}
       showHero={showHero}
+      knowMoreChooser={knowMoreChooser}
     />
   );
 }

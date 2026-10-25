@@ -1,8 +1,9 @@
 import type { ApprovedEventPublic } from '../services/public-events.service';
+import { getEventKnowMoreUrl } from '../utils/eventPostPublic';
 import { EventPostPublicDescription } from './EventPostPublicDescription';
 
 type Props = {
-  event: Pick<ApprovedEventPublic, 'externalLink'>;
+  event: Pick<ApprovedEventPublic, 'externalLink' | 'actionButtons'>;
   description: string;
   expanded: boolean;
   onExpand: () => void;
@@ -10,7 +11,7 @@ type Props = {
 };
 
 export function EventPostPublicDescriptionRow({ event, description, expanded, onExpand, compact }: Props) {
-  const externalLink = event.externalLink?.trim() || null;
+  const externalLink = getEventKnowMoreUrl(event);
   const hasDescription = !!description.trim();
 
   if (!hasDescription && !externalLink) return null;

@@ -79,6 +79,26 @@ export class SchoolAdminPostsController {
     return this.postsService.findOne(id, req.user.schoolId);
   }
 
+  @Post(':id/submit-edit-revision')
+  async submitEditRevision(
+    @Param('id') id: string,
+    @Body() body: UpdatePostDto,
+    @Request() req: { user: { sub: string; schoolId: string } },
+  ) {
+    return this.postsService.submitEditRevision(id, req.user.schoolId, req.user.sub, {
+      title: body.title,
+      description: body.description,
+      externalLink: body.externalLink,
+      eventDate: body.eventDate,
+      eventStartTime: body.eventStartTime,
+      eventEndTime: body.eventEndTime,
+      eventLocation: body.eventLocation,
+      actionButtons: body.actionButtons,
+      commentsEnabled: body.commentsEnabled,
+      imageUrls: body.imageUrls,
+    });
+  }
+
   @Patch(':id')
   async update(
     @Param('id') id: string,

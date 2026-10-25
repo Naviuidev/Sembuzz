@@ -7,6 +7,10 @@ import {
   parsePublishAt,
   resolveSchoolAdminCreateStatus,
 } from '../../events/event-publishing.constants';
+import {
+  assertNoPendingEditForOriginal,
+  isLivePostEditTarget,
+} from '../../events/event-edit-revision.util';
 import { PushNotificationService } from '../../push/push-notification.service';
 import {
   normalizeEventLocation,
@@ -158,6 +162,108 @@ export class SchoolAdminPostsService {
     }
     await this.prisma.event.delete({ where: { id } });
     return { deleted: true };
+  }
+
+  async submitEditRevision(
+    id: string,
+    schoolId: string,
+    schoolAdminId: string,
+    data: {
+      title?: string;
+      description?: string;
+      externalLink?: string;
+      eventDate?: string;
+      eventStartTime?: string;
+      eventEndTime?: string;
+      eventLocation?: string;
+      actionButtons?: { label: string; url: string }[];
+      commentsEnabled?: boolean;
+      imageUrls?: string[];
+    },
+  ) {
+    const event = await this.prisma.event.findFirst({
+      where: { id, schoolId, schoolAdminId },
+    });
+    if (!event) {
+      throw new NotFoundException('Post not found');
+    }
+    if (!isLivePostEditTarget(event.status)) {
+      throw new BadRequestException('Only live or scheduled school posts can be edited through approval.');
+    }
+    await assertNoPendingEditForOriginal(this.prisma, event.id);
+
+    const title = (data.title ?? event.title).trim();
+    if (!title) {
+      throw new BadRequestException('Title is required.');
+    }
+
+    const imageUrlsJson =
+      data.imageUrls !== undefined
+        ? (() => {
+            const arr = data.imageUrls.filter((u) => typeof u === 'string' && u.trim());
+            return arr.length > 0 ? JSON.stringify(arr) : null;
+          })()
+        : event.imageUrls;
+
+    const eventDate =
+      data.eventDate !== undefined
+        ? data.eventDate
+          ? parseEventDateYmd(data.eventDate)
+          : null
+        : event.eventDate;
+    const eventStartTime =
+      data.eventStartTime !== undefined
+        ? data.eventStartTime
+          ? parseEventTimeHm(data.eventStartTime)
+          : null
+        : event.eventStartTime;
+    const eventEndTime =
+      data.eventEndTime !== undefined
+        ? data.eventEndTime
+          ? parseEventTimeHm(data.eventEndTime)
+          : null
+        : event.eventEndTime;
+    const eventLocation =
+      data.eventLocation !== undefined
+        ? normalizeEventLocation(data.eventLocation)
+        : event.eventLocation;
+    const actionButtons =
+      data.actionButtons !== undefined
+        ? serializeActionButtons(data.actionButtons)
+        : event.actionButtons;
+
+    return this.prisma.event.create({
+      data: {
+        schoolAdminId,
+        subCategoryId: event.subCategoryId,
+        categoryId: event.categoryId,
+        schoolId: event.schoolId,
+        title,
+        description: data.description !== undefined ? data.description ?? null : event.description,
+        externalLink:
+          data.externalLink !== undefined ? data.externalLink || null : event.externalLink,
+        eventDate,
+        eventStartTime,
+        eventEndTime,
+        eventLocation,
+        actionButtons,
+        commentsEnabled: data.commentsEnabled ?? event.commentsEnabled,
+        imageUrls: imageUrlsJson,
+        status: EVENT_STATUS.PENDING,
+        publishAt: event.publishAt,
+        resubmitFromEventId: event.id,
+      },
+      include: {
+        subCategory: {
+          select: {
+            id: true,
+            name: true,
+            category: { select: { id: true, name: true } },
+          },
+        },
+        schoolAdmin: { select: { id: true, name: true, email: true } },
+      },
+    });
   }
 
   async update(

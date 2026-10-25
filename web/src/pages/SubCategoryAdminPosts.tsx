@@ -6,7 +6,7 @@ import { SubCategoryAdminCreatePost, type SubCategoryAdminResubmitEvent } from '
 import { SubCategoryAdminApprovalsPendingPanel } from '../components/SubCategoryAdminApprovalsPendingPanel';
 import { SubCategoryAdminApprovedPanel } from '../components/SubCategoryAdminApprovedPanel';
 import { SubCategoryAdminReceivedCorrectionsPanel } from '../components/SubCategoryAdminReceivedCorrectionsPanel';
-import type { RevertedEvent } from '../services/subcategory-admin-events.service';
+import type { ApprovedEvent, RevertedEvent } from '../services/subcategory-admin-events.service';
 
 type PostsTab = 'create' | 'corrections' | 'pending' | 'approved';
 
@@ -42,8 +42,27 @@ function toResubmitEvent(event: RevertedEvent): SubCategoryAdminResubmitEvent {
     eventEndTime: event.eventEndTime,
     eventLocation: event.eventLocation,
     actionButtons: event.actionButtons,
+    imageUrls: event.imageUrls,
     commentsEnabled: event.commentsEnabled,
     subCategory: event.subCategory,
+  };
+}
+
+function approvedToEditEvent(event: ApprovedEvent): SubCategoryAdminResubmitEvent {
+  return {
+    id: event.id,
+    title: event.title,
+    description: event.description,
+    externalLink: event.externalLink,
+    eventDate: event.eventDate,
+    eventStartTime: event.eventStartTime,
+    eventEndTime: event.eventEndTime,
+    eventLocation: event.eventLocation,
+    actionButtons: event.actionButtons,
+    imageUrls: event.imageUrls,
+    commentsEnabled: event.commentsEnabled,
+    subCategory: event.subCategory,
+    editLiveApprovedPost: true,
   };
 }
 
@@ -75,6 +94,11 @@ export const SubCategoryAdminPosts = () => {
 
   const handleMakeCorrections = useCallback((event: RevertedEvent) => {
     setResubmitEvent(toResubmitEvent(event));
+    setSearchParams({});
+  }, [setSearchParams]);
+
+  const handleEditApproved = useCallback((event: ApprovedEvent) => {
+    setResubmitEvent(approvedToEditEvent(event));
     setSearchParams({});
   }, [setSearchParams]);
 
@@ -130,7 +154,9 @@ export const SubCategoryAdminPosts = () => {
                   <SubCategoryAdminReceivedCorrectionsPanel onMakeCorrections={handleMakeCorrections} />
                 ) : null}
                 {activeTab === 'pending' ? <SubCategoryAdminApprovalsPendingPanel /> : null}
-                {activeTab === 'approved' ? <SubCategoryAdminApprovedPanel /> : null}
+                {activeTab === 'approved' ? (
+                  <SubCategoryAdminApprovedPanel onEditApproved={handleEditApproved} />
+                ) : null}
               </div>
             </section>
           </>

@@ -86,6 +86,25 @@ export const schoolAdminPostsService = {
     return response.data;
   },
 
+  submitEditRevision: async (
+    id: string,
+    data: {
+      title?: string;
+      description?: string;
+      externalLink?: string;
+      eventDate?: string;
+      eventStartTime?: string;
+      eventEndTime?: string;
+      eventLocation?: string;
+      actionButtons?: { label: string; url: string }[];
+      commentsEnabled?: boolean;
+      imageUrls?: string[];
+    },
+  ): Promise<SchoolAdminPost> => {
+    const response = await api.post<SchoolAdminPost>(`/school-admin/posts/${id}/submit-edit-revision`, data);
+    return response.data;
+  },
+
   updatePost: async (
     id: string,
     data: {

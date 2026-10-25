@@ -15,6 +15,10 @@ import {
   normalizeEventLocation,
   serializeActionButtons,
 } from '../../events/event-post-fields.util';
+import {
+  assertNoPendingEditForOriginal,
+  isLivePostEditTarget,
+} from '../../events/event-edit-revision.util';
 
 export interface AnalyzeBannerResult {
   title: string;
@@ -45,18 +49,29 @@ export class EventsService {
       throw new ForbiddenException('Subcategory admin not found');
     }
 
+    let lockedSubCategoryId = dto.subCategoryId;
     if (dto.resubmitFromEventId) {
       const original = await this.prisma.event.findFirst({
         where: {
           id: dto.resubmitFromEventId,
           subCategoryAdminId,
-          status: 'reverted',
         },
       });
       if (!original) {
         throw new BadRequestException(
-          'Original correction request not found or already resolved.',
+          'Original post not found or you do not have permission to revise it.',
         );
+      }
+      const isReverted = original.status === EVENT_STATUS.REVERTED;
+      const isLiveEdit = isLivePostEditTarget(original.status);
+      if (!isReverted && !isLiveEdit) {
+        throw new BadRequestException(
+          'Only correction requests or live approved posts can be resubmitted from this link.',
+        );
+      }
+      if (isLiveEdit) {
+        await assertNoPendingEditForOriginal(this.prisma, original.id);
+        lockedSubCategoryId = original.subCategoryId;
       }
     }
 
@@ -76,7 +91,7 @@ export class EventsService {
       return await this.prisma.event.create({
         data: {
           subCategoryAdminId,
-          subCategoryId: dto.subCategoryId,
+          subCategoryId: lockedSubCategoryId,
           categoryId: admin.categoryId,
           schoolId: admin.schoolId,
           title: dto.title.trim(),

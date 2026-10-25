@@ -17,6 +17,11 @@ import {
   normalizeEventLocation,
   serializeActionButtons,
 } from '../../events/event-post-fields.util';
+import {
+  applyPendingRevisionToLiveEvent,
+  isLivePostEditTarget,
+  supersedePendingRevision,
+} from '../../events/event-edit-revision.util';
 
 @Injectable()
 export class CategoryAdminEventsService {
@@ -68,6 +73,9 @@ export class CategoryAdminEventsService {
       include: {
         subCategory: { select: { id: true, name: true } },
         subCategoryAdmin: {
+          select: { id: true, name: true, email: true },
+        },
+        schoolAdmin: {
           select: { id: true, name: true, email: true },
         },
       },
@@ -180,6 +188,38 @@ export class CategoryAdminEventsService {
     );
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      if (event.resubmitFromEventId) {
+        const original = await tx.event.findUnique({ where: { id: event.resubmitFromEventId } });
+        if (original && isLivePostEditTarget(original.status)) {
+          await applyPendingRevisionToLiveEvent(tx, original.id, event);
+          const liveResolved = resolveCategoryAdminApproveStatus(
+            event.publishAt ?? original.publishAt,
+            {
+              publishNow: dto.publishNow,
+              newPublishAt,
+              wasScheduleMissed,
+            },
+          );
+          const live = await tx.event.update({
+            where: { id: original.id },
+            data: {
+              status: liveResolved.status,
+              publishAt: liveResolved.publishAt,
+              publishedAt:
+                liveResolved.publishedAt ??
+                (liveResolved.status === EVENT_STATUS.PUBLISHED ? new Date() : original.publishedAt),
+            },
+            include: {
+              school: { select: { name: true, image: true } },
+              subCategory: { select: { id: true, name: true } },
+              subCategoryAdmin: { select: { id: true, name: true, email: true } },
+            },
+          });
+          await supersedePendingRevision(tx, eventId);
+          return live;
+        }
+      }
+
       const approved = await tx.event.update({
         where: { id: eventId },
         data: {

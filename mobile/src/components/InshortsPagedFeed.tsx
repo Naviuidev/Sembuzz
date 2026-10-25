@@ -20,7 +20,6 @@ import { assignBannersToEventSlides, type PublicFeedItem } from '../utils/public
 import type { ApprovedEventPublic, SponsoredAdPublic, BannerAdPublic } from '../services/events';
 import { canPrefetchImage, imageSrc } from '../utils/image';
 import { SchoolLogo } from './SchoolLogo';
-import { UserBookmarkedEventDetailModal } from './UserBookmarkedEventDetail';
 import {
   recordBannerAdView,
   recordBannerAdClick,
@@ -36,10 +35,14 @@ import {
   parseEventActionButtonsPublic,
   computeInshortsFeedDescriptionMaxLines,
   computeInshortsFeedDescriptionMaxWords,
+  isKnowMoreActionLabel,
+  getEventKnowMoreUrl,
+  getEventAdminSourceUrl,
   truncateWords,
 } from '../utils/eventPostPublic';
 import { feedActionPillColors } from '../utils/feedActionPills';
 import { TOOLBAR_ICON_SIZE } from '../navigation/tabBarMetrics';
+import { UserBookmarkedEventDetailModal } from './UserBookmarkedEventDetail';
 
 /** Overlay on post hero — icon matches tabs; slightly smaller hit than full toolbar slot. */
 const FEED_ENGAGE_BTN_SIZE = TOOLBAR_ICON_SIZE + 8;
@@ -48,6 +51,12 @@ import {
   formatRelativeTime,
   getPostedDateIso,
 } from '../utils/formatRelativeTime';
+import {
+  eventDateToYmd,
+  formatEventDateHeroPillLabel,
+  getPostedDateYmd,
+  getTodayYmdLocal,
+} from '../utils/eventFeedDate';
 
 export { formatRelativeTime };
 import { Ionicons } from '@expo/vector-icons';
@@ -123,13 +132,15 @@ function InshortsEventPage({
 }) {
   const images = event.imageUrls ? parseImageUrlsJson(event.imageUrls) : [];
   const firstImage = images[0];
-  const actionButtons = parseEventActionButtonsPublic(event.actionButtons);
+  const actionButtons = parseEventActionButtonsPublic(event.actionButtons).filter(
+    (b) => !isKnowMoreActionLabel(b.label),
+  );
   const postedDisplay = formatPostedDateDisplay(getPostedDateIso(event));
   const innerPageHeight = feedPageInnerHeight(pageHeight);
   const imgH = computeFeedHeroHeight(innerPageHeight, actionButtons.length);
+  const sourceUrl = getEventKnowMoreUrl(event) ?? '';
   const [knowMoreChooserVisible, setKnowMoreChooserVisible] = React.useState(false);
   const [inAppPostVisible, setInAppPostVisible] = React.useState(false);
-  const sourceUrl = event.externalLink?.trim() ?? '';
   const [commentsOpen, setCommentsOpen] = React.useState(false);
   const [comments, setComments] = React.useState<EventCommentResponse[]>([]);
   const [commentsLoading, setCommentsLoading] = React.useState(false);
@@ -149,11 +160,6 @@ function InshortsEventPage({
     () => computeInshortsFeedDescriptionMaxLines(descSlotHeight),
     [descSlotHeight],
   );
-  const { truncated: descNeedsKnowMore } = React.useMemo(
-    () => truncateWords(trimmedDesc, descriptionMaxWords),
-    [trimmedDesc, descriptionMaxWords],
-  );
-
   React.useEffect(() => {
     if (banner?.id) recordBannerAdView(banner.id).catch(() => {});
   }, [banner?.id]);
@@ -217,21 +223,25 @@ function InshortsEventPage({
 
   const schoolHeroImg = event.school?.image?.trim();
   const heroFallbackLogoSize = Math.min(128, Math.round(imgH * 0.4));
+  const heroDatePillYmd = eventDateToYmd(event.eventDate) ?? getPostedDateYmd(event);
+  const heroDatePillLabel = formatEventDateHeroPillLabel(heroDatePillYmd, getTodayYmdLocal());
 
   const openKnowMoreChooser = React.useCallback(() => {
     setKnowMoreChooserVisible(true);
   }, []);
 
+  const adminSourceUrl = getEventAdminSourceUrl(event) ?? '';
+
   const openSourceUrl = React.useCallback(() => {
     setKnowMoreChooserVisible(false);
-    if (!sourceUrl) {
+    if (!adminSourceUrl) {
       Alert.alert('No source link', 'This post does not have an external source URL.');
       return;
     }
-    Linking.openURL(sourceUrl).catch(() => {
+    Linking.openURL(adminSourceUrl).catch(() => {
       Alert.alert('Could not open link', 'Please try again later.');
     });
-  }, [sourceUrl]);
+  }, [adminSourceUrl]);
 
   const openPostWithinApp = React.useCallback(() => {
     setKnowMoreChooserVisible(false);
@@ -255,6 +265,13 @@ function InshortsEventPage({
               <SchoolLogo school={event.school} size={heroFallbackLogoSize} borderRadius={16} />
             </View>
           )}
+          {heroDatePillLabel ? (
+            <View style={styles.heroDatePill} pointerEvents="none">
+              <Text style={styles.heroDatePillText} numberOfLines={1}>
+                {heroDatePillLabel}
+              </Text>
+            </View>
+          ) : null}
           <View style={styles.engagePill} pointerEvents="box-none">
             <View style={styles.engageActionGroup}>
               <TouchableOpacity
@@ -335,12 +352,13 @@ function InshortsEventPage({
                   ) : null}
                 </View>
                 <View style={styles.postFieldsTail}>
-                  {descNeedsKnowMore ? (
+                  {sourceUrl ? (
                     <TouchableOpacity
                       style={styles.feedKnowMorePill}
                       onPress={openKnowMoreChooser}
                       activeOpacity={0.85}
                       accessibilityRole="button"
+                      accessibilityLabel="Know more"
                     >
                       <Text style={styles.feedKnowMorePillText}>Know more</Text>
                     </TouchableOpacity>
@@ -870,6 +888,27 @@ const styles = StyleSheet.create({
   heroWrap: {
     position: 'relative',
     width: '100%',
+  },
+  heroDatePill: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 3,
+    maxWidth: '72%',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#d1fae5',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  heroDatePillText: {
+    color: '#065f46',
+    fontSize: 12,
+    fontWeight: '700',
   },
   engagePill: {
     position: 'absolute',

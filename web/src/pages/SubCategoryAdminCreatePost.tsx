@@ -20,6 +20,7 @@ import {
   APPLE_CALENDAR_BUTTON_LABEL,
 } from '../components/EventPostDetailFields';
 import { CreatePostLivePreview } from '../components/CreatePostLivePreview';
+import { EventPostExternalLinkField } from '../components/EventPostExternalLinkField';
 import type { EventActionButton } from '../types/event-post';
 import { imageSrc } from '../utils/image';
 
@@ -47,8 +48,11 @@ export type SubCategoryAdminResubmitEvent = {
   eventEndTime?: string | null;
   eventLocation?: string | null;
   actionButtons?: string | null;
+  imageUrls?: string | null;
   commentsEnabled: boolean;
   subCategory: { id: string; name: string };
+  /** Resubmit edits to a live approved post (not a reverted correction). */
+  editLiveApprovedPost?: boolean;
 };
 
 export const SubCategoryAdminCreatePost = ({
@@ -66,10 +70,9 @@ export const SubCategoryAdminCreatePost = ({
   const { user, refreshUser } = useSubCategoryAdminAuth();
   const panelStyle = { '--admin-accent': ADMIN_PORTAL_ACCENTS.subcategory } as CSSProperties;
   const [resubmitFromEventId, setResubmitFromEventId] = useState<string | undefined>();
+  const [editingLiveApprovedPost, setEditingLiveApprovedPost] = useState(false);
   const [activeStep, setActiveStep] = useState<StepId>('content');
   const [previewMode, setPreviewMode] = useState<'mobile' | 'tablet' | 'web'>('mobile');
-  const [showVirtualLink, setShowVirtualLink] = useState(false);
-
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [externalLink, setExternalLink] = useState('');
@@ -112,15 +115,16 @@ export const SubCategoryAdminCreatePost = ({
     }
   }, [availableSubcategories, subCategoryId]);
 
-  const hasAppliedResubmit = useRef(false);
+  const lastAppliedResubmitId = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (!resubmitEvent || !user || hasAppliedResubmit.current) return;
-    hasAppliedResubmit.current = true;
+    if (!resubmitEvent || !user) return;
+    if (lastAppliedResubmitId.current === resubmitEvent.id) return;
+    lastAppliedResubmitId.current = resubmitEvent.id;
     setResubmitFromEventId(resubmitEvent.id);
+    setEditingLiveApprovedPost(!!resubmitEvent.editLiveApprovedPost);
     setTitle(resubmitEvent.title ?? '');
     setDescription(resubmitEvent.description ?? '');
     setExternalLink(resubmitEvent.externalLink ?? '');
-    setShowVirtualLink(!!resubmitEvent.externalLink?.trim());
     setSubCategoryId(resubmitEvent.subCategory?.id ?? user.subCategoryId);
     setCommentsEnabled(resubmitEvent.commentsEnabled ?? false);
     setEventDate(eventDateToInputValue(resubmitEvent.eventDate ?? null));
@@ -128,6 +132,16 @@ export const SubCategoryAdminCreatePost = ({
     setEventEndTime(eventTimeToInputValue(resubmitEvent.eventEndTime ?? null));
     setEventLocation(resubmitEvent.eventLocation?.trim() ?? '');
     setActionButtons(parseStoredActionButtons(resubmitEvent.actionButtons));
+    if (resubmitEvent.imageUrls) {
+      try {
+        const parsed = JSON.parse(resubmitEvent.imageUrls);
+        if (Array.isArray(parsed)) {
+          setImageUrls(parsed.filter((u): u is string => typeof u === 'string'));
+        }
+      } catch {
+        /* ignore */
+      }
+    }
     setActiveStep('content');
   }, [resubmitEvent, user]);
 
@@ -236,7 +250,6 @@ export const SubCategoryAdminCreatePost = ({
     setTitle('');
     setDescription('');
     setExternalLink('');
-    setShowVirtualLink(false);
     setEventDate('');
     setEventStartTime('');
     setEventEndTime('');
@@ -279,15 +292,19 @@ export const SubCategoryAdminCreatePost = ({
           publishMode === 'schedule' && scheduledAt ? dateTimeLocalToIso(scheduledAt) : undefined,
       });
       setSuccess(
-        publishMode === 'schedule'
-          ? 'Post submitted for approval with a scheduled publish time. Category admin must approve first.'
-          : 'Post submitted for category admin approval.',
+        editingLiveApprovedPost
+          ? 'Edit submitted for category admin approval. The live post stays unchanged until approved.'
+          : publishMode === 'schedule'
+            ? 'Post submitted for approval with a scheduled publish time. Category admin must approve first.'
+            : 'Post submitted for category admin approval.',
       );
       setResubmitFromEventId(undefined);
+      setEditingLiveApprovedPost(false);
       resetForm();
       scrollToStep('content');
       await queryClient.invalidateQueries({ queryKey: ['subcategory-admin', 'events', 'pending'] });
       await queryClient.invalidateQueries({ queryKey: ['subcategory-admin', 'events', 'reverted'] });
+      await queryClient.invalidateQueries({ queryKey: ['subcategory-admin', 'events', 'approved'] });
       void invalidateAdminActionItems(queryClient, 'subcategory-admin');
       onSubmitted?.();
     } catch (err) {
@@ -341,6 +358,14 @@ export const SubCategoryAdminCreatePost = ({
           onChange={handleImageUpload}
           disabled={uploadingImage || imageUrls.length >= MAX_IMAGES}
         />
+        {editingLiveApprovedPost ? (
+          <div className="admin-notice admin-notice--info mb-3">
+            <p className="mb-0">
+              You are editing a live approved post. Submitting sends changes for category admin approval; the current
+              live version stays visible until then.
+            </p>
+          </div>
+        ) : null}
         {error ? (
           <div className="admin-notice mb-3">
             <p className="admin-form-hint admin-form-hint--error mb-0">{error}</p>
@@ -504,32 +529,11 @@ export const SubCategoryAdminCreatePost = ({
                     onActionButtonsChange={setActionButtons}
                   />
                 </div>
-                <div className="form-check mt-3">
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    id="virtual-link-toggle"
-                    checked={showVirtualLink || !!externalLink.trim()}
-                    onChange={(e) => {
-                      setShowVirtualLink(e.target.checked);
-                      if (!e.target.checked) setExternalLink('');
-                    }}
-                  />
-                  <label className="form-check-label" htmlFor="virtual-link-toggle">
-                    Add virtual event link (e.g. Zoom, Teams)
-                  </label>
-                </div>
-                {showVirtualLink || externalLink.trim() ? (
-                  <div className="mt-2">
-                    <input
-                      type="url"
-                      className="form-control admin-form-control"
-                      placeholder="https://"
-                      value={externalLink}
-                      onChange={(e) => setExternalLink(e.target.value)}
-                    />
-                  </div>
-                ) : null}
+                <EventPostExternalLinkField
+                  id="subcategory-create-external-link"
+                  value={externalLink}
+                  onChange={setExternalLink}
+                />
               </div>
             </section>
 
@@ -672,6 +676,7 @@ export const SubCategoryAdminCreatePost = ({
                 eventEndTime={eventEndTime}
                 eventLocation={eventLocation}
                 actionButtons={previewButtons}
+                externalLink={externalLink}
                 coverSrc={previewCoverSrc}
                 previewMode={previewMode}
                 accentColor={ADMIN_PORTAL_ACCENTS.subcategory}

@@ -25,6 +25,9 @@ import {
   eventMatchesCalendarDateYmd,
   filterEventsByViewByDate,
   getFeedDateFilterTzOffsetMinutes,
+  sortEventsChronologicalByEventDate,
+  getTodayYmdLocal,
+  sortEventsForHomeFeed,
 } from '../utils/eventFeedDate';
 import { FeedCalendarMonthGrid } from '../components/FeedCalendarMonthGrid';
 import { FeedCalendarPostTypePicker } from '../components/FeedCalendarPostTypePicker';
@@ -130,7 +133,7 @@ function LikedEventDetailView({ event, onBack }: { event: LikedEventItem; onBack
       </button>
       <article className="card border-0 shadow-sm" style={{ borderRadius: '12px', overflow: 'hidden' }}>
         <div className="px-3 py-3">
-          <EventPostPublicContent event={event} showHero />
+          <EventPostPublicContent event={event} showHero knowMoreChooser />
         </div>
       </article>
     </>
@@ -444,7 +447,7 @@ function EventPostCard({
           }}
         >
           <div className="px-3 py-2">
-            <EventPostPublicContent event={event} description={description} showHero />
+            <EventPostPublicContent event={event} description={description} showHero knowMoreChooser />
             <div className="small text-muted mt-2">{formatDate(event.updatedAt)}</div>
           </div>
 
@@ -845,6 +848,7 @@ export const PublicEvents = () => {
   const [selectedSettingsEvent, setSelectedSettingsEvent] = useState<ApprovedEventPublic | null>(null);
   const [appsScreenKey, setAppsScreenKey] = useState(0);
   const [feedSort, setFeedSort] = useState<'latest' | 'popular'>('latest');
+  const [feedTodayYmd, setFeedTodayYmd] = useState(() => getTodayYmdLocal());
   const [homeFeedMode, setHomeFeedMode] = useState<HomeFeedMode>('mySchool');
   const showAllSchoolsFeed = homeFeedMode === 'allSchools';
   const showExternalHomeFeed = homeFeedMode === 'external';
@@ -1811,6 +1815,26 @@ export const PublicEvents = () => {
     );
   }, [events, eventsFilter?.searchQuery, bottomNavActive, effectiveFeedDateFilter, effectiveFeedDateMode]);
 
+  const isDefaultHomeFeed =
+    bottomNavActive === 'home' && !upcomingDateFilter && !effectiveFeedDateFilter;
+
+  /** Default home: all posts in scope; sort orders today → upcoming → past. */
+  const homeFeedEvents = filteredEvents;
+
+  useEffect(() => {
+    const refreshToday = () => setFeedTodayYmd(getTodayYmdLocal());
+    refreshToday();
+    const onVis = () => {
+      if (document.visibilityState === 'visible') refreshToday();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    const iv = window.setInterval(refreshToday, 60_000);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.clearInterval(iv);
+    };
+  }, []);
+
   const popularSortCounts = useMemo(() => {
     const likes = { ...(publicEngagementCounts?.likes ?? {}) };
     const commentCounts = { ...(publicEngagementCounts?.commentCounts ?? {}) };
@@ -1829,23 +1853,30 @@ export const PublicEvents = () => {
   }, [publicEngagementCounts, engagement]);
 
   const sortedEvents = useMemo(() => {
-    const list = [...filteredEvents];
-    if (feedSort === 'latest') {
-      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    } else {
-      /** Match mobile EventsScreen popular: likes + comments + saves */
-      const score = (id: string) =>
-        (popularSortCounts.likes[id] ?? 0) +
-        (popularSortCounts.commentCounts[id] ?? 0) +
-        (popularSortCounts.savedCounts[id] ?? 0);
-      list.sort((a, b) => {
-        const diff = score(b.id) - score(a.id);
-        if (diff !== 0) return diff;
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    const score = (id: string) =>
+      (popularSortCounts.likes[id] ?? 0) +
+      (popularSortCounts.commentCounts[id] ?? 0) +
+      (popularSortCounts.savedCounts[id] ?? 0);
+
+    if (isDefaultHomeFeed) {
+      return sortEventsForHomeFeed(homeFeedEvents, {
+        feedSort,
+        todayYmd: feedTodayYmd,
+        engagementScore: score,
       });
     }
+
+    const list = [...homeFeedEvents];
+    if (feedSort === 'latest') {
+      return sortEventsChronologicalByEventDate(list, feedTodayYmd);
+    }
+    list.sort((a, b) => {
+      const diff = score(b.id) - score(a.id);
+      if (diff !== 0) return diff;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
     return list;
-  }, [filteredEvents, feedSort, popularSortCounts]);
+  }, [homeFeedEvents, feedSort, popularSortCounts, isDefaultHomeFeed, feedTodayYmd]);
 
   const feedItems = useMemo(
     () => buildPublicFeedItems(sortedEvents, activeSponsoredAds, activeBannerAds, feedSort),

@@ -36,7 +36,11 @@ function parseImageUrls(imageUrls: string | null): string[] {
   }
 }
 
-export function SubCategoryAdminApprovedPanel() {
+type Props = {
+  onEditApproved?: (event: ApprovedEvent) => void;
+};
+
+export function SubCategoryAdminApprovedPanel({ onEditApproved }: Props) {
   const { user } = useSubCategoryAdminAuth();
   const [previewPost, setPreviewPost] = useState<ApprovedEvent | null>(null);
   const [previewMode, setPreviewMode] = useState<'mobile' | 'tablet' | 'web'>('mobile');
@@ -91,15 +95,28 @@ export function SubCategoryAdminApprovedPanel() {
                   <span className="admin-pill admin-pill--status-done">Live</span>
                 </td>
                 <td>
-                  <button
-                    type="button"
-                    className="admin-icon-btn admin-icon-btn--edit"
-                    title="Live preview"
-                    aria-label={`Preview ${event.title}`}
-                    onClick={() => openPreview(event)}
-                  >
-                    <i className="bi bi-eye" aria-hidden />
-                  </button>
+                  <div className="d-flex gap-1">
+                    <button
+                      type="button"
+                      className="admin-icon-btn admin-icon-btn--edit"
+                      title="Live preview"
+                      aria-label={`Preview ${event.title}`}
+                      onClick={() => openPreview(event)}
+                    >
+                      <i className="bi bi-eye" aria-hidden />
+                    </button>
+                    {onEditApproved ? (
+                      <button
+                        type="button"
+                        className="admin-icon-btn admin-icon-btn--edit"
+                        title="Edit post (requires re-approval)"
+                        aria-label={`Edit ${event.title}`}
+                        onClick={() => onEditApproved(event)}
+                      >
+                        <i className="bi bi-pencil" aria-hidden />
+                      </button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -157,6 +174,7 @@ export function SubCategoryAdminApprovedPanel() {
                   eventEndTime={eventTimeToInputValue(previewPost.eventEndTime ?? null)}
                   eventLocation={previewPost.eventLocation?.trim() ?? ''}
                   actionButtons={actionButtonsForApi(parseStoredActionButtons(previewPost.actionButtons))}
+                  externalLink={previewPost.externalLink ?? ''}
                   coverSrc={previewImages[0] ? imageSrc(previewImages[0]) : ''}
                   previewMode={previewMode}
                   accentColor={ADMIN_PORTAL_ACCENTS.subcategory}

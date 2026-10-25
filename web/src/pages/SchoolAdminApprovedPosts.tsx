@@ -14,6 +14,7 @@ import {
 import type { EventActionButton } from '../types/event-post';
 import { imageSrc } from '../utils/image';
 import { CreatePostLivePreview } from '../components/CreatePostLivePreview';
+import { EventPostExternalLinkField } from '../components/EventPostExternalLinkField';
 import { ADMIN_PORTAL_ACCENTS } from '../constants/adminPortalTheme';
 import { useSchoolAdminAuth } from '../contexts/SchoolAdminAuthContext';
 
@@ -69,6 +70,7 @@ export function SchoolAdminApprovedPostsPanel() {
     imageUrls: [],
   });
   const [saving, setSaving] = useState(false);
+  const [editNotice, setEditNotice] = useState<string | null>(null);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -144,7 +146,7 @@ export function SchoolAdminApprovedPostsPanel() {
     setError(null);
     try {
       const imageUrlsFiltered = editForm.imageUrls.map((u) => u.trim()).filter(Boolean);
-      const updated = await schoolAdminPostsService.updatePost(viewPost.id, {
+      await schoolAdminPostsService.submitEditRevision(viewPost.id, {
         title: editForm.title.trim() || undefined,
         description: editForm.description.trim() || undefined,
         externalLink: editForm.externalLink.trim() || undefined,
@@ -156,9 +158,13 @@ export function SchoolAdminApprovedPostsPanel() {
         commentsEnabled: editForm.commentsEnabled,
         imageUrls: imageUrlsFiltered.length > 0 ? imageUrlsFiltered : [],
       });
-      setPosts((prev) => prev.map((p) => (p.id === viewPost.id ? updated : p)));
       setViewPost(null);
       setIsEditing(false);
+      setError(null);
+      setEditNotice(
+        'Your edits were sent to the category admin for approval. The live post stays unchanged until approved.',
+      );
+      fetchPosts();
     } catch (err) {
       const msg =
         err && typeof err === 'object' && 'response' in err
@@ -222,6 +228,11 @@ export function SchoolAdminApprovedPostsPanel() {
 
   return (
     <>
+      {editNotice ? (
+        <div className="admin-notice admin-notice--success mb-3">
+          <p className="admin-form-hint mb-0">{editNotice}</p>
+        </div>
+      ) : null}
       {error ? (
         <div className="admin-notice mb-3">
           <p className="admin-form-hint admin-form-hint--error mb-0">{error}</p>
@@ -361,6 +372,7 @@ export function SchoolAdminApprovedPostsPanel() {
                   actionButtons={actionButtonsForApi(
                     parseStoredActionButtons(previewPost.actionButtons),
                   )}
+                  externalLink={previewPost.externalLink ?? ''}
                   coverSrc={
                     parseImageUrls(previewPost.imageUrls)[0]
                       ? imageSrc(parseImageUrls(previewPost.imageUrls)[0])
@@ -408,6 +420,10 @@ export function SchoolAdminApprovedPostsPanel() {
             <div className="admin-modal__body admin-modal__body--with-close admin-modal__scroll">
               <>
                   <h3 className="admin-modal__title" id="approved-post-modal-title">Edit post</h3>
+                  <p className="admin-form-hint mb-3">
+                    Saving sends your changes for category admin approval. Students still see the current live version
+                    until the edit is approved.
+                  </p>
                   <div className="mb-3">
                     <label className="admin-form-label" htmlFor="approved-edit-title">Title</label>
                     <input
@@ -430,17 +446,12 @@ export function SchoolAdminApprovedPostsPanel() {
                       placeholder="Description"
                     />
                   </div>
-                  <div className="mb-3">
-                    <label className="admin-form-label" htmlFor="approved-edit-link">External link</label>
-                    <input
-                      id="approved-edit-link"
-                      type="url"
-                      className="form-control admin-form-control"
-                      value={editForm.externalLink}
-                      onChange={(e) => setEditForm((f) => ({ ...f, externalLink: e.target.value }))}
-                      placeholder="https://..."
-                    />
-                  </div>
+                  <EventPostExternalLinkField
+                    id="approved-edit-link"
+                    className="mb-3"
+                    value={editForm.externalLink}
+                    onChange={(value) => setEditForm((f) => ({ ...f, externalLink: value }))}
+                  />
                   <EventPostDetailFields
                     details={{
                       eventDate: editForm.eventDate,
@@ -510,7 +521,7 @@ export function SchoolAdminApprovedPostsPanel() {
                       Cancel
                     </button>
                     <button type="button" className="admin-btn-primary" onClick={handleEditSave} disabled={saving}>
-                      {saving ? 'Saving…' : 'Save changes'}
+                      {saving ? 'Submitting…' : 'Submit for approval'}
                     </button>
                   </div>
               </>

@@ -57,6 +57,41 @@ export function truncateWords(text: string, maxWords: number): { text: string; t
   return { text: `${words.slice(0, maxWords).join(' ')}…`, truncated: true };
 }
 
+/** Labels like “Know more” — use `externalLink` for the public CTA, not action buttons. */
+export function isKnowMoreActionLabel(label: string): boolean {
+  const norm = label.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!norm) return false;
+  if (norm === 'know more' || norm === 'learn more' || norm === 'read more') return true;
+  if (/^know\s+m[o0]r[eew]?$/.test(norm)) return true;
+  if (norm.startsWith('know mor')) return true;
+  return false;
+}
+
+export function normalizeExternalUrlForOpen(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith('//')) return `https:${trimmed}`;
+  return `https://${trimmed.replace(/^\/+/, '')}`;
+}
+
+export function getEventAdminSourceUrl(event: { externalLink?: string | null }): string | null {
+  const ext = event.externalLink?.trim();
+  return ext ? normalizeExternalUrlForOpen(ext) : null;
+}
+
+export function getEventKnowMoreUrl(event: {
+  externalLink?: string | null;
+  actionButtons?: string | null;
+}): string | null {
+  const ext = event.externalLink?.trim();
+  if (ext) return normalizeExternalUrlForOpen(ext);
+  const fromBtn = parseEventActionButtonsPublic(event.actionButtons).find((b) =>
+    isKnowMoreActionLabel(b.label),
+  )?.url?.trim();
+  return fromBtn ? normalizeExternalUrlForOpen(fromBtn) : null;
+}
+
 export function parseEventActionButtonsPublic(
   stored: string | null | undefined,
 ): EventActionButtonStored[] {
@@ -170,7 +205,7 @@ export function isEventPrimaryActionLabel(label: string): boolean {
 }
 
 export function eventPostHasActionButtons(event: { actionButtons?: string | null }): boolean {
-  return parseEventActionButtonsPublic(event.actionButtons).length > 0;
+  return parseEventActionButtonsPublic(event.actionButtons).some((b) => !isKnowMoreActionLabel(b.label));
 }
 
 export type EventPostPublicFields = {

@@ -38,6 +38,7 @@ export type EventViewByDateFields = {
   publishAt?: string | null;
   publishedAt?: string | null;
   createdAt: string;
+  updatedAt?: string | null;
 };
 
 /** Event details date (YYYY-MM-DD) from API, stable across timezones. */
@@ -53,7 +54,7 @@ export function eventDateToYmd(eventDate: string | null | undefined): string | n
 
 /** When no event date: day the news was published (or created). */
 export function getPostedDateYmd(event: EventViewByDateFields): string | null {
-  const iso = event.publishedAt || event.createdAt || event.publishAt || '';
+  const iso = event.publishedAt || event.createdAt || event.publishAt || event.updatedAt || '';
   if (!iso) return null;
   const t = new Date(iso).getTime();
   if (Number.isNaN(t)) return null;
@@ -137,4 +138,135 @@ export function eventMatchesCalendarDateYmd(event: EventViewByDateFields, ymd: s
 /** @deprecated Use eventMatchesCalendarDateYmd */
 export function eventMatchesScheduledDateYmd(event: EventViewByDateFields, ymd: string): boolean {
   return eventMatchesCalendarDateYmd(event, ymd);
+}
+
+export function getTodayYmdLocal(now = new Date()): string {
+  return toYmdLocal(now);
+}
+
+export function addDaysYmd(ymd: string, days: number): string {
+  const [y, m, d] = ymd.split('-').map((n) => parseInt(n, 10));
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  return toYmdLocal(dt);
+}
+
+/** Pill on feed hero — e.g. "Today · Oct 25, 2025". */
+export function formatEventDateHeroPillLabel(
+  ymd: string | null | undefined,
+  todayYmd = getTodayYmdLocal(),
+): string | null {
+  if (!ymd || !/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+  const [y, m, d] = ymd.split('-').map((n) => parseInt(n, 10));
+  const dt = new Date(y, m - 1, d);
+  if (Number.isNaN(dt.getTime())) return null;
+  const base = dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  const tomorrow = addDaysYmd(todayYmd, 1);
+  if (ymd === todayYmd) return `Today · ${base}`;
+  if (ymd === tomorrow) return `Tomorrow · ${base}`;
+  return base;
+}
+
+type ChronologicalFeedSortable = EventViewByDateFields & { createdAt: string };
+
+/**
+ * Calendar day for feed ordering: event-date field when set, otherwise posted/created day.
+ */
+export function getFeedSortBucketYmd(event: EventViewByDateFields): string | null {
+  const eventDay = eventDateToYmd(event.eventDate);
+  if (eventDay) return eventDay;
+  return getPostedDateYmd(event);
+}
+
+/**
+ * Within a calendar day: posts with an event-date field for that day first,
+ * then posts with no event date that were posted that day.
+ */
+export function getFeedSortWithinDayRank(event: EventViewByDateFields, bucketYmd: string): number {
+  const eventDay = eventDateToYmd(event.eventDate);
+  if (eventDay === bucketYmd) return 0;
+  return 1;
+}
+
+/**
+ * Home feed (Latest): group by bucket day (today → tomorrow → …), then within each day
+ * event-dated posts first, then posted-only posts for that day.
+ */
+export function compareEventsChronologicalByEventDate(
+  a: ChronologicalFeedSortable,
+  b: ChronologicalFeedSortable,
+  todayYmd = getTodayYmdLocal(),
+): number {
+  const bucketA = getFeedSortBucketYmd(a);
+  const bucketB = getFeedSortBucketYmd(b);
+
+  if (!bucketA && !bucketB) {
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  }
+  if (!bucketA) return 1;
+  if (!bucketB) return -1;
+
+  const era = (ymd: string): number => (ymd >= todayYmd ? 0 : 1);
+  const eraA = era(bucketA);
+  const eraB = era(bucketB);
+  if (eraA !== eraB) return eraA - eraB;
+
+  if (eraA === 0) {
+    const cmp = bucketA.localeCompare(bucketB);
+    if (cmp !== 0) return cmp;
+  } else {
+    const cmp = bucketB.localeCompare(bucketA);
+    if (cmp !== 0) return cmp;
+  }
+
+  const rankA = getFeedSortWithinDayRank(a, bucketA);
+  const rankB = getFeedSortWithinDayRank(b, bucketB);
+  if (rankA !== rankB) return rankA - rankB;
+
+  return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+}
+
+export function sortEventsChronologicalByEventDate<T extends ChronologicalFeedSortable>(
+  events: T[],
+  todayYmd = getTodayYmdLocal(),
+): T[] {
+  return [...events].sort((a, b) => compareEventsChronologicalByEventDate(a, b, todayYmd));
+}
+
+/**
+ * Default home feed: today and upcoming bucket days only. Older posts stay available via calendar / date filters.
+ */
+export function filterEventsHomeFeedFromToday<T extends EventViewByDateFields>(
+  events: T[],
+  todayYmd = getTodayYmdLocal(),
+): T[] {
+  return events.filter((e) => {
+    const bucket = getFeedSortBucketYmd(e);
+    return bucket != null && bucket >= todayYmd;
+  });
+}
+
+/** Latest / Popular on home: calendar-day order always wins; Popular only breaks ties within the same day. */
+export function sortEventsForHomeFeed<T extends ChronologicalFeedSortable & { id: string }>(
+  events: T[],
+  options: {
+    feedSort: 'latest' | 'popular';
+    todayYmd?: string;
+    engagementScore?: (eventId: string) => number;
+  },
+): T[] {
+  const todayYmd = options.todayYmd ?? getTodayYmdLocal();
+  const score = options.engagementScore ?? (() => 0);
+
+  if (options.feedSort === 'latest') {
+    return sortEventsChronologicalByEventDate(events, todayYmd);
+  }
+
+  return [...events].sort((a, b) => {
+    const chrono = compareEventsChronologicalByEventDate(a, b, todayYmd);
+    if (chrono !== 0) return chrono;
+    const diff = score(b.id) - score(a.id);
+    if (diff !== 0) return diff;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 }
