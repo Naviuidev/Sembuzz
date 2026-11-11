@@ -612,7 +612,7 @@ export function MasterAdminRaiseRequestPage() {
               ) : null}
               {'customMessage' in viewQuery && viewQuery.customMessage ? (
                 <p className="small" style={{ whiteSpace: 'pre-wrap' }}>
-                  {viewQuery.customMessage}
+                  {String(viewQuery.customMessage)}
                 </p>
               ) : null}
             </div>

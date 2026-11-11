@@ -17,19 +17,6 @@ function formatPostDate(iso: string | null | undefined) {
   return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-function formatScheduledLabel(iso: string) {
-  try {
-    return new Date(iso).toLocaleDateString(undefined, {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  } catch {
-    return iso;
-  }
-}
-
 function parsePostImages(imageUrls: string | null): string[] {
   if (!imageUrls) return [];
   try {

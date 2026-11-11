@@ -124,7 +124,9 @@ export function MasterAdminCategoriesPage() {
 
   const deleteSubMutation = useMutation({
     mutationFn: (id: string) => masterAdminCategoriesService.deleteSubCategory(selectedSchoolId, id),
-    onSuccess: invalidate(selectedSchoolId),
+    onSuccess: () => {
+      invalidate(selectedSchoolId);
+    },
   });
 
   const startCreate = () => {

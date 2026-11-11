@@ -89,7 +89,6 @@ import { MasterAdminDashboard } from './pages/MasterAdminDashboard';
 import { MasterAdminSchools } from './pages/MasterAdminSchools';
 import { MasterAdminSchoolDetail } from './pages/MasterAdminSchoolDetail';
 import { MasterAdminPostView } from './pages/MasterAdminPostView';
-import { MasterAdminMainSection } from './pages/MasterAdminMainSection';
 import { MasterAdminPostsPage } from './pages/MasterAdminPostsPage';
 import { MasterAdminSocialPage } from './pages/MasterAdminSocialPage';
 import { MasterAdminUsersPage } from './pages/MasterAdminUsersPage';
@@ -101,7 +100,6 @@ import { MasterAdminRaiseRequestPage } from './pages/MasterAdminRaiseRequestPage
 import { MasterAdminBlogsPage } from './pages/MasterAdminBlogsPage';
 import { MasterAdminDeveloperLayerPage } from './pages/MasterAdminDeveloperLayerPage';
 import { MasterAdminSetPassword } from './pages/MasterAdminSetPassword';
-import { MASTER_ADMIN_SCHOOL_SECTIONS } from './constants/masterAdminSchoolSections';
 import { defaultPortalPathForUser } from './utils/masterAdminPortalAccess';
 import { Contact } from './pages/Contact';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
@@ -821,28 +819,6 @@ const MasterAdminRoutes = () => {
           </MasterAdminProtectedRoute>
         }
       />
-      {MASTER_ADMIN_SCHOOL_SECTIONS.filter(
-        (section) =>
-          section.id !== 'posts' &&
-          section.id !== 'social' &&
-          section.id !== 'users' &&
-          section.id !== 'categories' &&
-          section.id !== 'external-config' &&
-          section.id !== 'upcoming' &&
-          section.id !== 'analytics' &&
-          section.id !== 'raise-request' &&
-          section.id !== 'blogs',
-      ).map((section) => (
-        <Route
-          key={section.id}
-          path={section.id}
-          element={
-            <MasterAdminProtectedRoute>
-              <MasterAdminMainSection sectionId={section.id} />
-            </MasterAdminProtectedRoute>
-          }
-        />
-      ))}
       <Route path="" element={<Navigate to="/master-admin/login" replace />} />
       <Route path="*" element={<Navigate to="/master-admin/dashboard" replace />} />
     </Routes>

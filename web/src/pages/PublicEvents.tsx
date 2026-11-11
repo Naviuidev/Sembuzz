@@ -1607,11 +1607,11 @@ export const PublicEvents = () => {
       setShowSettingsLoginPopup(false);
     }
 
-    if (fromQuery) {
-      const next = new URLSearchParams(searchParams);
-      next.delete('openAuth');
-      setSearchParams(next, { replace: true });
-    }
+      if (fromQuery) {
+        const next = new URLSearchParams(searchParams);
+        next.delete('openAuth');
+        setSearchParams(next, { replace: true });
+      }
     if (fromState) {
       navigate({ pathname: location.pathname, search: location.search }, { replace: true, state: null });
     }
@@ -1853,7 +1853,7 @@ export const PublicEvents = () => {
   }, [publicEngagementCounts, engagement]);
 
   const sortedEvents = useMemo(() => {
-    const score = (id: string) =>
+      const score = (id: string) =>
       (popularSortCounts.likes[id] ?? 0) +
       (popularSortCounts.commentCounts[id] ?? 0) +
       (popularSortCounts.savedCounts[id] ?? 0);
@@ -1870,11 +1870,11 @@ export const PublicEvents = () => {
     if (feedSort === 'latest') {
       return sortEventsChronologicalByEventDate(list, feedTodayYmd);
     }
-    list.sort((a, b) => {
-      const diff = score(b.id) - score(a.id);
-      if (diff !== 0) return diff;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
+      list.sort((a, b) => {
+        const diff = score(b.id) - score(a.id);
+        if (diff !== 0) return diff;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
     return list;
   }, [homeFeedEvents, feedSort, popularSortCounts, isDefaultHomeFeed, feedTodayYmd]);
 
@@ -2639,7 +2639,7 @@ export const PublicEvents = () => {
           authLoading ? (
             <div className="d-flex justify-content-center py-5">
               <div className="spinner-border text-secondary" role="status" aria-label="Loading account" />
-            </div>
+                  </div>
           ) : (
           <StudentProfileHub
             user={user ? { name: user.name, email: user.email, schoolName: user.schoolName } : null}
@@ -2660,15 +2660,15 @@ export const PublicEvents = () => {
             recentNewsContent={renderSettingsRecentNewsList()}
             guestRecentEvents={settingsRecentSorted}
             onGuestRecentEventClick={(e) => {
-                            setBottomNavActive('home');
-                            if (e.schoolId) {
-                              setSearchParams((prev) => {
-                                const next = new URLSearchParams(prev);
-                                next.set('schoolId', e.schoolId);
-                                return next;
-                              });
-                            }
-                            setSelectedSettingsEvent(e);
+                              setBottomNavActive('home');
+                              if (e.schoolId) {
+                                setSearchParams((prev) => {
+                                  const next = new URLSearchParams(prev);
+                                  next.set('schoolId', e.schoolId);
+                                  return next;
+                                });
+                              }
+                              setSelectedSettingsEvent(e);
               navigate('/', { replace: true });
             }}
             onDeleteAccount={() => setShowDeleteAccountModal(true)}
