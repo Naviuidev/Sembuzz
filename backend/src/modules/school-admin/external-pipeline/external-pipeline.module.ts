@@ -21,5 +21,6 @@ import { SchoolAdminExternalPipelineService } from './external-pipeline.service'
   ],
   controllers: [SchoolAdminExternalPipelineController],
   providers: [SchoolAdminExternalPipelineService, SchoolAdminGuard],
+  exports: [SchoolAdminExternalPipelineService],
 })
 export class SchoolAdminExternalPipelineModule {}

@@ -140,20 +140,37 @@ export const publicEventsService = {
     if (eventIds.length === 0) {
       return { likes: {}, commentCounts: {}, savedCounts: {} };
     }
-    const params: Record<string, string> = { eventIds: eventIds.join(',') };
-    if (options?.dateFrom) params.dateFrom = options.dateFrom;
-    if (options?.dateTo) params.dateTo = options.dateTo;
-    const response = await api.get<{
-      likes: Record<string, number>;
-      commentCounts: Record<string, number>;
-      savedCounts: Record<string, number>;
-    }>('/events/engagement-counts', { params });
-    const data = response?.data;
-    return {
-      likes: data?.likes ?? {},
-      commentCounts: data?.commentCounts ?? {},
-      savedCounts: data?.savedCounts ?? {},
+
+    const chunkSize = 80;
+    const merged = {
+      likes: {} as Record<string, number>,
+      commentCounts: {} as Record<string, number>,
+      savedCounts: {} as Record<string, number>,
     };
+
+    for (let i = 0; i < eventIds.length; i += chunkSize) {
+      const chunk = eventIds.slice(i, i + chunkSize);
+      const params: Record<string, string> = { eventIds: chunk.join(',') };
+      if (options?.dateFrom) params.dateFrom = options.dateFrom;
+      if (options?.dateTo) params.dateTo = options.dateTo;
+      const response = await api.get<{
+        likes: Record<string, number>;
+        commentCounts: Record<string, number>;
+        savedCounts: Record<string, number>;
+      }>('/events/engagement-counts', { params });
+      const data = response?.data;
+      Object.assign(merged.likes, data?.likes ?? {});
+      Object.assign(merged.commentCounts, data?.commentCounts ?? {});
+      Object.assign(merged.savedCounts, data?.savedCounts ?? {});
+    }
+
+    for (const id of eventIds) {
+      if (merged.likes[id] === undefined) merged.likes[id] = 0;
+      if (merged.commentCounts[id] === undefined) merged.commentCounts[id] = 0;
+      if (merged.savedCounts[id] === undefined) merged.savedCounts[id] = 0;
+    }
+
+    return merged;
   },
 
   /** Active banner ads (startAt <= now <= endAt). Optional schoolId to filter by school. For guests and logged-in users. */

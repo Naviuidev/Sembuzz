@@ -81,6 +81,8 @@ export default defineConfig({
       '/user/event-comment': { target: 'http://localhost:3000', changeOrigin: true },
       '/events/categories': { target: 'http://localhost:3000', changeOrigin: true },
       '/events/external-categories': { target: 'http://localhost:3000', changeOrigin: true },
+      '/master-admin/auth': { target: 'http://localhost:3000', changeOrigin: true },
+      // No proxy for /master-admin/schools — same as super-admin/schools: SPA route at /master-admin/schools; API uses getApiBaseUrl() → :3000
       '/external-admin/auth': { target: 'http://localhost:3000', changeOrigin: true },
       '/external-admin/pipeline': { target: 'http://localhost:3000', changeOrigin: true },
       '/external-admin': {
@@ -95,6 +97,7 @@ export default defineConfig({
       '/school-admin/external-pipeline': { target: 'http://localhost:3000', changeOrigin: true },
       '/school-admin/external-post-requests': { target: 'http://localhost:3000', changeOrigin: true },
       '/external-admin/post-requests': { target: 'http://localhost:3000', changeOrigin: true },
+      '/events/engagement-counts': { target: 'http://localhost:3000', changeOrigin: true },
       '/events/approved': { target: 'http://localhost:3000', changeOrigin: true },
       '/events/school-filter-settings': { target: 'http://localhost:3000', changeOrigin: true },
       '/events/blogs': { target: 'http://localhost:3000', changeOrigin: true },

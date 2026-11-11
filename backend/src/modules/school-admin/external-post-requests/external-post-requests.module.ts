@@ -21,5 +21,6 @@ import { SchoolAdminExternalPostRequestsService } from './external-post-requests
   ],
   controllers: [SchoolAdminExternalPostRequestsController],
   providers: [SchoolAdminExternalPostRequestsService, SchoolAdminGuard],
+  exports: [SchoolAdminExternalPostRequestsService],
 })
 export class SchoolAdminExternalPostRequestsModule {}

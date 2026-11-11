@@ -19,6 +19,7 @@ import { AdminActionItemsModule } from './modules/admin-action-items/admin-actio
 import { PlatformUserModule } from './modules/platform-user/platform-user.module';
 import { AdminEmailChangeRequestsModule } from './modules/admin-email-change-requests/admin-email-change-requests.module';
 import { EventsPublishingModule } from './modules/events/events-publishing.module';
+import { MasterAdminModule } from './modules/master-admin/master-admin.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { EventsPublishingModule } from './modules/events/events-publishing.modul
     AdminActionItemsModule,
     AdminEmailChangeRequestsModule,
     EventsPublishingModule,
+    MasterAdminModule,
   ],
   controllers: [AppController, GoogleAuthController, EventsPublicController],
   providers: [AppService, PublishedBlogsService],

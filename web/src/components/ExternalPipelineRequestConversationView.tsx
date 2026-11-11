@@ -3,14 +3,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { PipelineRequestRow, PipelineThreadMessage } from '../services/external-admin-pipeline.service';
 import { externalAdminPipelineService } from '../services/external-admin-pipeline.service';
 import { schoolAdminExternalPipelineService } from '../services/school-admin-external-pipeline.service';
+import { masterAdminExternalConfigService } from '../services/master-admin-external-config.service';
 import { pipelineThreadMessages } from '../utils/externalPipelineThread';
 import { pipelineStatusLabel, pipelineStatusPillClass } from '../utils/externalPipelineStatus';
 import { getApiErrorMessage } from '../utils/apiError';
 
-export type ExternalPipelineDetailRole = 'external' | 'school';
+export type ExternalPipelineDetailRole = 'external' | 'school' | 'master';
 
 type Props = {
   role: ExternalPipelineDetailRole;
+  schoolId?: string;
   requestId: string;
   preview?: PipelineRequestRow | null;
   onBack: () => void;
@@ -28,7 +30,7 @@ function isConversationClosed(status: string) {
   return status === 'approved' || status === 'rejected' || status === 'banned';
 }
 
-export function ExternalPipelineRequestConversationView({ role, requestId, preview, onBack }: Props) {
+export function ExternalPipelineRequestConversationView({ role, schoolId, requestId, preview, onBack }: Props) {
   const queryClient = useQueryClient();
   const [reply, setReply] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -36,14 +38,18 @@ export function ExternalPipelineRequestConversationView({ role, requestId, previ
   const queryKey =
     role === 'external'
       ? ['external-admin', 'pipeline', 'request', requestId]
-      : ['school-admin', 'external-pipeline', 'request', requestId];
+      : role === 'master'
+        ? ['master-admin', 'external-config', schoolId, 'pipeline', 'request', requestId]
+        : ['school-admin', 'external-pipeline', 'request', requestId];
 
   const { data: request, isLoading } = useQuery({
     queryKey,
-    queryFn: () =>
-      role === 'external'
-        ? externalAdminPipelineService.getRequest(requestId)
-        : schoolAdminExternalPipelineService.getRequest(requestId),
+    queryFn: () => {
+      if (role === 'external') return externalAdminPipelineService.getRequest(requestId);
+      if (role === 'master') return masterAdminExternalConfigService.getPipelineRequest(schoolId!, requestId);
+      return schoolAdminExternalPipelineService.getRequest(requestId);
+    },
+    enabled: role !== 'master' || Boolean(schoolId),
   });
 
   const row = request ?? preview;
@@ -58,9 +64,8 @@ export function ExternalPipelineRequestConversationView({ role, requestId, previ
 
   const replyMutation = useMutation({
     mutationFn: async (message: string) => {
-      if (role === 'external') {
-        return externalAdminPipelineService.reply(requestId, message);
-      }
+      if (role === 'external') return externalAdminPipelineService.reply(requestId, message);
+      if (role === 'master') return masterAdminExternalConfigService.pipelineReply(schoolId!, requestId, message);
       return schoolAdminExternalPipelineService.reply(requestId, message);
     },
     onSuccess: () => {
@@ -68,6 +73,8 @@ export function ExternalPipelineRequestConversationView({ role, requestId, previ
       setError(null);
       if (role === 'external') {
         queryClient.invalidateQueries({ queryKey: ['external-admin', 'pipeline'] });
+      } else if (role === 'master') {
+        queryClient.invalidateQueries({ queryKey: ['master-admin', 'external-config', schoolId] });
       } else {
         queryClient.invalidateQueries({ queryKey: ['school-admin', 'external-pipeline'] });
       }
@@ -123,7 +130,7 @@ export function ExternalPipelineRequestConversationView({ role, requestId, previ
               <span className={pipelineStatusPillClass(row.status)}>{pipelineStatusLabel(row.status)}</span>
             </div>
           </div>
-          {role === 'school' ? (
+          {role === 'school' || role === 'master' ? (
             <div>
               <span className="text-muted small">External admin</span>
               <div className="fw-semibold">{row.externalAdmin.name}</div>

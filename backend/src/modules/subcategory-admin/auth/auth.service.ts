@@ -14,6 +14,11 @@ import { RequestOtpDto, VerifyOtpDto, ResetPasswordDto } from '../dto/forgot-pas
 import { EmailService } from '../../super-admin/schools/email.service';
 import { PlatformUserService } from '../../platform-user/platform-user.service';
 import { UpdateEmailDto } from '../../platform-user/dto/update-email.dto';
+import {
+  findSubCategoryAssignments,
+  pickPrimarySubCategory,
+  type SubCategoryAssignment,
+} from '../subcategory-admin-relations.util';
 
 @Injectable()
 export class SubCategoryAdminAuthService {
@@ -32,11 +37,17 @@ export class SubCategoryAdminAuthService {
     return this.prisma.subCategoryAdmin.findFirst({
       where: { platformUserId: platformUser.id, isActive: true },
       include: {
-        subCategory: { select: { id: true, name: true } },
         category: { select: { id: true, name: true } },
         school: { select: { id: true, name: true, domain: true } },
       },
     });
+  }
+
+  private async loadAssignedSubCategories(
+    adminId: string,
+    primarySubCategoryId: string,
+  ): Promise<SubCategoryAssignment[]> {
+    return findSubCategoryAssignments(this.prisma, adminId, primarySubCategoryId);
   }
 
   async login(loginDto: SubCategoryAdminLoginDto) {
@@ -52,6 +63,12 @@ export class SubCategoryAdminAuthService {
       throw new UnauthorizedException('Account is inactive');
     }
 
+    const assignedSubCategories = await this.loadAssignedSubCategories(admin.id, admin.subCategoryId);
+    const primarySubCategory = pickPrimarySubCategory(assignedSubCategories, admin.subCategoryId);
+    if (!primarySubCategory) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
     const isPasswordValid = await bcrypt.compare(password, admin.password);
 
     if (!isPasswordValid) {
@@ -62,29 +79,14 @@ export class SubCategoryAdminAuthService {
       sub: admin.id,
       userId: admin.platformUserId,
       email: admin.email,
-      subCategoryId: admin.subCategoryId,
+      subCategoryId: primarySubCategory.id,
       categoryId: admin.categoryId,
       schoolId: admin.schoolId,
       role: 'subcategory_admin',
       isFirstLogin: admin.isFirstLogin,
     };
 
-    // Get all subcategories from junction table
-    const subCategories = await this.prisma.subCategoryAdminSubCategory.findMany({
-      where: { subCategoryAdminId: admin.id },
-      include: {
-        subCategory: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-    });
-
-    const subCategoryNames = subCategories.length > 0
-      ? subCategories.map((sc) => sc.subCategory.name)
-      : [admin.subCategory.name];
+    const subCategoryNames = assignedSubCategories.map((sc) => sc.name);
 
     // Include category admin in login response so dashboard shows it without extra getMe call
     let loginCategoryAdmin = await this.prisma.categoryAdmin.findFirst({
@@ -113,12 +115,10 @@ export class SubCategoryAdminAuthService {
         userId: admin.platformUserId,
         name: admin.name,
         email: admin.email,
-        subCategoryId: admin.subCategoryId,
-        subCategoryName: admin.subCategory.name,
+        subCategoryId: primarySubCategory.id,
+        subCategoryName: primarySubCategory.name,
         subCategoryNames: subCategoryNames,
-        subCategories: subCategories.length > 0
-          ? subCategories.map((sc) => ({ id: sc.subCategory.id, name: sc.subCategory.name }))
-          : [{ id: admin.subCategory.id, name: admin.subCategory.name }],
+        subCategories: assignedSubCategories.map((sc) => ({ id: sc.id, name: sc.name })),
         categoryId: admin.categoryId,
         categoryName: admin.category.name,
         categoryAdmin: loginCategoryAdmin ? { id: loginCategoryAdmin.id, name: loginCategoryAdmin.name, email: loginCategoryAdmin.email } : null,
@@ -168,12 +168,6 @@ export class SubCategoryAdminAuthService {
     const admin = await this.prisma.subCategoryAdmin.findUnique({
       where: { id: userId },
       include: {
-        subCategory: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
         category: {
           select: {
             id: true,
@@ -194,25 +188,11 @@ export class SubCategoryAdminAuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    // Get all subcategories from junction table with their category info
-    const subCategories = await this.prisma.subCategoryAdminSubCategory.findMany({
-      where: { subCategoryAdminId: admin.id },
-      include: {
-        subCategory: {
-          select: {
-            id: true,
-            name: true,
-            categoryId: true,
-            category: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-      },
-    });
+    const assignedSubCategories = await this.loadAssignedSubCategories(admin.id, admin.subCategoryId);
+    const primarySubCategory = pickPrimarySubCategory(assignedSubCategories, admin.subCategoryId);
+    if (!primarySubCategory) {
+      throw new UnauthorizedException('User not found');
+    }
 
     // Get category admin who manages the category: try junction table first, then primary categoryId
     let categoryAdmin = await this.prisma.categoryAdmin.findFirst({
@@ -244,58 +224,42 @@ export class SubCategoryAdminAuthService {
       });
     }
 
-    // Get all subcategory names (from junction table or fallback to primary)
-    const subCategoryNames = subCategories.length > 0
-      ? subCategories.map((sc) => sc.subCategory.name)
-      : [admin.subCategory.name];
+    const subCategoryNames = assignedSubCategories.map((sc) => sc.name);
 
-    // Group subcategories by category
-    const categoriesWithSubcategories = subCategories.length > 0
-      ? subCategories.reduce((acc, sc) => {
-          const categoryId = sc.subCategory.categoryId;
-          const categoryName = sc.subCategory.category.name;
-          if (!acc[categoryId]) {
-            acc[categoryId] = {
-              id: categoryId,
-              name: categoryName,
-              subcategories: [],
-            };
-          }
-          acc[categoryId].subcategories.push({
-            id: sc.subCategory.id,
-            name: sc.subCategory.name,
-          });
-          return acc;
-        }, {} as Record<string, { id: string; name: string; subcategories: Array<{ id: string; name: string }> }>)
-      : {
-          [admin.categoryId]: {
-            id: admin.categoryId,
-            name: admin.category.name,
-            subcategories: [{ id: admin.subCategory.id, name: admin.subCategory.name }],
-          },
-        };
+    const categoriesWithSubcategories = assignedSubCategories.reduce(
+      (acc, sc) => {
+        const categoryId = sc.categoryId;
+        const categoryName = sc.category.name;
+        if (!acc[categoryId]) {
+          acc[categoryId] = {
+            id: categoryId,
+            name: categoryName,
+            subcategories: [],
+          };
+        }
+        acc[categoryId].subcategories.push({
+          id: sc.id,
+          name: sc.name,
+        });
+        return acc;
+      },
+      {} as Record<string, { id: string; name: string; subcategories: Array<{ id: string; name: string }> }>,
+    );
 
     return {
       id: admin.id,
       userId: admin.platformUserId,
       name: admin.name,
       email: admin.email,
-      subCategoryId: admin.subCategoryId,
-      subCategoryName: admin.subCategory.name,
-      subCategoryNames: subCategoryNames, // Array of all assigned subcategory names
-      subCategories: subCategories.length > 0
-        ? subCategories.map((sc) => ({
-            id: sc.subCategory.id,
-            name: sc.subCategory.name,
-            categoryId: sc.subCategory.categoryId,
-            categoryName: sc.subCategory.category.name,
-          }))
-        : [{
-            id: admin.subCategory.id,
-            name: admin.subCategory.name,
-            categoryId: admin.categoryId,
-            categoryName: admin.category.name,
-          }],
+      subCategoryId: primarySubCategory.id,
+      subCategoryName: primarySubCategory.name,
+      subCategoryNames: subCategoryNames,
+      subCategories: assignedSubCategories.map((sc) => ({
+        id: sc.id,
+        name: sc.name,
+        categoryId: sc.categoryId,
+        categoryName: sc.category.name,
+      })),
       categoriesWithSubcategories: Object.values(categoriesWithSubcategories),
       categoryId: admin.categoryId,
       categoryName: admin.category.name,

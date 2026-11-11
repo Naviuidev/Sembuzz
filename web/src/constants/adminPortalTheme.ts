@@ -1,5 +1,5 @@
 /** Login / navbar / sidebar accent — keep in sync across admin portals. */
-export type AdminPortalKey = 'super' | 'school' | 'category' | 'subcategory' | 'ads' | 'external';
+export type AdminPortalKey = 'super' | 'school' | 'category' | 'subcategory' | 'ads' | 'external' | 'master';
 
 export const ADMIN_PORTAL_ACCENTS: Record<AdminPortalKey, string> = {
   super: '#3468f9',
@@ -8,6 +8,7 @@ export const ADMIN_PORTAL_ACCENTS: Record<AdminPortalKey, string> = {
   subcategory: '#4f46e5',
   ads: '#0284c7',
   external: '#7c3aed',
+  master: '#b45309',
 };
 
 export const ADMIN_PORTAL_LABELS: Record<AdminPortalKey, string> = {
@@ -17,4 +18,5 @@ export const ADMIN_PORTAL_LABELS: Record<AdminPortalKey, string> = {
   subcategory: 'Subcategory Admin',
   ads: 'Ads Admin',
   external: 'External Admin',
+  master: 'Master Admin',
 };

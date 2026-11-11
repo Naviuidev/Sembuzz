@@ -9,16 +9,21 @@ import { ADMIN_PORTAL_ACCENTS } from '../constants/adminPortalTheme';
 import { externalAdminPostRequestsService } from '../services/external-admin-post-requests.service';
 import { getApiErrorMessage } from '../utils/apiError';
 import { imageSrc } from '../utils/image';
+import type { ExternalAdminComposeMasterOptions } from '../types/externalCreateMaster';
 
 type Props = {
   categoryId: string;
   categoryName: string;
+  master?: ExternalAdminComposeMasterOptions;
+  onCancel?: () => void;
 };
 
 type PreviewSize = 'device' | 'web';
 
-export function ExternalAdminCreateCampaignPanel({ categoryId, categoryName }: Props) {
-  const panelStyle = { '--admin-accent': ADMIN_PORTAL_ACCENTS.external } as CSSProperties;
+export function ExternalAdminCreateCampaignPanel({ categoryId, categoryName, master, onCancel }: Props) {
+  const panelStyle = {
+    '--admin-accent': master ? ADMIN_PORTAL_ACCENTS.master : ADMIN_PORTAL_ACCENTS.external,
+  } as CSSProperties;
   const queryClient = useQueryClient();
   const [previewSize, setPreviewSize] = useState<PreviewSize>('web');
   const [schoolId, setSchoolId] = useState('');
@@ -48,15 +53,29 @@ export function ExternalAdminCreateCampaignPanel({ categoryId, categoryName }: P
   const { data: schools = [], isLoading: schoolsLoading } = useQuery({
     queryKey: ['external-admin', 'post', 'schools', categoryId],
     queryFn: () => externalAdminPostRequestsService.listApprovedSchools(categoryId),
+    enabled: !master,
   });
 
   useEffect(() => {
+    if (master) {
+      setSchoolId(master.schoolId);
+      return;
+    }
     if (schools.length > 0 && !schoolId) setSchoolId(schools[0].id);
-  }, [schools, schoolId]);
+  }, [schools, schoolId, master]);
 
   const createMutation = useMutation({
-    mutationFn: externalAdminPostRequestsService.createCampaignRequest,
+    mutationFn: (payload: Record<string, unknown>) =>
+      master ? master.submitRequest(payload) : externalAdminPostRequestsService.createCampaignRequest(payload as never),
     onSuccess: () => {
+      if (master) {
+        master.invalidateQueryKeys?.forEach((key) => {
+          queryClient.invalidateQueries({ queryKey: key });
+        });
+        setFormError(null);
+        master.onSaved();
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ['external-admin', 'post-requests'] });
       setFormError(null);
       setSubmitSuccessOpen(true);
@@ -68,7 +87,7 @@ export function ExternalAdminCreateCampaignPanel({ categoryId, categoryName }: P
     const setUploading = kind === 'logo' ? setLogoUploading : setBannerUploading;
     setUploading(true);
     try {
-      const url = await externalAdminPostRequestsService.uploadImage(file);
+      const url = master ? await master.uploadImage(file) : await externalAdminPostRequestsService.uploadImage(file);
       if (kind === 'logo') setCompanyLogoUrl(url);
       else setBannerImageUrl(url);
     } catch (err: unknown) {
@@ -144,7 +163,7 @@ export function ExternalAdminCreateCampaignPanel({ categoryId, categoryName }: P
         contactEmail: contactEmail.trim() || undefined,
         termsAndConditions: termsAndConditions.trim() || undefined,
         postedByOrganization: postedByOrganization.trim(),
-        publishStatus,
+        publishStatus: master ? 'draft' : publishStatus,
       },
       { onSuccess: () => resetForm() },
     );
@@ -171,8 +190,8 @@ export function ExternalAdminCreateCampaignPanel({ categoryId, categoryName }: P
     categoryName,
   };
 
-  if (schoolsLoading) return <p className="small text-muted">Loading approved schools…</p>;
-  if (schools.length === 0) {
+  if (!master && schoolsLoading) return <p className="small text-muted">Loading approved schools…</p>;
+  if (!master && schools.length === 0) {
     return (
       <div className="admin-empty-state">
         <p>No approved schools for this category yet. Complete pipeline access under Privacy first.</p>
@@ -200,11 +219,17 @@ export function ExternalAdminCreateCampaignPanel({ categoryId, categoryName }: P
             </div>
             <div className="admin-panel__body">
               <label className="form-label small fw-semibold">School *</label>
-              <select className="form-select form-select-sm" value={schoolId} onChange={(e) => setSchoolId(e.target.value)}>
-                {schools.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} — {s.city}</option>
-                ))}
-              </select>
+              {master ? (
+                <p className="mb-0 admin-table__strong">{master.schoolName}</p>
+              ) : (
+                <select className="form-select form-select-sm" value={schoolId} onChange={(e) => setSchoolId(e.target.value)}>
+                  {schools.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} — {s.city}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </section>
 
@@ -349,10 +374,17 @@ export function ExternalAdminCreateCampaignPanel({ categoryId, categoryName }: P
       </div>
 
       <div className="admin-create-post-footer" style={panelStyle}>
-        <p className="small text-muted mb-0 d-none d-xl-block flex-grow-1">Submitted campaigns are reviewed by the school admin.</p>
+        <p className="small text-muted mb-0 d-none d-xl-block flex-grow-1">
+          {master ? 'Save as draft, then publish from the table.' : 'Submitted campaigns are reviewed by the school admin.'}
+        </p>
         <div className="admin-create-post-footer__actions">
+          {onCancel ? (
+            <button type="button" className="admin-btn-secondary me-2" onClick={onCancel}>
+              Cancel
+            </button>
+          ) : null}
           <button type="submit" form="external-admin-create-campaign-form" className="admin-btn-primary" disabled={createMutation.isPending}>
-            {createMutation.isPending ? 'Submitting…' : 'Submit campaign for review'}
+            {createMutation.isPending ? 'Saving…' : master ? 'Save campaign' : 'Submit campaign for review'}
           </button>
         </div>
       </div>

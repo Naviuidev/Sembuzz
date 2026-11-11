@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ExternalPostRequestRow } from '../services/external-admin-post-requests.service';
 import { externalAdminPostRequestsService } from '../services/external-admin-post-requests.service';
 import { schoolAdminExternalPostRequestsService } from '../services/school-admin-external-post-requests.service';
+import { masterAdminExternalConfigService } from '../services/master-admin-external-config.service';
 import { postThreadMessages } from '../utils/externalPostRequestThread';
 import { externalPostStatusLabel, externalPostStatusPillClass } from '../utils/externalPostRequestStatus';
 import { getApiErrorMessage } from '../utils/apiError';
@@ -14,10 +15,11 @@ import { externalPostRowToCampaignPreview, isExternalCampaignPost } from '../uti
 import { externalPostRowToJobPreview, isExternalJobPost } from '../utils/externalJobPostView';
 import { externalPostContentTypeLabel, externalPostRowToOfferPreview, isExternalOfferPost } from '../utils/externalOfferPostView';
 
-export type ExternalPostDetailRole = 'external' | 'school';
+export type ExternalPostDetailRole = 'external' | 'school' | 'master';
 
 type Props = {
   role: ExternalPostDetailRole;
+  schoolId?: string;
   requestId: string;
   preview?: ExternalPostRequestRow | null;
   onBack: () => void;
@@ -45,7 +47,7 @@ function isClosed(status: string) {
   return status === 'approved' || status === 'rejected' || status === 'banned';
 }
 
-export function ExternalPostRequestConversationView({ role, requestId, preview, onBack }: Props) {
+export function ExternalPostRequestConversationView({ role, schoolId, requestId, preview, onBack }: Props) {
   const queryClient = useQueryClient();
   const [reply, setReply] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -53,14 +55,18 @@ export function ExternalPostRequestConversationView({ role, requestId, preview, 
   const queryKey =
     role === 'external'
       ? ['external-admin', 'post-request', requestId]
-      : ['school-admin', 'external-post-request', requestId];
+      : role === 'master'
+        ? ['master-admin', 'external-config', schoolId, 'post', requestId]
+        : ['school-admin', 'external-post-request', requestId];
 
   const { data: request, isLoading } = useQuery({
     queryKey,
-    queryFn: () =>
-      role === 'external'
-        ? externalAdminPostRequestsService.getRequest(requestId)
-        : schoolAdminExternalPostRequestsService.getRequest(requestId),
+    queryFn: () => {
+      if (role === 'external') return externalAdminPostRequestsService.getRequest(requestId);
+      if (role === 'master') return masterAdminExternalConfigService.getPostRequest(schoolId!, requestId);
+      return schoolAdminExternalPostRequestsService.getRequest(requestId);
+    },
+    enabled: role !== 'master' || Boolean(schoolId),
   });
 
   const row = request ?? preview;
@@ -70,6 +76,7 @@ export function ExternalPostRequestConversationView({ role, requestId, preview, 
   const replyMutation = useMutation({
     mutationFn: async (message: string) => {
       if (role === 'external') return externalAdminPostRequestsService.reply(requestId, message);
+      if (role === 'master') return masterAdminExternalConfigService.postReply(schoolId!, requestId, message);
       return schoolAdminExternalPostRequestsService.reply(requestId, message);
     },
     onSuccess: () => {
@@ -77,6 +84,9 @@ export function ExternalPostRequestConversationView({ role, requestId, preview, 
       setError(null);
       queryClient.invalidateQueries({ queryKey: ['external-admin', 'post-requests'] });
       queryClient.invalidateQueries({ queryKey: ['school-admin', 'external-post-requests'] });
+      if (role === 'master') {
+        queryClient.invalidateQueries({ queryKey: ['master-admin', 'external-config', schoolId] });
+      }
       queryClient.invalidateQueries({ queryKey });
     },
     onError: (err: unknown) => setError(getApiErrorMessage(err, 'Failed to send reply.')),
@@ -169,8 +179,8 @@ export function ExternalPostRequestConversationView({ role, requestId, preview, 
           <CreateJobLivePreview
             {...externalPostRowToJobPreview(row)}
             layoutVariant="web"
-            interactiveDescription={role === 'school'}
-            schoolAudience={role === 'school'}
+            interactiveDescription={role === 'school' || role === 'master'}
+            schoolAudience={role === 'school' || role === 'master'}
           />
         </div>
       ) : null}
@@ -180,8 +190,8 @@ export function ExternalPostRequestConversationView({ role, requestId, preview, 
           <CreateOfferLivePreview
             {...externalPostRowToOfferPreview(row)}
             layoutVariant="web"
-            interactiveDescription={role === 'school'}
-            schoolAudience={role === 'school'}
+            interactiveDescription={role === 'school' || role === 'master'}
+            schoolAudience={role === 'school' || role === 'master'}
           />
         </div>
       ) : null}
@@ -191,8 +201,8 @@ export function ExternalPostRequestConversationView({ role, requestId, preview, 
           <CreateCampaignLivePreview
             {...externalPostRowToCampaignPreview(row)}
             layoutVariant="web"
-            interactiveDescription={role === 'school'}
-            schoolAudience={role === 'school'}
+            interactiveDescription={role === 'school' || role === 'master'}
+            schoolAudience={role === 'school' || role === 'master'}
           />
         </div>
       ) : null}

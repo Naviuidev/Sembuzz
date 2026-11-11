@@ -235,11 +235,11 @@
 }
 
 .admin-panel {
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-  overflow: hidden;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
 }
 
 .admin-panel__header {
@@ -2202,6 +2202,13 @@
   color: var(--admin-accent, #0f766e);
 }
 
+.admin-social-platform-btn.is-disabled,
+.admin-social-platform-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
 .admin-social-form-row {
   display: flex;
   flex-wrap: wrap;
@@ -2695,9 +2702,10 @@
   }
 
   .admin-create-post-layout--embedded {
+    grid-template-columns: 200px minmax(480px, 1fr) min(400px, 36vw);
     grid-template-areas:
-      'stepper preview'
-      'form preview';
+      'stepper form preview'
+      'stepper form preview';
   }
 
   /* External admin job composer: form + preview only (no stepper column) */
@@ -4653,4 +4661,885 @@
   font-size: 0.8125rem;
   font-weight: 600;
   word-break: break-all;
+}
+
+/* Master Admin — schools grid */
+.master-admin-schools-panel.admin-panel {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.master-admin-schools-panel .admin-panel__body {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.master-admin-schools-search {
+  width: 100%;
+  max-width: 28rem;
+}
+
+.master-admin-school-card {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: left;
+  width: 100%;
+  max-width: none;
+  gap: 0.75rem;
+  min-height: 72px;
+  padding: 0.85rem 1rem;
+}
+
+.master-admin-school-card .admin-picker-card__title {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  line-height: 1.35;
+}
+
+.master-admin-school-card--inactive {
+  opacity: 0.72;
+}
+
+.master-admin-school-card--skeleton {
+  min-height: 72px;
+  animation: masterAdminSchoolPulse 1.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes masterAdminSchoolPulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.master-admin-school-card__logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.master-admin-school-card__logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.master-admin-school-card__logo .bi-building {
+  font-size: 1.5rem;
+  color: #64748b;
+}
+
+.master-admin-school-card {
+  cursor: pointer;
+}
+
+/* Master Admin — school detail (flush secondary sidebar, fixed columns) */
+.admin-main:has(.master-admin-school-detail-page) {
+  padding: 0;
+  overflow: hidden;
+}
+
+.master-admin-school-detail-page {
+  --master-admin-secondary-width: 220px;
+  display: grid;
+  grid-template-columns: var(--master-admin-secondary-width) minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.master-admin-primary-sidebar-school {
+  margin: 0;
+  padding: 0.65rem 0.85rem 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #0f172a;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  background: #fff;
+}
+
+.master-admin-school-content {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1rem 1.5rem 2rem;
+  background: #f8fafc;
+}
+
+.master-admin-school-content-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.75rem;
+}
+
+.master-admin-section-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 1rem;
+}
+
+.master-admin-school-secondary {
+  width: var(--master-admin-secondary-width);
+  min-height: 0;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  flex-shrink: 0;
+  background: #fff;
+  border: none;
+  border-right: 1px solid #e2e8f0;
+  border-radius: 0;
+  padding: 0.75rem 0.5rem 1rem;
+  box-shadow: none;
+  align-self: stretch;
+}
+
+.master-admin-school-secondary__school {
+  margin: 0 0 0.65rem;
+  padding: 0.35rem 0.65rem 0.75rem;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #0f172a;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.master-admin-school-secondary__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.master-admin-school-secondary__link {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #475569;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.master-admin-school-secondary__link:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.master-admin-school-secondary__link.is-active {
+  background: color-mix(in srgb, var(--sidebar-accent, #b45309) 12%, #fff);
+  color: var(--sidebar-accent, #b45309);
+}
+
+@media (max-width: 767.98px) {
+  .master-admin-school-detail-page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .master-admin-school-secondary {
+    width: 100%;
+    max-height: 38vh;
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+  }
+}
+
+.master-admin-detail-panel .admin-panel__title {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.master-admin-detail-panel .admin-panel__meta {
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
+.master-admin-detail-muted {
+  color: #64748b;
+  font-size: 0.9375rem;
+}
+
+.master-admin-detail-school-name {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.master-admin-detail-school-logo {
+  width: 56px;
+  height: 56px;
+}
+
+.master-admin-detail-status {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.master-admin-detail-status--active {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.master-admin-detail-meta dt {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.master-admin-detail-meta dd {
+  font-size: 0.9375rem;
+  color: #0f172a;
+}
+
+.master-admin-detail-feature-chip {
+  display: inline-block;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.master-admin-detail-admin-list li + li {
+  margin-top: 0.5rem;
+}
+
+.master-admin-detail-admin-name {
+  display: block;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #0f172a;
+}
+
+.master-admin-detail-admin-email {
+  font-size: 0.875rem;
+  color: var(--admin-accent, #b45309);
+  word-break: break-all;
+}
+
+.master-admin-detail-badge-inactive {
+  display: inline-block;
+  margin-left: 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.master-admin-category-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.master-admin-category-block {
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.master-admin-category-block:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.master-admin-category-block__title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 0.65rem;
+  color: #0f172a;
+}
+
+.master-admin-category-block__label,
+.master-admin-category-block__section .master-admin-category-block__label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+  margin: 0 0 0.35rem;
+}
+
+.master-admin-subcategory-list {
+  margin-top: 0.85rem;
+  padding-left: 0.75rem;
+  border-left: 3px solid #f1f5f9;
+}
+
+.master-admin-subcategory-item + .master-admin-subcategory-item {
+  margin-top: 1rem;
+}
+
+.master-admin-subcategory-item__name {
+  font-weight: 600;
+  margin: 0 0 0.35rem;
+  color: #334155;
+}
+
+.master-admin-simple-list > li + li {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+@media (max-width: 767.98px) {
+  .master-admin-primary-sidebar-school {
+    font-size: 0.75rem;
+  }
+}
+
+/* Master Admin — overview accordions */
+.master-admin-overview-accordion-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.master-admin-overview-accordion {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.master-admin-overview-accordion__summary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
+  color: #0f172a;
+  user-select: none;
+}
+
+.master-admin-overview-accordion__summary::-webkit-details-marker {
+  display: none;
+}
+
+.master-admin-overview-accordion__title {
+  flex: 1;
+  font-size: 0.9375rem;
+}
+
+.master-admin-overview-accordion__meta {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.master-admin-overview-accordion__chevron {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  transition: transform 0.2s ease;
+}
+
+.master-admin-overview-accordion[open] .master-admin-overview-accordion__chevron {
+  transform: rotate(180deg);
+}
+
+.master-admin-overview-accordion__summary:hover {
+  background: #f8fafc;
+}
+
+.master-admin-overview-accordion[open] .master-admin-overview-accordion__summary {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.master-admin-overview-accordion__body {
+  padding: 1rem 1rem 1.1rem;
+}
+
+.master-admin-accordion-entity-list > .master-admin-accordion-entity + .master-admin-accordion-entity {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.master-admin-accordion-entity__name {
+  margin: 0 0 0.35rem;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: #0f172a;
+}
+
+/* Master Admin — category / subcategory hub cards */
+.master-admin-category-hub-card {
+  width: 100%;
+  max-width: 320px;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  text-align: left;
+}
+
+.master-admin-category-hub-card__title {
+  margin: 0.85rem 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.master-admin-category-hub-card__meta {
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.master-admin-category-hub-card__subs {
+  margin-top: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  background: #f1f5f9;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #475569;
+}
+
+.master-admin-category-hub-card__subs li + li {
+  margin-top: 0.35rem;
+}
+
+.master-admin-category-hub-card__subs-empty {
+  margin-top: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  background: #f1f5f9;
+  font-size: 0.8125rem;
+  color: #94a3b8;
+}
+
+/* Master Admin — post view (new tab) */
+.master-admin-post-view-page {
+  min-height: 100dvh;
+  background: #f8fafc;
+}
+
+.master-admin-post-view-page__bar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+.master-admin-post-view-page__main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.master-admin-post-view-page__main--preview {
+  max-width: min(960px, 100%);
+}
+
+.master-admin-post-preview-panel {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem 1.5rem;
+}
+
+.master-admin-post-preview-panel__title {
+  margin: 0 0 0.25rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.master-admin-post-preview-panel__subtitle {
+  margin-bottom: 1rem;
+}
+
+.master-admin-post-preview-frame {
+  max-height: none;
+}
+
+/* Master Admin — school data tables (categories, etc.) */
+.master-admin-school-table-wrap {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  overflow: hidden;
+}
+
+.master-admin-school-table-wrap--posts {
+  overflow-x: hidden;
+}
+
+.master-admin-school-table-wrap--posts.admin-table-wrap {
+  margin: 0;
+  overflow-x: hidden;
+}
+
+.master-admin-posts-table {
+  table-layout: fixed;
+  width: 100%;
+  font-size: 0.8125rem;
+}
+
+.master-admin-posts-table thead th {
+  padding: 0.5rem 0.45rem;
+  font-size: 0.625rem;
+  letter-spacing: 0.03em;
+  white-space: normal;
+  line-height: 1.2;
+  vertical-align: bottom;
+}
+
+.master-admin-posts-table tbody td {
+  padding: 0.5rem 0.45rem;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.master-admin-posts-table .admin-table__strong {
+  font-size: inherit;
+  font-weight: 600;
+}
+
+.master-admin-posts-table .admin-pill {
+  font-size: 0.6875rem;
+  padding: 0.12rem 0.35rem;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.master-admin-posts-table__col-title {
+  width: 20%;
+}
+
+.master-admin-posts-table__col-view {
+  width: 4.5rem;
+}
+
+.master-admin-posts-table__published {
+  font-size: 0.75rem;
+  line-height: 1.25;
+}
+
+.master-admin-posts-table__preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.master-admin-posts-table__preview .bi {
+  font-size: 0.85em;
+}
+
+.master-admin-posts-page__header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+}
+
+.master-admin-post-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.85rem;
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.master-admin-post-breadcrumb__item--current {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.master-admin-post-breadcrumb__sep {
+  color: #cbd5e1;
+}
+
+.master-admin-post-target-picker__title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 1rem;
+}
+
+.master-admin-post-target-picker__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+.master-admin-post-target-picker--progressive {
+  max-width: 28rem;
+}
+
+.master-admin-post-target-picker__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.master-admin-post-target-picker__step {
+  width: 100%;
+}
+
+.master-admin-posts-hub.admin-posts-page--create {
+  padding-bottom: 1.5rem;
+}
+
+.master-admin-posts-hub .admin-create-post-page--embedded {
+  max-width: none;
+  width: 100%;
+}
+
+.master-admin-posts-page__row-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.master-admin-posts-school-filter.admin-panel .admin-panel__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0;
+}
+
+.master-admin-posts-school-filter .admin-form-label {
+  display: block;
+  width: 100%;
+  max-width: 24rem;
+  margin-bottom: 0.35rem;
+}
+
+.master-admin-posts-school-filter__select,
+.master-admin-posts-school-filter__field {
+  max-width: 24rem;
+  display: block;
+}
+
+.master-admin-posts-school-filter__field.form-control,
+.master-admin-posts-school-filter__field.form-select,
+select.master-admin-posts-school-filter__select {
+  width: 100%;
+}
+
+.master-admin-posts-school-filter__field--btn {
+  display: block;
+  width: 100%;
+}
+
+.master-admin-posts-table__col-actions {
+  width: 9.5rem;
+}
+
+.master-admin-posts-table__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.master-admin-posts-table__action--danger {
+  color: #b91c1c;
+}
+
+.master-admin-posts-table__action--danger:hover:not(:disabled) {
+  color: #991b1b;
+}
+
+.master-admin-posts-table__action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.master-admin-post-publish-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.master-admin-post-publish-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.master-admin-post-publish-modal__panel {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 40rem);
+  max-height: min(90vh, 520px);
+  overflow: auto;
+  margin: 0;
+}
+
+.master-admin-ext-publish-modal {
+  width: min(100%, 28rem);
+  max-width: 28rem;
+}
+
+.master-admin-ext-publish-modal__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.master-admin-ext-publish-modal__field .master-admin-posts-school-filter__select {
+  max-width: 100%;
+  width: 100%;
+}
+
+.master-admin-ext-publish-modal .form-select:disabled {
+  background-color: #f8fafc;
+  color: #0f172a;
+  opacity: 1;
+  cursor: default;
+}
+
+.master-admin-school-table thead th {
+  background: #f8fafc;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.master-admin-school-table__admins {
+  min-width: 200px;
+}
+
+.master-admin-table-admins li + li {
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.master-admin-table-admins__email {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--admin-accent, #b45309);
+  word-break: break-all;
+  text-decoration: none;
+}
+
+.master-admin-table-admins__email:hover {
+  text-decoration: underline;
+}
+
+.master-admin-table-meta {
+  margin-top: 0.2rem;
+  font-size: 0.8125rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.master-admin-table-sub-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.master-admin-table-sub-chip {
+  display: inline-block;
+  padding: 0.28rem 0.55rem;
+  border-radius: 6px;
+  background: #f1f5f9;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #475569;
+  line-height: 1.3;
+}
+
+.master-admin-school-table__subs {
+  min-width: 160px;
+  max-width: 360px;
+}
+
+.master-admin-section-table-body {
+  padding: 0;
+}
+
+.master-admin-detail-panel:has(.master-admin-school-table-wrap) {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.master-admin-detail-panel:has(.master-admin-school-table-wrap) .master-admin-section-table-body {
+  padding: 0;
+}
+
+.master-admin-table-parent-chip {
+  display: inline-block;
+  padding: 0.28rem 0.55rem;
+  border-radius: 6px;
+  background: #fff7ed;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #9a3412;
+  line-height: 1.3;
+}
+
+.master-admin-analytics-results {
+  scroll-margin-top: 5.5rem;
 }

@@ -353,8 +353,31 @@ model School {
   externalPipelineRequests         ExternalCategorySchoolPipelineRequest[]
   externalPostRequests             ExternalSchoolPostRequest[]
   externalSubcategoryLinks         ExternalCategorySubcategoryLinkRequest[]
+  schoolMasterAdmins               SchoolMasterAdmin[]
 
   @@map("schools")
+}
+
+/// Scoped master-admin delegate for a single school (provisioned via Developer layer).
+model SchoolMasterAdmin {
+  id                      String   @id @default(uuid())
+  schoolId                String
+  email                   String   @unique
+  password                String
+  firstName               String   @db.VarChar(120)
+  lastName                String   @db.VarChar(120)
+  accessMethod            String   @default("email") @db.VarChar(16) // email | sso
+  verificationDocumentUrl String?  @db.VarChar(2048)
+  allowedPortalSections   Json
+  isActive                Boolean  @default(true)
+  isFirstLogin            Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@map("school_master_admins")
 }
 
 model SchoolAdmin {

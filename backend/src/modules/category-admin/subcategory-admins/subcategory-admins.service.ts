@@ -6,6 +6,10 @@ import { EmailService } from '../../super-admin/schools/email.service';
 import { PlatformUserService } from '../../platform-user/platform-user.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+import {
+  findSubCategoryAssignments,
+  pickPrimarySubCategory,
+} from '../../subcategory-admin/subcategory-admin-relations.util';
 
 @Injectable()
 export class SubCategoryAdminsService {
@@ -35,25 +39,9 @@ export class SubCategoryAdminsService {
       throw new UnauthorizedException('You do not have access to any category');
     }
 
-    return this.prisma.subCategoryAdmin.findMany({
+    const admins = await this.prisma.subCategoryAdmin.findMany({
       where: { categoryId: { in: categoryIds } },
       include: {
-        subCategory: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        subCategories: {
-          include: {
-            subCategory: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
         category: {
           select: {
             id: true,
@@ -70,6 +58,20 @@ export class SubCategoryAdminsService {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    return Promise.all(
+      admins.map(async (admin) => {
+        const assigned = await findSubCategoryAssignments(this.prisma, admin.id, admin.subCategoryId);
+        const primary = pickPrimarySubCategory(assigned, admin.subCategoryId);
+        return {
+          ...admin,
+          subCategory: primary ? { id: primary.id, name: primary.name } : null,
+          subCategories: assigned.map((sc) => ({
+            subCategory: { id: sc.id, name: sc.name },
+          })),
+        };
+      }),
+    );
   }
 
   async findOne(id: string, categoryId: string, categoryAdminId: string) {
@@ -81,22 +83,6 @@ export class SubCategoryAdminsService {
     const subCategoryAdmin = await this.prisma.subCategoryAdmin.findFirst({
       where: { id, categoryId: { in: categoryIds } },
       include: {
-        subCategory: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        subCategories: {
-          include: {
-            subCategory: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
         category: {
           select: {
             id: true,
@@ -117,7 +103,20 @@ export class SubCategoryAdminsService {
       throw new NotFoundException(`Subcategory admin with id ${id} not found`);
     }
 
-    return subCategoryAdmin;
+    const assigned = await findSubCategoryAssignments(
+      this.prisma,
+      subCategoryAdmin.id,
+      subCategoryAdmin.subCategoryId,
+    );
+    const primary = pickPrimarySubCategory(assigned, subCategoryAdmin.subCategoryId);
+
+    return {
+      ...subCategoryAdmin,
+      subCategory: primary ? { id: primary.id, name: primary.name } : null,
+      subCategories: assigned.map((sc) => ({
+        subCategory: { id: sc.id, name: sc.name },
+      })),
+    };
   }
 
   async create(categoryId: string, categoryAdminId: string, createSubCategoryAdminDto: CreateSubCategoryAdminDto) {

@@ -1302,6 +1302,69 @@ export class EmailService {
     }
   }
 
+  async sendSchoolMasterAdminOnboardingEmail(params: {
+    adminEmail: string;
+    adminName: string;
+    schoolName: string;
+    schoolRefNum: string;
+    tempPassword: string;
+  }) {
+    const { adminEmail, adminName, schoolName, schoolRefNum, tempPassword } = params;
+    const frontend = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const loginUrl = `${frontend}/master-admin/login`;
+    const mailOptions = {
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: adminEmail,
+      subject: `SemBuzz – School Master Admin access for ${schoolName}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: 'Poppins', Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #1a1f2e; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .content { background-color: #f8f9fa; padding: 30px; border-radius: 0 0 8px 8px; }
+            .credentials { background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1a1f2e; }
+            .button { display: inline-block; padding: 12px 30px; background-color: #1a1f2e; color: white; text-decoration: none; border-radius: 50px; margin-top: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header"><h1>School Master Admin access</h1></div>
+            <div class="content">
+              <p>Hello ${adminName},</p>
+              <p>You have been granted scoped master admin access for <strong>${schoolName}</strong> (${schoolRefNum}) on SemBuzz.</p>
+              <div class="credentials">
+                <p><strong>Login URL:</strong> Master Admin portal</p>
+                <p><strong>User ID:</strong> ${adminEmail}</p>
+                <p><strong>Temporary password:</strong> <code>${tempPassword}</code></p>
+              </div>
+              <ol>
+                <li>Sign in at the master admin login page using your <strong>email</strong> and temporary password.</li>
+                <li>Create a new password on first login.</li>
+                <li>You will only see data and sidebar tools enabled for your school.</li>
+              </ol>
+              <p><a href="${loginUrl}" class="button">Sign in</a></p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.warn('[EmailService] School master admin credentials (SMTP unavailable):', {
+        adminEmail,
+        tempPassword,
+        loginUrl,
+      });
+      throw new Error('SMTP is not configured. Set SMTP_USER and SMTP_PASS in .env to send onboarding emails.');
+    }
+
+    await this.transporter.sendMail(mailOptions);
+  }
+
   async sendAdsAdminPasswordResetOtp(adminEmail: string, adminName: string, otp: string) {
     const mailOptions = {
       from: process.env.SMTP_FROM || process.env.SMTP_USER,
@@ -1781,6 +1844,7 @@ export class EmailService {
       meetingError?: string;
     },
     superAdminEmail?: string,
+    context?: { requesterRole?: string; schoolName?: string },
   ) {
     const requestTypeLabels: Record<string, string> = {
       'raise_issue': 'Raise an Issue with the Software',
@@ -1837,6 +1901,16 @@ export class EmailService {
       }
     }
 
+    if (context?.requesterRole) {
+      emailContent += `
+        <p><strong style="color: #1a1f2e;">Portal:</strong> <span style="color: #6c757d;">${context.requesterRole}</span></p>
+      `;
+    }
+    if (context?.schoolName) {
+      emailContent += `
+        <p><strong style="color: #1a1f2e;">School:</strong> <span style="color: #6c757d;">${context.schoolName}</span></p>
+      `;
+    }
     if (superAdminEmail) {
       emailContent += `
         <p><strong style="color: #1a1f2e;">Requested By:</strong> <span style="color: #6c757d;">${superAdminEmail}</span></p>
@@ -1855,7 +1929,7 @@ export class EmailService {
     const mailOptions = {
       from: process.env.SMTP_FROM || process.env.SMTP_USER,
       to: 'naveenreddyhosur921@gmail.com',
-      subject: `Support Request: ${requestType} - SemBuzz`,
+      subject: `Support Request: ${requestType}${context?.schoolName ? ` (${context.schoolName})` : ''} - SemBuzz`,
       html: `
         <!DOCTYPE html>
         <html>

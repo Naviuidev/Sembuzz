@@ -44,6 +44,11 @@ export const ADMIN_LOGIN_HERO_CONFIG: Record<
     heroSubtitle:
       'Manage platform-wide external categories and content outside the school hierarchy.',
   },
+  master: {
+    heroGreeting: 'Hello, Master Admin! 👋',
+    heroSubtitle:
+      'Operate across schools from one console — posts, ads, and school data when dedicated admins are not available.',
+  },
 };
 
 export type AdminLoginShellProps = {

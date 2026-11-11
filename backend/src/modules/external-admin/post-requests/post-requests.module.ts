@@ -21,5 +21,6 @@ import { ExternalAdminPostRequestsService } from './post-requests.service';
   ],
   controllers: [ExternalAdminPostRequestsController],
   providers: [ExternalAdminPostRequestsService, ExternalAdminGuard],
+  exports: [ExternalAdminPostRequestsService],
 })
 export class ExternalAdminPostRequestsModule {}

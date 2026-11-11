@@ -8,7 +8,9 @@ import { invalidateAdminActionItems } from '../services/admin-action-items.servi
 import {
   subcategoryAdminBlogsService,
   type CreateBlogContentBlock,
+  type CreateBlogDto,
 } from '../services/subcategory-admin-blogs.service';
+import type { SubCategoryAdminUser } from '../services/subcategory-admin-auth.service';
 import { CreateBlogLivePreview } from '../components/CreateBlogLivePreview';
 import type { ContentBlock } from '../services/public-blogs.service';
 import { imageSrc } from '../utils/image';
@@ -48,6 +50,26 @@ type ResubmitBlog = {
 };
 
 export type { ResubmitBlog };
+
+export type MasterBlogComposerConfig = {
+  panelStyle: CSSProperties;
+  /** Subcategories for the selected school (picker lives in the composer, like subcategory admin). */
+  subCategoryOptions: { id: string; name: string }[];
+  uploadImage: (file: File) => Promise<{ url: string }>;
+  onSubmit: (payload: CreateBlogDto, publish: boolean) => Promise<void>;
+  emptySubcategoryHint?: string;
+  initial?: {
+    subCategoryId?: string;
+    title?: string;
+    content?: string;
+    coverImageUrl?: string | null;
+    heroTitle?: string | null;
+    heroParagraph?: string | null;
+    heroButtonText?: string | null;
+    heroButtonLink?: string | null;
+    contentBlocks?: CreateBlogContentBlock[] | null;
+  };
+};
 
 const COL_OPTIONS = [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
 
@@ -120,28 +142,71 @@ function toPreviewBlocks(blocks: EditorBlock[]): ContentBlock[] {
   return list;
 }
 
-export function SubCategoryAdminPostBlogPanel({
+function apiBlocksToEditor(blocks: CreateBlogContentBlock[] | null | undefined): EditorBlock[] {
+  if (!blocks?.length) {
+    return [{ id: newId(), type: 'paragraph', value: '', cols: 12 }];
+  }
+  return blocks.map((b) => {
+    if (b.type === 'heading') {
+      return { id: newId(), type: 'heading', value: b.value ?? '', cols: b.cols ?? 12 };
+    }
+    if (b.type === 'paragraph') {
+      return { id: newId(), type: 'paragraph', value: b.value ?? '', cols: b.cols ?? 12 };
+    }
+    if (b.type === 'image') {
+      return {
+        id: newId(),
+        type: 'image',
+        cols: b.cols ?? 12,
+        alt: b.alt ?? '',
+        imageUrl: b.imageUrl,
+      };
+    }
+    if (b.type === 'heading_para') {
+      return {
+        id: newId(),
+        type: 'heading_para',
+        heading: b.heading ?? '',
+        paragraph: b.paragraph ?? '',
+        cols: b.cols ?? 12,
+      };
+    }
+    return { id: newId(), type: 'paragraph', value: '', cols: 12 };
+  });
+}
+
+function SubCategoryAdminPostBlogPanelInner({
   embedded = false,
   hubHeader,
   resubmitBlog,
   onSubmitted,
+  master,
+  user,
+  refreshUser,
 }: {
   embedded?: boolean;
   hubHeader?: ReactNode;
   resubmitBlog?: ResubmitBlog;
   onSubmitted?: () => void;
+  master?: MasterBlogComposerConfig;
+  user: SubCategoryAdminUser | null;
+  refreshUser?: () => Promise<void>;
 }) {
   const queryClient = useQueryClient();
-  const { user, refreshUser } = useSubCategoryAdminAuth();
-  const panelStyle = { '--admin-accent': ADMIN_PORTAL_ACCENTS.subcategory } as CSSProperties;
+  const panelStyle =
+    master?.panelStyle ?? ({ '--admin-accent': ADMIN_PORTAL_ACCENTS.subcategory } as CSSProperties);
 
-  const availableSubcategories =
-    user?.subCategories && user.subCategories.length > 0
+  const availableSubcategories = master
+    ? master.subCategoryOptions
+    : user?.subCategories && user.subCategories.length > 0
       ? user.subCategories
       : user?.subCategoryName
         ? [{ id: user.subCategoryId, name: user.subCategoryName }]
         : [];
-  const initialSubId = availableSubcategories[0]?.id ?? '';
+  const initialSubId =
+    master?.initial?.subCategoryId ?? master?.subCategoryOptions[0]?.id ?? availableSubcategories[0]?.id ?? '';
+
+  const uploadImageFn = master?.uploadImage ?? ((file: File) => subcategoryAdminBlogsService.uploadImage(file));
 
   const [subcategoryId, setSubcategoryId] = useState(initialSubId);
   const [title, setTitle] = useState('');
@@ -160,21 +225,50 @@ export function SubCategoryAdminPostBlogPanel({
   const [error, setError] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState<'mobile' | 'tablet' | 'web'>('mobile');
   const hasAppliedResubmit = useRef(false);
+  const hasAppliedMasterInitial = useRef(false);
 
   const previewBlocks = useMemo(() => toPreviewBlocks(blocks), [blocks]);
 
   useEffect(() => {
-    refreshUser().catch(console.error);
-  }, [refreshUser]);
+    if (!master && refreshUser) {
+      refreshUser().catch(console.error);
+    }
+  }, [master, refreshUser]);
 
   useEffect(() => {
+    if (!master?.initial || hasAppliedMasterInitial.current) return;
+    hasAppliedMasterInitial.current = true;
+    const init = master.initial;
+    setTitle(init.title ?? '');
+    setListingSummary(init.content ?? '');
+    setHeroTitle(init.heroTitle ?? '');
+    setHeroParagraph(init.heroParagraph ?? '');
+    setHeroButtonText(init.heroButtonText ?? '');
+    setHeroButtonLink(init.heroButtonLink ?? '');
+    if (init.subCategoryId) {
+      setSubcategoryId(init.subCategoryId);
+    }
+    if (init.coverImageUrl) {
+      setCoverUrl(init.coverImageUrl);
+      setCoverPreview(init.coverImageUrl);
+    }
+    setBlocks(apiBlocksToEditor(init.contentBlocks));
+  }, [master]);
+
+  useEffect(() => {
+    if (master && availableSubcategories.length) {
+      const keep =
+        availableSubcategories.find((s) => s.id === subcategoryId) ?? availableSubcategories[0];
+      if (keep && keep.id !== subcategoryId) setSubcategoryId(keep.id);
+      return;
+    }
     if (user && availableSubcategories.length && !resubmitBlog) {
       const sel =
         availableSubcategories.find((s) => s.id === subcategoryId) ||
         availableSubcategories[0];
       setSubcategoryId(sel.id);
     }
-  }, [user]);
+  }, [user, master, availableSubcategories, subcategoryId, resubmitBlog]);
 
   useEffect(() => {
     if (resubmitBlog && user && !hasAppliedResubmit.current) {
@@ -284,7 +378,7 @@ export function SubCategoryAdminPostBlogPanel({
       updateBlock(index, { localPreview: reader.result as string });
     reader.readAsDataURL(file);
     try {
-      const up = await subcategoryAdminBlogsService.uploadImage(file);
+      const up = await uploadImageFn(file);
       updateBlock(index, {
         imageUrl: up.url,
         file: undefined,
@@ -295,15 +389,18 @@ export function SubCategoryAdminPostBlogPanel({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const buildAndSend = async (publish: boolean) => {
     setError(null);
     if (!title.trim()) {
       setError('Title is required.');
       return;
     }
     if (!subcategoryId) {
-      setError('Select a subcategory.');
+      setError(
+        master
+          ? 'This school has no subcategory to attach the blog. Add a category/subcategory first.'
+          : 'Select a subcategory.',
+      );
       return;
     }
     const hasText =
@@ -324,13 +421,13 @@ export function SubCategoryAdminPostBlogPanel({
     try {
       let finalCover = coverUrl;
       if (coverFile) {
-        const up = await subcategoryAdminBlogsService.uploadImage(coverFile);
+        const up = await uploadImageFn(coverFile);
         finalCover = up.url;
       }
       const working = await Promise.all(
         blocks.map(async (b) => {
           if (b.type === 'image' && b.file && !b.imageUrl) {
-            const up = await subcategoryAdminBlogsService.uploadImage(b.file);
+            const up = await uploadImageFn(b.file);
             return {
               ...b,
               imageUrl: up.url,
@@ -342,7 +439,7 @@ export function SubCategoryAdminPostBlogPanel({
         }),
       );
       const finalBlocks = editorToApiBlocks(working);
-      await subcategoryAdminBlogsService.create({
+      const payload: CreateBlogDto = {
         subCategoryId: subcategoryId,
         title: title.trim(),
         content: listingSummary.trim() || undefined,
@@ -352,9 +449,14 @@ export function SubCategoryAdminPostBlogPanel({
         heroButtonText: heroButtonText.trim() || undefined,
         heroButtonLink: heroButtonLink.trim() || undefined,
         contentBlocks: finalBlocks.length ? finalBlocks : undefined,
-      });
-      await queryClient.invalidateQueries({ queryKey: ['subcategory-admin', 'blogs'] });
-      void invalidateAdminActionItems(queryClient, 'subcategory-admin');
+      };
+      if (master) {
+        await master.onSubmit(payload, publish);
+      } else {
+        await subcategoryAdminBlogsService.create(payload);
+        await queryClient.invalidateQueries({ queryKey: ['subcategory-admin', 'blogs'] });
+        void invalidateAdminActionItems(queryClient, 'subcategory-admin');
+      }
       if (onSubmitted) {
         onSubmitted();
       }
@@ -378,6 +480,11 @@ export function SubCategoryAdminPostBlogPanel({
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await buildAndSend(false);
   };
 
   const previewHeroTitle = heroTitle.trim() || title.trim() || 'Blog title';
@@ -408,19 +515,19 @@ export function SubCategoryAdminPostBlogPanel({
 
       <div
         className={`admin-create-post-layout admin-create-post-layout--blog${
-          embedded && !hubHeader ? ' admin-create-post-layout--embedded' : ''
+          embedded ? ' admin-create-post-layout--embedded' : ''
         }${hubHeader ? ' admin-create-post-layout--hub' : ''}`}
       >
         {hubHeader ? (
-          <div className="admin-create-post-header admin-create-post-layout__header admin-create-post-layout__header--hub">
-            {hubHeader}
-          </div>
+          <div className="admin-create-post-layout__header admin-create-post-layout__header--hub">{hubHeader}</div>
         ) : null}
         {!embedded && !hubHeader ? (
           <div className="admin-create-post-header admin-create-post-layout__header">
             <h1 className="admin-page-title">Post blog</h1>
             <p className="admin-page-subtitle mb-0">
-              Build your article with blocks, preview it, then submit for category admin approval.
+              {master
+                ? 'Build your article with blocks, preview it, then Save or Publish.'
+                : 'Build your article with blocks, preview it, then submit for category admin approval.'}
             </p>
           </div>
         ) : null}
@@ -428,13 +535,12 @@ export function SubCategoryAdminPostBlogPanel({
         <form id="subcategory-admin-blog-form" className="admin-create-post-main" onSubmit={handleSubmit}>
           <section className="admin-panel admin-create-post-section" style={panelStyle}>
             <div className="admin-panel__body">
-              {sectionHead(1, 'Audience & title')}
-              <div className="admin-notice admin-notice--info mb-3">
-                <p className="admin-form-label mb-1">Posting to subcategory</p>
+              {sectionHead(1, master ? 'Title & content' : 'Audience & title')}
+              {!master ? (
+                <div className="admin-notice admin-notice--info mb-3">
+                  <p className="admin-form-label mb-1">Posting to subcategory</p>
                   {availableSubcategories.length === 0 ? (
-                    <p className="small text-muted mb-0">
-                      No subcategory assigned. Contact your school admin.
-                    </p>
+                    <p className="small text-muted mb-0">No subcategory assigned. Contact your school admin.</p>
                   ) : availableSubcategories.length === 1 ? (
                     <p className="mb-0 fw-medium" style={{ color: '#1a1f2e' }}>
                       {availableSubcategories[0].name}
@@ -454,6 +560,13 @@ export function SubCategoryAdminPostBlogPanel({
                     </select>
                   )}
                 </div>
+              ) : availableSubcategories.length === 0 ? (
+                <div className="admin-notice admin-notice--info mb-3">
+                  <p className="small mb-0">
+                    {master.emptySubcategoryHint ?? 'No subcategories for this school. Add categories first.'}
+                  </p>
+                </div>
+              ) : null}
 
               <div className="mb-3">
                 <label className="admin-form-label" htmlFor="sca-blog-title">Title</label>
@@ -768,16 +881,28 @@ export function SubCategoryAdminPostBlogPanel({
       </div>
 
       <div className="admin-create-post-footer" style={panelStyle}>
-        <div className="admin-create-post-footer__actions ms-auto">
-          <button
-            type="submit"
-            form="subcategory-admin-blog-form"
-            className="admin-btn-primary"
-            disabled={submitting}
-          >
-            <i className="bi bi-send me-2" aria-hidden />
-            {submitting ? 'Submitting…' : 'Submit for approval'}
-          </button>
+        <div className="admin-create-post-footer__actions ms-auto d-flex flex-wrap gap-2">
+          {master ? (
+            <button
+              type="button"
+              className="admin-btn-primary"
+              disabled={submitting || !subcategoryId}
+              onClick={() => void buildAndSend(false)}
+            >
+              <i className="bi bi-save me-2" aria-hidden />
+              {submitting ? 'Saving…' : 'Save'}
+            </button>
+          ) : (
+            <button
+              type="submit"
+              form="subcategory-admin-blog-form"
+              className="admin-btn-primary"
+              disabled={submitting}
+            >
+              <i className="bi bi-send me-2" aria-hidden />
+              {submitting ? 'Submitting…' : 'Submit for approval'}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -785,7 +910,58 @@ export function SubCategoryAdminPostBlogPanel({
 
   if (embedded) return page;
   return <SubCategoryAdminLayout>{page}</SubCategoryAdminLayout>;
-};
+}
+
+export function SubCategoryAdminPostBlogPanel({
+  embedded = false,
+  hubHeader,
+  resubmitBlog,
+  onSubmitted,
+  masterComposer,
+}: {
+  embedded?: boolean;
+  hubHeader?: ReactNode;
+  resubmitBlog?: ResubmitBlog;
+  onSubmitted?: () => void;
+  masterComposer?: MasterBlogComposerConfig;
+}) {
+  if (masterComposer) {
+    return (
+      <SubCategoryAdminPostBlogPanelInner
+        embedded={embedded}
+        hubHeader={hubHeader}
+        onSubmitted={onSubmitted}
+        master={masterComposer}
+        user={null}
+      />
+    );
+  }
+  return <SubCategoryAdminPostBlogPanelWithAuth embedded={embedded} hubHeader={hubHeader} resubmitBlog={resubmitBlog} onSubmitted={onSubmitted} />;
+}
+
+function SubCategoryAdminPostBlogPanelWithAuth({
+  embedded,
+  hubHeader,
+  resubmitBlog,
+  onSubmitted,
+}: {
+  embedded?: boolean;
+  hubHeader?: ReactNode;
+  resubmitBlog?: ResubmitBlog;
+  onSubmitted?: () => void;
+}) {
+  const { user, refreshUser } = useSubCategoryAdminAuth();
+  return (
+    <SubCategoryAdminPostBlogPanelInner
+      embedded={embedded}
+      hubHeader={hubHeader}
+      resubmitBlog={resubmitBlog}
+      onSubmitted={onSubmitted}
+      user={user}
+      refreshUser={refreshUser}
+    />
+  );
+}
 
 export const SubCategoryAdminPostBlog = () => {
   const location = useLocation();

@@ -6,6 +6,7 @@ import { CategoryAdminAuthProvider, useCategoryAdminAuth } from './contexts/Cate
 import { SubCategoryAdminAuthProvider, useSubCategoryAdminAuth } from './contexts/SubCategoryAdminAuthContext';
 import { AdsAdminAuthProvider, useAdsAdminAuth } from './contexts/AdsAdminAuthContext';
 import { ExternalAdminAuthProvider, useExternalAdminAuth } from './contexts/ExternalAdminAuthContext';
+import { MasterAdminAuthProvider, useMasterAdminAuth } from './contexts/MasterAdminAuthContext';
 import { UserAuthProvider } from './contexts/UserAuthContext';
 import { ChatPopupProvider } from './contexts/ChatPopupContext';
 import { StudentChatGroupsWidget } from './components/StudentChatGroupsWidget';
@@ -82,6 +83,26 @@ import { ExternalAdminPrivacy } from './pages/ExternalAdminPrivacy';
 import { ExternalAdminPosts } from './pages/ExternalAdminPosts';
 import { SchoolAdminExternalConfig } from './pages/SchoolAdminExternalConfig';
 import { ExternalAdminProtectedRoute } from './components/ExternalAdminProtectedRoute';
+import { MasterAdminProtectedRoute } from './components/MasterAdminProtectedRoute';
+import { MasterAdminLogin } from './pages/MasterAdminLogin';
+import { MasterAdminDashboard } from './pages/MasterAdminDashboard';
+import { MasterAdminSchools } from './pages/MasterAdminSchools';
+import { MasterAdminSchoolDetail } from './pages/MasterAdminSchoolDetail';
+import { MasterAdminPostView } from './pages/MasterAdminPostView';
+import { MasterAdminMainSection } from './pages/MasterAdminMainSection';
+import { MasterAdminPostsPage } from './pages/MasterAdminPostsPage';
+import { MasterAdminSocialPage } from './pages/MasterAdminSocialPage';
+import { MasterAdminUsersPage } from './pages/MasterAdminUsersPage';
+import { MasterAdminCategoriesPage } from './pages/MasterAdminCategoriesPage';
+import { MasterAdminExternalConfigPage } from './pages/MasterAdminExternalConfigPage';
+import { MasterAdminUpcomingPage } from './pages/MasterAdminUpcomingPage';
+import { MasterAdminAnalyticsPage } from './pages/MasterAdminAnalyticsPage';
+import { MasterAdminRaiseRequestPage } from './pages/MasterAdminRaiseRequestPage';
+import { MasterAdminBlogsPage } from './pages/MasterAdminBlogsPage';
+import { MasterAdminDeveloperLayerPage } from './pages/MasterAdminDeveloperLayerPage';
+import { MasterAdminSetPassword } from './pages/MasterAdminSetPassword';
+import { MASTER_ADMIN_SCHOOL_SECTIONS } from './constants/masterAdminSchoolSections';
+import { defaultPortalPathForUser } from './utils/masterAdminPortalAccess';
 import { Contact } from './pages/Contact';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { TermsOfService } from './pages/TermsOfService';
@@ -652,6 +673,182 @@ const ExternalAdminRoutes = () => {
   );
 };
 
+const MasterAdminRoutes = () => {
+  const { isAuthenticated, loading, user } = useMasterAdminAuth();
+
+  if (loading) {
+    return <div className="d-flex align-items-center justify-content-center min-h-screen">Loading...</div>;
+  }
+
+  const loginRedirect =
+    isAuthenticated && user
+      ? user.isFirstLogin && user.role === 'school_master_admin'
+        ? '/master-admin/set-password'
+        : defaultPortalPathForUser(user)
+      : null;
+
+  return (
+    <Routes>
+      <Route
+        path="login"
+        element={loginRedirect ? <Navigate to={loginRedirect} replace /> : <MasterAdminLogin />}
+      />
+      <Route
+        path="set-password"
+        element={
+          <MasterAdminProtectedRoute>
+            <MasterAdminSetPassword />
+          </MasterAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="dashboard"
+        element={
+          <MasterAdminProtectedRoute>
+            <MasterAdminDashboard />
+          </MasterAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="schools"
+        element={
+          <MasterAdminProtectedRoute>
+            <MasterAdminSchools />
+          </MasterAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="schools/:schoolId"
+        element={
+          <MasterAdminProtectedRoute>
+            <MasterAdminSchoolDetail />
+          </MasterAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="schools/:schoolId/:section"
+        element={
+          <MasterAdminProtectedRoute>
+            <MasterAdminSchoolDetail />
+          </MasterAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="view-post/:eventId"
+        element={
+          <MasterAdminProtectedRoute>
+            <MasterAdminPostView />
+          </MasterAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="posts"
+        element={
+          <MasterAdminProtectedRoute>
+            <MasterAdminPostsPage />
+          </MasterAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="social"
+        element={
+          <MasterAdminProtectedRoute>
+            <MasterAdminSocialPage />
+          </MasterAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="users"
+        element={
+          <MasterAdminProtectedRoute>
+            <MasterAdminUsersPage />
+          </MasterAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="categories"
+        element={
+          <MasterAdminProtectedRoute>
+            <MasterAdminCategoriesPage />
+          </MasterAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="external-config"
+        element={
+          <MasterAdminProtectedRoute>
+            <MasterAdminExternalConfigPage />
+          </MasterAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="upcoming"
+        element={
+          <MasterAdminProtectedRoute>
+            <MasterAdminUpcomingPage />
+          </MasterAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="analytics"
+        element={
+          <MasterAdminProtectedRoute>
+            <MasterAdminAnalyticsPage />
+          </MasterAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="raise-request"
+        element={
+          <MasterAdminProtectedRoute>
+            <MasterAdminRaiseRequestPage />
+          </MasterAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="blogs"
+        element={
+          <MasterAdminProtectedRoute>
+            <MasterAdminBlogsPage />
+          </MasterAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="developer-layer"
+        element={
+          <MasterAdminProtectedRoute>
+            <MasterAdminDeveloperLayerPage />
+          </MasterAdminProtectedRoute>
+        }
+      />
+      {MASTER_ADMIN_SCHOOL_SECTIONS.filter(
+        (section) =>
+          section.id !== 'posts' &&
+          section.id !== 'social' &&
+          section.id !== 'users' &&
+          section.id !== 'categories' &&
+          section.id !== 'external-config' &&
+          section.id !== 'upcoming' &&
+          section.id !== 'analytics' &&
+          section.id !== 'raise-request' &&
+          section.id !== 'blogs',
+      ).map((section) => (
+        <Route
+          key={section.id}
+          path={section.id}
+          element={
+            <MasterAdminProtectedRoute>
+              <MasterAdminMainSection sectionId={section.id} />
+            </MasterAdminProtectedRoute>
+          }
+        />
+      ))}
+      <Route path="" element={<Navigate to="/master-admin/login" replace />} />
+      <Route path="*" element={<Navigate to="/master-admin/dashboard" replace />} />
+    </Routes>
+  );
+};
+
 const AdsAdminRoutes = () => {
   const { isAuthenticated, user, loading } = useAdsAdminAuth();
 
@@ -740,6 +937,9 @@ const AppRoutes = () => {
 
       {/* External Admin Routes */}
       <Route path="/external-admin/*" element={<ExternalAdminRoutes />} />
+
+      {/* Master Admin Routes */}
+      <Route path="/master-admin/*" element={<MasterAdminRoutes />} />
       
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
@@ -756,6 +956,7 @@ function App() {
             <SubCategoryAdminAuthProvider>
               <AdsAdminAuthProvider>
               <ExternalAdminAuthProvider>
+              <MasterAdminAuthProvider>
                 <UserAuthProvider>
                 <BrowserRouter>
                   <ChatPopupProvider>
@@ -766,6 +967,7 @@ function App() {
                   </ChatPopupProvider>
                 </BrowserRouter>
                 </UserAuthProvider>
+              </MasterAdminAuthProvider>
               </ExternalAdminAuthProvider>
               </AdsAdminAuthProvider>
             </SubCategoryAdminAuthProvider>

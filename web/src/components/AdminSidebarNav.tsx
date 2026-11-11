@@ -7,6 +7,10 @@ export type AdminSidebarItem = {
   icon: string;
   title?: string;
   iconNode?: ReactNode;
+  /** Active when path matches or pathname ends with /sectionId (e.g. school drill-down). */
+  sectionId?: string;
+  /** Active only on exact path — not on child routes (e.g. /schools but not /schools/:id). */
+  exactPathOnly?: boolean;
 };
 
 export function AdminSidebarNav({
@@ -22,15 +26,22 @@ export function AdminSidebarNav({
 }) {
   const location = useLocation();
 
-  const isActive = (path: string) =>
-    matchActive === 'prefix'
-      ? location.pathname === path || location.pathname.startsWith(`${path}/`)
-      : location.pathname === path;
+  const isActive = (item: AdminSidebarItem) => {
+    const { pathname } = location;
+    if (item.exactPathOnly) return pathname === item.path;
+    if (item.sectionId) {
+      return pathname === item.path || pathname.endsWith(`/${item.sectionId}`);
+    }
+    if (matchActive === 'prefix') {
+      return pathname === item.path || pathname.startsWith(`${item.path}/`);
+    }
+    return pathname === item.path;
+  };
 
   const style = { '--sidebar-accent': accent } as CSSProperties;
 
   const renderItem = (item: AdminSidebarItem) => {
-    const active = isActive(item.path);
+    const active = isActive(item);
     return (
       <li key={item.path} className="admin-sidebar-item">
         <Link
